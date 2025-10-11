@@ -11,6 +11,7 @@ struct WelcomeView: View {
     @State private var showingSignIn = false
     @State private var showingSignUp = false
     @State private var navigateToGames = false
+    @State private var showMainTabPreview = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -24,10 +25,14 @@ struct WelcomeView: View {
                         .font(.system(size: 72, weight: .medium))
                         .foregroundColor(Color("AccentPrimary"))
                     
-                    // App Logo Text
+                    // App Logo Text (Hidden tap for MainTab preview)
                     Text("DanDarts")
                         .font(.system(size: 42, weight: .bold, design: .default))
                         .foregroundColor(Color("TextPrimary"))
+                        .onTapGesture(count: 3) {
+                            // Triple tap to show MainTabView preview
+                            showMainTabPreview = true
+                        }
                     
                     // Tagline
                     Text("Focus on the fun, not the math")
@@ -84,7 +89,7 @@ struct WelcomeView: View {
                     
                     // Continue as Guest Button
                     Button(action: {
-                        navigateToGames = true
+                        showMainTabPreview = true
                     }) {
                         Text("Continue as Guest")
                             .font(.system(size: 16, weight: .medium))
@@ -136,6 +141,11 @@ struct WelcomeView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color("BackgroundPrimary"))
+        }
+        .fullScreenCover(isPresented: $showMainTabPreview) {
+            // Clean MainTabView Preview - no extra UI elements
+            MainTabView()
+                .environmentObject(AuthService())
         }
     }
 }
