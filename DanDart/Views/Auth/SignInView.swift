@@ -50,6 +50,16 @@ struct SignInView: View {
                                 .keyboardType(.emailAddress)
                                 .textContentType(.emailAddress)
                                 .autocapitalization(.none)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .submitLabel(.next)
+                                .onChange(of: email) { oldValue, newValue in
+                                    // Fix Swedish keyboard @ symbol issue
+                                    let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
+                                    if correctedEmail != newValue {
+                                        email = correctedEmail
+                                    }
+                                }
                         }
                         
                         // Password SecureField
@@ -252,7 +262,7 @@ struct CustomTextFieldStyle: TextFieldStyle {
             .foregroundColor(Color("TextPrimary"))
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color("BackgroundSecondary"))
+            .background(Color("InputBackground"))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

@@ -9,6 +9,34 @@ import SwiftUI
 
 struct SignUpView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authService: AuthService
+    
+    // MARK: - Form State
+    @State private var displayName = ""
+    @State private var nickname = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmPassword = ""
+    
+    // MARK: - UI State
+    @State private var showErrors = false
+    @State private var errorMessage = ""
+    @State private var showingProfileSetup = false
+    
+    // MARK: - Computed Properties
+    private var isFormValid: Bool {
+        !displayName.isEmpty &&
+        !nickname.isEmpty &&
+        nickname.count >= 3 &&
+        !email.isEmpty &&
+        email.contains("@") &&
+        password.count >= 8 &&
+        confirmPassword == password
+    }
+    
+    private var isPasswordValid: Bool {
+        password.count >= 8
+    }
     
     var body: some View {
         NavigationView {
@@ -39,12 +67,12 @@ struct SignUpView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color("TextSecondary"))
                             
-                            TextField("Your full name", text: .constant(""))
+                            TextField("Your full name", text: $displayName)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(Color("TextPrimary"))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
-                                .background(Color("BackgroundSecondary"))
+                                .background(Color("InputBackground"))
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
@@ -67,7 +95,7 @@ struct SignUpView: View {
                                     .padding(.leading, 16)
                                     .padding(.trailing, 4)
                                 
-                                TextField("username", text: .constant(""))
+                                TextField("username", text: $nickname)
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(Color("TextPrimary"))
                                     .textContentType(.username)
@@ -75,7 +103,7 @@ struct SignUpView: View {
                                     .padding(.trailing, 16)
                                     .padding(.vertical, 14)
                             }
-                            .background(Color("BackgroundSecondary"))
+                            .background(Color("InputBackground"))
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -89,12 +117,12 @@ struct SignUpView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color("TextSecondary"))
                             
-                            TextField("Enter your email", text: .constant(""))
+                            TextField("Enter your email", text: $email)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(Color("TextPrimary"))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
-                                .background(Color("BackgroundSecondary"))
+                                .background(Color("InputBackground"))
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
@@ -103,6 +131,16 @@ struct SignUpView: View {
                                 .keyboardType(.emailAddress)
                                 .textContentType(.emailAddress)
                                 .autocapitalization(.none)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .submitLabel(.next)
+                                .onChange(of: email) { oldValue, newValue in
+                                    // Fix Swedish keyboard @ symbol issue
+                                    let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
+                                    if correctedEmail != newValue {
+                                        email = correctedEmail
+                                    }
+                                }
                         }
                         
                         // Password SecureField
@@ -111,12 +149,12 @@ struct SignUpView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color("TextSecondary"))
                             
-                            SecureField("Create a password", text: .constant(""))
+                            SecureField("Create a password", text: $password)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(Color("TextPrimary"))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
-                                .background(Color("BackgroundSecondary"))
+                                .background(Color("InputBackground"))
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
@@ -131,12 +169,12 @@ struct SignUpView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color("TextSecondary"))
                             
-                            SecureField("Confirm your password", text: .constant(""))
+                            SecureField("Confirm your password", text: $confirmPassword)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(Color("TextPrimary"))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
-                                .background(Color("BackgroundSecondary"))
+                                .background(Color("InputBackground"))
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
@@ -152,12 +190,12 @@ struct SignUpView: View {
                                 .foregroundColor(Color("TextSecondary"))
                             
                             HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
+                                Image(systemName: isPasswordValid ? "checkmark.circle.fill" : "circle")
                                     .font(.system(size: 12))
-                                    .foregroundColor(.green.opacity(0.6))
+                                    .foregroundColor(isPasswordValid ? .green : Color("TextSecondary").opacity(0.6))
                                 Text("At least 8 characters")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(isPasswordValid ? .green : Color("TextSecondary"))
                                 Spacer()
                             }
                         }
@@ -165,28 +203,99 @@ struct SignUpView: View {
                     }
                     .padding(.horizontal, 32)
                     
+                    // Error Message
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    
                     // Create Account Button
                     VStack(spacing: 16) {
                         Button(action: {
-                            // TODO: Implement sign up action
+                            Task {
+                                await handleSignUp()
+                            }
                         }) {
-                            Text("Create Account")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color("AccentPrimary"), Color("AccentPrimary").opacity(0.8)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
+                            HStack {
+                                if authService.isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                }
+                                Text(authService.isLoading ? "Creating Account..." : "Create Account")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color("AccentPrimary"), Color("AccentPrimary").opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
-                                .cornerRadius(25)
+                            )
+                            .cornerRadius(25)
                         }
+                        .disabled(!isFormValid || authService.isLoading)
+                        .opacity((isFormValid && !authService.isLoading) ? 1.0 : 0.6)
                         .scaleEffect(1.0)
                         .animation(.easeInOut(duration: 0.1), value: false)
                     }
+                    .padding(.horizontal, 32)
+                    
+                    // OR Divider
+                    HStack {
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                        
+                        Text("OR")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                            .padding(.horizontal, 16)
+                        
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                    }
+                    .padding(.horizontal, 32)
+                    
+                    // Google Sign Up Button
+                    Button(action: {
+                        Task {
+                            await handleGoogleSignUp()
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            if authService.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: Color("TextPrimary")))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(Color("TextPrimary"))
+                            }
+                            
+                            Text(authService.isLoading ? "Signing up with Google..." : "Continue with Google")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Color("TextPrimary"))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color("BackgroundSecondary"))
+                        .cornerRadius(25)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 25)
+                                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .disabled(authService.isLoading)
+                    .opacity(authService.isLoading ? 0.6 : 1.0)
                     .padding(.horizontal, 32)
                     
                     Spacer(minLength: 20)
@@ -218,6 +327,87 @@ struct SignUpView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingProfileSetup) {
+            ProfileSetupView()
+                .environmentObject(authService)
+        }
+    }
+    
+    // MARK: - Actions
+    private func handleSignUp() async {
+        showErrors = true
+        errorMessage = ""
+        
+        guard isFormValid else {
+            errorMessage = "Please fill in all fields correctly"
+            return
+        }
+        
+        do {
+            // Call AuthService to create the account
+            try await authService.signUp(
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: password,
+                displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+                nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            
+            // Success! Navigate to Profile Setup
+            showingProfileSetup = true
+            
+        } catch let error as AuthError {
+            // Handle specific auth errors
+            switch error {
+            case .emailAlreadyExists:
+                errorMessage = "An account with this email already exists"
+            case .nicknameAlreadyExists:
+                errorMessage = "This nickname is already taken"
+            case .weakPassword:
+                errorMessage = "Password is too weak. Please choose a stronger password"
+            case .invalidEmail:
+                errorMessage = "Please enter a valid email address"
+            case .networkError:
+                errorMessage = "Network error. Please check your connection and try again"
+            default:
+                errorMessage = "Failed to create account. Please try again"
+            }
+        } catch {
+            // Handle unexpected errors
+            errorMessage = "An unexpected error occurred. Please try again"
+        }
+    }
+    
+    private func handleGoogleSignUp() async {
+        errorMessage = ""
+        
+        do {
+            // Call AuthService Google OAuth
+            let isNewUser = try await authService.signInWithGoogle()
+            
+            if isNewUser {
+                // New user - navigate to Profile Setup
+                showingProfileSetup = true
+            } else {
+                // Existing user - dismiss and navigate to main app
+                dismiss()
+            }
+            
+        } catch let error as AuthError {
+            // Handle specific OAuth errors
+            switch error {
+            case .oauthCancelled:
+                // Don't show error for cancelled OAuth
+                break
+            case .oauthFailed:
+                errorMessage = "Google sign in failed. Please try again"
+            case .networkError:
+                errorMessage = "Network error. Please check your connection and try again"
+            default:
+                errorMessage = "Failed to sign in with Google. Please try again"
+            }
+        } catch {
+            errorMessage = "An unexpected error occurred. Please try again"
+        }
     }
 }
 
@@ -227,14 +417,17 @@ struct SignUpView: View {
 // MARK: - Preview
 #Preview {
     SignUpView()
+        .environmentObject(AuthService())
 }
 
 #Preview("Sign Up - Dark") {
     SignUpView()
+        .environmentObject(AuthService())
         .preferredColorScheme(.dark)
 }
 
 #Preview("Sign Up - Light") {
     SignUpView()
+        .environmentObject(AuthService())
         .preferredColorScheme(.light)
 }

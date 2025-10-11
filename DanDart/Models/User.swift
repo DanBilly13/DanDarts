@@ -11,10 +11,10 @@ struct User: Codable, Identifiable {
     let id: UUID
     let displayName: String
     let nickname: String
-    let handle: String?
-    let avatarURL: String?
+    var handle: String?
+    var avatarURL: String?
     let createdAt: Date
-    let lastSeenAt: Date?
+    var lastSeenAt: Date?
     
     // Stats properties (will be fetched separately from player_stats table)
     var totalWins: Int = 0

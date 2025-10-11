@@ -9,9 +9,22 @@ import SwiftUI
 
 @main
 struct DanDartApp: App {
+    @StateObject private var authService = AuthService()
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(authService)
+                .onOpenURL { url in
+                    // Handle OAuth redirect URLs
+                    if url.scheme == "dandart" && url.host == "auth" {
+                        // Supabase SDK will automatically handle the OAuth callback
+                        // The session will be established and AuthService will be notified
+                        Task {
+                            await authService.checkSession()
+                        }
+                    }
+                }
         }
     }
 }

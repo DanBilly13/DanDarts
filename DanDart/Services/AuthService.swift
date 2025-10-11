@@ -162,17 +162,84 @@ class AuthService: ObservableObject {
     }
     
     /// Sign in with Google OAuth
-    func signInWithGoogle() async throws {
+    func signInWithGoogle() async throws -> Bool {
         isLoading = true
         defer { isLoading = false }
         
-        // TODO: Implement Google OAuth sign in
-        // 1. Call Supabase Google OAuth flow
-        // 2. Handle OAuth callback
-        // 3. Fetch/create user profile
-        // 4. Set authentication state
-        
-        throw AuthError.notImplemented
+        do {
+            // 1. Initiate Google OAuth flow with Supabase
+            let session = try await supabaseService.client.auth.signInWithOAuth(
+                provider: .google,
+                redirectTo: URL(string: "dandart://auth/callback")
+            )
+            
+            // 2. Check if user profile exists in users table
+            let userId = session.user.id
+            
+            do {
+                // Try to fetch existing user profile
+                let existingUser: User = try await supabaseService.client
+                    .from("users")
+                    .select()
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                    .value
+                
+                // User exists, set authentication state
+                currentUser = existingUser
+                updateAuthenticationState()
+                
+                // Return false to indicate existing user (navigate to GamesTab)
+                return false
+                
+            } catch {
+                // User doesn't exist, create new profile with Google data
+                let googleEmail = session.user.email ?? ""
+                let googleName = session.user.userMetadata["full_name"] as? String ?? ""
+                
+                // Generate a unique nickname from email or name
+                let baseNickname = generateNicknameFromGoogle(email: googleEmail, name: googleName)
+                let uniqueNickname = try await ensureUniqueNickname(baseNickname)
+                
+                let newUser = User(
+                    id: userId,
+                    displayName: googleName.isEmpty ? "Google User" : googleName,
+                    nickname: uniqueNickname,
+                    handle: nil, // Will be set in Profile Setup
+                    avatarURL: session.user.userMetadata["avatar_url"] as? String,
+                    createdAt: Date(),
+                    lastSeenAt: Date(),
+                    totalWins: 0,
+                    totalLosses: 0
+                )
+                
+                try await supabaseService.client
+                    .from("users")
+                    .insert(newUser)
+                    .execute()
+                
+                // Set authentication state
+                currentUser = newUser
+                updateAuthenticationState()
+                
+                // Return true to indicate new user (navigate to Profile Setup)
+                return true
+            }
+            
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            // Handle OAuth-specific errors
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("cancelled") || errorMessage.contains("cancel") {
+                throw AuthError.oauthCancelled
+            } else if errorMessage.contains("network") || errorMessage.contains("connection") {
+                throw AuthError.networkError
+            } else {
+                throw AuthError.oauthFailed
+            }
+        }
     }
     
     /// Check for existing session on app launch
@@ -238,6 +305,69 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Update user profile information
+    func updateProfile(handle: String?, bio: String?, avatarIcon: String?) async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let currentUser = currentUser else {
+            throw AuthError.userNotFound
+        }
+        
+        do {
+            // Create updated user object
+            var updatedUser = currentUser
+            
+            if let newHandle = handle?.trimmingCharacters(in: .whitespacesAndNewlines), !newHandle.isEmpty {
+                // Validate handle format
+                guard newHandle.count >= 3 && newHandle.count <= 20 else {
+                    throw AuthError.invalidNickname
+                }
+                guard newHandle.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }) else {
+                    throw AuthError.invalidNickname
+                }
+                updatedUser.handle = newHandle
+            }
+            
+            if let newBio = bio?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                // For now, we'll store bio in a field we have available
+                // In the future, add a bio field to the User model and database
+                // For now, we'll skip bio updates until the User model is extended
+                // When bio field is added: updatedUser.bio = String(newBio.prefix(200))
+            }
+            
+            if let newAvatarIcon = avatarIcon {
+                // For now, we'll store the SF Symbol name as a string
+                // In the future, this could be a URL to an uploaded image
+                updatedUser.avatarURL = newAvatarIcon
+            }
+            
+            // Update lastSeenAt
+            updatedUser.lastSeenAt = Date()
+            
+            // Update user profile in Supabase
+            try await supabaseService.client
+                .from("users")
+                .update(updatedUser)
+                .eq("id", value: currentUser.id)
+                .execute()
+            
+            // Update local state
+            self.currentUser = updatedUser
+            
+        } catch let error as PostgrestError {
+            // Handle database-specific errors
+            if error.message.contains("duplicate key") && error.message.contains("handle") {
+                throw AuthError.nicknameAlreadyExists
+            }
+            throw AuthError.networkError
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            throw AuthError.networkError
+        }
+    }
+    
     // MARK: - Private Helper Methods
     
     /// Validate sign up input parameters
@@ -290,6 +420,71 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Generate a nickname from Google OAuth data
+    private func generateNicknameFromGoogle(email: String, name: String) -> String {
+        // Try to use name first, then email username
+        if !name.isEmpty {
+            // Clean the name: remove spaces, special chars, make lowercase
+            let cleanName = name
+                .lowercased()
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "[^a-zA-Z0-9_]", with: "", options: .regularExpression)
+            
+            if cleanName.count >= 3 {
+                return String(cleanName.prefix(20)) // Max 20 chars
+            }
+        }
+        
+        // Fallback to email username
+        if let emailUsername = email.split(separator: "@").first {
+            let cleanUsername = String(emailUsername)
+                .lowercased()
+                .replacingOccurrences(of: "[^a-zA-Z0-9_]", with: "", options: .regularExpression)
+            
+            if cleanUsername.count >= 3 {
+                return String(cleanUsername.prefix(20))
+            }
+        }
+        
+        // Final fallback
+        return "user\(Int.random(in: 1000...9999))"
+    }
+    
+    /// Ensure nickname is unique by checking database and adding numbers if needed
+    private func ensureUniqueNickname(_ baseNickname: String) async throws -> String {
+        var nickname = baseNickname
+        var counter = 1
+        
+        while try await nicknameExists(nickname) {
+            nickname = "\(baseNickname)\(counter)"
+            counter += 1
+            
+            // Prevent infinite loop
+            if counter > 999 {
+                nickname = "user\(Int.random(in: 10000...99999))"
+                break
+            }
+        }
+        
+        return nickname
+    }
+    
+    /// Check if nickname already exists in database
+    private func nicknameExists(_ nickname: String) async throws -> Bool {
+        do {
+            let _: [User] = try await supabaseService.client
+                .from("users")
+                .select("id")
+                .eq("nickname", value: nickname)
+                .execute()
+                .value
+            
+            return true // If we get here, nickname exists
+        } catch {
+            return false // If query fails, assume nickname doesn't exist
+        }
+    }
+    
     /// Update authentication state based on current user
     private func updateAuthenticationState() {
         isAuthenticated = currentUser != nil
@@ -315,6 +510,8 @@ enum AuthError: LocalizedError {
     case invalidDisplayName
     case invalidNickname
     case sessionExpired
+    case oauthCancelled
+    case oauthFailed
     
     var errorDescription: String? {
         switch self {
@@ -340,6 +537,10 @@ enum AuthError: LocalizedError {
             return "Nickname must be 3-20 characters and contain only letters, numbers, and underscores"
         case .sessionExpired:
             return "Your session has expired. Please sign in again"
+        case .oauthCancelled:
+            return "Sign in was cancelled"
+        case .oauthFailed:
+            return "Google sign in failed. Please try again"
         }
     }
 }
