@@ -47,9 +47,8 @@ class AuthService: ObservableObject {
                 password: password
             )
             
-            guard let user = authResponse.user else {
-                throw AuthError.userNotFound
-            }
+            // Get the user from the auth response
+            let user = authResponse.user
             
             // 2. Create user profile in the users table
             let newUser = User(
@@ -59,7 +58,9 @@ class AuthService: ObservableObject {
                 handle: nil, // Can be set later in profile setup
                 avatarURL: nil,
                 createdAt: Date(),
-                lastSeenAt: Date()
+                lastSeenAt: Date(),
+                totalWins: 0,
+                totalLosses: 0
             )
             
             try await supabaseService.client
@@ -110,14 +111,54 @@ class AuthService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // TODO: Implement sign in logic
-        // 1. Call supabase.auth.signIn
-        // 2. Fetch user profile from profiles table
-        // 3. Store session in Keychain
-        // 4. Set currentUser and isAuthenticated
-        // 5. Add error handling
-        
-        throw AuthError.notImplemented
+        do {
+            // Validate input
+            try validateSignInInput(email: email, password: password)
+            
+            // 1. Authenticate with Supabase
+            let authResponse = try await supabaseService.client.auth.signIn(
+                email: email,
+                password: password
+            )
+            
+            // Get the authenticated user
+            let user = authResponse.user
+            
+            // 2. Fetch user profile from users table
+            let userProfile: User = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: user.id)
+                .single()
+                .execute()
+                .value
+            
+            // 3. Store session in Keychain (handled by Supabase SDK automatically)
+            
+            // 4. Set current user and authentication state
+            currentUser = userProfile
+            updateAuthenticationState()
+            
+        } catch let error as PostgrestError {
+            // Handle database-specific errors
+            if error.message.contains("No rows") || error.message.contains("not found") {
+                throw AuthError.userNotFound
+            }
+            throw AuthError.networkError
+        } catch let error as AuthError {
+            // Re-throw our custom auth errors
+            throw error
+        } catch {
+            // Handle Supabase auth errors
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("invalid") && (errorMessage.contains("email") || errorMessage.contains("password") || errorMessage.contains("credentials")) {
+                throw AuthError.invalidCredentials
+            } else if errorMessage.contains("network") || errorMessage.contains("connection") {
+                throw AuthError.networkError
+            } else {
+                throw AuthError.invalidCredentials
+            }
+        }
     }
     
     /// Sign in with Google OAuth
@@ -139,15 +180,43 @@ class AuthService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // TODO: Implement session check
-        // 1. Check Keychain for existing session
-        // 2. Validate session with Supabase
-        // 3. Fetch user profile if valid
-        // 4. Set authentication state
-        // 5. Handle expired sessions
-        
-        // For now, set to not authenticated
-        await updateAuthenticationState()
+        do {
+            // 1. Check for existing session (Supabase SDK handles Keychain automatically)
+            // 2. Validate session with Supabase
+            let session = try await supabaseService.client.auth.session
+            
+            // Check if we have a valid session
+            guard let currentSession = session else {
+                // No session found, user is not authenticated
+                await clearAuthenticationState()
+                return
+            }
+            
+            // Check if session is expired
+            if currentSession.expiresAt < Date() {
+                // Session expired, sign out
+                await clearAuthenticationState()
+                return
+            }
+            
+            // 3. Fetch user profile if session is valid
+            let userProfile: User = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: currentSession.user.id)
+                .single()
+                .execute()
+                .value
+            
+            // 4. Set authentication state
+            currentUser = userProfile
+            updateAuthenticationState()
+            
+        } catch {
+            // 5. Handle expired/invalid sessions gracefully
+            // If any error occurs (network, expired session, user not found), clear auth state
+            await clearAuthenticationState()
+        }
     }
     
     /// Sign out the current user
@@ -155,13 +224,24 @@ class AuthService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // TODO: Implement sign out logic
-        // 1. Call supabase.auth.signOut()
-        // 2. Clear Keychain session
-        // 3. Reset currentUser to nil
-        // 4. Set isAuthenticated to false
-        
-        await clearAuthenticationState()
+        do {
+            // 1. Call Supabase sign out
+            try await supabaseService.client.auth.signOut()
+            
+            // 2. Clear Keychain session (handled by Supabase SDK automatically)
+            
+            // 3. Reset currentUser to nil and set isAuthenticated to false
+            await clearAuthenticationState()
+            
+        } catch {
+            // 4. Handle sign out errors gracefully
+            // Even if sign out fails on server, clear local state for security
+            await clearAuthenticationState()
+            
+            // Log the error for debugging but don't throw it
+            // User should always be able to sign out locally
+            print("Sign out error (cleared local state anyway): \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Private Helper Methods
@@ -195,6 +275,24 @@ class AuthService: ObservableObject {
         let nicknamePredicate = NSPredicate(format: "SELF MATCHES %@", nicknameRegex)
         guard nicknamePredicate.evaluate(with: nickname) else {
             throw AuthError.invalidNickname
+        }
+    }
+    
+    /// Validate sign in input parameters
+    /// - Parameters:
+    ///   - email: User's email address
+    ///   - password: User's password
+    private func validateSignInInput(email: String, password: String) throws {
+        // Validate email format
+        let emailRegex = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        guard emailPredicate.evaluate(with: email) else {
+            throw AuthError.invalidEmail
+        }
+        
+        // Validate password is not empty
+        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AuthError.invalidCredentials
         }
     }
     
