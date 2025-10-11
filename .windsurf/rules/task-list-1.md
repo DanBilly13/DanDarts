@@ -352,6 +352,30 @@ trigger: manual
 
 ---
 
+### Task 20.1: Implement Google OAuth Sign In/Sign Up
+
+-   [ ] Add Google OAuth configuration to Supabase dashboard (get Client ID)
+-   [ ] Update AuthService.signInWithGoogle() method stub
+-   [ ] Implement OAuth flow using supabase.auth.signInWithOAuth(provider: .google)
+-   [ ] Handle OAuth redirect/callback
+-   [ ] Check if user profile exists in profiles table
+-   [ ] If new user: navigate to Profile Setup
+-   [ ] If existing user: navigate to GamesTab
+-   [ ] Add error handling for OAuth failures
+-   [ ] Test on actual device (OAuth doesn't work well in simulator)
+
+**Acceptance Criteria:**
+
+-   ✓ Google OAuth flow completes successfully
+-   ✓ New users create profile automatically
+-   ✓ Existing users sign in directly
+-   ✓ Error handling for cancelled/failed OAuth
+-   ✓ Works on physical device
+-   ✓ Session persists in Keychain
+
+---
+
+
 ### Task 21: Create Profile Setup Screen
 - [ ] Create file: Views/Auth/ProfileSetupView.swift
 - [ ] Add "Complete Your Profile" header
@@ -383,54 +407,6 @@ trigger: manual
 
 ---
 
-## Phase 5: Main Navigation Structure
 
-### Task 23: Create Tab Bar Navigation
-- [ ] Create file: Views/MainTabView.swift
-- [ ] Add TabView with 3 tabs
-- [ ] Add GamesTab with SF Symbol "target"
-- [ ] Add FriendsTab with SF Symbol "person.2.fill"
-- [ ] Add HistoryTab with SF Symbol "chart.bar.fill"
-- [ ] Style tab bar for dark mode
-- [ ] Set accent color
-
-**Acceptance Criteria:**
-- ✓ 3 tabs visible and labeled
-- ✓ Icons show correctly
-- ✓ Selected state shows accent color
-- ✓ Can switch between tabs
-
----
-
-### Task 24: Create Top Bar Component
-- [ ] Create file: Views/Components/TopBar.swift
-- [ ] Add "DanDarts" title text (left)
-- [ ] Add avatar button (right, 32pt circle)
-- [ ] Add placeholder avatar image
-- [ ] Style with dark background
-- [ ] Make height 44pt
-
-**Acceptance Criteria:**
-- ✓ Top bar matches design spec
-- ✓ Logo and avatar positioned correctly
-- ✓ Avatar tappable (no action yet)
-
----
-
-### Task 25: Integrate Top Bar in Main Tabs
-- [ ] Add TopBar to GamesTab
-- [ ] Add TopBar to FriendsTab
-- [ ] Add TopBar to HistoryTab
-- [ ] Ensure consistent appearance
-- [ ] Test safe area insets
-
-**Acceptance Criteria:**
-- ✓ Top bar appears on all main tabs
-- ✓ Consistent styling across tabs
-- ✓ No overlap with status bar
-
-**Dependencies:** Task 23, Task 24
-
----
 
 Next: Continue with DanDarts task-list-2

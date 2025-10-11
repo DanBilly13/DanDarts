@@ -2,6 +2,56 @@
 trigger: manual
 ---
 
+## Phase 5: Main Navigation Structure
+
+### Task 23: Create Tab Bar Navigation
+- [ ] Create file: Views/MainTabView.swift
+- [ ] Add TabView with 3 tabs
+- [ ] Add GamesTab with SF Symbol "target"
+- [ ] Add FriendsTab with SF Symbol "person.2.fill"
+- [ ] Add HistoryTab with SF Symbol "chart.bar.fill"
+- [ ] Style tab bar for dark mode
+- [ ] Set accent color
+
+**Acceptance Criteria:**
+- ✓ 3 tabs visible and labeled
+- ✓ Icons show correctly
+- ✓ Selected state shows accent color
+- ✓ Can switch between tabs
+
+---
+
+### Task 24: Create Top Bar Component
+- [ ] Create file: Views/Components/TopBar.swift
+- [ ] Add "DanDarts" title text (left)
+- [ ] Add avatar button (right, 32pt circle)
+- [ ] Add placeholder avatar image
+- [ ] Style with dark background
+- [ ] Make height 44pt
+
+**Acceptance Criteria:**
+- ✓ Top bar matches design spec
+- ✓ Logo and avatar positioned correctly
+- ✓ Avatar tappable (no action yet)
+
+---
+
+### Task 25: Integrate Top Bar in Main Tabs
+- [ ] Add TopBar to GamesTab
+- [ ] Add TopBar to FriendsTab
+- [ ] Add TopBar to HistoryTab
+- [ ] Ensure consistent appearance
+- [ ] Test safe area insets
+
+**Acceptance Criteria:**
+- ✓ Top bar appears on all main tabs
+- ✓ Consistent styling across tabs
+- ✓ No overlap with status bar
+
+**Dependencies:** Task 23, Task 24
+
+---
+
 Phase 6: Games Tab - Game List
 ------------------------------
 

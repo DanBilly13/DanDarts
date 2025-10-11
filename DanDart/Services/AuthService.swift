@@ -183,19 +183,13 @@ class AuthService: ObservableObject {
         do {
             // 1. Check for existing session (Supabase SDK handles Keychain automatically)
             // 2. Validate session with Supabase
-            let session = try await supabaseService.client.auth.session
+            let currentSession = try await supabaseService.client.auth.session
             
-            // Check if we have a valid session
-            guard let currentSession = session else {
-                // No session found, user is not authenticated
-                await clearAuthenticationState()
-                return
-            }
-            
-            // Check if session is expired
-            if currentSession.expiresAt < Date() {
-                // Session expired, sign out
-                await clearAuthenticationState()
+            // Check if session is expired (expiresAt is TimeInterval, convert to Date)
+            let expirationDate = Date(timeIntervalSince1970: currentSession.expiresAt)
+            if expirationDate < Date() {
+                // Session expired, clear state
+                clearAuthenticationState()
                 return
             }
             
@@ -215,7 +209,7 @@ class AuthService: ObservableObject {
         } catch {
             // 5. Handle expired/invalid sessions gracefully
             // If any error occurs (network, expired session, user not found), clear auth state
-            await clearAuthenticationState()
+            clearAuthenticationState()
         }
     }
     
@@ -231,12 +225,12 @@ class AuthService: ObservableObject {
             // 2. Clear Keychain session (handled by Supabase SDK automatically)
             
             // 3. Reset currentUser to nil and set isAuthenticated to false
-            await clearAuthenticationState()
+            clearAuthenticationState()
             
         } catch {
             // 4. Handle sign out errors gracefully
             // Even if sign out fails on server, clear local state for security
-            await clearAuthenticationState()
+            clearAuthenticationState()
             
             // Log the error for debugging but don't throw it
             // User should always be able to sign out locally
