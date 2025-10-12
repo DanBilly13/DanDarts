@@ -15,18 +15,23 @@ struct GameCard: View {
         VStack(alignment: .leading, spacing: 16) {
             // Game Info Section
             VStack(alignment: .leading, spacing: 8) {
-                // Game Name - Simple text to avoid crashes
-                Text(game.name)
+                // Game Title - Simple text to avoid crashes
+                Text(game.title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(.white)
                     .lineLimit(1)
                 
-                // Tagline - Simple text
-                Text(game.tagline)
+                // Subtitle - Simple text
+                Text(game.subtitle)
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.8))
                     .lineLimit(2)
+                
+                // Players info
+                Text("Players: \(game.players)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
             }
             
             Spacer()
@@ -49,7 +54,7 @@ struct GameCard: View {
         .padding(20)
         .frame(maxWidth: .infinity)
         .frame(height: 200)
-        .background(Color.gray.opacity(0.1))
+        .background(Color("InputBackground"))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
@@ -98,9 +103,9 @@ struct GameCardContainer: View {
 #Preview("Game Card - All Games") {
     ScrollView {
         LazyVStack(spacing: 16) {
-            ForEach(Game.mockGames) { game in
+            ForEach(Game.loadGames()) { game in
                 GameCard(game: game) {
-                    print("Play \(game.name) tapped")
+                    print("Play \(game.title) tapped")
                 }
             }
         }
@@ -112,9 +117,9 @@ struct GameCardContainer: View {
 #Preview("Game Card - 90% Width") {
     ScrollView {
         LazyVStack(spacing: 16) {
-            ForEach(Game.mockGames.prefix(3)) { game in
-                GameCardContainer(game: game) {
-                    print("Play \(game.name) tapped")
+            ForEach(Array(Game.loadGames().prefix(3))) { game in
+                GameCard(game: game) {
+                    print("Play \(game.title) tapped")
                 }
             }
         }
@@ -128,8 +133,12 @@ struct GameCardContainer: View {
         GameCard(game: Game.previewHalveIt) {
             print("Play Halve-It tapped")
         }
+        
+        GameCard(game: Game.preview301) {
+            print("Play 301 tapped")
+        }
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(Color.black)
     .preferredColorScheme(.dark)
 }

@@ -6,12 +6,13 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct GamesListView: View {
     let games: [Game]
     let onGameSelected: (Game) -> Void
     
-    init(games: [Game] = Game.mockGames, onGameSelected: @escaping (Game) -> Void = { _ in }) {
+    init(games: [Game] = Game.loadGames(), onGameSelected: @escaping (Game) -> Void = { _ in }) {
         self.games = games
         self.onGameSelected = onGameSelected
     }
@@ -37,7 +38,7 @@ struct GamesListViewLegacy: View {
     }
     private let cardSpacing: CGFloat = 20
     
-    init(games: [Game] = Game.mockGames, onGameSelected: @escaping (Game) -> Void = { _ in }) {
+    init(games: [Game] = Game.loadGames(), onGameSelected: @escaping (Game) -> Void = { _ in }) {
         self.games = games
         self.onGameSelected = onGameSelected
     }
@@ -116,7 +117,7 @@ struct GamesListViewVertical: View {
     let games: [Game]
     let onGameSelected: (Game) -> Void
     
-    init(games: [Game] = Game.mockGames, onGameSelected: @escaping (Game) -> Void = { _ in }) {
+    init(games: [Game] = Game.loadGames(), onGameSelected: @escaping (Game) -> Void = { _ in }) {
         self.games = games
         self.onGameSelected = onGameSelected
     }
@@ -125,7 +126,7 @@ struct GamesListViewVertical: View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 16) {
                 ForEach(games) { game in
-                    GameCardContainer(game: game) {
+                    GameCard(game: game) {
                         onGameSelected(game)
                     }
                 }
@@ -138,28 +139,28 @@ struct GamesListViewVertical: View {
 // MARK: - Preview
 #Preview("Games List - Horizontal") {
     GamesListView { game in
-        print("Selected game: \(game.name)")
+        print("Selected game: \(game.title)")
     }
     .background(Color("BackgroundPrimary"))
 }
 
 #Preview("Games List - Legacy") {
     GamesListViewLegacy { game in
-        print("Selected game: \(game.name)")
+        print("Selected game: \(game.title)")
     }
     .background(Color("BackgroundPrimary"))
 }
 
 #Preview("Games List - Vertical") {
     GamesListViewVertical { game in
-        print("Selected game: \(game.name)")
+        print("Selected game: \(game.title)")
     }
     .background(Color("BackgroundPrimary"))
 }
 
 #Preview("Games List - Dark Mode") {
     GamesListView { game in
-        print("Selected game: \(game.name)")
+        print("Selected game: \(game.title)")
     }
     .background(Color("BackgroundPrimary"))
     .preferredColorScheme(.dark)

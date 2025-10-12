@@ -68,15 +68,7 @@ struct MainTabView: View {
 // MARK: - Tab Views
 
 struct GamesTabView: View {
-    let games = [
-        "301 - A Classic Countdown Game",
-        "501 - The Professional Standard", 
-        "Halve-It - Accuracy Under Pressure",
-        "Knockout - Beat the Previous Player or Lose a Life",
-        "Sudden Death - Fast and Ruthless Fun",
-        "English Cricket - Bat and Bowl with Darts",
-        "Killer - Target Others, Protect Yourself"
-    ]
+    let games = Game.loadGames()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -90,14 +82,23 @@ struct GamesTabView: View {
             // Simple list
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    ForEach(games, id: \.self) { game in
+                    ForEach(games) { game in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(game)
+                            Text(game.title)
                                 .font(.headline)
+                                .fontWeight(.bold)
                                 .foregroundColor(.white)
                             
+                            Text(game.subtitle)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Text("Players: \(game.players)")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.6))
+                            
                             Button("Play") {
-                                print("Selected: \(game)")
+                                print("Selected: \(game.title)")
                             }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 8)
