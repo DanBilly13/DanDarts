@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Game Model
 
-struct Game: Identifiable, Codable {
+struct Game: Identifiable, Codable, Hashable {
     let id = UUID()
     let title: String
     let subtitle: String
@@ -23,6 +23,22 @@ struct Game: Identifiable, Codable {
     // Custom coding keys to exclude id from JSON decoding
     private enum CodingKeys: String, CodingKey {
         case title, subtitle, players, instructions
+    }
+    
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(title)
+        hasher.combine(subtitle)
+        hasher.combine(players)
+        hasher.combine(instructions)
+    }
+    
+    // Equatable conformance (required for Hashable)
+    static func == (lhs: Game, rhs: Game) -> Bool {
+        return lhs.title == rhs.title &&
+               lhs.subtitle == rhs.subtitle &&
+               lhs.players == rhs.players &&
+               lhs.instructions == rhs.instructions
     }
 }
 

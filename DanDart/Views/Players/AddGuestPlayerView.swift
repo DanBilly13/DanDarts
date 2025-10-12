@@ -1,0 +1,340 @@
+//
+//  AddGuestPlayerView.swift
+//  DanDart
+//
+//  Sheet for adding new guest players with display name and nickname validation
+//
+
+import SwiftUI
+import Foundation
+
+struct AddGuestPlayerView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    // Form state
+    @State private var displayName: String = ""
+    @State private var nickname: String = ""
+    @State private var selectedAvatar: String = "avatar1" // Default to first avatar
+    
+    // Validation state
+    @State private var displayNameError: String = ""
+    @State private var nicknameError: String = ""
+    @State private var isLoading: Bool = false
+    
+    // Avatar options: 4 assets + 4 SF Symbols
+    private let avatarOptions: [AvatarOption] = [
+        // Asset avatars
+        AvatarOption(id: "avatar1", type: .asset),
+        AvatarOption(id: "avatar2", type: .asset),
+        AvatarOption(id: "avatar3", type: .asset),
+        AvatarOption(id: "avatar4", type: .asset),
+        // SF Symbol avatars
+        AvatarOption(id: "person.circle.fill", type: .symbol),
+        AvatarOption(id: "person.crop.circle.fill", type: .symbol),
+        AvatarOption(id: "figure.wave.circle.fill", type: .symbol),
+        AvatarOption(id: "person.2.circle.fill", type: .symbol)
+    ]
+    
+    // Callback for when player is created
+    let onPlayerCreated: (Player) -> Void
+    
+    init(onPlayerCreated: @escaping (Player) -> Void) {
+        self.onPlayerCreated = onPlayerCreated
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Header
+                VStack(spacing: 8) {
+                    Text("Add Guest Player")
+                        .font(.system(size: 28, weight: .bold, design: .default))
+                        .foregroundColor(Color("TextPrimary"))
+                    
+                    Text("Create a local player profile")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                }
+                .padding(.top, 24)
+                .padding(.horizontal, 24)
+                
+                // Form
+                VStack(spacing: 24) {
+                    // Avatar Selection
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Choose Avatar")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                        
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                            ForEach(avatarOptions, id: \.id) { option in
+                                Button(action: {
+                                    selectedAvatar = option.id
+                                }) {
+                                    AvatarOptionView(
+                                        option: option,
+                                        isSelected: selectedAvatar == option.id,
+                                        size: 60
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+                    // Display Name Field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Display Name")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                        
+                        TextField("Enter full name", text: $displayName)
+                            .textFieldStyle(DartTextFieldStyle())
+                            .disableAutocorrection(true)
+                            .onChange(of: displayName) { _, newValue in
+                                validateDisplayName(newValue)
+                            }
+                        
+                        if !displayNameError.isEmpty {
+                            Text(displayNameError)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color("AccentSecondary"))
+                        }
+                    }
+                    
+                    // Nickname Field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Nickname")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                        
+                        TextField("Enter nickname", text: $nickname)
+                            .textFieldStyle(DartTextFieldStyle())
+                            .disableAutocorrection(true)
+                            .onChange(of: nickname) { _, newValue in
+                                validateNickname(newValue)
+                            }
+                        
+                        if !nicknameError.isEmpty {
+                            Text(nicknameError)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color("AccentSecondary"))
+                        }
+                        
+                        Text("Used for quick identification during games")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                    }
+                }
+                .padding(.top, 32)
+                .padding(.horizontal, 24)
+                
+                Spacer()
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    // Save Button
+                    Button(action: savePlayer) {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            }
+                            
+                            Text(isLoading ? "Creating..." : "Save Player")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(
+                            RoundedRectangle(cornerRadius: 25)
+                                .fill(isSaveEnabled ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
+                        )
+                    }
+                    .disabled(!isSaveEnabled || isLoading)
+                    
+                    // Cancel Button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color("TextSecondary"))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 25)
+                                    .fill(Color("InputBackground"))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 25)
+                                            .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .disabled(isLoading)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 34)
+            }
+            .background(Color("BackgroundPrimary"))
+            .navigationBarBackButtonHidden(true)
+        }
+    }
+    
+    // MARK: - Validation Logic
+    
+    private func validateDisplayName(_ name: String) {
+        displayNameError = ""
+        
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            displayNameError = "Display name is required"
+        } else if name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 {
+            displayNameError = "Display name must be at least 2 characters"
+        } else if name.count > 50 {
+            displayNameError = "Display name must be less than 50 characters"
+        }
+    }
+    
+    private func validateNickname(_ nick: String) {
+        nicknameError = ""
+        
+        if nick.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            nicknameError = "Nickname is required"
+        } else if nick.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 {
+            nicknameError = "Nickname must be at least 2 characters"
+        } else if nick.count > 20 {
+            nicknameError = "Nickname must be less than 20 characters"
+        } else if !nick.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }) {
+            nicknameError = "Nickname can only contain letters, numbers, and underscores"
+        }
+    }
+    
+    private var isSaveEnabled: Bool {
+        return displayNameError.isEmpty && 
+               nicknameError.isEmpty && 
+               !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+               !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    // MARK: - Actions
+    
+    private func savePlayer() {
+        guard isSaveEnabled else { return }
+        
+        isLoading = true
+        
+        // Simulate a brief loading state for better UX
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            let newPlayer = Player.createGuestWithAvatar(
+                displayName: trimmedDisplayName,
+                nickname: trimmedNickname,
+                avatarURL: selectedAvatar
+            )
+            
+            onPlayerCreated(newPlayer)
+            isLoading = false
+            dismiss()
+        }
+    }
+}
+
+// MARK: - Supporting Types
+
+enum AvatarType {
+    case asset
+    case symbol
+}
+
+struct AvatarOption {
+    let id: String
+    let type: AvatarType
+}
+
+// MARK: - Avatar Option View
+
+struct AvatarOptionView: View {
+    let option: AvatarOption
+    let isSelected: Bool
+    let size: CGFloat
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color("InputBackground"))
+                .frame(width: size, height: size)
+            
+            Group {
+                switch option.type {
+                case .asset:
+                    Image(option.id)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: size - 4, height: size - 4)
+                        .clipShape(Circle())
+                case .symbol:
+                    Image(systemName: option.id)
+                        .font(.system(size: size * 0.4, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                }
+            }
+        }
+        .overlay(
+            Circle()
+                .stroke(
+                    isSelected ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.2),
+                    lineWidth: isSelected ? 3 : 1
+                )
+        )
+        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
+// MARK: - Custom Text Field Style
+
+struct DartTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color("InputBackground"))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(Color("TextPrimary"))
+    }
+}
+
+// MARK: - Preview
+#Preview("Add Guest Player") {
+    AddGuestPlayerView { player in
+        print("Created player: \(player.displayName) (@\(player.nickname))")
+    }
+}
+
+#Preview("Avatar Options Grid") {
+    VStack {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+            ForEach(0..<8) { index in
+                let isAsset = index < 4
+                let avatarId = isAsset ? "avatar\(index + 1)" : ["person.circle.fill", "person.crop.circle.fill", "figure.wave.circle.fill", "person.2.circle.fill"][index - 4]
+                let option = AvatarOption(id: avatarId, type: isAsset ? .asset : .symbol)
+                
+                AvatarOptionView(
+                    option: option,
+                    isSelected: index == 0,
+                    size: 60
+                )
+            }
+        }
+        .padding()
+    }
+    .background(Color.black)
+}

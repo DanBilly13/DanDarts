@@ -57,7 +57,7 @@ extension User {
         displayName: "Dan Billingham",
         nickname: "danbilly",
         handle: "@thearrow",
-        avatarURL: nil,
+        avatarURL: "avatar1",
         createdAt: Date().addingTimeInterval(-86400 * 30), // 30 days ago
         lastSeenAt: Date().addingTimeInterval(-3600), // 1 hour ago
         totalWins: 15,
@@ -69,7 +69,7 @@ extension User {
         displayName: "Sarah Connor",
         nickname: "terminator",
         handle: nil,
-        avatarURL: "https://example.com/avatar2.jpg",
+        avatarURL: "avatar2",
         createdAt: Date().addingTimeInterval(-86400 * 60), // 60 days ago
         lastSeenAt: Date().addingTimeInterval(-1800), // 30 minutes ago
         totalWins: 22,
@@ -81,7 +81,7 @@ extension User {
         displayName: "Mike \"The Dart\" Johnson",
         nickname: "dartmaster",
         handle: "@180king",
-        avatarURL: nil,
+        avatarURL: "avatar3",
         createdAt: Date().addingTimeInterval(-86400 * 90), // 90 days ago
         lastSeenAt: Date().addingTimeInterval(-86400), // 1 day ago
         totalWins: 45,

@@ -196,7 +196,7 @@ class AuthService: ObservableObject {
             } catch {
                 // User doesn't exist, create new profile with Google data
                 let googleEmail = session.user.email ?? ""
-                let googleName = (session.user.userMetadata["full_name"] as? String) ?? ""
+                let googleName = session.user.userMetadata["full_name"]?.stringValue ?? ""
                 
                 // Generate a unique nickname from email or name
                 let baseNickname = generateNicknameFromGoogle(email: googleEmail, name: googleName)
@@ -207,7 +207,7 @@ class AuthService: ObservableObject {
                     displayName: googleName.isEmpty ? "Google User" : googleName,
                     nickname: uniqueNickname,
                     handle: nil, // Will be set in Profile Setup
-                    avatarURL: (session.user.userMetadata["avatar_url"] as? String),
+                    avatarURL: session.user.userMetadata["avatar_url"]?.stringValue,
                     createdAt: Date(),
                     lastSeenAt: Date(),
                     totalWins: 0,

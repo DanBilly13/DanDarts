@@ -69,54 +69,33 @@ struct MainTabView: View {
 
 struct GamesTabView: View {
     let games = Game.loadGames()
+    @State private var selectedGame: Game?
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Simple header
-            Text("Games")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding()
-            
-            // Simple list
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(games) { game in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(game.title)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                            
-                            Text(game.subtitle)
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            Text("Players: \(game.players)")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
-                            
-                            Button("Play") {
-                                print("Selected: \(game.title)")
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Top Bar
+                TopBar()
+                
+                // Games List Content
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(games) { game in
+                            GameCard(game: game) {
+                                selectedGame = game
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .clipShape(Capsule())
                         }
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.gray.opacity(0.2))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+                    .padding()
                 }
-                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color("BackgroundPrimary"))
+            }
+            .background(Color("BackgroundPrimary"))
+            .navigationDestination(item: $selectedGame) { game in
+                GameSetupView(game: game)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
     }
 }
 
