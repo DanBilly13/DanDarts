@@ -202,8 +202,8 @@ struct PreGameHypeView: View {
                 // Play boxing sound when view appears
                 SoundManager.shared.playBoxingSound()
             }
-            .onChange(of: navigationManager.shouldDismissToGamesList) { shouldDismiss in
-                if shouldDismiss {
+            .onChange(of: navigationManager.shouldDismissToGamesList) {
+                if navigationManager.shouldDismissToGamesList {
                     navigationManager.resetDismissFlag()
                     dismiss()
                 }

@@ -97,8 +97,8 @@ struct GamesTabView: View {
                 GameSetupView(game: game)
                     .background(Color.black)
             }
-            .onChange(of: navigationManager.shouldDismissToGamesList) { shouldDismiss in
-                if shouldDismiss {
+            .onChange(of: navigationManager.shouldDismissToGamesList) {
+                if navigationManager.shouldDismissToGamesList {
                     navigationManager.resetDismissFlag()
                     navigationPath.removeLast(navigationPath.count)
                 }

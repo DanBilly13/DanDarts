@@ -8,6 +8,47 @@
 
 import SwiftUI
 
+// MARK: - Score Types
+
+enum ScoreType: String, CaseIterable {
+    case single = "Single"
+    case double = "Double"
+    case triple = "Triple"
+    
+    var multiplier: Int {
+        switch self {
+        case .single: return 1
+        case .double: return 2
+        case .triple: return 3
+        }
+    }
+    
+    var prefix: String {
+        switch self {
+        case .single: return ""
+        case .double: return "D"
+        case .triple: return "T"
+        }
+    }
+}
+
+struct ScoredThrow {
+    let baseValue: Int
+    let scoreType: ScoreType
+    
+    var totalValue: Int {
+        baseValue * scoreType.multiplier
+    }
+    
+    var displayText: String {
+        if scoreType == .single {
+            return "\(totalValue)"
+        } else {
+            return "\(scoreType.prefix)\(baseValue)"
+        }
+    }
+}
+
 struct GameplayView: View {
     let game: Game
     let players: [Player]
@@ -15,7 +56,7 @@ struct GameplayView: View {
     // Game state
     @State private var currentPlayerIndex: Int = 0
     @State private var playerScores: [UUID: Int] = [:]
-    @State private var currentThrow: [Int] = []
+    @State private var currentThrow: [ScoredThrow] = []
     @State private var showExitAlert: Bool = false
     @State private var isTurnComplete: Bool = false
     @State private var showMoreMenu: Bool = false
@@ -66,8 +107,8 @@ struct GameplayView: View {
                     
                     // Scoring button grid (center)
                     ScoringButtonGrid(
-                        onScoreSelected: { score in
-                            addScoreToThrow(score)
+                        onScoreSelected: { baseValue, scoreType in
+                            addScoreToThrow(baseValue: baseValue, scoreType: scoreType)
                         }
                     )
                     .padding(.horizontal, 16)
@@ -160,24 +201,26 @@ struct GameplayView: View {
     
     // MARK: - Game Logic
     
-    private func addScoreToThrow(_ score: Int) {
+    private func addScoreToThrow(baseValue: Int, scoreType: ScoreType) {
         guard currentThrow.count < 3 else { return }
         
         // Handle bust - end turn immediately and reset score
-        if score == -1 { // Using -1 as bust indicator
+        if baseValue == -1 { // Using -1 as bust indicator
             bustCurrentTurn()
             return
         }
         
+        let scoredThrow = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
+        
         // Handle miss sound
-        if score == 0 {
+        if scoredThrow.totalValue == 0 {
             SoundManager.shared.playMissSound()
         } else {
             // Play score sound for any non-zero score
             SoundManager.shared.playScoreSound()
         }
         
-        currentThrow.append(score)
+        currentThrow.append(scoredThrow)
         
         // Check if turn is complete (3 throws)
         if currentThrow.count == 3 {
@@ -195,7 +238,7 @@ struct GameplayView: View {
     private func saveScore() {
         guard !currentThrow.isEmpty else { return }
         
-        let throwTotal = currentThrow.reduce(0, +)
+        let throwTotal = currentThrow.reduce(0) { $0 + $1.totalValue }
         let currentScore = playerScores[currentPlayer.id] ?? 301
         let newScore = max(0, currentScore - throwTotal)
         
@@ -242,18 +285,18 @@ struct StackedPlayerCards: View {
     let players: [Player]
     let currentPlayerIndex: Int
     let playerScores: [UUID: Int]
-    let currentThrow: [Int]
+    let currentThrow: [ScoredThrow]
     
     var body: some View {
         VStack(spacing: 16) {
             // Stacked player cards with current player in front
             ZStack {
                 ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
-                    PlayerGameCard(
+                    PlayerScoreCard(
                         player: player,
                         score: playerScores[player.id] ?? 301,
                         isCurrentPlayer: index == currentPlayerIndex,
-                        currentThrow: index == currentPlayerIndex ? currentThrow : []
+                        currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow]()
                     )
                     .overlay(
                         // Background-colored overlay for depth effect
@@ -367,11 +410,11 @@ struct StackedPlayerCards: View {
 
 // MARK: - Player Game Card
 
-struct PlayerGameCard: View {
+struct PlayerScoreCard: View {
     let player: Player
     let score: Int
     let isCurrentPlayer: Bool
-    let currentThrow: [Int]
+    let currentThrow: [ScoredThrow]
     
     var body: some View {
         VStack(spacing: 12) {
@@ -418,13 +461,13 @@ struct PlayerGameCard: View {
 // MARK: - Current Throw Display
 
 struct CurrentThrowDisplay: View {
-    let currentThrow: [Int]
+    let currentThrow: [ScoredThrow]
     
     var body: some View {
         HStack(spacing: 12) {
                 // Individual throw scores
                 ForEach(0..<3, id: \.self) { index in
-                    Text(index < currentThrow.count ? "\(currentThrow[index])" : "—")
+                    Text(index < currentThrow.count ? currentThrow[index].displayText : "—")
                         .font(.system(size: 18, weight: .semibold, design: .monospaced))
                         .foregroundColor(index < currentThrow.count ? Color("TextPrimary") : Color("TextSecondary").opacity(0.5))
                         .frame(width: 40, height: 40)
@@ -439,7 +482,7 @@ struct CurrentThrowDisplay: View {
                     .padding(.horizontal, 8)
                 
                 // Total score
-                Text("\(currentThrow.reduce(0, +))")
+                Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
                     .font(.system(size: 20, weight: .bold, design: .monospaced))
                     .foregroundColor(Color("AccentPrimary"))
                     .frame(width: 50, height: 40)
@@ -462,7 +505,7 @@ struct CurrentThrowDisplay: View {
 // MARK: - Scoring Button Grid
 
 struct ScoringButtonGrid: View {
-    let onScoreSelected: (Int) -> Void
+    let onScoreSelected: (Int, ScoreType) -> Void
     
     // Sequential numbers 1-20
     private let dartboardNumbers = Array(1...20)
@@ -473,42 +516,37 @@ struct ScoringButtonGrid: View {
             ForEach(dartboardNumbers, id: \.self) { number in
                 ScoringButton(
                     title: "\(number)",
-                    action: {
-                        onScoreSelected(number)
-                    }
+                    baseValue: number,
+                    onScoreSelected: onScoreSelected
                 )
             }
             
             // 25
             ScoringButton(
                 title: "25",
-                action: {
-                    onScoreSelected(25)
-                }
+                baseValue: 25,
+                onScoreSelected: onScoreSelected
             )
             
             // Bull
             ScoringButton(
                 title: "Bull",
-                action: {
-                    onScoreSelected(50)
-                }
+                baseValue: 50,
+                onScoreSelected: onScoreSelected
             )
             
             // Miss
             ScoringButton(
                 title: "Miss",
-                action: {
-                    onScoreSelected(0)
-                }
+                baseValue: 0,
+                onScoreSelected: onScoreSelected
             )
             
             // Bust
             ScoringButton(
                 title: "Bust",
-                action: {
-                    onScoreSelected(-1) // -1 indicates bust
-                }
+                baseValue: -1, // -1 indicates bust
+                onScoreSelected: onScoreSelected
             )
         }
     }
@@ -519,19 +557,50 @@ struct ScoringButtonGrid: View {
 struct ScoringButton: View {
     let title: String
     let subtitle: String?
-    let action: () -> Void
+    let baseValue: Int
+    let onScoreSelected: (Int, ScoreType) -> Void
     
     @State private var isPressed = false
     @State private var isHighlighted = false
+    @State private var showContextMenu = false
     
-    init(title: String, subtitle: String? = nil, action: @escaping () -> Void) {
+    // Don't show context menu for special buttons
+    private var canShowContextMenu: Bool {
+        baseValue > 0 && baseValue != 50 // Exclude Miss, Bust, and Bull
+    }
+    
+    init(title: String, subtitle: String? = nil, baseValue: Int, onScoreSelected: @escaping (Int, ScoreType) -> Void) {
         self.title = title
         self.subtitle = subtitle
-        self.action = action
+        self.baseValue = baseValue
+        self.onScoreSelected = onScoreSelected
     }
     
     var body: some View {
-        Button(action: {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.system(size: 18, weight: .medium, design: .default))
+                .foregroundColor(Color("BackgroundPrimary"))
+            
+            if let subtitle = subtitle {
+                Text(subtitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Color("BackgroundPrimary").opacity(0.8))
+            }
+        }
+        .frame(width: 64, height: 64)
+        .background(
+            Circle()
+                .fill(Color("AccentTertiary"))
+                .overlay(
+                    Circle()
+                        .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
+                )
+        )
+        .clipShape(Circle())
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .onTapGesture {
             // Haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
@@ -548,37 +617,48 @@ struct ScoringButton: View {
                 }
             }
             
-            action()
-        }) {
-            VStack(spacing: 2) {
-                Text(title)
-                    .font(.system(size: 18, weight: .medium, design: .default))
-                    .foregroundColor(Color("BackgroundPrimary"))
-                
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Color("BackgroundPrimary").opacity(0.8))
-                }
-            }
-            .frame(width: 64, height: 64)
-            .background(
-                Circle()
-                    .fill(Color("AccentTertiary"))
-                    .overlay(
-                        Circle()
-                            .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
-                    )
-            )
-            .clipShape(Circle())
-            .scaleEffect(isPressed ? 0.92 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: isPressed)
+            // Default to single
+            onScoreSelected(baseValue, .single)
         }
-        .buttonStyle(PlainButtonStyle())
-        .onLongPressGesture(minimumDuration: 0) { pressing in
-            isPressed = pressing
-        } perform: {
-            // Long press action for doubles/triples (future implementation)
+        .onLongPressGesture(minimumDuration: 0.5) {
+            if canShowContextMenu {
+                // Haptic feedback for long press
+                let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                impactFeedback.impactOccurred()
+                showContextMenu = true
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(.easeInOut(duration: 0.1)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+        )
+        .confirmationDialog("Select Score Type", isPresented: $showContextMenu, titleVisibility: .visible) {
+            Button("Single (\(baseValue))") {
+                onScoreSelected(baseValue, .single)
+            }
+            
+            Button("Double (D\(baseValue))") {
+                onScoreSelected(baseValue, .double)
+            }
+            
+            Button("Triple (T\(baseValue))") {
+                onScoreSelected(baseValue, .triple)
+            }
+            
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Choose how to score \(title)")
         }
     }
 }
