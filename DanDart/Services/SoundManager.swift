@@ -14,6 +14,7 @@ class SoundManager: ObservableObject {
     
     private var audioPlayer: AVAudioPlayer?
     private var isInitialized = false
+    private var consecutiveMisses = 0
     
     private init() {
         setupAudioSession()
@@ -79,7 +80,65 @@ class SoundManager: ObservableObject {
         audioPlayer?.volume = min(max(volume, 0.0), 1.0)
     }
     
-    // MARK: - Future Sound Effects
+    // MARK: - Game Sound Effects
+    
+    /// Play miss sound based on consecutive misses
+    func playMissSound() {
+        consecutiveMisses += 1
+        
+        let soundName: String
+        switch consecutiveMisses {
+        case 1:
+            soundName = "brokenglass"
+        case 2:
+            soundName = "cat"
+        case 3:
+            soundName = "horse"
+        default:
+            soundName = "horse" // Continue with horse sound for 4+ misses
+        }
+        
+        playSound(named: soundName)
+    }
+    
+    /// Reset miss counter (call when player scores)
+    func resetMissCounter() {
+        consecutiveMisses = 0
+    }
+    
+    /// Play scoring sound
+    func playScoreSound() {
+        resetMissCounter() // Reset miss counter when scoring
+        playSound(named: "thud")
+    }
+    
+    /// Play boxing sound for pre-game hype
+    func playBoxingSound() {
+        playSound(named: "boxing")
+    }
+    
+    /// Generic method to play any sound file
+    private func playSound(named soundName: String) {
+        guard isInitialized else {
+            print("Audio session not initialized")
+            return
+        }
+        
+        guard let soundURL = Bundle.main.url(forResource: soundName, withExtension: "mp3") else {
+            print("Sound file '\(soundName).mp3' not found")
+            return
+        }
+        
+        do {
+            audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
+            audioPlayer?.volume = 0.7
+            audioPlayer?.play()
+        } catch {
+            print("Failed to play sound '\(soundName)': \(error)")
+        }
+    }
+    
+    // MARK: - Legacy Sound Effects
     
     /// Play dart throw sound (placeholder for future implementation)
     func playDartThrow() {

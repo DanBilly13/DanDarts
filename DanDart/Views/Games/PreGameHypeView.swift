@@ -195,9 +195,9 @@ struct PreGameHypeView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            // Play bell sound when hype screen appears
-            SoundManager.shared.playBell()
             startAnimationSequence()
+            // Play boxing sound when view appears
+            SoundManager.shared.playBoxingSound()
         }
         .onTapGesture {
             navigateToGameplay = true

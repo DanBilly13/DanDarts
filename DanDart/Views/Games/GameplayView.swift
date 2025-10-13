@@ -128,6 +128,14 @@ struct GameplayView: View {
             return
         }
         
+        // Handle miss sound
+        if score == 0 {
+            SoundManager.shared.playMissSound()
+        } else {
+            // Play score sound for any non-zero score
+            SoundManager.shared.playScoreSound()
+        }
+        
         currentThrow.append(score)
         
         // Check if turn is complete (3 throws)
@@ -170,6 +178,7 @@ struct GameplayView: View {
     private func switchToNextPlayer() {
         currentPlayerIndex = (currentPlayerIndex + 1) % players.count
         isTurnComplete = false
+        SoundManager.shared.resetMissCounter() // Reset miss counter for new player
     }
 }
 
@@ -501,7 +510,7 @@ struct ScoringButton: View {
             .frame(width: 64, height: 64)
             .background(
                 Circle()
-                    .fill(Color("AccentSecondary"))
+                    .fill(Color("AccentTertiary"))
                     .overlay(
                         Circle()
                             .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
