@@ -51,9 +51,9 @@ struct WelcomeView: View {
                     Button(action: {
                         showingSignIn = true
                     }) {
-                        Text("Sign In")
+                        Text("Get Started")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color("BackgroundPrimary"))
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(
@@ -71,9 +71,9 @@ struct WelcomeView: View {
                     Button(action: {
                         showingSignUp = true
                     }) {
-                        Text("Sign Up")
+                        Text("Continue as Guest")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color("BackgroundPrimary"))
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(

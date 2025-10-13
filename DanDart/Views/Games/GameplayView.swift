@@ -17,6 +17,7 @@ struct GameplayView: View {
     @State private var playerScores: [UUID: Int] = [:]
     @State private var currentThrow: [Int] = []
     @State private var showExitAlert: Bool = false
+    @State private var isTurnComplete: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     
@@ -81,10 +82,10 @@ struct GameplayView: View {
                         .frame(height: 56)
                         .background(
                             RoundedRectangle(cornerRadius: 28)
-                                .fill(currentThrow.isEmpty ? Color("TextSecondary").opacity(0.3) : Color("AccentPrimary"))
+                                .fill(isTurnComplete ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
                         )
                     }
-                    .disabled(currentThrow.isEmpty)
+                    .disabled(!isTurnComplete)
                     .padding(.horizontal, 16)
                     
                     // Cancel Game button
@@ -120,7 +121,26 @@ struct GameplayView: View {
     
     private func addScoreToThrow(_ score: Int) {
         guard currentThrow.count < 3 else { return }
+        
+        // Handle bust - end turn immediately and reset score
+        if score == -1 { // Using -1 as bust indicator
+            bustCurrentTurn()
+            return
+        }
+        
         currentThrow.append(score)
+        
+        // Check if turn is complete (3 throws)
+        if currentThrow.count == 3 {
+            isTurnComplete = true
+        }
+    }
+    
+    private func bustCurrentTurn() {
+        // Player busted - turn ends immediately, score stays the same, move to next player
+        currentThrow.removeAll()
+        isTurnComplete = false
+        switchToNextPlayer()
     }
     
     private func saveScore() {
@@ -142,12 +162,14 @@ struct GameplayView: View {
             switchToNextPlayer()
         }
         
-        // Clear current throw
+        // Clear current throw and reset turn state
         currentThrow.removeAll()
+        isTurnComplete = false
     }
     
     private func switchToNextPlayer() {
         currentPlayerIndex = (currentPlayerIndex + 1) % players.count
+        isTurnComplete = false
     }
 }
 
@@ -422,8 +444,7 @@ struct ScoringButtonGrid: View {
             ScoringButton(
                 title: "Bust",
                 action: {
-                    // TODO: Handle bust logic
-                    onScoreSelected(0)
+                    onScoreSelected(-1) // -1 indicates bust
                 }
             )
         }
@@ -438,6 +459,7 @@ struct ScoringButton: View {
     let action: () -> Void
     
     @State private var isPressed = false
+    @State private var isHighlighted = false
     
     init(title: String, subtitle: String? = nil, action: @escaping () -> Void) {
         self.title = title
@@ -451,21 +473,40 @@ struct ScoringButton: View {
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
             
+            // Brief highlight effect
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHighlighted = true
+            }
+            
+            // Remove highlight after brief delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHighlighted = false
+                }
+            }
+            
             action()
         }) {
             VStack(spacing: 2) {
                 Text(title)
                     .font(.system(size: 18, weight: .medium, design: .default))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(Color("BackgroundPrimary"))
                 
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(Color("BackgroundPrimary").opacity(0.8))
                 }
             }
             .frame(width: 64, height: 64)
-            .background(Color("AccentSecondary"))
+            .background(
+                Circle()
+                    .fill(Color("AccentSecondary"))
+                    .overlay(
+                        Circle()
+                            .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
+                    )
+            )
             .clipShape(Circle())
             .scaleEffect(isPressed ? 0.92 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)

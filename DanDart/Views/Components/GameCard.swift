@@ -46,7 +46,7 @@ struct GameCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
-                        .background(Color.blue)
+                        .background(Color.accentPrimary)
                         .clipShape(Capsule())
                 }
             }
