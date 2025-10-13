@@ -13,6 +13,7 @@ struct GameSetupView: View {
     @State private var showSearchPlayer: Bool = false
     @State private var showGameView: Bool = false
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var navigationManager = NavigationManager.shared
     
     private let playerLimit = 8 // Maximum players for MVP
     private var canStartGame: Bool {
@@ -20,8 +21,7 @@ struct GameSetupView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
             // Top Bar with Back Button
             HStack {
                 Button(action: {
@@ -200,14 +200,26 @@ struct GameSetupView: View {
             .background(Color("BackgroundPrimary"))
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $showGameView) {
-                PreGameHypeView(game: game, players: selectedPlayers)
+                // Always show black background to prevent white flash
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    
+                    if !navigationManager.shouldDismissToGamesList {
+                        PreGameHypeView(game: game, players: selectedPlayers)
+                    }
+                }
+            }
+            .onChange(of: navigationManager.shouldDismissToGamesList) { shouldDismiss in
+                if shouldDismiss {
+                    navigationManager.resetDismissFlag()
+                    dismiss()
+                }
             }
             .sheet(isPresented: $showSearchPlayer) {
                 SearchPlayerSheet { player in
                     addPlayer(player)
                 }
             }
-        }
     }
     
     // MARK: - Helper Methods

@@ -18,6 +18,11 @@ struct GameplayView: View {
     @State private var currentThrow: [Int] = []
     @State private var showExitAlert: Bool = false
     @State private var isTurnComplete: Bool = false
+    @State private var showMoreMenu: Bool = false
+    @State private var showInstructions: Bool = false
+    @State private var showRestartAlert: Bool = false
+    @State private var navigateToPreGameHype: Bool = false
+    @State private var shouldDismissToRoot: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     
@@ -87,17 +92,39 @@ struct GameplayView: View {
                     }
                     .disabled(!isTurnComplete)
                     .padding(.horizontal, 16)
-                    
-                    // Cancel Game button
-                    Button(action: {
-                        showExitAlert = true
-                    }) {
-                        Text("Cancel Game")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                    .padding(.bottom, 34)
+                }
+                
+                // Absolutely positioned more menu button
+                VStack {
+                    HStack {
+                        Spacer()
+                        
+                        Menu {
+                            Button("Instructions") {
+                                showInstructions = true
+                            }
+                            
+                            Button("Restart Game") {
+                                showRestartAlert = true
+                            }
+                            
+                            Button("Cancel Game", role: .destructive) {
+                                showExitAlert = true
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(Color("TextSecondary"))
+                                .frame(width: 44, height: 44)
+                                .background(Color("InputBackground").opacity(0.8))
+                                .clipShape(Circle())
+                        }
                     }
-                    .padding(.top, 24)
-                    .padding(.bottom, 16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    
+                    Spacer()
                 }
             }
         }
@@ -110,10 +137,24 @@ struct GameplayView: View {
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {
+                // Set flag first, then dismiss
+                NavigationManager.shared.dismissToGamesList()
                 dismiss()
             }
         } message: {
             Text("Are you sure you want to leave the game? Your progress will be lost.")
+        }
+        .alert("Restart Game", isPresented: $showRestartAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Restart", role: .destructive) {
+                // Navigate back to PreGameHypeView for a fresh start
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to restart the game? All progress will be lost.")
+        }
+        .sheet(isPresented: $showInstructions) {
+            GameInstructionsView(game: game)
         }
     }
     
@@ -179,6 +220,19 @@ struct GameplayView: View {
         currentPlayerIndex = (currentPlayerIndex + 1) % players.count
         isTurnComplete = false
         SoundManager.shared.resetMissCounter() // Reset miss counter for new player
+    }
+    
+    private func restartGame() {
+        // Reset all game state
+        currentPlayerIndex = 0
+        currentThrow.removeAll()
+        isTurnComplete = false
+        SoundManager.shared.resetMissCounter()
+        
+        // Reset all player scores
+        for player in players {
+            playerScores[player.id] = 301 // Reset to starting score
+        }
     }
 }
 

@@ -329,10 +329,11 @@ class AuthService: ObservableObject {
                 updatedUser.handle = newHandle
             }
             
-            if let newBio = bio?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            if let newBio = bio?.trimmingCharacters(in: .whitespacesAndNewlines), !newBio.isEmpty {
                 // For now, we'll store bio in a field we have available
                 // In the future, add a bio field to the User model and database
                 // For now, we'll skip bio updates until the User model is extended
+                print("Bio update requested: \(String(newBio.prefix(200)))")
                 // When bio field is added: updatedUser.bio = String(newBio.prefix(200))
             }
             

@@ -69,10 +69,11 @@ struct MainTabView: View {
 
 struct GamesTabView: View {
     let games = Game.loadGames()
-    @State private var selectedGame: Game?
+    @State private var navigationPath = NavigationPath()
+    @StateObject private var navigationManager = NavigationManager.shared
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 // Top Bar
                 TopBar()
@@ -82,7 +83,7 @@ struct GamesTabView: View {
                     LazyVStack(spacing: 16) {
                         ForEach(games) { game in
                             GameCard(game: game) {
-                                selectedGame = game
+                                navigationPath.append(game)
                             }
                         }
                     }
@@ -92,8 +93,15 @@ struct GamesTabView: View {
                 .background(Color("BackgroundPrimary"))
             }
             .background(Color("BackgroundPrimary"))
-            .navigationDestination(item: $selectedGame) { game in
+            .navigationDestination(for: Game.self) { game in
                 GameSetupView(game: game)
+                    .background(Color.black)
+            }
+            .onChange(of: navigationManager.shouldDismissToGamesList) { shouldDismiss in
+                if shouldDismiss {
+                    navigationManager.resetDismissFlag()
+                    navigationPath.removeLast(navigationPath.count)
+                }
             }
         }
     }

@@ -14,6 +14,9 @@ struct PreGameHypeView: View {
     // Navigation state
     @State private var navigateToGameplay = false
     
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var navigationManager = NavigationManager.shared
+    
     // Animation states
     @State private var showPlayer1 = false
     @State private var showPlayer2 = false
@@ -21,19 +24,11 @@ struct PreGameHypeView: View {
     @State private var showGetReady = false
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Dark gradient background
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color("BackgroundPrimary"),
-                        Color("BackgroundPrimary").opacity(0.8),
-                        Color.black
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+            GeometryReader { geometry in
+                ZStack {
+                    // Solid black background to prevent white page
+                    Color.black
+                        .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Game name at top
@@ -190,21 +185,37 @@ struct PreGameHypeView: View {
                     }
                     .padding(.bottom, 60)
                 }
+                } // End of conditional content
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            startAnimationSequence()
-            // Play boxing sound when view appears
-            SoundManager.shared.playBoxingSound()
-        }
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .onAppear {
+                // Check if we should dismiss immediately (from cancel game)
+                if navigationManager.shouldDismissToGamesList {
+                    navigationManager.resetDismissFlag()
+                    dismiss()
+                    return
+                }
+                
+                startAnimationSequence()
+                // Play boxing sound when view appears
+                SoundManager.shared.playBoxingSound()
+            }
+            .onChange(of: navigationManager.shouldDismissToGamesList) { shouldDismiss in
+                if shouldDismiss {
+                    navigationManager.resetDismissFlag()
+                    dismiss()
+                }
+            }
         .onTapGesture {
             navigateToGameplay = true
         }
         .navigationDestination(isPresented: $navigateToGameplay) {
             GameplayView(game: game, players: players)
         }
+        .background(Color.black)
+        .preferredColorScheme(.dark)
     }
     
     // MARK: - Animation Sequence
