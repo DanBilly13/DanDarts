@@ -77,6 +77,7 @@ struct GameplayView: View {
     @State private var showInstructions: Bool = false
     @State private var showRestartAlert: Bool = false
     @State private var showExitAlert: Bool = false
+    @State private var navigateToGameEnd: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     
@@ -215,6 +216,39 @@ struct GameplayView: View {
         }
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
+        }
+        .onChange(of: gameViewModel.winner) { oldValue, newValue in
+            if newValue != nil {
+                // Winner detected - navigate to game end screen after brief delay
+                // This ensures all state updates are complete
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    navigateToGameEnd = true
+                }
+            }
+        }
+        .navigationDestination(isPresented: $navigateToGameEnd) {
+            if let winner = gameViewModel.winner {
+                GameEndView(
+                    game: game,
+                    winner: winner,
+                    players: players,
+                    onPlayAgain: {
+                        // Reset game with same players
+                        gameViewModel.restartGame()
+                        navigateToGameEnd = false
+                    },
+                    onChangePlayers: {
+                        // Navigate back to game setup
+                        navigateToGameEnd = false
+                        dismiss()
+                    },
+                    onBackToGames: {
+                        // Navigate back to games list
+                        NavigationManager.shared.dismissToGamesList()
+                        dismiss()
+                    }
+                )
+            }
         }
     }
     

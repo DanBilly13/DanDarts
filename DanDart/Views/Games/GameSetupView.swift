@@ -247,107 +247,125 @@ struct SearchPlayerSheet: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 24) {
-                Text("Add Player")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
-                
-                Text("Choose yourself, a friend, or add a new guest")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
-                
-                // Current User Section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("You")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                        Spacer()
-                    }
-                    
+            VStack(spacing: 0) {
+                // Custom Navigation Bar
+                HStack {
+                    // Back button
                     Button(action: {
-                        // Convert User to Player
-                        let currentUserAsPlayer = Player(
-                            displayName: currentUser.displayName,
-                            nickname: currentUser.nickname,
-                            avatarURL: currentUser.avatarURL,
-                            isGuest: false,
-                            totalWins: currentUser.totalWins,
-                            totalLosses: currentUser.totalLosses
-                        )
-                        onPlayerSelected(currentUserAsPlayer)
                         dismiss()
                     }) {
-                        PlayerCard(player: Player(
-                            displayName: currentUser.displayName,
-                            nickname: currentUser.nickname,
-                            avatarURL: currentUser.avatarURL,
-                            isGuest: false,
-                            totalWins: currentUser.totalWins,
-                            totalLosses: currentUser.totalLosses
-                        ))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-                // Add Guest Button
-                Button(action: {
-                    showAddGuestPlayer = true
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20, weight: .medium))
-                        Text("Add Guest Player")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .foregroundColor(Color("AccentPrimary"))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color("InputBackground"))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color("AccentPrimary"), lineWidth: 2)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                
-                // Friends section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Your Friends")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(Color("AccentPrimary"))
                     }
                     
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(Player.mockConnectedPlayers, id: \.id) { player in
-                                Button(action: {
-                                    onPlayerSelected(player)
-                                    dismiss()
-                                }) {
-                                    PlayerCard(player: player)
+                    Spacer()
+                    
+                    // Add Guest button
+                    Button(action: {
+                        showAddGuestPlayer = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Guest")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(Color("AccentPrimary"))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color("AccentPrimary").opacity(0.15))
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color("BackgroundPrimary"))
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header
+                        VStack(spacing: 8) {
+                            Text("Add Player")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(Color("TextPrimary"))
+                            
+                            Text("Choose yourself, a friend, or add a new guest")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 8)
+                        
+                        // Current User Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("You")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                Spacer()
+                            }
+                            
+                            Button(action: {
+                                // Convert User to Player
+                                let currentUserAsPlayer = Player(
+                                    displayName: currentUser.displayName,
+                                    nickname: currentUser.nickname,
+                                    avatarURL: currentUser.avatarURL,
+                                    isGuest: false,
+                                    totalWins: currentUser.totalWins,
+                                    totalLosses: currentUser.totalLosses
+                                )
+                                onPlayerSelected(currentUserAsPlayer)
+                                dismiss()
+                            }) {
+                                PlayerCard(player: Player(
+                                    displayName: currentUser.displayName,
+                                    nickname: currentUser.nickname,
+                                    avatarURL: currentUser.avatarURL,
+                                    isGuest: false,
+                                    totalWins: currentUser.totalWins,
+                                    totalLosses: currentUser.totalLosses
+                                ))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
+                        // Friends section
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Your Friends")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                Spacer()
+                            }
+                            
+                            VStack(spacing: 12) {
+                                ForEach(Player.mockConnectedPlayers, id: \.id) { player in
+                                    Button(action: {
+                                        onPlayerSelected(player)
+                                        dismiss()
+                                    }) {
+                                        PlayerCard(player: player)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
                         }
+                        
+                        Spacer(minLength: 40)
                     }
+                    .padding()
                 }
-                
-                Spacer()
             }
-            .padding()
             .background(Color("BackgroundPrimary"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(Color("AccentPrimary"))
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showAddGuestPlayer) {
                 AddGuestPlayerView { player in
                     onPlayerSelected(player)

@@ -159,8 +159,9 @@ class GameViewModel: ObservableObject {
             // Play celebration sound
             SoundManager.shared.playGameWin()
             
-            // Winner detected - don't switch players
+            // Winner detected - clear state but don't switch players
             currentThrow.removeAll()
+            selectedDartIndex = nil
             return
         }
         

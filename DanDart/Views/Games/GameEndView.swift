@@ -12,6 +12,9 @@ struct GameEndView: View {
     let game: Game
     let winner: Player
     let players: [Player]
+    let onPlayAgain: () -> Void
+    let onChangePlayers: () -> Void
+    let onBackToGames: () -> Void
     
     @Environment(\.dismiss) private var dismiss
     @State private var showCelebration = false
@@ -89,8 +92,7 @@ struct GameEndView: View {
                 VStack(spacing: 16) {
                     // Play Again Button (same players)
                     Button(action: {
-                        // TODO: Implement play again
-                        dismiss()
+                        onPlayAgain()
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "arrow.clockwise")
@@ -110,8 +112,7 @@ struct GameEndView: View {
                     
                     // New Game Button (same game, different players)
                     Button(action: {
-                        // TODO: Navigate to player selection
-                        dismiss()
+                        onChangePlayers()
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "person.2.fill")
@@ -130,8 +131,7 @@ struct GameEndView: View {
                     
                     // Back to Games Button
                     Button(action: {
-                        NavigationManager.shared.dismissToGamesList()
-                        dismiss()
+                        onBackToGames()
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "house.fill")
@@ -173,7 +173,10 @@ struct GameEndView: View {
     GameEndView(
         game: Game.preview301,
         winner: Player.mockGuest1,
-        players: [Player.mockGuest1, Player.mockGuest2]
+        players: [Player.mockGuest1, Player.mockGuest2],
+        onPlayAgain: { print("Play Again") },
+        onChangePlayers: { print("Change Players") },
+        onBackToGames: { print("Back to Games") }
     )
 }
 
@@ -181,6 +184,9 @@ struct GameEndView: View {
     GameEndView(
         game: Game.preview501,
         winner: Player.mockConnected1,
-        players: [Player.mockConnected1, Player.mockGuest1]
+        players: [Player.mockConnected1, Player.mockGuest1],
+        onPlayAgain: { print("Play Again") },
+        onChangePlayers: { print("Change Players") },
+        onBackToGames: { print("Back to Games") }
     )
 }
