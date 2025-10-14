@@ -70,34 +70,21 @@ struct GameplayView: View {
     let game: Game
     let players: [Player]
     
-    // Game state
-    @State private var currentPlayerIndex = 0
-    @State private var playerScores: [UUID: Int] = [:]
-    @State private var currentThrow: [ScoredThrow] = []
-    @State private var throwIndex = 0
+    // Game state managed by ViewModel
+    @StateObject private var gameViewModel: GameViewModel
     @StateObject private var navigationManager = NavigationManager.shared
     @StateObject private var menuCoordinator = MenuCoordinator.shared
-    @State private var showMoreMenu: Bool = false
     @State private var showInstructions: Bool = false
     @State private var showRestartAlert: Bool = false
-    @State private var navigateToPreGameHype: Bool = false
-    @State private var shouldDismissToRoot: Bool = false
-    @State private var isTurnComplete: Bool = false
     @State private var showExitAlert: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     
-    // Initialize player scores based on game type
-    private func initializeScores() {
-        if playerScores.isEmpty {
-            for player in players {
-                playerScores[player.id] = 301 // Start with 301 for 301 game
-            }
-        }
-    }
-    
-    var currentPlayer: Player {
-        players[currentPlayerIndex]
+    // Initialize with game and players
+    init(game: Game, players: [Player]) {
+        self.game = game
+        self.players = players
+        _gameViewModel = StateObject(wrappedValue: GameViewModel(game: game, players: players))
     }
     
     var body: some View {
@@ -110,25 +97,38 @@ struct GameplayView: View {
                 VStack(spacing: 0) {
                     // Stacked player cards (current player in front)
                     StackedPlayerCards(
-                        players: players,
-                        currentPlayerIndex: currentPlayerIndex,
-                        playerScores: playerScores,
-                        currentThrow: currentThrow
+                        players: gameViewModel.players,
+                        currentPlayerIndex: gameViewModel.currentPlayerIndex,
+                        playerScores: gameViewModel.playerScores,
+                        currentThrow: gameViewModel.currentThrow
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 60)  // Extra padding to clear the notch area
                     
                     // Current throw display (always visible)
-                    CurrentThrowDisplay(currentThrow: currentThrow)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
+                    CurrentThrowDisplay(
+                        currentThrow: gameViewModel.currentThrow,
+                        selectedDartIndex: gameViewModel.selectedDartIndex,
+                        onDartTapped: { index in
+                            gameViewModel.selectDart(at: index)
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    
+                    // Checkout suggestion (when available)
+                    if let checkout = gameViewModel.suggestedCheckout {
+                        CheckoutSuggestionView(checkout: checkout)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 4)
+                    }
                     
                     Spacer()
                     
                     // Scoring button grid (center)
                     ScoringButtonGrid(
                         onScoreSelected: { baseValue, scoreType in
-                            addScoreToThrow(baseValue: baseValue, scoreType: scoreType)
+                            gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
                         }
                     )
                     .padding(.horizontal, 16)
@@ -136,7 +136,7 @@ struct GameplayView: View {
                     Spacer()
                     
                     // Save Score button
-                    Button(action: saveScore) {
+                    Button(action: { gameViewModel.saveScore() }) {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .medium))
@@ -148,10 +148,10 @@ struct GameplayView: View {
                         .frame(height: 56)
                         .background(
                             RoundedRectangle(cornerRadius: 28)
-                                .fill(isTurnComplete ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
+                                .fill(gameViewModel.isTurnComplete ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
                         )
                     }
-                    .disabled(!isTurnComplete)
+                    .disabled(!gameViewModel.isTurnComplete)
                     .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
                     .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
                     .animation(.easeInOut(duration: 0.2), value: menuCoordinator.activeMenuId != nil)
@@ -195,9 +195,6 @@ struct GameplayView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .ignoresSafeArea(.container, edges: .bottom)
-        .onAppear {
-            initializeScores()
-        }
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {
@@ -211,8 +208,7 @@ struct GameplayView: View {
         .alert("Restart Game", isPresented: $showRestartAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Restart", role: .destructive) {
-                // Navigate back to PreGameHypeView for a fresh start
-                dismiss()
+                gameViewModel.restartGame()
             }
         } message: {
             Text("Are you sure you want to restart the game? All progress will be lost.")
@@ -223,83 +219,7 @@ struct GameplayView: View {
     }
     
     // MARK: - Game Logic
-    
-    private func addScoreToThrow(baseValue: Int, scoreType: ScoreType) {
-        guard currentThrow.count < 3 else { return }
-        
-        // Handle bust - end turn immediately and reset score
-        if baseValue == -1 { // Using -1 as bust indicator
-            bustCurrentTurn()
-            return
-        }
-        
-        let scoredThrow = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
-        
-        // Handle miss sound
-        if scoredThrow.totalValue == 0 {
-            SoundManager.shared.playMissSound()
-        } else {
-            // Play score sound for any non-zero score
-            SoundManager.shared.playScoreSound()
-        }
-        
-        currentThrow.append(scoredThrow)
-        
-        // Check if turn is complete (3 throws)
-        if currentThrow.count == 3 {
-            isTurnComplete = true
-        }
-    }
-    
-    private func bustCurrentTurn() {
-        // Player busted - turn ends immediately, score stays the same, move to next player
-        currentThrow.removeAll()
-        isTurnComplete = false
-        switchToNextPlayer()
-    }
-    
-    private func saveScore() {
-        guard !currentThrow.isEmpty else { return }
-        
-        let throwTotal = currentThrow.reduce(0) { $0 + $1.totalValue }
-        let currentScore = playerScores[currentPlayer.id] ?? 301
-        let newScore = max(0, currentScore - throwTotal)
-        
-        playerScores[currentPlayer.id] = newScore
-        
-        // Check for winner
-        if newScore == 0 {
-            // Game won!
-            // TODO: Navigate to GameEndView
-            print("Player \(currentPlayer.displayName) wins!")
-        } else {
-            // Switch to next player
-            switchToNextPlayer()
-        }
-        
-        // Clear current throw and reset turn state
-        currentThrow.removeAll()
-        isTurnComplete = false
-    }
-    
-    private func switchToNextPlayer() {
-        currentPlayerIndex = (currentPlayerIndex + 1) % players.count
-        isTurnComplete = false
-        SoundManager.shared.resetMissCounter() // Reset miss counter for new player
-    }
-    
-    private func restartGame() {
-        // Reset all game state
-        currentPlayerIndex = 0
-        currentThrow.removeAll()
-        isTurnComplete = false
-        SoundManager.shared.resetMissCounter()
-        
-        // Reset all player scores
-        for player in players {
-            playerScores[player.id] = 301 // Reset to starting score
-        }
-    }
+    // All game logic now handled by GameViewModel
 }
 
 // MARK: - Stacked Player Cards
@@ -485,33 +405,60 @@ struct PlayerScoreCard: View {
 
 struct CurrentThrowDisplay: View {
     let currentThrow: [ScoredThrow]
+    let selectedDartIndex: Int?
+    let onDartTapped: (Int) -> Void
     
     var body: some View {
         HStack(spacing: 12) {
-                // Individual throw scores
-                ForEach(0..<3, id: \.self) { index in
-                    Text(index < currentThrow.count ? currentThrow[index].displayText : "—")
+            // Individual throw scores
+            ForEach(0..<3, id: \.self) { index in
+                let isSelected = selectedDartIndex == index
+                let hasDart = index < currentThrow.count
+                
+                Button(action: {
+                    if hasDart {
+                        // Haptic feedback
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        onDartTapped(index)
+                    }
+                }) {
+                    Text(hasDart ? currentThrow[index].displayText : "—")
                         .font(.system(size: 18, weight: .semibold, design: .monospaced))
-                        .foregroundColor(index < currentThrow.count ? Color("TextPrimary") : Color("TextSecondary").opacity(0.5))
+                        .foregroundColor(hasDart ? Color("TextPrimary") : Color("TextSecondary").opacity(0.5))
                         .frame(width: 40, height: 40)
-                        .background(Color("AccentPrimary").opacity(index < currentThrow.count ? 0.15 : 0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color("AccentPrimary").opacity(hasDart ? 0.15 : 0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(
+                                    isSelected ? Color("AccentPrimary") : Color.clear,
+                                    lineWidth: isSelected ? 2 : 0
+                                )
+                        )
+                        .scaleEffect(isSelected ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
                 }
-                
-                // Equals sign
-                Text("=")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
-                    .padding(.horizontal, 8)
-                
-                // Total score
-                Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color("AccentPrimary"))
-                    .frame(width: 50, height: 40)
-                    .background(Color("AccentPrimary").opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                .buttonStyle(PlainButtonStyle())
+                .disabled(!hasDart)
             }
+            
+            // Equals sign
+            Text("=")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Color("TextSecondary"))
+                .padding(.horizontal, 8)
+            
+            // Total score
+            Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
+                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .foregroundColor(Color("AccentPrimary"))
+                .frame(width: 50, height: 40)
+                .background(Color("AccentPrimary").opacity(0.2))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
         .background(
@@ -803,6 +750,39 @@ struct ScoringButton: View {
                 }
             }
         )
+    }
+}
+
+// MARK: - Checkout Suggestion View
+
+struct CheckoutSuggestionView: View {
+    let checkout: String
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "target")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color("AccentPrimary"))
+            
+            Text("Checkout: \(checkout)")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color("AccentPrimary"))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color("AccentPrimary").opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color("AccentPrimary").opacity(0.4), lineWidth: 1)
+                )
+        )
+        .transition(.asymmetric(
+            insertion: .scale(scale: 0.9).combined(with: .opacity),
+            removal: .scale(scale: 0.9).combined(with: .opacity)
+        ))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: checkout)
     }
 }
 
