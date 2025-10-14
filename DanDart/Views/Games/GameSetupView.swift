@@ -173,20 +173,14 @@ struct GameSetupView: View {
             
             // Start Game Button
             VStack(spacing: 16) {
-                Button(action: {
+                AppButton(role: .primary, controlSize: .regular, isDisabled: !canStartGame) {
                     showGameView = true
-                }) {
-                    Text("Start Game")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(canStartGame ? .white : Color("TextSecondary"))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(canStartGame ? Color("AccentPrimary") : Color("InputBackground"))
-                        .cornerRadius(12)
+                } label: {
+                    Text("Start Game").bold()
                 }
-                .disabled(!canStartGame)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 16)
-                
+
                 if !canStartGame && selectedPlayers.count == 1 {
                     Text("Add at least one more player")
                         .font(.system(size: 14, weight: .medium))
@@ -266,23 +260,17 @@ struct SearchPlayerSheet: View {
                     Spacer()
                     
                     // Add Guest button
-                    Button(action: {
+                    AppButton(role: .primary, controlSize: .small, compact: true) {
                         showAddGuestPlayer = true
-                    }) {
+                    } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
                                 .font(.system(size: 14, weight: .semibold))
                             Text("Guest")
                                 .font(.system(size: 14, weight: .semibold))
                         }
-                        .foregroundColor(Color("AccentPrimary"))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color("AccentPrimary").opacity(0.15))
-                        )
                     }
+                    .frame(width: 100)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)

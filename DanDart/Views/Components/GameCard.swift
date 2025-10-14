@@ -40,14 +40,11 @@ struct GameCard: View {
             HStack {
                 Spacer()
                 
-                Button(action: onPlayTapped) {
+                AppButton(role: .primary, controlSize: .small, compact: true) {
+                    onPlayTapped()
+                } label: {
                     Text("Play")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.accentPrimary)
-                        .clipShape(Capsule())
+                        .bold()
                 }
             }
         }

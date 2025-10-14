@@ -102,6 +102,37 @@ Phase 9: Gameplay Screen - Scoring (301 Only)
 
 * * * * *
 
+Task 45.1: Implement Custom Context Menu Overlay System
+
+-   [ ] Create MenuCoordinator class to manage active menu state across all scoring buttons
+-   [ ]  Implement custom overlay positioning system that calculates optimal menu placement
+-   [ ]  Add long-press gesture detection to trigger custom context menu
+-   [ ]  Create custom dark-themed popup with Single/Double/Triple options
+-   [ ]  Implement smart positioning logic to avoid screen edges
+-   [ ]  Add blur effects to background when menu is active
+-   [ ]  Integrate haptic feedback for menu interactions
+
+Acceptance Criteria:
+
+✓ Custom overlay menu appears on long-press with spatial relationship to button
+✓ Menu positioned intelligently (above/below button based on screen position)
+✓ Background blur and opacity effects when menu is active
+✓ Menu animations use spring transitions for smooth UX
+✓ Proper cleanup when menu is dismissed
+✓ Haptic feedback differentiates between Single/Double/Triple selections
+Dependencies: Task 45
+
+Technical Implementation:
+
+MenuCoordinator singleton manages global menu state
+Custom positioning calculates optimal menu placement
+Overlay system with z-index management
+Gesture coordination between tap and long-press
+Frame tracking for dynamic positioning
+
+
+* * * * *
+
 ### Task 46: Create Game State Manager (301 Logic)
 
 -   [ ] Create file: ViewModels/GameViewModel.swift
@@ -144,20 +175,54 @@ Phase 9: Gameplay Screen - Scoring (301 Only)
 
 * * * * *
 
-### Task 48: Implement Undo Last Turn
+### Task 47.1: Implement Checkout Suggestions (301/501)
 
--   [ ] Add @Published lastTurn in GameViewModel
--   [ ] Store last turn data before switching players
--   [ ] Add "Undo" button (appears for 5 seconds after save)
--   [ ] Implement undo logic (restore previous state)
--   [ ] Test undo functionality
+-   [ ]  Create checkout calculation logic in GameViewModel
+-   [ ]  Add @Published suggestedCheckout: String?
+-   [ ]  Calculate possible checkouts based on remaining score
+-   [ ]  Display checkout suggestion under current player's current throw
+-   [ ]  Update checkout dynamically after each dart
+-   [ ]  Only show checkout when one is available (hide if impossible)
+-   [ ]  Use standard dart checkout chart logic
+-   [ ]  Style checkout text (accent color, smaller font)
 
 **Acceptance Criteria:**
 
--   ✓ Undo button appears after save
--   ✓ Undo restores previous score and player
--   ✓ Undo disappears after 5 seconds
--   ✓ Can't undo more than once
+-   ✓ Shows valid checkout when player can finish (2-170 range)
+-   ✓ Updates after each dart in turn
+-   ✓ Hidden when no checkout available
+-   ✓ Ends with double as per darts rules
+-   ✓ Displays clearly under current throw
+
+**Dependencies:** Task 47
+
+**Note:** Support checkouts requiring 3 darts or less (2-170). Above 170, no checkout shown.
+
+* * * * *
+
+
+### Task 48: Implement Edit Current Throw
+
+-   [ ]  Add tap gesture to current throw display (the boxes showing 18, 18, ---, =, 36)
+-   [ ]  Highlight/select a dart when tapped
+-   [ ]  Allow replacing the selected dart with a new button press
+-   [ ]  Update throw total automatically
+-   [ ]  Visual indication of which dart is selected (border or highlight)
+-   [ ]  Deselect after replacement
+-   [ ]  Only allow editing current turn (before "Save Score")
+
+**Acceptance Criteria:**
+
+-   ✓ Can tap any dart in current throw to select it
+-   ✓ Selected dart visually highlighted
+-   ✓ Pressing a number button replaces the selected dart
+-   ✓ Total updates immediately
+-   ✓ Can edit all 3 darts
+-   ✓ Cannot edit after "Save Score" is pressed
+
+**Dependencies:** Task 44, Task 47
+
+**Note:** This replaces the "Undo Last Turn" functionality with inline editing during the current turn, which is more intuitive.
 
 **Dependencies:** Task 47
 
@@ -205,7 +270,7 @@ Phase 10: Game End Screen
 
 * * * * *
 
-### Task 51: Implement Confetti Animation
+### Task 51: Implement Confetti Animation - CANCELLED
 
 -   [ ] Create simple confetti particle system
 -   [ ] Use Canvas or SpriteKit for particles
@@ -363,46 +428,7 @@ Phase 11: Friends Tab
 
 * * * * *
 
-### Task 59: Create Friend Profile View
-
--   [ ] Create file: Views/Friends/FriendProfileView.swift
--   [ ] Add large avatar (120pt)
--   [ ] Add display name and nickname
--   [ ] Add total W/L stats
--   [ ] Add head-to-head stats section (placeholder)
--   [ ] Add match history section (placeholder)
--   [ ] Add "Remove Friend" button
--   [ ] Style per design spec
-
-**Acceptance Criteria:**
-
--   ✓ Profile shows all user info
--   ✓ Layout clean and readable
--   ✓ Remove button present
--   ✓ Navigates from friend list tap
 
 * * * * *
-
-### Task 60: Integrate Friends Tab Navigation
-
--   [ ] Add NavigationStack to FriendsListView
--   [ ] Add NavigationLink on friend card tap
--   [ ] Navigate to FriendProfileView
--   [ ] Pass friend data
--   [ ] Test navigation flow
-
-**Acceptance Criteria:**
-
--   ✓ Tapping friend navigates to profile
--   ✓ Back button works
--   ✓ Correct data displayed
-
-**Dependencies:** Task 54, Task 59
-
-* * * * *
-
----
 
 Next: Continue with DanDarts task-list-4
-
-Phase 12: History Tab

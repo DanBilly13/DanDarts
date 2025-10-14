@@ -50,7 +50,11 @@ struct GamesListViewLegacy: View {
                 HStack(spacing: cardSpacing) {
                     ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                         GameCard(game: game) {
-                            onGameSelected(game)
+                            AppButton(role: .primary, controlSize: .small) {
+                                onGameSelected(game)
+                            } label: {
+                                Text("Play")
+                            }
                         }
                         .frame(width: cardWidth)
                         .scaleEffect(index == currentIndex ? 1.0 : 0.95)
@@ -127,7 +131,11 @@ struct GamesListViewVertical: View {
             LazyVStack(spacing: 16) {
                 ForEach(games) { game in
                     GameCard(game: game) {
-                        onGameSelected(game)
+                        AppButton(role: .primary, controlSize: .small) {
+                            onGameSelected(game)
+                        } label: {
+                            Text("Play")
+                        }
                     }
                 }
             }

@@ -48,44 +48,20 @@ struct WelcomeView: View {
                 // Bottom section with buttons
                 VStack(spacing: 16) {
                     // Sign In Button
-                    Button(action: {
+                    AppButton(role: .primary, controlSize: .small) {
                         showingSignIn = true
-                    }) {
+                    } label: {
                         Text("Get Started")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(Color("BackgroundPrimary"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color("AccentPrimary"), Color("AccentPrimary").opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(25)
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                     
                     // Sign Up Button
-                    Button(action: {
+                    AppButton(role: .secondary, controlSize: .small) {
                         showingSignUp = true
-                    }) {
+                    } label: {
                         Text("Continue as Guest")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(Color("BackgroundPrimary"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color("AccentSecondary"), Color("AccentSecondary").opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(25)
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                     
                     // Continue as Guest Button
                     Button(action: {
