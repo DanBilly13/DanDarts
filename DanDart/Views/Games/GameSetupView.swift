@@ -124,24 +124,11 @@ struct GameSetupView: View {
                             
                             // Add next player button (if under limit)
                             if selectedPlayers.count < playerLimit {
-                                Button(action: {
+                                AppButton(role: .primaryOutline, controlSize: .regular, compact: true) {
                                     showSearchPlayer = true
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "plus.circle.fill")
-                                            .font(.system(size: 20, weight: .medium))
-                                        Text("Add Player \(selectedPlayers.count + 1)")
-                                            .font(.system(size: 16, weight: .semibold))
-                                    }
-                                    .foregroundColor(Color("AccentPrimary"))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(Color("InputBackground"))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color("AccentPrimary"), lineWidth: 2)
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                } label: {
+                                    Label("Add Player \(selectedPlayers.count + 1)", systemImage: "plus")
+                                        .font(.system(size: 16))
                                 }
                             }
                         }
@@ -176,7 +163,7 @@ struct GameSetupView: View {
                 AppButton(role: .primary, controlSize: .regular, isDisabled: !canStartGame) {
                     showGameView = true
                 } label: {
-                    Text("Start Game").bold()
+                    Text("Start Game")
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 16)
