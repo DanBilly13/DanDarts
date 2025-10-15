@@ -116,13 +116,17 @@ struct GameplayView: View {
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
-                    
-                    // Checkout suggestion (when available)
-                    if let checkout = gameViewModel.suggestedCheckout {
-                        CheckoutSuggestionView(checkout: checkout)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 4)
+                    VStack {
+                        if let checkout = gameViewModel.suggestedCheckout {
+                            CheckoutSuggestionView(checkout: checkout)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 4)
+                        }
                     }
+                    .frame(height: 36)
+                    
+                    
+                    
                     
                     Spacer()
                     
@@ -327,7 +331,7 @@ struct StackedPlayerCards: View {
         // Progressive overlay opacity for depth effect
         switch stackPosition {
         case 1: return 0.3   // Player 2: 30% dark overlay
-        case 2: return 0.5   // Player 3: 50% dark overlay  
+        case 2: return 0.5   // Player 3: 50% dark overlay
         case 3: return 0.65  // Player 4: 65% dark overlay
         default: return min(0.8, 0.3 + (CGFloat(stackPosition - 1) * 0.15))  // Additional players
         }
@@ -394,11 +398,11 @@ struct PlayerScoreCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(player.displayName)
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(Color("AccentTertiary"))
                     
                     Text("@\(player.nickname)")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(Color("AccentTertiary").opacity(0.8))
                 }
                 
                 Spacer()
@@ -406,7 +410,7 @@ struct PlayerScoreCard: View {
                 // Score
                 Text("\(score)")
                     .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(isCurrentPlayer ? Color("AccentPrimary") : Color("TextPrimary"))
+                    .foregroundColor(isCurrentPlayer ? Color("AccentTertiary") : Color("AccentTertiary"))
             }
             
         }
@@ -417,7 +421,7 @@ struct PlayerScoreCard: View {
                 .fill(Color("InputBackground"))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color("AccentPrimary"), lineWidth: 2)
+                        .stroke(Color("AccentSecondary"), lineWidth: 2)
                 )
         )
     }
@@ -451,7 +455,7 @@ struct CurrentThrowDisplay: View {
                         .frame(width: 40, height: 40)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color("AccentPrimary").opacity(hasDart ? 0.15 : 0.05))
+                                .fill(Color("AccentTertiary").opacity(hasDart ? 0.25 : 0.25))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -476,19 +480,19 @@ struct CurrentThrowDisplay: View {
             // Total score
             Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
                 .font(.system(size: 20, weight: .bold, design: .monospaced))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(Color("AccentTertiary"))
                 .frame(width: 50, height: 40)
-                .background(Color("AccentPrimary").opacity(0.2))
+                .background(Color("AccentTertiary").opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color("InputBackground").opacity(0.5))
+                .fill(Color("InputBackground").opacity(0))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color("AccentPrimary").opacity(0.3), lineWidth: 1)
+                        .stroke(Color("AccentTertiary").opacity(0), lineWidth: 1)
                 )
         )
     }
@@ -591,7 +595,7 @@ struct ScoringButton: View {
             offsetX = 16 - buttonCenterX + menuWidth/2
         }
         
-        // Check if menu would go off right edge  
+        // Check if menu would go off right edge
         if buttonCenterX + menuWidth/2 > screenWidth - 16 {
             offsetX = (screenWidth - 16) - buttonCenterX - menuWidth/2
         }
@@ -641,8 +645,8 @@ struct ScoringButton: View {
             .clipShape(Circle())
             .scaleEffect(isPressed ? 0.92 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
-            .blur(radius: shouldBlur ? 2 : 0)
-            .opacity(shouldBlur ? 0.4 : 1.0)
+            .blur(radius: shouldBlur ? 4 : 0)
+            .opacity(shouldBlur ? 0.6 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: shouldBlur)
             .onAppear {
                 // Capture button frame in global coordinates
@@ -679,7 +683,7 @@ struct ScoringButton: View {
             // Default to single
             onScoreSelected(baseValue, .single)
         }
-        .onLongPressGesture(minimumDuration: 0.5) {
+        .onLongPressGesture(minimumDuration: 0.25) {
             if canShowContextMenu {
                 // Haptic feedback for long press
                 let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
@@ -782,22 +786,20 @@ struct CheckoutSuggestionView: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "target")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color("AccentPrimary"))
+            
             
             Text("Checkout: \(checkout)")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(Color("AccentTertiary"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color("AccentPrimary").opacity(0.15))
+                .fill(Color("AccentSecondary").opacity(0))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color("AccentPrimary").opacity(0.4), lineWidth: 1)
+                        .stroke(Color("AccentPrimary").opacity(0), lineWidth: 1)
                 )
         )
         .transition(.asymmetric(
