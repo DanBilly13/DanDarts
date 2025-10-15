@@ -95,15 +95,17 @@ private struct AppButtonStyle: ButtonStyle {
         switch role {
         case .primary, .secondary, .tertiary:
             let bg: Color = {
-                if !isEnabled { return base.opacity(role == .tertiary ? 0.35 : 0.55) }
+                // disabled filled background button opacity
+                if !isEnabled { return base.opacity(0.2) }
                 return pressed ? base.opacity(role == .tertiary ? 0.85 : 0.90) : base
             }()
             Capsule().fill(bg)
                 .shadow(radius: (role == .tertiary || !isEnabled) ? 0 : 2)
 
         case .primaryOutline, .secondaryOutline, .tertiaryOutline:
-            let fillOpacity: Double = !isEnabled ? 0.06 : (pressed ? 0.18 : 0.12)
-            Capsule().fill(base.opacity(fillOpacity))
+            // Use app background to clearly differentiate from disabled filled buttons
+            let bg = Color("BackgroundPrimary")
+            Capsule().fill(bg)
         }
     }
 
@@ -119,19 +121,19 @@ private struct AppButtonStyle: ButtonStyle {
         case .primaryOutline:
             Capsule()
                 .strokeBorder(
-                    Color("AccentPrimary").opacity(isEnabled ? (pressed ? 0.9 : 0.8) : 0.4),
+                    Color("AccentPrimary").opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         case .secondaryOutline:
             Capsule()
                 .strokeBorder(
-                    Color("AccentSecondary").opacity(isEnabled ? (pressed ? 0.9 : 0.8) : 0.4),
+                    Color("AccentSecondary").opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         case .tertiaryOutline:
             Capsule()
                 .strokeBorder(
-                    Color("AccentPrimary").opacity(isEnabled ? (pressed ? 0.6 : 0.5) : 0.3),
+                    Color("AccentPrimary").opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         default:
@@ -231,8 +233,10 @@ private extension View {
     func applyButtonForeground(role: AppButtonRole, isEnabled: Bool) -> some View {
         let primaryBase = Color("AccentPrimary")
         let secondaryBase = Color("AccentSecondary")
-        let white = Color.white.opacity(isEnabled ? 1 : 0.7)
-        let dim: (Color) -> Color = { color in color.opacity(isEnabled ? 1 : 0.6) }
+        // disabled filled button text opacity
+        let white = Color.white.opacity(isEnabled ? 1 : 0.2)
+        // disabled border text opacity
+        let dim: (Color) -> Color = { color in color.opacity(isEnabled ? 1 : 0.2) }
 
         let textColor: Color
         let iconTint: Color

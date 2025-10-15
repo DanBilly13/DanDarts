@@ -136,21 +136,9 @@ struct GameplayView: View {
                     
                     Spacer()
                     
-                    // Save Score button
-                    Button(action: { gameViewModel.saveScore() }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 20, weight: .medium))
-                            Text("Save Score")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 28)
-                                .fill(gameViewModel.isTurnComplete ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
-                        )
+                    // Save Score button (new AppButton)
+                    AppButton(role: .primary, action: { gameViewModel.saveScore() }) {
+                        Label("Save Score", systemImage: "checkmark.circle.fill")
                     }
                     .disabled(!gameViewModel.isTurnComplete)
                     .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
