@@ -33,11 +33,71 @@ class GameViewModel: ObservableObject {
     }
     
     var isTurnComplete: Bool {
-        currentThrow.count == 3 || currentThrow.contains(where: { $0.baseValue == -1 })
+        // Turn is complete if:
+        // 1. All 3 darts thrown
+        // 2. Bust recorded
+        // 3. Player has reached exactly zero (winner)
+        if currentThrow.count == 3 || currentThrow.contains(where: { $0.baseValue == -1 }) {
+            return true
+        }
+        
+        // Check if current throw would result in exactly zero (winning condition)
+        let currentScore = playerScores[currentPlayer.id] ?? startingScore
+        let throwTotal = currentThrowTotal
+        let newScore = currentScore - throwTotal
+        
+        return newScore == 0
     }
     
     var currentThrowTotal: Int {
         currentThrow.reduce(0) { $0 + $1.totalValue }
+    }
+    
+    var isBust: Bool {
+        // Check if bust button was pressed
+        if currentThrow.contains(where: { $0.baseValue == -1 }) {
+            return true
+        }
+        
+        // Check if the current throw would result in a bust
+        guard !currentThrow.isEmpty else { return false }
+        
+        let currentScore = playerScores[currentPlayer.id] ?? startingScore
+        let throwTotal = currentThrowTotal
+        let newScore = currentScore - throwTotal
+        
+        // Bust if: score goes below 0, equals 1, or reaches 0 without a double
+        if newScore < 0 || newScore == 1 {
+            return true
+        }
+        
+        // If reaching exactly 0, must finish on a double
+        if newScore == 0 {
+            // Check if last dart was a double
+            if let lastDart = currentThrow.last {
+                return lastDart.scoreType != .double
+            }
+        }
+        
+        return false
+    }
+    
+    var isWinningThrow: Bool {
+        // Check if the current throw would result in a win (exactly 0 with a double)
+        guard !currentThrow.isEmpty else { return false }
+        
+        let currentScore = playerScores[currentPlayer.id] ?? startingScore
+        let throwTotal = currentThrowTotal
+        let newScore = currentScore - throwTotal
+        
+        // Win if: score reaches exactly 0 AND last dart was a double
+        if newScore == 0 {
+            if let lastDart = currentThrow.last {
+                return lastDart.scoreType == .double
+            }
+        }
+        
+        return false
     }
     
     // MARK: - Initialization
@@ -124,8 +184,17 @@ class GameViewModel: ObservableObject {
         let currentScore = playerScores[currentPlayer.id] ?? startingScore
         let newScore = currentScore - throwTotal
         
-        // Check for bust (score would go below 0 or exactly 1)
-        if newScore < 0 || newScore == 1 {
+        // Check for bust (score would go below 0, exactly 1, or finish without double)
+        let isBustTurn = newScore < 0 || newScore == 1
+        
+        // If reaching exactly 0, must finish on a double
+        let finishedOnDouble = if newScore == 0 {
+            currentThrow.last?.scoreType == .double
+        } else {
+            false
+        }
+        
+        if isBustTurn || (newScore == 0 && !finishedOnDouble) {
             // Bust - score stays the same
             saveTurnHistory(
                 player: currentPlayer,
@@ -136,7 +205,11 @@ class GameViewModel: ObservableObject {
             )
             
             currentThrow.removeAll()
+            selectedDartIndex = nil
             switchPlayer()
+            
+            // Update checkout for new player
+            updateCheckoutSuggestion()
             return
         }
         

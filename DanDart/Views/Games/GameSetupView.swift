@@ -38,7 +38,7 @@ struct GameSetupView: View {
                 
                 Spacer()
                 
-                Text("Setup")
+                Text(game.title)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(Color("TextPrimary"))
                 
@@ -60,36 +60,6 @@ struct GameSetupView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Game Info Section
-                    VStack(spacing: 16) {
-                        // Game Title and Description
-                        VStack(spacing: 8) {
-                            Text(game.title)
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(Color("TextPrimary"))
-                            
-                            Text(game.subtitle)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                                .multilineTextAlignment(.center)
-                        }
-                        
-                        // Game Instructions
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("How to Play")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(Color("TextPrimary"))
-                            
-                            Text(game.instructions)
-                                .font(.system(size: 14, weight: .regular))
-                                .foregroundColor(Color("TextSecondary"))
-                                .lineLimit(nil)
-                        }
-                        .padding(16)
-                        .background(Color("InputBackground"))
-                        .cornerRadius(12)
-                    }
-                    
                     // Player Selection Section
                     VStack(spacing: 16) {
                         HStack {
@@ -133,53 +103,48 @@ struct GameSetupView: View {
                             }
                         }
                         
-                        // Empty state when no players
-                        if selectedPlayers.isEmpty {
-                            VStack(spacing: 8) {
-                                Image(systemName: "person.2.badge.plus")
-                                    .font(.system(size: 32, weight: .light))
-                                    .foregroundColor(Color("TextSecondary"))
-                                
-                                Text("Add players to start the game")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                                
-                                Text("You need at least 2 players")
-                                    .font(.system(size: 14, weight: .regular))
-                                    .foregroundColor(Color("TextSecondary").opacity(0.7))
-                            }
-                            .padding(.vertical, 32)
+                    }
+                    
+                    // Start Game Button
+                    VStack(spacing: 12) {
+                        AppButton(role: .primary, controlSize: .regular, isDisabled: !canStartGame) {
+                            showGameView = true
+                        } label: {
+                            Text("Start Game")
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        if !canStartGame && selectedPlayers.count == 1 {
+                            Text("Add at least one more player")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
                         }
                     }
                     
-                    Spacer(minLength: 100)
+                    // Game Instructions (moved to bottom)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("How to Play")
+                            .font(.headline)
+                            .foregroundStyle(Color("TextPrimary"))
+                        
+                        Text(game.instructions)
+                            .font(.body)
+                            .foregroundStyle(Color("TextSecondary"))
+                    }
+                    .padding(16)
+                    .background(Color("InputBackground"))
+                    .cornerRadius(12)
+                    
+                    Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 24)
+                .padding(.bottom, 16)
             }
-            
-            // Start Game Button
-            VStack(spacing: 16) {
-                AppButton(role: .primary, controlSize: .regular, isDisabled: !canStartGame) {
-                    showGameView = true
-                } label: {
-                    Text("Start Game")
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
-
-                if !canStartGame && selectedPlayers.count == 1 {
-                    Text("Add at least one more player")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                        .padding(.horizontal, 16)
-                }
-            }
-            .padding(.bottom, 16)
-            .background(Color("BackgroundPrimary"))
             }
             .background(Color("BackgroundPrimary"))
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .tabBar)
             .navigationDestination(isPresented: $showGameView) {
                 // Always show black background to prevent white flash
                 ZStack {
