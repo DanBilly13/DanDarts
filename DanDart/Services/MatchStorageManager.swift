@@ -216,3 +216,92 @@ struct PlayerStats: Codable {
         return String(format: "%.1f%%", winRate * 100)
     }
 }
+
+// MARK: - Testing Helper
+
+extension MatchStorageManager {
+    /// Add mock matches for testing (call this once to populate test data)
+    func seedTestMatches() {
+        // Create test players
+        let player1 = MatchPlayer(
+            id: UUID(),
+            displayName: "Dan Billingham",
+            nickname: "danbilly",
+            avatarURL: "avatar1",
+            isGuest: false,
+            finalScore: 0,
+            startingScore: 301,
+            totalDartsThrown: 18,
+            turns: []
+        )
+        
+        let player2 = MatchPlayer(
+            id: UUID(),
+            displayName: "Bob Smith",
+            nickname: "bobsmith",
+            avatarURL: "avatar2",
+            isGuest: false,
+            finalScore: 45,
+            startingScore: 301,
+            totalDartsThrown: 18,
+            turns: []
+        )
+        
+        let player3 = MatchPlayer(
+            id: UUID(),
+            displayName: "Alice Jones",
+            nickname: "alicej",
+            avatarURL: "avatar3",
+            isGuest: false,
+            finalScore: 127,
+            startingScore: 501,
+            totalDartsThrown: 24,
+            turns: []
+        )
+        
+        // Create test matches with different dates
+        let match1 = MatchResult(
+            gameType: "301",
+            gameName: "301",
+            players: [player1, player2],
+            winnerId: player1.id,
+            timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
+            duration: 180
+        )
+        
+        let match2 = MatchResult(
+            gameType: "501",
+            gameName: "501",
+            players: [player1, player3],
+            winnerId: player3.id,
+            timestamp: Date().addingTimeInterval(-86400), // 1 day ago
+            duration: 240
+        )
+        
+        let match3 = MatchResult(
+            gameType: "Cricket",
+            gameName: "English Cricket",
+            players: [player2, player3],
+            winnerId: player2.id,
+            timestamp: Date().addingTimeInterval(-172800), // 2 days ago
+            duration: 300
+        )
+        
+        let match4 = MatchResult(
+            gameType: "301",
+            gameName: "301",
+            players: [player1, player2],
+            winnerId: player2.id,
+            timestamp: Date().addingTimeInterval(-259200), // 3 days ago
+            duration: 150
+        )
+        
+        // Save all test matches
+        saveMatch(match1)
+        saveMatch(match2)
+        saveMatch(match3)
+        saveMatch(match4)
+        
+        print("✅ Seeded 4 test matches")
+    }
+}

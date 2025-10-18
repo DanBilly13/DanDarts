@@ -6,59 +6,39 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ProfileHeaderView: View {
     let player: Player
     let showEditButton: Bool
     let onEditTapped: (() -> Void)?
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+    var selectedAvatarImage: UIImage?
     
-    init(player: Player, showEditButton: Bool = false, onEditTapped: (() -> Void)? = nil) {
+    init(player: Player, 
+         showEditButton: Bool = false, 
+         onEditTapped: (() -> Void)? = nil,
+         selectedPhotoItem: Binding<PhotosPickerItem?> = .constant(nil),
+         selectedAvatarImage: UIImage? = nil) {
         self.player = player
         self.showEditButton = showEditButton
         self.onEditTapped = onEditTapped
+        self._selectedPhotoItem = selectedPhotoItem
+        self.selectedAvatarImage = selectedAvatarImage
     }
     
     var body: some View {
         VStack(spacing: 16) {
-            // Avatar
-            ZStack {
-                Circle()
-                    .fill(Color("InputBackground"))
-                    .frame(width: 120, height: 120)
-                
-                if let avatarURL = player.avatarURL {
-                    Image(avatarURL)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 120, height: 120)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 60, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
+            // Avatar with optional PhotosPicker
+            if showEditButton {
+                // Editable avatar with PhotosPicker
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    avatarView
                 }
-                
-                // Edit button overlay (for user profile)
-                if showEditButton {
-                    Button(action: {
-                        onEditTapped?()
-                    }) {
-                        Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 32, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
-                            .background(
-                                Circle()
-                                    .fill(Color("BackgroundPrimary"))
-                                    .frame(width: 28, height: 28)
-                            )
-                    }
-                    .offset(x: 42, y: 42)
-                }
+            } else {
+                // Non-editable avatar
+                avatarView
             }
-            .overlay(
-                Circle()
-                    .stroke(Color("AccentPrimary").opacity(0.3), lineWidth: 2)
-            )
             
             // Name and Handle
             VStack(spacing: 4) {
@@ -101,6 +81,57 @@ struct ProfileHeaderView: View {
                 )
             }
         }
+    }
+    
+    // MARK: - Avatar View
+    
+    private var avatarView: some View {
+        ZStack {
+            Circle()
+                .fill(Color("InputBackground"))
+                .frame(width: 120, height: 120)
+            
+            // Show selected image first, then avatar URL, then default
+            if let selectedImage = selectedAvatarImage {
+                Image(uiImage: selectedImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 120, height: 120)
+                    .clipShape(Circle())
+            } else if let avatarURL = player.avatarURL {
+                Image(avatarURL)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 120, height: 120)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 60, weight: .medium))
+                    .foregroundColor(Color("AccentPrimary"))
+            }
+            
+            // Camera icon overlay for editable avatars
+            if showEditButton {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color("AccentPrimary"))
+                            .clipShape(Circle())
+                            .offset(x: -5, y: -5)
+                    }
+                }
+                .frame(width: 120, height: 120)
+            }
+        }
+        .overlay(
+            Circle()
+                .stroke(Color("AccentPrimary"), lineWidth: 3)
+        )
     }
 }
 

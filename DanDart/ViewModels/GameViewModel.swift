@@ -162,6 +162,11 @@ class GameViewModel: ObservableObject {
             SoundManager.shared.playScoreSound()
         }
         
+        // Check for 180 (perfect score with 3 darts)
+        if currentThrow.count == 3 && currentThrowTotal == 180 {
+            SoundManager.shared.play180Sound()
+        }
+        
         // Update checkout suggestion after each dart
         updateCheckoutSuggestion()
     }

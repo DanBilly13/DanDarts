@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct WelcomeView: View {
+    @EnvironmentObject var authService: AuthService
     @State private var showingSignIn = false
     @State private var showingSignUp = false
     @State private var navigateToGames = false
@@ -59,7 +60,7 @@ struct WelcomeView: View {
                     AppButton(role: .secondary, controlSize: .small) {
                         showingSignUp = true
                     } label: {
-                        Text("Continue as Guest")
+                        Text("Sign Up")
                     }
                     .frame(maxWidth: .infinity)
                     
@@ -73,6 +74,17 @@ struct WelcomeView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.top, 8)
+                    
+                    // Mock User Button (for testing)
+                    Button(action: {
+                        authService.setMockUser()
+                    }) {
+                        Text("Use Mock User (Testing)")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("AccentPrimary"))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.top, 4)
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom, 32))

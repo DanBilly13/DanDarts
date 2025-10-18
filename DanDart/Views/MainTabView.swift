@@ -9,11 +9,12 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
+    @State private var showProfile: Bool = false
     
     var body: some View {
         TabView {
             // Games Tab
-            GamesTabView()
+            GamesTabView(showProfile: $showProfile)
                 .tabItem {
                     Image(systemName: "target")
                     Text("Games")
@@ -21,7 +22,7 @@ struct MainTabView: View {
                 .tag(0)
             
             // Friends Tab
-            FriendsTabView()
+            FriendsTabView(showProfile: $showProfile)
                 .tabItem {
                     Image(systemName: "person.2.fill")
                     Text("Friends")
@@ -29,7 +30,7 @@ struct MainTabView: View {
                 .tag(1)
             
             // History Tab
-            HistoryTabView()
+            HistoryTabView(showProfile: $showProfile)
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
                     Text("History")
@@ -37,6 +38,10 @@ struct MainTabView: View {
                 .tag(2)
         }
         .accentColor(Color("AccentPrimary"))
+        .sheet(isPresented: $showProfile) {
+            ProfileView()
+                .environmentObject(authService)
+        }
         .onAppear {
             configureTabBarAppearance()
         }
@@ -71,12 +76,13 @@ struct GamesTabView: View {
     let games = Game.loadGames()
     @State private var navigationPath = NavigationPath()
     @StateObject private var navigationManager = NavigationManager.shared
+    @Binding var showProfile: Bool
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 // Top Bar
-                TopBar()
+                TopBar(showProfile: $showProfile)
                 
                 // Games List Content
                 ScrollView {
@@ -108,42 +114,18 @@ struct GamesTabView: View {
 }
 
 struct FriendsTabView: View {
+    @Binding var showProfile: Bool
+    
     var body: some View {
         FriendsListView()
     }
 }
 
 struct HistoryTabView: View {
+    @Binding var showProfile: Bool
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Top Bar
-            TopBar()
-            
-            // Content Area
-            VStack {
-                Spacer()
-                
-                VStack(spacing: 16) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 60, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
-                    
-                    Text("History")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color("TextPrimary"))
-                    
-                    Text("View your game history and stats")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                        .multilineTextAlignment(.center)
-                }
-                
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color("BackgroundPrimary"))
-        }
-        .background(Color("BackgroundPrimary"))
+        MatchHistoryView()
     }
 }
 

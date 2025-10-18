@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TopBar: View {
     @EnvironmentObject private var authService: AuthService
+    @Binding var showProfile: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +30,7 @@ struct TopBar: View {
                 
                 // Avatar Button (Right)
                 Button(action: {
-                    // TODO: Add avatar tap action (profile menu, etc.)
+                    showProfile = true
                 }) {
                     AvatarView()
                 }
@@ -77,8 +78,10 @@ struct AvatarView: View {
 
 // MARK: - Preview
 #Preview {
+    @Previewable @State var showProfile = false
+    
     VStack(spacing: 0) {
-        TopBar()
+        TopBar(showProfile: $showProfile)
         
         Spacer()
         
@@ -93,8 +96,10 @@ struct AvatarView: View {
 }
 
 #Preview("TopBar with User") {
+    @Previewable @State var showProfile = false
+    
     VStack(spacing: 0) {
-        TopBar()
+        TopBar(showProfile: $showProfile)
         
         Spacer()
         
@@ -122,8 +127,10 @@ struct AvatarView: View {
 }
 
 #Preview("TopBar - Dark") {
+    @Previewable @State var showProfile = false
+    
     VStack(spacing: 0) {
-        TopBar()
+        TopBar(showProfile: $showProfile)
         
         Spacer()
         

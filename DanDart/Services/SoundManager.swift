@@ -16,7 +16,16 @@ class SoundManager: ObservableObject {
     private var isInitialized = false
     private var consecutiveMisses = 0
     
+    // Sound effects preference
+    @Published var soundEffectsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(soundEffectsEnabled, forKey: "soundEffectsEnabled")
+        }
+    }
+    
     private init() {
+        // Load sound effects preference from UserDefaults (default: true)
+        self.soundEffectsEnabled = UserDefaults.standard.object(forKey: "soundEffectsEnabled") as? Bool ?? true
         setupAudioSession()
     }
     
@@ -36,6 +45,8 @@ class SoundManager: ObservableObject {
     
     /// Play bell sound effect (currently uses system sound as placeholder)
     func playBell() {
+        guard soundEffectsEnabled else { return }
+        
         // Option 1: System Sound (immediate, no file needed)
         playSystemBell()
         
@@ -45,6 +56,8 @@ class SoundManager: ObservableObject {
     
     /// Play system bell sound as placeholder
     private func playSystemBell() {
+        guard soundEffectsEnabled else { return }
+        
         // Use system sound ID 1013 (Classic system bell/ding sound)
         AudioServicesPlaySystemSound(1013)
     }
@@ -119,6 +132,7 @@ class SoundManager: ObservableObject {
     
     /// Generic method to play any sound file
     private func playSound(named soundName: String) {
+        guard soundEffectsEnabled else { return }
         guard isInitialized else {
             print("Audio session not initialized")
             return
@@ -138,22 +152,45 @@ class SoundManager: ObservableObject {
         }
     }
     
-    // MARK: - Legacy Sound Effects
+    // MARK: - Game Sound Effects (Additional)
     
     /// Play dart throw sound (placeholder for future implementation)
     func playDartThrow() {
+        guard soundEffectsEnabled else { return }
         // TODO: Implement dart throw sound
         AudioServicesPlaySystemSound(1104) // Camera shutter as placeholder
     }
     
+    /// Play 180 sound (perfect score callout)
+    func play180Sound() {
+        guard soundEffectsEnabled else { return }
+        
+        // Try to play custom 180.mp3 file
+        if let soundURL = Bundle.main.url(forResource: "180", withExtension: "mp3") {
+            do {
+                audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
+                audioPlayer?.volume = 0.8
+                audioPlayer?.play()
+                return
+            } catch {
+                print("Failed to play 180 sound: \(error)")
+            }
+        }
+        
+        // Fallback to system sound (celebration sound)
+        AudioServicesPlaySystemSound(1025) // New mail sound as placeholder
+    }
+    
     /// Play game win sound (placeholder for future implementation)
     func playGameWin() {
+        guard soundEffectsEnabled else { return }
         // TODO: Implement win sound
         AudioServicesPlaySystemSound(1025) // New mail sound as placeholder
     }
     
     /// Play button tap sound (placeholder for future implementation)
     func playButtonTap() {
+        guard soundEffectsEnabled else { return }
         // TODO: Implement button tap sound
         AudioServicesPlaySystemSound(1104) // Keyboard click as placeholder
     }

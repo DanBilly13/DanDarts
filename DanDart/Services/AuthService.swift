@@ -25,6 +25,24 @@ class AuthService: ObservableObject {
         updateAuthenticationState()
     }
     
+    // MARK: - Mock User for Testing
+    
+    /// Set a mock user for testing (bypasses authentication)
+    func setMockUser() {
+        currentUser = User(
+            id: UUID(),
+            displayName: "Dan Billingham",
+            nickname: "danbilly",
+            handle: "@thearrow",
+            avatarURL: "avatar1",
+            createdAt: Date().addingTimeInterval(-86400 * 30), // 30 days ago
+            lastSeenAt: Date(),
+            totalWins: 24,
+            totalLosses: 12
+        )
+        isAuthenticated = true
+    }
+    
     // MARK: - Authentication Methods
     
     /// Sign up a new user with email and password

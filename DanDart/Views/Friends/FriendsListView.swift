@@ -33,33 +33,32 @@ struct FriendsListView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Search Bar
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
-                
-                TextField("Search friends", text: $searchText)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextPrimary"))
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    TextField("Search friends", text: $searchText)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextPrimary"))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                        }
                     }
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color("InputBackground"))
-            .cornerRadius(12)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color("InputBackground"))
+                .cornerRadius(12)
+                .padding(.bottom, 16)
             
             // Friends List or Empty State
             if friends.isEmpty {
@@ -92,7 +91,7 @@ struct FriendsListView: View {
                     
                     Spacer()
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 16)
             } else if filteredFriends.isEmpty {
                 // No Search Results
                 VStack(spacing: 16) {
@@ -114,7 +113,7 @@ struct FriendsListView: View {
                     
                     Spacer()
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 16)
             } else {
                 // Friends List
                 List {
@@ -123,7 +122,7 @@ struct FriendsListView: View {
                             PlayerCard(player: friend)
                         }
                         .listRowBackground(Color("BackgroundPrimary"))
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 0))
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 friendToDelete = friend
@@ -139,8 +138,10 @@ struct FriendsListView: View {
                 .background(Color("BackgroundPrimary"))
             }
             }
+            .padding(.horizontal, 16)
             .background(Color("BackgroundPrimary"))
             .navigationTitle("Friends")
+            /*'/.foregroundColor(Color.accentColor)*/
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

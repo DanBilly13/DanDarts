@@ -48,6 +48,19 @@ struct User: Codable, Identifiable {
     var displayHandle: String {
         handle ?? "@\(nickname)"
     }
+    
+    /// Convert User to Player for use in components that expect Player type
+    func toPlayer() -> Player {
+        return Player(
+            id: id,
+            displayName: displayName,
+            nickname: nickname,
+            avatarURL: avatarURL,
+            isGuest: false,
+            totalWins: totalWins,
+            totalLosses: totalLosses
+        )
+    }
 }
 
 // MARK: - Mock Data for Previews
