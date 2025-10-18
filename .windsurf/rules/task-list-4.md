@@ -2,6 +2,42 @@
 trigger: manual
 ---
 
+**Task 59: Create Friend Profile View**
+
+-   [ ] Create file: Views/Friends/FriendProfileView.swift
+-   [ ] Add large avatar (120pt)
+-   [ ] Add display name and nickname
+-   [ ] Add total W/L stats
+-   [ ] Add head-to-head stats section (placeholder)
+-   [ ] Add match history section (placeholder)
+-   [ ] Add "Remove Friend" button
+-   [ ] Style per design spec
+
+**Acceptance Criteria:**
+
+-   ✓ Profile shows all user info
+-   ✓ Layout clean and readable
+-   ✓ Remove button present
+-   ✓ Navigates from friend list tap
+
+**Task 60: Integrate Friends Tab Navigation**
+
+-   [ ] Add NavigationStack to FriendsListView
+-   [ ] Add NavigationLink on friend card tap
+-   [ ] Navigate to FriendProfileView
+-   [ ] Pass friend data
+-   [ ] Test navigation flow
+
+**Acceptance Criteria:**
+
+-   ✓ Tapping friend navigates to profile
+-   ✓ Back button works
+-   ✓ Correct data displayed
+
+**Dependencies:** Task 54, Task 59
+
+
+
 Phase 12: History Tab
 ---------------------
 

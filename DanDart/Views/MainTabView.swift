@@ -109,35 +109,7 @@ struct GamesTabView: View {
 
 struct FriendsTabView: View {
     var body: some View {
-        VStack(spacing: 0) {
-            // Top Bar
-            TopBar()
-            
-            // Content Area
-            VStack {
-                Spacer()
-                
-                VStack(spacing: 16) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 60, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
-                    
-                    Text("Friends")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color("TextPrimary"))
-                    
-                    Text("Connect with other dart players")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                        .multilineTextAlignment(.center)
-                }
-                
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color("BackgroundPrimary"))
-        }
-        .background(Color("BackgroundPrimary"))
+        FriendsListView()
     }
 }
 

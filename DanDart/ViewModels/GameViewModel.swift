@@ -25,6 +25,7 @@ class GameViewModel: ObservableObject {
     // Game configuration
     let game: Game
     let startingScore: Int
+    private let matchStartTime: Date
     
     // MARK: - Computed Properties
     
@@ -105,6 +106,7 @@ class GameViewModel: ObservableObject {
     init(game: Game, players: [Player]) {
         self.game = game
         self.players = players
+        self.matchStartTime = Date()
         
         // Determine starting score based on game type
         if game.title.contains("301") {
@@ -231,6 +233,9 @@ class GameViewModel: ObservableObject {
             
             // Play celebration sound
             SoundManager.shared.playGameWin()
+            
+            // Save match result to local storage
+            saveMatchResult()
             
             // Winner detected - clear state but don't switch players
             currentThrow.removeAll()
@@ -369,11 +374,10 @@ class GameViewModel: ObservableObject {
         
         return nil
     }
-}
-
-// MARK: - Checkout Chart
-
-struct CheckoutChart {
+    
+    // MARK: - Checkout Chart
+    
+    struct CheckoutChart {
     /// Standard dart checkout chart (2-170)
     /// Format: "D20" = Double 20, "T20" = Triple 20, "Bull" = Bullseye (50)
     static let checkouts: [Int: String] = [
@@ -427,6 +431,61 @@ struct CheckoutChart {
         165: "T20 → T19 → Bull", 166: "T20 → T18 → Bull", 167: "T20 → T19 → Bull", 168: "T20 → T20 → Bull",
         169: "T20 → T19 → Bull", 170: "T20 → T20 → Bull"
     ]
+}
+    
+    // MARK: - Match Storage
+    
+    /// Save match result to local storage
+    private func saveMatchResult() {
+        guard let winner = winner else { return }
+        
+        let matchDuration = Date().timeIntervalSince(matchStartTime)
+        
+        // Build match players with their data
+        let matchPlayers = players.map { player in
+            let finalScore = playerScores[player.id] ?? startingScore
+            let playerTurns = turnHistory.filter { $0.player.id == player.id }
+            
+            // Convert turn history to match turns
+            let matchTurns = playerTurns.enumerated().map { index, turn in
+                let matchDarts = turn.darts.map { dart in
+                    MatchDart(baseValue: dart.baseValue, multiplier: dart.scoreType.multiplier)
+                }
+                return MatchTurn(
+                    turnNumber: index + 1,
+                    darts: matchDarts,
+                    scoreBefore: turn.scoreBefore,
+                    scoreAfter: turn.scoreAfter,
+                    isBust: turn.isBust
+                )
+            }
+            
+            let totalDarts = playerTurns.reduce(0) { $0 + $1.darts.count }
+            
+            return MatchPlayer.from(
+                player: player,
+                finalScore: finalScore,
+                startingScore: startingScore,
+                totalDartsThrown: totalDarts,
+                turns: matchTurns
+            )
+        }
+        
+        // Create match result
+        let matchResult = MatchResult(
+            gameType: game.title,
+            gameName: game.title,
+            players: matchPlayers,
+            winnerId: winner.id,
+            duration: matchDuration
+        )
+        
+        // Save to local storage
+        MatchStorageManager.shared.saveMatch(matchResult)
+        
+        // Update player stats
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+    }
 }
 
 // MARK: - Turn History Model
