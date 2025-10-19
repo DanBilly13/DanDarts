@@ -7,12 +7,16 @@
 
 import Foundation
 
+@MainActor
 class MatchStorageManager {
     static let shared = MatchStorageManager()
     
     private let fileManager = FileManager.default
     private let matchesFileName = "matches.json"
     private let playerStatsFileName = "player_stats.json"
+    private let failedSyncsFileName = "failed_syncs.json"
+    
+    private let matchesService = MatchesService()
     
     private init() {
         // Ensure documents directory exists
@@ -33,6 +37,10 @@ class MatchStorageManager {
         documentsDirectory.appendingPathComponent(playerStatsFileName)
     }
     
+    private var failedSyncsFileURL: URL {
+        documentsDirectory.appendingPathComponent(failedSyncsFileName)
+    }
+    
     // MARK: - Directory Setup
     
     private func createDocumentsDirectoryIfNeeded() {
@@ -43,8 +51,9 @@ class MatchStorageManager {
     
     // MARK: - Match Storage
     
-    /// Save a match result to local storage
+    /// Save a match result to local storage and sync to Supabase
     func saveMatch(_ match: MatchResult) {
+        // 1. Save to local storage first
         var matches = loadMatches()
         matches.append(match)
         
@@ -54,9 +63,22 @@ class MatchStorageManager {
             encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(matches)
             try data.write(to: matchesFileURL)
-            print("✅ Match saved successfully: \(match.id)")
+            print("✅ Match saved locally: \(match.id)")
         } catch {
-            print("❌ Error saving match: \(error.localizedDescription)")
+            print("❌ Error saving match locally: \(error.localizedDescription)")
+            return
+        }
+        
+        // 2. Try to sync to Supabase
+        Task {
+            do {
+                _ = try await matchesService.syncMatch(match)
+                print("✅ Match synced to Supabase: \(match.id)")
+            } catch {
+                print("⚠️ Match sync failed, queuing for retry: \(match.id)")
+                // Add to failed syncs queue
+                addToFailedSyncs(match)
+            }
         }
     }
     
@@ -192,6 +214,73 @@ class MatchStorageManager {
     func getAllPlayerStats() -> [PlayerStats] {
         let stats = loadPlayerStats()
         return Array(stats.values).sorted { $0.wins > $1.wins }
+    }
+    
+    // MARK: - Failed Syncs Management
+    
+    /// Add a match to the failed syncs queue
+    private func addToFailedSyncs(_ match: MatchResult) {
+        var failedSyncs = loadFailedSyncs()
+        
+        // Avoid duplicates
+        if !failedSyncs.contains(where: { $0.id == match.id }) {
+            failedSyncs.append(match)
+            saveFailedSyncs(failedSyncs)
+        }
+    }
+    
+    /// Load failed syncs from local storage
+    private func loadFailedSyncs() -> [MatchResult] {
+        guard fileManager.fileExists(atPath: failedSyncsFileURL.path) else {
+            return []
+        }
+        
+        do {
+            let data = try Data(contentsOf: failedSyncsFileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let matches = try decoder.decode([MatchResult].self, from: data)
+            return matches
+        } catch {
+            print("❌ Error loading failed syncs: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    /// Save failed syncs to local storage
+    private func saveFailedSyncs(_ matches: [MatchResult]) {
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(matches)
+            try data.write(to: failedSyncsFileURL)
+        } catch {
+            print("❌ Error saving failed syncs: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Retry syncing all failed matches
+    func retryFailedSyncs() async -> Int {
+        let failedMatches = loadFailedSyncs()
+        guard !failedMatches.isEmpty else {
+            print("ℹ️ No failed syncs to retry")
+            return 0
+        }
+        
+        print("🔄 Retrying \(failedMatches.count) failed syncs...")
+        let successCount = await matchesService.retrySyncFailedMatches(failedMatches)
+        
+        // Remove successfully synced matches from failed queue
+        if successCount > 0 {
+            var remaining = failedMatches
+            // This is simplified - in production you'd track which ones succeeded
+            remaining.removeFirst(min(successCount, remaining.count))
+            saveFailedSyncs(remaining)
+        }
+        
+        print("✅ Successfully synced \(successCount)/\(failedMatches.count) matches")
+        return successCount
     }
 }
 

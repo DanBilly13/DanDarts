@@ -17,9 +17,21 @@ class SupabaseService {
     private let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4b3Z5dWN0a3NzZHJlbmRpaGFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMTczOTgsImV4cCI6MjA3NTY5MzM5OH0.jDeSDC9dIm2-vLZaOSOSoamEOX8CLNZRweAhZkCC3Rw"
     
     lazy var client: SupabaseClient = {
+        // Configure with longer timeout for better reliability
+        var config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30 // 30 seconds
+        config.timeoutIntervalForResource = 60 // 60 seconds
+        
         return SupabaseClient(
             supabaseURL: URL(string: supabaseURL)!,
-            supabaseKey: supabaseAnonKey
+            supabaseKey: supabaseAnonKey,
+            options: SupabaseClientOptions(
+                db: SupabaseClientOptions.DatabaseOptions(),
+                auth: SupabaseClientOptions.AuthOptions(),
+                global: SupabaseClientOptions.GlobalOptions(
+                    session: URLSession(configuration: config)
+                )
+            )
         )
     }()
     

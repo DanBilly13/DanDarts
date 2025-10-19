@@ -14,6 +14,7 @@ struct GameSetupView: View {
     @State private var showGameView: Bool = false
     @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
+    @EnvironmentObject private var authService: AuthService
     
     private let playerLimit = 8 // Maximum players for MVP
     private var canStartGame: Bool {

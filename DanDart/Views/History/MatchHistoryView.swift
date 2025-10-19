@@ -8,9 +8,14 @@
 import SwiftUI
 
 struct MatchHistoryView: View {
+    @EnvironmentObject private var authService: AuthService
+    @StateObject private var matchesService = MatchesService()
+    
     @State private var selectedFilter: GameFilter = .all
     @State private var matches: [MatchResult] = []
     @State private var isRefreshing: Bool = false
+    @State private var isLoadingFromSupabase: Bool = false
+    @State private var loadError: String?
     
     // Filter options
     enum GameFilter: String, CaseIterable {
@@ -146,21 +151,86 @@ struct MatchHistoryView: View {
     
     // MARK: - Helper Methods
     
-    /// Load matches from local storage and sort by date (most recent first)
+    /// Load matches from both Supabase and local storage, merge and deduplicate
     private func loadMatches() {
-        matches = MatchStorageManager.shared.loadMatches()
-            .sorted { $0.timestamp > $1.timestamp }
+        // 1. Load local matches first (instant)
+        let localMatches = MatchStorageManager.shared.loadMatches()
+        matches = localMatches.sorted { $0.timestamp > $1.timestamp }
+        
+        // 2. Load from Supabase in background
+        guard let currentUserId = authService.currentUser?.id else {
+            print("⚠️ No current user, showing local matches only")
+            return
+        }
+        
+        isLoadingFromSupabase = true
+        
+        Task {
+            do {
+                // Load matches from Supabase
+                let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
+                
+                // Merge with local matches and remove duplicates
+                let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
+                
+                // Update UI with merged matches
+                matches = allMatches.sorted { $0.timestamp > $1.timestamp }
+                
+                isLoadingFromSupabase = false
+                print("✅ Loaded \(supabaseMatches.count) from Supabase, \(localMatches.count) local, \(matches.count) total")
+                
+            } catch {
+                isLoadingFromSupabase = false
+                loadError = "Failed to load cloud matches"
+                print("❌ Load matches error: \(error)")
+                // Keep showing local matches on error
+            }
+        }
     }
     
-    /// Refresh matches (placeholder for future cloud sync)
+    /// Merge local and Supabase matches, removing duplicates
+    private func mergeMatches(local: [MatchResult], supabase: [MatchResult]) -> [MatchResult] {
+        var matchesById: [UUID: MatchResult] = [:]
+        
+        // Add local matches first
+        for match in local {
+            matchesById[match.id] = match
+        }
+        
+        // Add Supabase matches (will overwrite local if same ID)
+        for match in supabase {
+            matchesById[match.id] = match
+        }
+        
+        return Array(matchesById.values)
+    }
+    
+    /// Refresh matches from Supabase
     private func refreshMatches() async {
         isRefreshing = true
         
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        guard let currentUserId = authService.currentUser?.id else {
+            isRefreshing = false
+            return
+        }
         
-        // Reload from local storage
-        loadMatches()
+        do {
+            // Load from Supabase
+            let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
+            
+            // Load local matches
+            let localMatches = MatchStorageManager.shared.loadMatches()
+            
+            // Merge and update
+            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
+            matches = allMatches.sorted { $0.timestamp > $1.timestamp }
+            
+            print("✅ Refreshed: \(matches.count) total matches")
+            
+        } catch {
+            print("❌ Refresh error: \(error)")
+            loadError = "Failed to refresh matches"
+        }
         
         isRefreshing = false
     }
@@ -192,9 +262,10 @@ struct FilterButton: View {
 
 #Preview {
     MatchHistoryView()
+        .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("With Matches") {
-    let view = MatchHistoryView()
-    return view
+    MatchHistoryView()
+        .environmentObject(AuthService.mockAuthenticated)
 }
