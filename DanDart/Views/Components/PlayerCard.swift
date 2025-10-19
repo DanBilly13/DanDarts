@@ -21,28 +21,10 @@ struct PlayerCard: View {
     var body: some View {
         HStack(spacing: 16) {
             // Avatar (48pt, left)
-            ZStack {
-                Circle()
-                    .fill(Color("InputBackground"))
-                    .frame(width: 48, height: 48)
-                
-                if let avatarURL = player.avatarURL {
-                    // Player with avatar from assets
-                    Image(avatarURL)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                } else {
-                    // No avatar - show placeholder
-                    Image(systemName: player.isGuest ? "person.circle.fill" : "person.circle")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(player.isGuest ? Color("TextSecondary") : Color("AccentPrimary"))
-                }
-            }
-            .overlay(
-                Circle()
-                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+            AsyncAvatarImage(
+                avatarURL: player.avatarURL,
+                size: 48,
+                placeholderIcon: player.isGuest ? "person.circle.fill" : "person.circle"
             )
             
             // Display name and nickname (center)

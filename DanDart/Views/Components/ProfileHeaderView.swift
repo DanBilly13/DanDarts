@@ -87,27 +87,24 @@ struct ProfileHeaderView: View {
     
     private var avatarView: some View {
         ZStack {
-            Circle()
-                .fill(Color("InputBackground"))
-                .frame(width: 120, height: 120)
-            
             // Show selected image first, then avatar URL, then default
             if let selectedImage = selectedAvatarImage {
-                Image(uiImage: selectedImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                Circle()
+                    .fill(Color("InputBackground"))
                     .frame(width: 120, height: 120)
-                    .clipShape(Circle())
-            } else if let avatarURL = player.avatarURL {
-                Image(avatarURL)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 120, height: 120)
-                    .clipShape(Circle())
+                    .overlay(
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 120)
+                            .clipShape(Circle())
+                    )
             } else {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 60, weight: .medium))
-                    .foregroundColor(Color("AccentPrimary"))
+                AsyncAvatarImage(
+                    avatarURL: player.avatarURL,
+                    size: 120,
+                    placeholderIcon: "person.circle.fill"
+                )
             }
             
             // Camera icon overlay for editable avatars

@@ -49,29 +49,10 @@ struct AvatarView: View {
     @EnvironmentObject private var authService: AuthService
     
     var body: some View {
-        ZStack {
-            // Avatar Background Circle
-            Circle()
-                .fill(Color("InputBackground"))
-                .frame(width: 32, height: 32)
-            
-            // Avatar Content
-            if let user = authService.currentUser,
-               let avatarURL = user.avatarURL {
-                // User has custom avatar (SF Symbol for now)
-                Image(systemName: avatarURL)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("AccentPrimary"))
-            } else {
-                // Default placeholder avatar
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
-            }
-        }
-        .overlay(
-            Circle()
-                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+        AsyncAvatarImage(
+            avatarURL: authService.currentUser?.avatarURL,
+            size: 32,
+            placeholderIcon: "person.circle.fill"
         )
     }
 }

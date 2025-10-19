@@ -6,8 +6,9 @@
 //
 
 import Foundation
-import SwiftUI
 import Supabase
+import GoogleSignIn
+import SwiftUI
 
 @MainActor
 class AuthService: ObservableObject {
@@ -179,19 +180,65 @@ class AuthService: ObservableObject {
         }
     }
     
-    /// Sign in with Google OAuth
+    /// Sign in with Google OAuth (Native iOS)
     func signInWithGoogle() async throws -> Bool {
         isLoading = true
         defer { isLoading = false }
         
         do {
-            // 1. Initiate Google OAuth flow with Supabase
-            let session = try await supabaseService.client.auth.signInWithOAuth(
-                provider: .google,
-                redirectTo: URL(string: "dandart://auth/callback")
-            )
+            // 1. Get the iOS Client ID from Google Cloud Console
+            print("ℹ️ Step 1: Getting Client ID from Info.plist...")
+            guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_CLIENT_ID") as? String else {
+                print("❌ Client ID not found in Info.plist")
+                throw AuthError.oauthFailed
+            }
+            print("✅ Client ID found: \(clientID.prefix(20))...")
             
-            // 2. Check if user profile exists in users table
+            // 2. Configure Google Sign-In
+            print("ℹ️ Step 2: Configuring Google Sign-In...")
+            let config = GIDConfiguration(clientID: clientID)
+            GIDSignIn.sharedInstance.configuration = config
+            print("✅ Google Sign-In configured")
+            
+            // 3. Get the root view controller
+            print("ℹ️ Step 3: Getting root view controller...")
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let rootViewController = windowScene.windows.first?.rootViewController else {
+                print("❌ Root view controller not found")
+                throw AuthError.oauthFailed
+            }
+            print("✅ Root view controller found")
+            
+            // 4. Perform Google Sign-In
+            print("ℹ️ Step 4: Presenting Google Sign-In...")
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+            print("✅ Google Sign-In completed")
+            
+            // 5. Get the ID token and user info
+            print("ℹ️ Step 5: Getting ID token...")
+            guard let idToken = result.user.idToken?.tokenString else {
+                print("❌ ID token not found")
+                throw AuthError.oauthFailed
+            }
+            print("✅ ID token obtained")
+            
+            // Get Google profile info
+            let googleUser = result.user
+            let googleEmail = googleUser.profile?.email ?? ""
+            let googleName = googleUser.profile?.name ?? ""
+            let googleAvatarURL = googleUser.profile?.imageURL(withDimension: 200)?.absoluteString
+            
+            // 6. Sign in to Supabase with Google ID token
+            print("ℹ️ Step 6: Signing in to Supabase...")
+            let session = try await supabaseService.client.auth.signInWithIdToken(
+                credentials: .init(
+                    provider: .google,
+                    idToken: idToken
+                )
+            )
+            print("✅ Supabase sign-in successful")
+            
+            // 7. Check if user profile exists in users table
             let userId = session.user.id
             
             do {
@@ -213,9 +260,6 @@ class AuthService: ObservableObject {
                 
             } catch {
                 // User doesn't exist, create new profile with Google data
-                let googleEmail = session.user.email ?? ""
-                let googleName = session.user.userMetadata["full_name"]?.stringValue ?? ""
-                
                 // Generate a unique nickname from email or name
                 let baseNickname = generateNicknameFromGoogle(email: googleEmail, name: googleName)
                 let uniqueNickname = try await ensureUniqueNickname(baseNickname)
@@ -225,7 +269,7 @@ class AuthService: ObservableObject {
                     displayName: googleName.isEmpty ? "Google User" : googleName,
                     nickname: uniqueNickname,
                     handle: nil, // Will be set in Profile Setup
-                    avatarURL: session.user.userMetadata["avatar_url"]?.stringValue,
+                    avatarURL: googleAvatarURL,
                     createdAt: Date(),
                     lastSeenAt: Date(),
                     totalWins: 0,
@@ -246,9 +290,13 @@ class AuthService: ObservableObject {
             }
             
         } catch let error as AuthError {
+            print("❌ Google Sign-In failed with AuthError: \(error)")
             throw error
         } catch {
             // Handle OAuth-specific errors
+            print("❌ Google Sign-In failed with error: \(error)")
+            print("❌ Error description: \(error.localizedDescription)")
+            
             let errorMessage = error.localizedDescription.lowercased()
             if errorMessage.contains("cancelled") || errorMessage.contains("cancel") {
                 throw AuthError.oauthCancelled
@@ -295,6 +343,61 @@ class AuthService: ObservableObject {
             // 5. Handle expired/invalid sessions gracefully
             // If any error occurs (network, expired session, user not found), clear auth state
             clearAuthenticationState()
+        }
+    }
+    
+    /// Upload avatar image to Supabase Storage and update user profile
+    /// - Parameter imageData: The image data to upload (JPEG format recommended)
+    /// - Returns: The public URL of the uploaded avatar
+    func uploadAvatar(imageData: Data) async throws -> String {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let currentUser = currentUser else {
+            throw AuthError.userNotFound
+        }
+        
+        do {
+            // 1. Generate unique filename
+            let fileExtension = "jpg"
+            let fileName = "\(currentUser.id.uuidString)_\(Date().timeIntervalSince1970).\(fileExtension)"
+            let filePath = "avatars/\(fileName)"
+            
+            // 2. Upload to Supabase Storage
+            try await supabaseService.client.storage
+                .from("avatars")
+                .upload(
+                    path: filePath,
+                    file: imageData,
+                    options: .init(
+                        contentType: "image/jpeg",
+                        upsert: false
+                    )
+                )
+            
+            // 3. Get public URL
+            let publicURL = try supabaseService.client.storage
+                .from("avatars")
+                .getPublicURL(path: filePath)
+            
+            // 4. Update user profile in database
+            var updatedUser = currentUser
+            updatedUser.avatarURL = publicURL.absoluteString
+            
+            try await supabaseService.client
+                .from("users")
+                .update(updatedUser)
+                .eq("id", value: currentUser.id)
+                .execute()
+            
+            // 5. Update local state
+            self.currentUser = updatedUser
+            
+            return publicURL.absoluteString
+            
+        } catch {
+            print("❌ Avatar upload failed: \(error)")
+            throw AuthError.networkError
         }
     }
     

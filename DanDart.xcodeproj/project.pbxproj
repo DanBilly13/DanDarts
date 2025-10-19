@@ -13,6 +13,8 @@
 		9E12AC332E9A4A32006F3847 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 9E12AC322E9A4A32006F3847 /* Realtime */; };
 		9E12AC352E9A4A32006F3847 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 9E12AC342E9A4A32006F3847 /* Storage */; };
 		9E12AC372E9A4A32006F3847 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 9E12AC362E9A4A32006F3847 /* Supabase */; };
+		9E21F04B2EA4E1630097BEC4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9E21F04A2EA4E1630097BEC4 /* GoogleSignIn */; };
+		9E21F04D2EA4E1630097BEC4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 9E21F04C2EA4E1630097BEC4 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,9 +40,22 @@
 		9E12ABF72E997D5B006F3847 /* DanDartUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DanDartUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		9E21F0492EA4DAC20097BEC4 /* Exceptions for "DanDart" folder in "DanDart" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9E12ABDF2E997D5A006F3847 /* DanDart */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9E12ABE22E997D5A006F3847 /* DanDart */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9E21F0492EA4DAC20097BEC4 /* Exceptions for "DanDart" folder in "DanDart" target */,
+			);
 			path = DanDart;
 			sourceTree = "<group>";
 		};
@@ -64,9 +79,11 @@
 				9E12AC312E9A4A32006F3847 /* PostgREST in Frameworks */,
 				9E12AC2F2E9A4A32006F3847 /* Functions in Frameworks */,
 				9E12AC372E9A4A32006F3847 /* Supabase in Frameworks */,
+				9E21F04D2EA4E1630097BEC4 /* GoogleSignInSwift in Frameworks */,
 				9E12AC2D2E9A4A32006F3847 /* Auth in Frameworks */,
 				9E12AC352E9A4A32006F3847 /* Storage in Frameworks */,
 				9E12AC332E9A4A32006F3847 /* Realtime in Frameworks */,
+				9E21F04B2EA4E1630097BEC4 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,6 +158,8 @@
 				9E12AC322E9A4A32006F3847 /* Realtime */,
 				9E12AC342E9A4A32006F3847 /* Storage */,
 				9E12AC362E9A4A32006F3847 /* Supabase */,
+				9E21F04A2EA4E1630097BEC4 /* GoogleSignIn */,
+				9E21F04C2EA4E1630097BEC4 /* GoogleSignInSwift */,
 			);
 			productName = DanDart;
 			productReference = 9E12ABE02E997D5A006F3847 /* DanDart.app */;
@@ -226,6 +245,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9E12AC2A2E9A4903006F3847 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				9E21F0472EA4D88A0097BEC4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9E12ABE12E997D5A006F3847 /* Products */;
@@ -432,6 +452,9 @@
 				DEVELOPMENT_TEAM = CAG26MXD9H;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DanDart/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -442,7 +465,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "-234.DanDart";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dandarts.DanDart;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -464,6 +487,9 @@
 				DEVELOPMENT_TEAM = CAG26MXD9H;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DanDart/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -474,7 +500,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "-234.DanDart";
+				PRODUCT_BUNDLE_IDENTIFIER = com.dandarts.DanDart;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -608,6 +634,14 @@
 				minimumVersion = 2.5.1;
 			};
 		};
+		9E21F0472EA4D88A0097BEC4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -640,6 +674,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9E12AC2A2E9A4903006F3847 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		9E21F04A2EA4E1630097BEC4 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E21F0472EA4D88A0097BEC4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		9E21F04C2EA4E1630097BEC4 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E21F0472EA4D88A0097BEC4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

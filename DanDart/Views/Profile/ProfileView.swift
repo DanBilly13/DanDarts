@@ -15,6 +15,8 @@ struct ProfileView: View {
     @State private var showLogoutConfirmation: Bool = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedAvatarImage: UIImage?
+    @State private var isUploadingAvatar: Bool = false
+    @State private var uploadError: String?
     
     var body: some View {
         NavigationStack {
@@ -67,11 +69,56 @@ struct ProfileView: View {
             }
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self),
-                       let uiImage = UIImage(data: data) {
-                        selectedAvatarImage = uiImage
-                        // TODO: Upload to server in future task
+                    // Load the image data
+                    guard let data = try? await newItem?.loadTransferable(type: Data.self),
+                          let uiImage = UIImage(data: data) else {
+                        return
                     }
+                    
+                    // Show the selected image immediately
+                    selectedAvatarImage = uiImage
+                    
+                    // Upload to Supabase Storage
+                    isUploadingAvatar = true
+                    uploadError = nil
+                    
+                    do {
+                        // Resize image to max 512x512 (good for avatars, keeps file size small)
+                        let resizedImage = uiImage.resized(toMaxDimension: 512)
+                        
+                        // Compress image to JPEG with 0.8 quality
+                        guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                            throw NSError(domain: "ImageCompression", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to compress image"])
+                        }
+                        
+                        print("📦 Original image size: \(data.count / 1024)KB, Compressed: \(jpegData.count / 1024)KB")
+                        
+                        // Upload avatar
+                        let avatarURL = try await authService.uploadAvatar(imageData: jpegData)
+                        print("✅ Avatar uploaded successfully: \(avatarURL)")
+                        
+                        // Clear selected image after successful upload
+                        selectedAvatarImage = nil
+                        
+                    } catch {
+                        print("❌ Avatar upload error: \(error)")
+                        uploadError = "Failed to upload avatar. Please try again."
+                        
+                        // Keep the selected image visible on error
+                        // User can try again or dismiss
+                    }
+                    
+                    isUploadingAvatar = false
+                }
+            }
+            .alert("Upload Error", isPresented: .constant(uploadError != nil)) {
+                Button("OK") {
+                    uploadError = nil
+                    selectedAvatarImage = nil
+                }
+            } message: {
+                if let error = uploadError {
+                    Text(error)
                 }
             }
         }
