@@ -379,13 +379,17 @@ struct SignUpView: View {
     
     // MARK: - Actions
     private func handleSignUp() async {
+        print("🚀 handleSignUp called")
         showErrors = true
         errorMessage = ""
         
         guard isFormValid else {
+            print("❌ Form validation failed")
             errorMessage = "Please fill in all fields correctly"
             return
         }
+        
+        print("✅ Form validation passed")
         
         do {
             // Call AuthService to create the account
