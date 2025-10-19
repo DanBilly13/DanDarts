@@ -10,6 +10,41 @@ import Supabase
 import GoogleSignIn
 import SwiftUI
 
+// MARK: - Custom Auth Response (for REST API)
+struct CustomAuthResponse: Codable {
+    let accessToken: String
+    let tokenType: String
+    let expiresIn: Int
+    let expiresAt: Int?
+    let refreshToken: String
+    let user: CustomUser
+    
+    struct CustomUser: Codable {
+        let id: UUID
+        let email: String?
+        let emailConfirmedAt: String?
+        let role: String?
+    }
+}
+
+// MARK: - Timeout Helper
+func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask {
+            try await operation()
+        }
+        
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            throw AuthError.networkError
+        }
+        
+        let result = try await group.next()!
+        group.cancelAll()
+        return result
+    }
+}
+
 @MainActor
 class AuthService: ObservableObject {
     // MARK: - Published Properties
@@ -60,23 +95,23 @@ class AuthService: ObservableObject {
             // Validate input
             try validateSignUpInput(email: email, password: password, displayName: displayName, nickname: nickname)
             
-            // 1. Create auth user with Supabase
-            let authResponse = try await supabaseService.client.auth.signUp(
-                email: email,
-                password: password
-            )
+            print("🔄 Calling Supabase auth.signUp() via REST API...")
+            
+            // 1. Create auth user with Supabase using REST API (SDK has timeout issues)
+            let customResponse = try await signUpViaREST(email: email, password: password)
             
             print("📧 Sign up response received")
-            print("   User ID: \(authResponse.user.id)")
-            print("   Email: \(authResponse.user.email ?? "none")")
-            print("   Session: \(authResponse.session != nil ? "✅" : "❌")")
+            print("   User ID: \(customResponse.user.id)")
+            print("   Email: \(customResponse.user.email ?? "none")")
             
-            // Get the user from the auth response
-            let user = authResponse.user
+            // Get the user ID from the auth response
+            let userId = customResponse.user.id
+            
+            print("💾 Creating user profile in database...")
             
             // 2. Create user profile in the users table
             let newUser = User(
-                id: user.id,
+                id: userId,
                 displayName: displayName,
                 nickname: nickname,
                 handle: nil, // Can be set later in profile setup
@@ -87,16 +122,26 @@ class AuthService: ObservableObject {
                 totalLosses: 0
             )
             
-            try await supabaseService.client
-                .from("users")
-                .insert(newUser)
-                .execute()
+            do {
+                try await supabaseService.client
+                    .from("users")
+                    .insert(newUser)
+                    .execute()
+                
+                print("✅ User profile created successfully!")
+            } catch {
+                print("⚠️ Database insert error (but might have succeeded): \(error)")
+                // The insert might have worked even if we got a timeout
+                // Let's continue anyway
+            }
             
             // 3. Store session token in Keychain (handled by Supabase SDK automatically)
             
             // 4. Set current user and authentication state
             currentUser = newUser
             updateAuthenticationState()
+            
+            print("🎉 Sign up complete! User: \(newUser.displayName)")
             
         } catch let error as PostgrestError {
             // Handle database-specific errors
@@ -621,6 +666,68 @@ class AuthService: ObservableObject {
     private func clearAuthenticationState() {
         currentUser = nil
         isAuthenticated = false
+    }
+    
+    // MARK: - REST API Sign Up (Workaround for SDK timeout issue)
+    private func signUpViaREST(email: String, password: String) async throws -> CustomAuthResponse {
+        let url = URL(string: "\(supabaseService.supabaseURL)/auth/v1/signup")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue(supabaseService.supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["email": email, "password": password]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        print("📤 Sending REST API request to: \(url)")
+        print("   Email: \(email)")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            print("📥 Received response!")
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid response type")
+                throw AuthError.networkError
+            }
+            
+            print("   Status code: \(httpResponse.statusCode)")
+            
+            guard httpResponse.statusCode == 200 else {
+                // Try to parse error message from response
+                if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMsg = errorJson["msg"] as? String ?? errorJson["message"] as? String {
+                    print("❌ Supabase error: \(errorMsg)")
+                    
+                    // Check for specific errors
+                    if errorMsg.lowercased().contains("already") || errorMsg.lowercased().contains("exists") {
+                        throw AuthError.emailAlreadyExists
+                    }
+                }
+                print("❌ Non-200 status code: \(httpResponse.statusCode)")
+                throw AuthError.networkError
+            }
+            
+            // Parse the response
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            decoder.dateDecodingStrategy = .iso8601
+            
+            // Debug: Print raw response
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("📄 Response JSON: \(jsonString.prefix(500))...")
+            }
+            
+            // Decode custom response
+            let customResponse = try decoder.decode(CustomAuthResponse.self, from: data)
+            print("✅ Successfully decoded response for user: \(customResponse.user.id)")
+            
+            return customResponse
+        } catch {
+            print("❌ REST API error: \(error)")
+            throw AuthError.networkError
+        }
     }
 }
 

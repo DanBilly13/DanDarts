@@ -374,6 +374,7 @@ struct SignUpView: View {
         .sheet(isPresented: $showingProfileSetup) {
             ProfileSetupView()
                 .environmentObject(authService)
+                .interactiveDismissDisabled(true) // Prevent swipe to dismiss
         }
     }
     
@@ -421,7 +422,16 @@ struct SignUpView: View {
             }
         } catch {
             // Handle unexpected errors
-            errorMessage = "An unexpected error occurred. Please try again"
+            print("❌ Unexpected error: \(error)")
+            
+            // Check if it's a timeout
+            if error.localizedDescription.contains("timed out") || 
+               error.localizedDescription.contains("network") ||
+               error.localizedDescription.contains("connection") {
+                errorMessage = "Connection timeout. Please try signing in with Google instead."
+            } else {
+                errorMessage = "An unexpected error occurred. Please try again"
+            }
         }
     }
     
