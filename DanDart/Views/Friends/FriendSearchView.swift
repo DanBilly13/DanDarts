@@ -9,14 +9,14 @@ import SwiftUI
 
 struct FriendSearchView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authService: AuthService
     let onFriendAdded: (Player) -> Void
     
+    @StateObject private var friendsService = FriendsService()
     @State private var searchQuery: String = ""
-    @State private var searchResults: [Player] = []
+    @State private var searchResults: [User] = []
     @State private var isSearching: Bool = false
-    
-    // Mock all players data - will be replaced with real API later
-    private let allPlayers: [Player] = Player.mockPlayers
+    @State private var searchError: String?
     
     var body: some View {
         NavigationView {
@@ -120,14 +120,14 @@ struct FriendSearchView: View {
                     // Search Results List
                     ScrollView {
                         VStack(spacing: 12) {
-                            ForEach(searchResults) { player in
+                            ForEach(searchResults) { user in
                                 HStack(spacing: 16) {
-                                    // Player Card
-                                    PlayerCard(player: player)
+                                    // Player Card (convert User to Player)
+                                    PlayerCard(player: user.toPlayer())
                                     
                                     // Add Friend Button
                                     Button(action: {
-                                        addFriend(player)
+                                        addFriend(user)
                                     }) {
                                         Image(systemName: "person.badge.plus")
                                             .font(.system(size: 20, weight: .semibold))
@@ -178,35 +178,51 @@ struct FriendSearchView: View {
     
     // MARK: - Helper Methods
     
-    /// Perform search with mock data
+    /// Perform search with Supabase
     private func performSearch(query: String) {
         guard !query.isEmpty else {
             searchResults = []
             return
         }
         
-        // Simulate loading state
+        // Set loading state
         isSearching = true
+        searchError = nil
         
-        // Debounce search with 300ms delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            let lowercasedQuery = query.lowercased()
-            searchResults = allPlayers.filter { player in
-                player.displayName.lowercased().contains(lowercasedQuery) ||
-                player.nickname.lowercased().contains(lowercasedQuery)
+        // Debounce search with 500ms delay
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            do {
+                // Search users in Supabase
+                let users = try await friendsService.searchUsers(query: query, limit: 20)
+                
+                // Filter out current user from results
+                if let currentUserId = authService.currentUser?.id {
+                    searchResults = users.filter { $0.id != currentUserId }
+                } else {
+                    searchResults = users
+                }
+                
+                isSearching = false
+                
+            } catch {
+                print("❌ Search error: \(error)")
+                searchError = "Failed to search. Please try again."
+                searchResults = []
+                isSearching = false
             }
-            isSearching = false
         }
     }
     
     /// Add friend and dismiss sheet
-    private func addFriend(_ player: Player) {
+    private func addFriend(_ user: User) {
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        // Call callback
-        onFriendAdded(player)
+        // Convert User to Player and call callback
+        onFriendAdded(user.toPlayer())
         
         // Dismiss sheet
         dismiss()
@@ -219,4 +235,5 @@ struct FriendSearchView: View {
     FriendSearchView { player in
         print("Added friend: \(player.displayName)")
     }
+    .environmentObject(AuthService.mockAuthenticated)
 }
