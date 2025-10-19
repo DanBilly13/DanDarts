@@ -45,6 +45,16 @@ struct MatchHistoryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Sync status banner
+                if isLoadingFromSupabase || isRefreshing {
+                    syncStatusBanner
+                }
+                
+                // Error banner
+                if let error = loadError {
+                    errorBanner(message: error)
+                }
+                
                 filterButtonsView
                 contentView
             }
@@ -73,6 +83,52 @@ struct MatchHistoryView: View {
     }
     
     // MARK: - Sub Views
+    
+    private var syncStatusBanner: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .scaleEffect(0.8)
+                .tint(Color("AccentPrimary"))
+            
+            Text(isRefreshing ? "Syncing with cloud..." : "Loading from cloud...")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color("TextSecondary"))
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color("InputBackground"))
+        .cornerRadius(8)
+        .padding(.bottom, 8)
+    }
+    
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14))
+                .foregroundColor(.orange)
+            
+            Text(message)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color("TextSecondary"))
+            
+            Spacer()
+            
+            Button(action: {
+                loadError = nil
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color("TextSecondary"))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(8)
+        .padding(.bottom, 8)
+    }
     
     private var filterButtonsView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
