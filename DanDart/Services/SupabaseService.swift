@@ -19,8 +19,9 @@ class SupabaseService {
     lazy var client: SupabaseClient = {
         // Configure with longer timeout for better reliability
         var config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30 // 30 seconds
-        config.timeoutIntervalForResource = 60 // 60 seconds
+        config.timeoutIntervalForRequest = 60 // 60 seconds
+        config.timeoutIntervalForResource = 120 // 120 seconds
+        config.waitsForConnectivity = true // Wait for connectivity instead of failing immediately
         
         return SupabaseClient(
             supabaseURL: URL(string: supabaseURL)!,

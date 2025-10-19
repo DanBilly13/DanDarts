@@ -66,6 +66,11 @@ class AuthService: ObservableObject {
                 password: password
             )
             
+            print("📧 Sign up response received")
+            print("   User ID: \(authResponse.user.id)")
+            print("   Email: \(authResponse.user.email ?? "none")")
+            print("   Session: \(authResponse.session != nil ? "✅" : "❌")")
+            
             // Get the user from the auth response
             let user = authResponse.user
             

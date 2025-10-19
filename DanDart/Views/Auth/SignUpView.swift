@@ -22,6 +22,8 @@ struct SignUpView: View {
     @State private var showErrors = false
     @State private var errorMessage = ""
     @State private var showingProfileSetup = false
+    @State private var showPassword = false
+    @State private var showConfirmPassword = false
     
     // MARK: - Computed Properties
     private var isFormValid: Bool {
@@ -98,8 +100,9 @@ struct SignUpView: View {
                                 TextField("username", text: $nickname)
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(Color("TextPrimary"))
-                                    .textContentType(.username)
+                                    .textContentType(.nickname)
                                     .autocapitalization(.none)
+                                    .autocorrectionDisabled()
                                     .padding(.trailing, 16)
                                     .padding(.vertical, 14)
                             }
@@ -149,18 +152,38 @@ struct SignUpView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color("TextSecondary"))
                             
-                            SecureField("Create a password", text: $password)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextPrimary"))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .background(Color("InputBackground"))
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                                )
-                                .textContentType(.newPassword)
+                            HStack {
+                                if showPassword {
+                                    TextField("Create a password", text: $password)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(Color("TextPrimary"))
+                                        .textContentType(.newPassword)
+                                        .autocapitalization(.none)
+                                        .autocorrectionDisabled()
+                                } else {
+                                    SecureField("Create a password", text: $password)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(Color("TextPrimary"))
+                                        .textContentType(.newPassword)
+                                }
+                                
+                                Button(action: {
+                                    showPassword.toggle()
+                                }) {
+                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color("TextSecondary"))
+                                }
+                                .padding(.trailing, 16)
+                            }
+                            .padding(.leading, 16)
+                            .padding(.vertical, 14)
+                            .background(Color("InputBackground"))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                            )
                         }
                         
                         // Confirm Password SecureField
@@ -169,18 +192,38 @@ struct SignUpView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color("TextSecondary"))
                             
-                            SecureField("Confirm your password", text: $confirmPassword)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextPrimary"))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .background(Color("InputBackground"))
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                                )
-                                .textContentType(.newPassword)
+                            HStack {
+                                if showConfirmPassword {
+                                    TextField("Confirm your password", text: $confirmPassword)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(Color("TextPrimary"))
+                                        .textContentType(.newPassword)
+                                        .autocapitalization(.none)
+                                        .autocorrectionDisabled()
+                                } else {
+                                    SecureField("Confirm your password", text: $confirmPassword)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(Color("TextPrimary"))
+                                        .textContentType(.newPassword)
+                                }
+                                
+                                Button(action: {
+                                    showConfirmPassword.toggle()
+                                }) {
+                                    Image(systemName: showConfirmPassword ? "eye.slash.fill" : "eye.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color("TextSecondary"))
+                                }
+                                .padding(.trailing, 16)
+                            }
+                            .padding(.leading, 16)
+                            .padding(.vertical, 14)
+                            .background(Color("InputBackground"))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                            )
                         }
                         
                         // Password Requirements
@@ -315,6 +358,7 @@ struct SignUpView: View {
                     .padding(.bottom, 32)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color("BackgroundPrimary"))
             .navigationBarTitleDisplayMode(.inline)

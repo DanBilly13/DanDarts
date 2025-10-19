@@ -197,6 +197,7 @@ struct SignInView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color("BackgroundPrimary"))
             .navigationBarTitleDisplayMode(.inline)

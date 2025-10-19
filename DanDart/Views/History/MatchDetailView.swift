@@ -119,7 +119,7 @@ struct MatchDetailView: View {
                 
                 // 3-dart average
                 StatComparisonRow(
-                    label: "Average visit",
+                    label: "Average visit   ",
                     player1Value: Int(match.players[0].averageScore),
                     player2Value: Int(match.players[1].averageScore),
                     isDecimal: true,
