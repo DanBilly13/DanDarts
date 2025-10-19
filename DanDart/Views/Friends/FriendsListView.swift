@@ -8,6 +8,9 @@
 import SwiftUI
 
 struct FriendsListView: View {
+    @EnvironmentObject private var authService: AuthService
+    @StateObject private var friendsService = FriendsService()
+    
     @State private var searchText: String = ""
     @State private var showAddFriend: Bool = false
     @State private var showSuccessAlert: Bool = false
@@ -15,8 +18,10 @@ struct FriendsListView: View {
     @State private var showDeleteConfirmation: Bool = false
     @State private var friendToDelete: Player? = nil
     
-    // Friends data loaded from local storage
+    // Friends data loaded from Supabase
     @State private var friends: [Player] = []
+    @State private var isLoadingFriends: Bool = false
+    @State private var loadError: String?
     
     var filteredFriends: [Player] {
         if searchText.isEmpty {
@@ -60,8 +65,24 @@ struct FriendsListView: View {
                 .cornerRadius(12)
                 .padding(.bottom, 16)
             
-            // Friends List or Empty State
-            if friends.isEmpty {
+            // Friends List, Loading, or Empty State
+            if isLoadingFriends {
+                // Loading State
+                VStack(spacing: 16) {
+                    Spacer()
+                    
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(Color("AccentPrimary"))
+                    
+                    Text("Loading friends...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+            } else if friends.isEmpty {
                 // Empty State
                 VStack(spacing: 16) {
                     Spacer()
@@ -188,63 +209,76 @@ struct FriendsListView: View {
     
     // MARK: - Helper Methods
     
-    /// Load friends from local storage
+    /// Load friends from Supabase
     private func loadFriends() {
-        friends = FriendsStorageManager.shared.loadFriends()
+        guard let currentUserId = authService.currentUser?.id else {
+            print("⚠️ No current user, cannot load friends")
+            return
+        }
         
-        // Add Bob as initial mock friend for testing (only if no friends exist)
-        if friends.isEmpty {
-            let bob = Player(
-                displayName: "Bob Smith",
-                nickname: "bobsmith",
-                avatarURL: "avatar2",
-                isGuest: false,
-                totalWins: 12,
-                totalLosses: 11
-            )
-            FriendsStorageManager.shared.addFriend(bob)
-            friends = FriendsStorageManager.shared.loadFriends()
+        isLoadingFriends = true
+        loadError = nil
+        
+        Task {
+            do {
+                // Load friends from Supabase
+                let friendUsers = try await friendsService.loadFriends(userId: currentUserId)
+                
+                // Convert Users to Players
+                friends = friendUsers.map { $0.toPlayer() }
+                
+                isLoadingFriends = false
+                print("✅ Loaded \(friends.count) friends from Supabase")
+                
+            } catch {
+                isLoadingFriends = false
+                loadError = "Failed to load friends"
+                print("❌ Load friends error: \(error)")
+                
+                // Show empty state on error
+                friends = []
+            }
         }
     }
     
-    /// Add friend with duplicate prevention and success feedback
+    /// Add friend callback - reload friends list
     private func addFriend(_ player: Player) {
-        // Haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        // Reload friends list from Supabase
+        loadFriends()
         
-        // Try to add friend
-        let success = FriendsStorageManager.shared.addFriend(player)
-        
-        if success {
-            // Reload friends list
-            loadFriends()
-            
-            // Show success message
-            successMessage = "\(player.displayName) added to friends!"
-            showSuccessAlert = true
-        } else {
-            // Already a friend
-            successMessage = "\(player.displayName) is already your friend"
-            showSuccessAlert = true
-        }
+        // Show success message
+        successMessage = "\(player.displayName) added to friends!"
+        showSuccessAlert = true
     }
     
     /// Remove friend with confirmation
     private func removeFriend(_ player: Player) {
+        guard let currentUserId = authService.currentUser?.id else {
+            return
+        }
+        
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        // Remove from storage
-        FriendsStorageManager.shared.removeFriend(withId: player.id)
-        
-        // Reload friends list
-        loadFriends()
-        
-        // Show success message
-        successMessage = "\(player.displayName) removed from friends"
-        showSuccessAlert = true
+        Task {
+            do {
+                // Remove friendship from Supabase
+                try await friendsService.removeFriend(userId: currentUserId, friendId: player.id)
+                
+                // Reload friends list
+                loadFriends()
+                
+                // Show success message
+                successMessage = "\(player.displayName) removed from friends"
+                showSuccessAlert = true
+                
+            } catch {
+                print("❌ Remove friend error: \(error)")
+                successMessage = "Failed to remove friend"
+                showSuccessAlert = true
+            }
+        }
     }
 }
 
@@ -252,8 +286,10 @@ struct FriendsListView: View {
 
 #Preview {
     FriendsListView()
+        .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("With Friends") {
     FriendsListView()
+        .environmentObject(AuthService.mockAuthenticated)
 }
