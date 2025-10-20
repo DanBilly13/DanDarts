@@ -148,13 +148,21 @@ struct SignInView: View {
                         
                         // Sign in with Google Button
                         Button(action: {
-                            // TODO: Implement Google sign in
+                            Task {
+                                await signInWithGoogle()
+                            }
                         }) {
                             HStack(spacing: 12) {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 16, weight: .medium))
+                                if isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: Color("TextPrimary")))
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 16, weight: .medium))
+                                }
                                 
-                                Text("Sign in with Google")
+                                Text(isLoading ? "Signing in with Google..." : "Sign in with Google")
                                     .font(.system(size: 17, weight: .semibold))
                             }
                             .foregroundColor(Color("TextPrimary"))
@@ -168,6 +176,7 @@ struct SignInView: View {
                             )
                         }
                         .buttonStyle(SecondaryButtonStyle())
+                        .disabled(isLoading)
                     }
                     .padding(.horizontal, 32)
                     
@@ -247,6 +256,44 @@ struct SignInView: View {
             } else {
                 errorMessage = "Sign in failed. Please try again."
             }
+        }
+        
+        // Reset loading state
+        isLoading = false
+    }
+    
+    /// Sign in with Google OAuth
+    private func signInWithGoogle() async {
+        // Clear previous error
+        errorMessage = ""
+        
+        // Set loading state
+        isLoading = true
+        
+        do {
+            // Call AuthService Google OAuth
+            let isNewUser = try await authService.signInWithGoogle()
+            
+            // Dismiss SignInView
+            // If new user: ContentView will show ProfileSetupView
+            // If existing user: ContentView will show MainTabView
+            dismiss()
+            
+        } catch let error as AuthError {
+            // Handle specific OAuth errors
+            switch error {
+            case .oauthCancelled:
+                // Don't show error for cancelled OAuth
+                break
+            case .oauthFailed:
+                errorMessage = "Google sign in failed. Please try again"
+            case .networkError:
+                errorMessage = "Network error. Please check your connection and try again"
+            default:
+                errorMessage = "Failed to sign in with Google. Please try again"
+            }
+        } catch {
+            errorMessage = "An unexpected error occurred. Please try again"
         }
         
         // Reset loading state

@@ -21,7 +21,6 @@ struct SignUpView: View {
     // MARK: - UI State
     @State private var showErrors = false
     @State private var errorMessage = ""
-    @State private var showingProfileSetup = false
     @State private var showPassword = false
     @State private var showConfirmPassword = false
     
@@ -371,11 +370,6 @@ struct SignUpView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingProfileSetup) {
-            ProfileSetupView()
-                .environmentObject(authService)
-                .interactiveDismissDisabled(true) // Prevent swipe to dismiss
-        }
     }
     
     // MARK: - Actions
@@ -401,8 +395,8 @@ struct SignUpView: View {
                 nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             
-            // Success! Navigate to Profile Setup
-            showingProfileSetup = true
+            // Success! Dismiss SignUpView - ContentView will show ProfileSetupView
+            dismiss()
             
         } catch let error as AuthError {
             // Handle specific auth errors
@@ -442,13 +436,10 @@ struct SignUpView: View {
             // Call AuthService Google OAuth
             let isNewUser = try await authService.signInWithGoogle()
             
-            if isNewUser {
-                // New user - navigate to Profile Setup
-                showingProfileSetup = true
-            } else {
-                // Existing user - dismiss and navigate to main app
-                dismiss()
-            }
+            // Dismiss SignUpView
+            // If new user: ContentView will show ProfileSetupView
+            // If existing user: ContentView will show MainTabView
+            dismiss()
             
         } catch let error as AuthError {
             // Handle specific OAuth errors

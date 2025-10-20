@@ -51,6 +51,7 @@ class AuthService: ObservableObject {
     @Published var currentUser: User?
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = false
+    @Published var needsProfileSetup: Bool = false // Track if new user needs profile setup
     
     // MARK: - Private Properties
     private let supabaseService = SupabaseService.shared
@@ -137,11 +138,12 @@ class AuthService: ObservableObject {
             
             // 3. Store session token in Keychain (handled by Supabase SDK automatically)
             
-            // 4. Set current user and authentication state
+            // 4. Set current user but DON'T authenticate yet (wait for profile setup)
             currentUser = newUser
-            updateAuthenticationState()
+            needsProfileSetup = true // Mark that profile setup is needed
+            // Don't call updateAuthenticationState() yet - wait for profile setup
             
-            print("🎉 Sign up complete! User: \(newUser.displayName)")
+            print("🎉 Sign up complete! User: \(newUser.displayName) - Profile setup needed")
             
         } catch let error as PostgrestError {
             // Handle database-specific errors
@@ -184,23 +186,71 @@ class AuthService: ObservableObject {
             // Validate input
             try validateSignInInput(email: email, password: password)
             
+            print("🔐 Attempting sign in for email: \(email)")
+            
             // 1. Authenticate with Supabase
             let authResponse = try await supabaseService.client.auth.signIn(
                 email: email,
                 password: password
             )
             
+            print("✅ Auth successful, user ID: \(authResponse.user.id)")
+            
             // Get the authenticated user
             let user = authResponse.user
             
             // 2. Fetch user profile from users table
-            let userProfile: User = try await supabaseService.client
-                .from("users")
-                .select()
-                .eq("id", value: user.id)
-                .single()
-                .execute()
-                .value
+            print("📥 Fetching user profile from database...")
+            
+            let userProfile: User
+            do {
+                userProfile = try await supabaseService.client
+                    .from("users")
+                    .select()
+                    .eq("id", value: user.id)
+                    .single()
+                    .execute()
+                    .value
+                
+                print("✅ User profile fetched: \(userProfile.displayName)")
+            } catch let fetchError {
+                // User profile doesn't exist - this can happen if signup partially failed
+                print("⚠️ User profile not found in database: \(fetchError)")
+                print("⚠️ Creating user profile now...")
+                
+                // Create a basic user profile from auth data
+                // Use a unique nickname based on user ID to avoid conflicts
+                let emailPrefix = user.email?.components(separatedBy: "@").first?.lowercased() ?? "user"
+                let uniqueNickname = "\(emailPrefix)_\(user.id.uuidString.prefix(8))"
+                
+                let newUser = User(
+                    id: user.id,
+                    displayName: user.email?.components(separatedBy: "@").first ?? "User",
+                    nickname: uniqueNickname,
+                    handle: nil,
+                    avatarURL: nil,
+                    createdAt: Date(),
+                    lastSeenAt: Date(),
+                    totalWins: 0,
+                    totalLosses: 0
+                )
+                
+                print("📝 Creating user with nickname: \(uniqueNickname)")
+                
+                do {
+                    try await supabaseService.client
+                        .from("users")
+                        .insert(newUser)
+                        .execute()
+                    
+                    print("✅ User profile created: \(newUser.displayName)")
+                    userProfile = newUser
+                } catch let insertError {
+                    print("❌ Failed to create user profile: \(insertError)")
+                    // If we can't create the profile, throw a more specific error
+                    throw AuthError.userNotFound
+                }
+            }
             
             // 3. Store session in Keychain (handled by Supabase SDK automatically)
             
@@ -208,23 +258,31 @@ class AuthService: ObservableObject {
             currentUser = userProfile
             updateAuthenticationState()
             
+            print("🎉 Sign in complete!")
+            
         } catch let error as PostgrestError {
             // Handle database-specific errors
+            print("❌ PostgrestError: \(error.message)")
             if error.message.contains("No rows") || error.message.contains("not found") {
                 throw AuthError.userNotFound
             }
             throw AuthError.networkError
         } catch let error as AuthError {
             // Re-throw our custom auth errors
+            print("❌ AuthError: \(error.localizedDescription)")
             throw error
         } catch {
             // Handle Supabase auth errors
+            print("❌ Sign in error: \(error)")
+            print("❌ Error description: \(error.localizedDescription)")
+            
             let errorMessage = error.localizedDescription.lowercased()
             if errorMessage.contains("invalid") && (errorMessage.contains("email") || errorMessage.contains("password") || errorMessage.contains("credentials")) {
                 throw AuthError.invalidCredentials
-            } else if errorMessage.contains("network") || errorMessage.contains("connection") {
+            } else if errorMessage.contains("network") || errorMessage.contains("connection") || errorMessage.contains("timeout") {
                 throw AuthError.networkError
             } else {
+                // Default to invalid credentials for unknown auth errors
                 throw AuthError.invalidCredentials
             }
         }
@@ -331,9 +389,10 @@ class AuthService: ObservableObject {
                     .insert(newUser)
                     .execute()
                 
-                // Set authentication state
+                // Set current user but mark as needing profile setup
                 currentUser = newUser
-                updateAuthenticationState()
+                needsProfileSetup = true
+                // Don't call updateAuthenticationState() yet - wait for profile setup
                 
                 // Return true to indicate new user (navigate to Profile Setup)
                 return true
@@ -527,6 +586,10 @@ class AuthService: ObservableObject {
             // Update local state
             self.currentUser = updatedUser
             
+            // Complete profile setup - now authenticate the user
+            needsProfileSetup = false
+            updateAuthenticationState()
+            
         } catch let error as PostgrestError {
             // Handle database-specific errors
             if error.message.contains("duplicate key") && error.message.contains("handle") {
@@ -657,15 +720,23 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Complete profile setup (for skip button)
+    func completeProfileSetup() {
+        needsProfileSetup = false
+        updateAuthenticationState()
+    }
+    
     /// Update authentication state based on current user
     private func updateAuthenticationState() {
         isAuthenticated = currentUser != nil
+        needsProfileSetup = false // Ensure profile setup flag is cleared when authenticating
     }
     
     /// Clear all authentication state
     private func clearAuthenticationState() {
         currentUser = nil
         isAuthenticated = false
+        needsProfileSetup = false
     }
     
     // MARK: - REST API Sign Up (Workaround for SDK timeout issue)

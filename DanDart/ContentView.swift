@@ -16,6 +16,10 @@ struct ContentView: View {
                 // User is authenticated - show main app
                 MainTabView()
                     .environmentObject(authService)
+            } else if authService.needsProfileSetup {
+                // User signed up but needs to complete profile setup
+                ProfileSetupView()
+                    .environmentObject(authService)
             } else {
                 // User is not authenticated - show splash/auth flow
                 SplashView()
