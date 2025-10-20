@@ -174,35 +174,40 @@ struct MatchDart: Codable {
 // MARK: - Mock Data
 
 extension MatchResult {
-    static let mock301 = MatchResult(
-        gameType: "301",
-        gameName: "301",
-        players: [
-            MatchPlayer(
-                id: UUID(),
-                displayName: "Dan Billingham",
-                nickname: "danbilly",
-                avatarURL: "avatar1",
-                isGuest: false,
-                finalScore: 0,
-                startingScore: 301,
-                totalDartsThrown: 18,
-                turns: []
-            ),
-            MatchPlayer(
-                id: UUID(),
-                displayName: "Diana Prince",
-                nickname: "wonderwoman",
-                avatarURL: "avatar4",
-                isGuest: false,
-                finalScore: 45,
-                startingScore: 301,
-                totalDartsThrown: 18,
-                turns: []
-            )
-        ],
-        winnerId: UUID(),
-        timestamp: Date(),
-        duration: 180
-    )
+    static let mock301: MatchResult = {
+        let winnerId = UUID()
+        let loserId = UUID()
+        
+        return MatchResult(
+            gameType: "301",
+            gameName: "301",
+            players: [
+                MatchPlayer(
+                    id: winnerId,
+                    displayName: "Dan Billingham",
+                    nickname: "danbilly",
+                    avatarURL: "avatar1",
+                    isGuest: false,
+                    finalScore: 0, // Winner - finished the game
+                    startingScore: 301,
+                    totalDartsThrown: 18,
+                    turns: []
+                ),
+                MatchPlayer(
+                    id: loserId,
+                    displayName: "Diana Prince",
+                    nickname: "wonderwoman",
+                    avatarURL: "avatar4",
+                    isGuest: false,
+                    finalScore: 45, // Loser - 45 points remaining
+                    startingScore: 301,
+                    totalDartsThrown: 18,
+                    turns: []
+                )
+            ],
+            winnerId: winnerId, // Set to first player's ID
+            timestamp: Date(),
+            duration: 180
+        )
+    }()
 }

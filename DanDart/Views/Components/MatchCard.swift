@@ -22,7 +22,7 @@ struct MatchCard: View {
                 
                 // Date
                 Text(relativeDate)
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.caption)
                     .foregroundColor(Color("TextSecondary"))
             }
             
@@ -39,7 +39,7 @@ struct MatchCard: View {
     private var gameBadge: some View {
         VStack(spacing: 4) {
             Text(match.gameType)
-                .font(.system(size: 16, weight: .bold))
+                .font(.body.weight(.bold))
                 .foregroundColor(Color("AccentPrimary"))
             
             Image(systemName: "target")
@@ -55,6 +55,11 @@ struct MatchCard: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(match.players.prefix(2)) { player in
                 HStack(spacing: 8) {
+                    // Player name
+                    Text(player.displayName)
+                        .font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))
+                        .foregroundColor(player.id == match.winnerId ? Color("AccentPrimary") : Color("TextPrimary"))
+                    
                     // Winner indicator
                     if player.id == match.winnerId {
                         Image(systemName: "crown.fill")
@@ -62,16 +67,11 @@ struct MatchCard: View {
                             .foregroundColor(Color("AccentPrimary"))
                     }
                     
-                    // Player name
-                    Text(player.displayName)
-                        .font(.system(size: 14, weight: player.id == match.winnerId ? .bold : .medium))
-                        .foregroundColor(player.id == match.winnerId ? Color("AccentPrimary") : Color("TextPrimary"))
-                    
                     Spacer()
                     
                     // Score
                     Text("\(player.finalScore)")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(Color("TextSecondary"))
                 }
             }
@@ -79,7 +79,7 @@ struct MatchCard: View {
             // Show "+X more" if more than 2 players
             if match.players.count > 2 {
                 Text("+\(match.players.count - 2) more")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.caption)
                     .foregroundColor(Color("TextSecondary"))
             }
         }

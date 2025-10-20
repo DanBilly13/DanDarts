@@ -68,7 +68,7 @@ struct MatchHistoryView: View {
                         MatchStorageManager.shared.seedTestMatches()
                         loadMatches()
                     }
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(Color("AccentPrimary"))
                 }
             }
@@ -91,7 +91,7 @@ struct MatchHistoryView: View {
                 .tint(Color("AccentPrimary"))
             
             Text(isRefreshing ? "Syncing with cloud..." : "Loading from cloud...")
-                .font(.system(size: 13, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundColor(Color("TextSecondary"))
             
             Spacer()
@@ -110,7 +110,7 @@ struct MatchHistoryView: View {
                 .foregroundColor(.orange)
             
             Text(message)
-                .font(.system(size: 13, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundColor(Color("TextSecondary"))
             
             Spacer()
@@ -165,11 +165,11 @@ struct MatchHistoryView: View {
             
             VStack(spacing: 8) {
                 Text("No matches yet")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundColor(Color("TextPrimary"))
                 
                 Text(emptyStateMessage)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundColor(Color("TextSecondary"))
                     .multilineTextAlignment(.center)
             }
@@ -302,7 +302,7 @@ struct FilterButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(isSelected ? Color("BackgroundPrimary") : Color("TextPrimary"))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)

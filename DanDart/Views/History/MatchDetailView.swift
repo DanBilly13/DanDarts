@@ -42,11 +42,11 @@ struct MatchDetailView: View {
     private var gameTypeHeader: some View {
         VStack(spacing: 8) {
             Text(match.gameName)
-                .font(.system(size: 32, weight: .bold))
+                .font(.largeTitle.weight(.bold))
                 .foregroundColor(Color("TextPrimary"))
             
             Text(match.formattedDate)
-                .font(.system(size: 14, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(Color("TextSecondary"))
         }
     }
@@ -85,7 +85,7 @@ struct MatchDetailView: View {
     private var statsComparisonSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Stats")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundColor(Color("TextPrimary"))
             
             VStack(spacing: 12) {
@@ -179,7 +179,7 @@ struct CompactPlayerCard: View {
     let alignment: HorizontalAlignment
     
     var body: some View {
-        VStack(alignment: alignment, spacing: 12) {
+        VStack(alignment: .center, spacing: 12) {
             // Avatar with crown
             ZStack {
                 Circle()
@@ -202,39 +202,53 @@ struct CompactPlayerCard: View {
                 if isWinner {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(Color("AccentTertiary"))
                         .offset(y: -55)
                 }
             }
             .overlay(
                 Circle()
-                    .stroke(isWinner ? Color("AccentPrimary") : Color("InputBackground"), lineWidth: 3)
+                    .stroke(isWinner ? Color("AccentTertiary") : Color("InputBackground"), lineWidth: 3)
             )
             
-            // Player info
-            VStack(alignment: alignment, spacing: 4) {
+            // Player info - centered
+            VStack(alignment: .center, spacing: 4) {
                 Text(player.displayName)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(isWinner ? Color("AccentPrimary") : Color("TextPrimary"))
-                    .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
+                    .font(.body.weight(.bold))
+                    .foregroundColor(isWinner ? Color("AccentTertiary") : Color("TextPrimary"))
+                    .multilineTextAlignment(.center)
                 
                 if !player.isGuest {
                     Text("@\(player.nickname)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(Color("AccentTertiary"))
                 }
             }
             
-            // Final score
-            VStack(spacing: 2) {
-                Text("\(player.finalScore)")
-                    .font(.system(size: 48, weight: .black))
-                    .foregroundColor(isWinner ? Color("AccentPrimary") : Color("TextPrimary"))
-                
-                Text("FINAL")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(Color("TextSecondary"))
-                    .tracking(1)
+            // Winner badge or remaining points
+            if isWinner {
+                VStack(spacing: 4) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(Color("AccentTertiary"))
+                    
+                    Text("WINNER")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(Color("AccentTertiary"))
+                        .tracking(1)
+                }
+                .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 4) {
+                    Text("\(player.finalScore)")
+                        .font(.title.weight(.bold))
+                        .foregroundColor(Color("AccentTertiary"))
+                    
+                    Text("points remaining")
+                        .font(.caption2.weight(.medium))
+                        .foregroundColor(Color("AccentTertiary"))
+                }
+                .padding(.vertical, 8)
             }
         }
         .frame(maxWidth: .infinity)
@@ -286,32 +300,44 @@ struct MatchPlayerCard: View {
             // Player Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(player.displayName)
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.headline)
                     .foregroundColor(isWinner ? Color("AccentPrimary") : Color("TextPrimary"))
                 
                 if !player.isGuest {
                     Text("@\(player.nickname)")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundColor(Color("TextSecondary"))
                 }
                 
                 Text("Average: \(player.formattedAverage)")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.caption)
                     .foregroundColor(Color("TextSecondary"))
             }
             
             Spacer()
             
-            // Final Score
-            VStack(spacing: 4) {
-                Text("\(player.finalScore)")
-                    .font(.system(size: 48, weight: .black))
-                    .foregroundColor(isWinner ? Color("AccentPrimary") : Color("TextPrimary"))
-                
-                Text("FINAL")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color("TextSecondary"))
-                    .tracking(1)
+            // Winner badge or remaining points
+            if isWinner {
+                VStack(spacing: 4) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(Color("AccentPrimary"))
+                    
+                    Text("WINNER")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(Color("AccentPrimary"))
+                        .tracking(1)
+                }
+            } else {
+                VStack(spacing: 4) {
+                    Text("\(player.finalScore)")
+                        .font(.title.weight(.bold))
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    Text("remaining")
+                        .font(.caption2.weight(.medium))
+                        .foregroundColor(Color("TextSecondary"))
+                }
             }
         }
         .padding(16)
@@ -335,13 +361,13 @@ struct InfoRow: View {
                 .frame(width: 24)
             
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(Color("TextSecondary"))
             
             Spacer()
             
             Text(value)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(Color("TextPrimary"))
         }
     }
@@ -375,7 +401,7 @@ struct StatComparisonRow: View {
             HStack(spacing: 12) {
                 // Player 1 value (left)
                 Text(isDecimal ? String(format: "%.2f", player1Decimal) : "\(player1Value)")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.body.weight(.bold))
                     .foregroundColor(Color("TextPrimary"))
                     .frame(width: 50, alignment: .leading)
                 
@@ -383,14 +409,14 @@ struct StatComparisonRow: View {
                 
                 // Label (center)
                 Text(label)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(Color("TextPrimary"))
                 
                 Spacer()
                 
                 // Player 2 value (right)
                 Text(isDecimal ? String(format: "%.2f", player2Decimal) : "\(player2Value)")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.body.weight(.bold))
                     .foregroundColor(Color("TextPrimary"))
                     .frame(width: 50, alignment: .trailing)
             }
@@ -448,7 +474,7 @@ struct PlayerTurnBreakdown: View {
         VStack(alignment: .leading, spacing: 12) {
             // Player name header
             Text(player.displayName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.headline)
                 .foregroundColor(Color("TextPrimary"))
             
             // Turns
@@ -473,7 +499,7 @@ struct TurnRow: View {
         HStack(spacing: 12) {
             // Turn number
             Text("Turn \(turn.turnNumber)")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundColor(Color("TextSecondary"))
                 .frame(width: 60, alignment: .leading)
             
@@ -481,7 +507,7 @@ struct TurnRow: View {
             HStack(spacing: 4) {
                 ForEach(turn.darts, id: \.value) { dart in
                     Text(dart.displayText)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption.weight(.medium))
                         .foregroundColor(Color("TextPrimary"))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)
@@ -494,12 +520,12 @@ struct TurnRow: View {
             
             // Turn total
             Text("\(turn.turnTotal)")
-                .font(.system(size: 14, weight: .bold))
+                .font(.subheadline.weight(.bold))
                 .foregroundColor(turn.isBust ? Color.red : Color("AccentPrimary"))
             
             // Score after
             Text("→ \(turn.scoreAfter)")
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundColor(Color("TextSecondary"))
         }
         .padding(.vertical, 4)
