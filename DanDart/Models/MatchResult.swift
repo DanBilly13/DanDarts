@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Match Result Model
 
-struct MatchResult: Identifiable, Codable {
+struct MatchResult: Identifiable, Codable, Hashable {
     let id: UUID
     let gameType: String // e.g., "301", "501", "Cricket"
     let gameName: String // Full game name for display
@@ -51,11 +51,33 @@ struct MatchResult: Identifiable, Codable {
         self.timestamp = timestamp
         self.duration = duration
     }
+    
+    // Custom Hashable implementation (only hash stored properties)
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(gameType)
+        hasher.combine(gameName)
+        hasher.combine(players)
+        hasher.combine(winnerId)
+        hasher.combine(timestamp)
+        hasher.combine(duration)
+    }
+    
+    // Custom Equatable implementation
+    static func == (lhs: MatchResult, rhs: MatchResult) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.gameType == rhs.gameType &&
+        lhs.gameName == rhs.gameName &&
+        lhs.players == rhs.players &&
+        lhs.winnerId == rhs.winnerId &&
+        lhs.timestamp == rhs.timestamp &&
+        lhs.duration == rhs.duration
+    }
 }
 
 // MARK: - Match Player Model
 
-struct MatchPlayer: Identifiable, Codable {
+struct MatchPlayer: Identifiable, Codable, Hashable {
     let id: UUID
     let displayName: String
     let nickname: String
@@ -119,7 +141,7 @@ struct MatchPlayer: Identifiable, Codable {
 
 // MARK: - Match Turn Model
 
-struct MatchTurn: Identifiable, Codable {
+struct MatchTurn: Identifiable, Codable, Hashable {
     let id: UUID
     let turnNumber: Int
     let darts: [MatchDart]
@@ -148,7 +170,7 @@ struct MatchTurn: Identifiable, Codable {
 
 // MARK: - Match Dart Model
 
-struct MatchDart: Codable {
+struct MatchDart: Codable, Hashable {
     let baseValue: Int
     let multiplier: Int // 1=single, 2=double, 3=triple
     let value: Int // total value (baseValue * multiplier)

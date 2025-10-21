@@ -45,20 +45,23 @@ struct MatchHistoryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Sync status banner
-                if isLoadingFromSupabase || isRefreshing {
-                    syncStatusBanner
+                VStack(spacing: 0) {
+                    // Sync status banner
+                    if isLoadingFromSupabase || isRefreshing {
+                        syncStatusBanner
+                    }
+                    
+                    // Error banner
+                    if let error = loadError {
+                        errorBanner(message: error)
+                    }
+                    
+                    filterButtonsView
                 }
+                .padding(.horizontal, 16)
                 
-                // Error banner
-                if let error = loadError {
-                    errorBanner(message: error)
-                }
-                
-                filterButtonsView
                 contentView
             }
-            .padding(.horizontal, 16)
             .background(Color("BackgroundPrimary"))
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.large)
@@ -78,6 +81,17 @@ struct MatchHistoryView: View {
         }
         .background(Color("BackgroundPrimary")).ignoresSafeArea()
         .onAppear {
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithTransparentBackground()
+            appearance.backgroundColor = UIColor(named: "BackgroundPrimary")
+            appearance.shadowColor = .clear
+            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+
+            UINavigationBar.appearance().standardAppearance = appearance
+            UINavigationBar.appearance().scrollEdgeAppearance = appearance
+            UINavigationBar.appearance().compactAppearance = appearance
+
             loadMatches()
         }
     }
@@ -142,7 +156,11 @@ struct MatchHistoryView: View {
                     }
                 }
             }
+            .padding(.horizontal, 1)
+            .padding(.trailing, 16)
         }
+        .scrollClipDisabled()
+        .padding(.top, 12)
         .padding(.bottom, 16)
     }
     
@@ -176,7 +194,7 @@ struct MatchHistoryView: View {
             
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity)
     }
     
     private var emptyStateMessage: String {
@@ -184,20 +202,22 @@ struct MatchHistoryView: View {
     }
     
     private var matchListView: some View {
-        List {
-            ForEach(filteredMatches) { match in
-                NavigationLink(destination: MatchDetailView(match: match)) {
-                    matchRowView(match)
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(filteredMatches) { match in
+                    NavigationLink(value: match) {
+                        matchRowView(match)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .listRowBackground(Color("BackgroundPrimary"))
-                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color("BackgroundPrimary"))
-        .refreshable {
-            await refreshMatches()
+        .navigationDestination(for: MatchResult.self) { match in
+            MatchDetailView(match: match)
         }
     }
     

@@ -124,19 +124,49 @@ struct ScoringButton: View {
     
     var body: some View {
         GeometryReader { geometry in
-            Text(title)
-                .font(.system(size: 18, weight: .medium, design: .default))
-                .foregroundColor(Color("BackgroundPrimary"))
-            .frame(width: 64, height: 64)
-            .background(
-                Circle()
-                    .fill(Color("AccentTertiary"))
-                    .overlay(
-                        Circle()
-                            .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
-                    )
-            )
-            .clipShape(Circle())
+            ZStack {
+                // Bull button special styling
+                if baseValue == 50 {
+                    // Outer circle (AccentTertiary background)
+                    Circle()
+                        .fill(Color("AccentTertiary"))
+                        .frame(width: 64, height: 64)
+                    
+                    // Inner red circle
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 42, height: 42)
+                    
+                    // White text on top
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold, design: .default))
+                        .foregroundColor(.white)
+                } else {
+                    // Standard button styling
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold, design: .default))
+                        .foregroundColor(Color("BackgroundPrimary"))
+                        .frame(width: 64, height: 64)
+                        .background(
+                            Circle()
+                                .fill(Color("AccentTertiary"))
+                                .overlay(
+                                    Circle()
+                                        .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
+                                )
+                        )
+                        .clipShape(Circle())
+                        // 25 button special border
+                        .overlay(
+                            Group {
+                                if baseValue == 25 {
+                                    Circle()
+                                        .stroke(Color("AccentSecondary"), lineWidth: 10)
+                                }
+                            }
+                        )
+                }
+            }
             .scaleEffect(isPressed ? 0.92 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
             .blur(radius: shouldBlur ? 4 : 0)

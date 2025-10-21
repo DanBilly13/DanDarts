@@ -63,6 +63,7 @@ struct FriendsListView: View {
                 .padding(.vertical, 12)
                 .background(Color("InputBackground"))
                 .cornerRadius(12)
+                .padding(.top, 12)
                 .padding(.bottom, 16)
             
             // Friends List, Loading, or Empty State
