@@ -93,7 +93,7 @@ struct PlayerCard: View {
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color("InputBackground"))
+        .moodCard(.red, radius: 12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
@@ -140,7 +140,7 @@ struct PlayerCardCompact: View {
                 if !player.isGuest {
                     Text("@\(player.nickname)")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(Color("AccentSecondary"))
                         .lineLimit(1)
                 }
             }
