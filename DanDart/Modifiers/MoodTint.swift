@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum MoodTint { case green, red, yellow }
+enum MoodTint { case green, red, yellow, grey }
 
 extension View {
     /// Rounded, dark card background with a muted hue gradient.
@@ -49,6 +49,16 @@ private extension LinearGradient {
                 ],
                 startPoint: .top, endPoint: .bottomTrailing
             )
+            
+        case .grey:
+            // from deep golden brown to warm amber
+            return LinearGradient(
+                colors: [
+                    Color(red: 0.227, green: 0.165, blue: 0.027).opacity(0.4), // #3A2A07
+                    Color(red: 0.773, green: 0.537, blue: 0.102).opacity(0.35)   // #C5891A
+                ],
+                startPoint: .top, endPoint: .bottomTrailing
+            )
         }
     }
 }
@@ -65,6 +75,7 @@ struct MoodTint_Previews: PreviewProvider {
                 cardSample(title: "Red Mood Card", tint: .red)
                 cardSample(title: "Green Mood Card", tint: .green)
                 cardSample(title: "Yellow Mood Card", tint: .yellow)
+                cardSample(title: "Yellow Mood Card", tint: .grey)
             }
             .padding(20)
         }

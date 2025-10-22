@@ -58,7 +58,7 @@ struct MatchCard: View {
                     // Player name
                     Text(player.displayName)
                         .font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))
-                        .foregroundColor(player.id == match.winnerId ? Color("AccentPrimary") : Color("TextPrimary"))
+                        .foregroundColor(player.id == match.winnerId ? Color("TextPrimary") : Color("TextPrimary"))
                     
                     // Winner indicator
                     if player.id == match.winnerId {

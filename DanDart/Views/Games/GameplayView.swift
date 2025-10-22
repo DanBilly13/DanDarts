@@ -377,7 +377,7 @@ struct PlayerScoreCard: View {
             
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color("InputBackground"))

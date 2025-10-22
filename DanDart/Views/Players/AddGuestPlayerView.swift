@@ -166,10 +166,10 @@ struct AddGuestPlayerView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 25)
                                     .fill(Color("InputBackground"))
-                                    .overlay(
+                                   /* .overlay(
                                         RoundedRectangle(cornerRadius: 25)
                                             .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                                    )
+                                    )*/
                             )
                     }
                     .disabled(isLoading)
@@ -250,10 +250,10 @@ struct DartTextFieldStyle: TextFieldStyle {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(Color("InputBackground"))
-            .overlay(
+            /*.overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-            )
+            )*/
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .font(.system(size: 16, weight: .medium))
             .foregroundColor(Color("TextPrimary"))

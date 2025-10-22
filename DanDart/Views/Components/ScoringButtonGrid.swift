@@ -125,46 +125,39 @@ struct ScoringButton: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Bull button special styling
+                // Bull button - solid AccentPrimary
                 if baseValue == 50 {
-                    // Outer circle (AccentTertiary background)
-                    Circle()
-                        .fill(Color("AccentTertiary"))
-                        .frame(width: 64, height: 64)
-                    
-                    // Inner red circle
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 42, height: 42)
-                    
-                    // White text on top
                     Text(title)
                         .font(.system(size: 16, weight: .semibold, design: .default))
                         .foregroundColor(.white)
+                        .frame(width: 64, height: 64)
+                        .background(
+                            Circle()
+                                .fill(Color("AccentPrimary"))
+                        )
+                        .clipShape(Circle())
+                } else if baseValue == 25 {
+                    // 25 button - solid AccentSecondary
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold, design: .default))
+                        .foregroundColor(.white)
+                        .frame(width: 64, height: 64)
+                        .background(
+                            Circle()
+                                .fill(Color("AccentSecondary"))
+                        )
+                        .clipShape(Circle())
                 } else {
                     // Standard button styling
                     Text(title)
                         .font(.system(size: 16, weight: .bold, design: .default))
-                        .foregroundColor(Color("BackgroundPrimary"))
+                        .foregroundColor(.white)
                         .frame(width: 64, height: 64)
                         .background(
                             Circle()
-                                .fill(Color("AccentTertiary"))
-                                .overlay(
-                                    Circle()
-                                        .fill(Color.white.opacity(isHighlighted ? 0.3 : 0.0))
-                                )
+                                .fill(isHighlighted ? Color("AccentPrimary") : Color("InputBackground"))
                         )
                         .clipShape(Circle())
-                        // 25 button special border
-                        .overlay(
-                            Group {
-                                if baseValue == 25 {
-                                    Circle()
-                                        .stroke(Color("AccentSecondary"), lineWidth: 10)
-                                }
-                            }
-                        )
                 }
             }
             .scaleEffect(isPressed ? 0.92 : 1.0)
@@ -192,14 +185,9 @@ struct ScoringButton: View {
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
             
-            // Brief highlight effect
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHighlighted = true
-            }
-            
-            // Remove highlight after brief delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.easeInOut(duration: 0.15)) {
+            // Hold for 1 second, then fade out (color change happens on press down)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeOut(duration: 0.3)) {
                     isHighlighted = false
                 }
             }
@@ -212,6 +200,7 @@ struct ScoringButton: View {
                 // Haptic feedback for long press
                 let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
                 impactFeedback.impactOccurred()
+                
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     menuCoordinator.showMenu(for: buttonId)
                 }
@@ -223,6 +212,7 @@ struct ScoringButton: View {
                     if !isPressed {
                         withAnimation(.easeInOut(duration: 0.1)) {
                             isPressed = true
+                            isHighlighted = true // Color change on press down
                         }
                     }
                 }
@@ -241,6 +231,7 @@ struct ScoringButton: View {
                         Button(action: {
                             let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
                             impactFeedback.impactOccurred()
+                            isHighlighted = false
                             onScoreSelected(baseValue, .triple)
                             withAnimation(.easeOut(duration: 0.2)) {
                                 menuCoordinator.hideMenu()
@@ -258,6 +249,7 @@ struct ScoringButton: View {
                         Button(action: {
                             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                             impactFeedback.impactOccurred()
+                            isHighlighted = false
                             onScoreSelected(baseValue, .double)
                             withAnimation(.easeOut(duration: 0.2)) {
                                 menuCoordinator.hideMenu()
@@ -275,6 +267,7 @@ struct ScoringButton: View {
                         Button(action: {
                             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                             impactFeedback.impactOccurred()
+                            isHighlighted = false
                             onScoreSelected(baseValue, .single)
                             withAnimation(.easeOut(duration: 0.2)) {
                                 menuCoordinator.hideMenu()
