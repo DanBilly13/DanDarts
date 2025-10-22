@@ -35,6 +35,7 @@ struct GameplayView: View {
                 // Dark background
                 Color.black
                     .ignoresSafeArea()
+                Spacer()
                 
                 VStack(spacing: 0) {
                     // Stacked player cards (current player in front)
@@ -45,7 +46,7 @@ struct GameplayView: View {
                         currentThrow: gameViewModel.currentThrow
                     )
                     .padding(.horizontal, 16)
-                    .padding(.top, 60)  // Extra padding to clear the notch area
+                    .padding(.top, 100)  // Extra padding to clear the notch area
                     
                     // Current throw display (always visible)
                     CurrentThrowDisplay(
@@ -62,12 +63,14 @@ struct GameplayView: View {
                         if let checkout = gameViewModel.suggestedCheckout {
                             CheckoutSuggestionView(checkout: checkout)
                                 .padding(.horizontal, 16)
-                                .padding(.top, 4)
+                                .padding(.vertical, 0)
                         }
                     }
-                    .frame(height: 36)
+                    .frame(height: 40, alignment: .center)
                     
-                    Spacer()
+                    .padding(.bottom, 8)
+                    
+                    
                     
                     // Scoring button grid (center)
                     ScoringButtonGrid(
@@ -360,11 +363,11 @@ struct PlayerScoreCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(player.displayName)
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .foregroundColor(Color("TextPrimary"))
                     
                     Text("@\(player.nickname)")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("AccentTertiary").opacity(0.8))
+                        .foregroundColor(Color("AccentPrimary").opacity(0.8))
                 }
                 
                 Spacer()
@@ -372,19 +375,17 @@ struct PlayerScoreCard: View {
                 // Score
                 Text("\(score)")
                     .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color("AccentTertiary"))
+                    .foregroundColor(Color("TextPrimary"))
             }
             
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color("InputBackground"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color("AccentSecondary"), lineWidth: 2)
-                )
+        .moodCard(.red, radius: 16)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color("AccentPrimary"), lineWidth: 2)
         )
     }
 }
@@ -417,7 +418,7 @@ struct CurrentThrowDisplay: View {
                         .frame(width: 40, height: 40)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color("AccentTertiary").opacity(hasDart ? 0.25 : 0.25))
+                                .fill(Color("TextPrimary").opacity(hasDart ? 0.15 : 0.10))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -430,7 +431,7 @@ struct CurrentThrowDisplay: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .disabled(!hasDart)
+                .allowsHitTesting(hasDart)
             }
             
             // Equals sign
@@ -442,21 +443,14 @@ struct CurrentThrowDisplay: View {
             // Total score
             Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
                 .font(.system(size: 20, weight: .bold, design: .monospaced))
-                .foregroundColor(Color("AccentTertiary"))
+                .foregroundColor(Color("TextPrimary"))
                 .frame(width: 50, height: 40)
-                .background(Color("AccentTertiary").opacity(0.2))
+                .background(Color("TextPrimary").opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color("InputBackground").opacity(0))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color("AccentTertiary").opacity(0), lineWidth: 1)
-                )
-        )
+        
     }
 }
 
