@@ -237,7 +237,8 @@ struct StackedPlayerCards: View {
                         isCurrentPlayer: index == currentPlayerIndex,
                         currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
                         legsWon: legsWon[player.id] ?? 0,
-                        matchFormat: matchFormat
+                        matchFormat: matchFormat,
+                        playerIndex: index
                     )
                     .overlay(
                         // Matched-radius dimming overlay for depth effect
@@ -358,6 +359,18 @@ struct PlayerScoreCard: View {
     let currentThrow: [ScoredThrow]
     let legsWon: Int
     let matchFormat: Int
+    let playerIndex: Int
+    
+    // Get border color based on player index
+    var borderColor: Color {
+        switch playerIndex {
+        case 0: return Color("AccentPrimary")
+        case 1: return Color("AccentSecondary")
+        case 2: return Color("AccentTertiary")
+        case 3: return Color("AccentQuaternary")
+        default: return Color("AccentPrimary")
+        }
+    }
     
     var body: some View {
         VStack(spacing: 12) {
@@ -366,7 +379,7 @@ struct PlayerScoreCard: View {
                 PlayerAvatarView(
                     avatarURL: player.avatarURL,
                     size: 48,
-                    borderColor: isCurrentPlayer ? Color("AccentPrimary") : nil
+                    borderColor: nil
                 )
                 
                 VStack(alignment: .leading, spacing: 0) {
@@ -414,7 +427,7 @@ struct PlayerScoreCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 40))
         .overlay(
             RoundedRectangle(cornerRadius: 40)
-                .strokeBorder(Color("TextPrimary").opacity(0.75), lineWidth: 2)
+                .strokeBorder(borderColor, lineWidth: 2)
         )
     }
 }
