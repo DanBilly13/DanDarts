@@ -93,12 +93,12 @@ struct PlayerCard: View {
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .moodCard(.red, radius: 12)
+        .moodCard(.red, radius: 48)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 48)
+                .stroke(Color("TextSecondary").opacity(0.5), lineWidth: 2)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 48))
     }
 }
 

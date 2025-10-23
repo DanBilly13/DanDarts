@@ -240,9 +240,10 @@ struct StackedPlayerCards: View {
                         matchFormat: matchFormat
                     )
                     .overlay(
-                        // Background-colored overlay for depth effect
-                        RoundedRectangle(cornerRadius: 12)
+                        // Matched-radius dimming overlay for depth effect
+                        RoundedRectangle(cornerRadius: 40)
                             .fill(Color.black.opacity(overlayOpacityForPlayer(index: index, currentIndex: currentPlayerIndex)))
+                            .allowsHitTesting(false)
                     )
                     .offset(
                         x: 0,
@@ -368,15 +369,17 @@ struct PlayerScoreCard: View {
                     borderColor: isCurrentPlayer ? Color("AccentPrimary") : nil
                 )
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(player.displayName)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.semibold)
                         .foregroundColor(Color("TextPrimary"))
                     
                     HStack(spacing: 6) {
                         Text("@\(player.nickname)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary").opacity(0.8))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color("TextPrimary").opacity(0.8))
                         
                         // Leg dots (only show for multi-leg matches)
                         if matchFormat > 1 {
@@ -395,18 +398,23 @@ struct PlayerScoreCard: View {
                 
                 // Score
                 Text("\(score)")
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
+                    .font(.system(.title, design: .monospaced))
+                    .fontWeight(.bold)
                     .foregroundColor(Color("TextPrimary"))
             }
             
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 20)
-        .moodCard(.red, radius: 16)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.leading, 16)
+        .padding(.trailing, 24)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 40)
+                .fill(Color("InputBackground"))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 40))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color("AccentPrimary"), lineWidth: 2)
+            RoundedRectangle(cornerRadius: 40)
+                .strokeBorder(Color("TextPrimary").opacity(0.75), lineWidth: 2)
         )
     }
 }
