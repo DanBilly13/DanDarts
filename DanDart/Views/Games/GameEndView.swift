@@ -15,9 +15,26 @@ struct GameEndView: View {
     let onPlayAgain: () -> Void
     let onChangePlayers: () -> Void
     let onBackToGames: () -> Void
+    let matchFormat: Int?
+    let legsWon: [UUID: Int]?
     
     @Environment(\.dismiss) private var dismiss
     @State private var showCelebration = false
+    
+    // Computed property for match result text
+    private var matchResultText: String? {
+        guard let matchFormat = matchFormat,
+              let legsWon = legsWon,
+              matchFormat > 1 else {
+            return nil
+        }
+        
+        let winnerLegs = legsWon[winner.id] ?? 0
+        let loser = players.first { $0.id != winner.id }
+        let loserLegs = loser.flatMap { legsWon[$0.id] } ?? 0
+        
+        return "\(winnerLegs)-\(loserLegs)"
+    }
     
     var body: some View {
         ZStack {
@@ -76,6 +93,15 @@ struct GameEndView: View {
                     .scaleEffect(showCelebration ? 1.0 : 0.8)
                     .opacity(showCelebration ? 1.0 : 0.0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.4), value: showCelebration)
+                    
+                    // Match result (if multi-leg)
+                    if let resultText = matchResultText {
+                        Text("Wins \(resultText)")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(Color("AccentPrimary"))
+                            .opacity(showCelebration ? 1.0 : 0.0)
+                            .animation(.easeIn(duration: 0.3).delay(0.5), value: showCelebration)
+                    }
                     
                     // Celebration Message
                     Text("🎯 Perfect Finish! 🎯")
@@ -176,17 +202,24 @@ struct GameEndView: View {
         players: [Player.mockGuest1, Player.mockGuest2],
         onPlayAgain: { print("Play Again") },
         onChangePlayers: { print("Change Players") },
-        onBackToGames: { print("Back to Games") }
+        onBackToGames: { print("Back to Games") },
+        matchFormat: nil,
+        legsWon: nil
     )
 }
 
-#Preview("Game End - Connected Player") {
+#Preview("Game End - Multi-Leg Match") {
+    let player1 = Player.mockGuest1
+    let player2 = Player.mockGuest2
+    
     GameEndView(
-        game: Game.preview501,
-        winner: Player.mockConnected1,
-        players: [Player.mockConnected1, Player.mockGuest1],
+        game: Game.preview301,
+        winner: player1,
+        players: [player1, player2],
         onPlayAgain: { print("Play Again") },
         onChangePlayers: { print("Change Players") },
-        onBackToGames: { print("Back to Games") }
+        onBackToGames: { print("Back to Games") },
+        matchFormat: 3,
+        legsWon: [player1.id: 2, player2.id: 1]
     )
 }

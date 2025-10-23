@@ -57,6 +57,8 @@ class MatchesService: ObservableObject {
             timestamp: match.timestamp,
             duration: Int(match.duration), // Convert to seconds
             players: match.players,
+            matchFormat: match.matchFormat,
+            totalLegsPlayed: match.totalLegsPlayed,
             syncedAt: Date()
         )
         
@@ -159,6 +161,8 @@ struct SupabaseMatch: Codable {
     let timestamp: Date
     let duration: Int // seconds
     let players: [MatchPlayer]
+    let matchFormat: Int // Total legs in match (1, 3, 5, or 7)
+    let totalLegsPlayed: Int // Actual number of legs played
     let syncedAt: Date?
     
     enum CodingKeys: String, CodingKey {
@@ -169,6 +173,8 @@ struct SupabaseMatch: Codable {
         case timestamp
         case duration
         case players
+        case matchFormat = "match_format"
+        case totalLegsPlayed = "total_legs_played"
         case syncedAt = "synced_at"
     }
     
@@ -181,7 +187,9 @@ struct SupabaseMatch: Codable {
             players: players,
             winnerId: winnerId,
             timestamp: timestamp,
-            duration: TimeInterval(duration)
+            duration: TimeInterval(duration),
+            matchFormat: matchFormat,
+            totalLegsPlayed: totalLegsPlayed
         )
     }
 }

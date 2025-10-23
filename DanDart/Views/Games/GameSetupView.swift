@@ -12,6 +12,7 @@ struct GameSetupView: View {
     @State private var selectedPlayers: [Player] = []
     @State private var showSearchPlayer: Bool = false
     @State private var showGameView: Bool = false
+    @State private var selectedLegs: Int = 1 // Best of 1, 3, 5, or 7
     @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
     @EnvironmentObject private var authService: AuthService
@@ -19,6 +20,11 @@ struct GameSetupView: View {
     private let playerLimit = 8 // Maximum players for MVP
     private var canStartGame: Bool {
         selectedPlayers.count >= 2
+    }
+    
+    // Check if current game supports legs (301/501 only)
+    private var supportsLegs: Bool {
+        game.title == "301" || game.title == "501"
     }
     
     var body: some View {
@@ -61,6 +67,41 @@ struct GameSetupView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
+                    // Legs Selection Section (301/501 only)
+                    if supportsLegs {
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Match Format")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                
+                                Spacer()
+                            }
+                            
+                            // Segmented control for legs selection
+                            HStack(spacing: 8) {
+                                ForEach([1, 3, 5, 7], id: \.self) { legs in
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            selectedLegs = legs
+                                        }
+                                    }) {
+                                        Text("Best of \(legs)")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(selectedLegs == legs ? .white : Color("TextSecondary"))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(selectedLegs == legs ? Color("AccentPrimary") : Color("InputBackground"))
+                                            )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                        }
+                    }
+                    
                     // Player Selection Section
                     VStack(spacing: 16) {
                         HStack {
@@ -152,7 +193,7 @@ struct GameSetupView: View {
                     Color.black.ignoresSafeArea()
                     
                     if !navigationManager.shouldDismissToGamesList {
-                        PreGameHypeView(game: game, players: selectedPlayers)
+                        PreGameHypeView(game: game, players: selectedPlayers, matchFormat: supportsLegs ? selectedLegs : 1)
                     }
                 }
             }

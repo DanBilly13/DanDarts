@@ -11,6 +11,7 @@ import SwiftUI
 struct GameplayView: View {
     let game: Game
     let players: [Player]
+    let matchFormat: Int
     
     // Game state managed by ViewModel
     @StateObject private var gameViewModel: GameViewModel
@@ -19,139 +20,119 @@ struct GameplayView: View {
     @State private var showRestartAlert: Bool = false
     @State private var showExitAlert: Bool = false
     @State private var navigateToGameEnd: Bool = false
+    @State private var showLegWinCelebration: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     
     // Initialize with game and players
-    init(game: Game, players: [Player]) {
+    init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         self.players = players
-        _gameViewModel = StateObject(wrappedValue: GameViewModel(game: game, players: players))
+        self.matchFormat = matchFormat
+        _gameViewModel = StateObject(wrappedValue: GameViewModel(game: game, players: players, matchFormat: matchFormat))
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Dark background
-                Color.black
-                    .ignoresSafeArea()
+        VStack(spacing: 0) {
+                // Stacked player cards (current player in front)
+                StackedPlayerCards(
+                    players: gameViewModel.players,
+                    currentPlayerIndex: gameViewModel.currentPlayerIndex,
+                    playerScores: gameViewModel.playerScores,
+                    currentThrow: gameViewModel.currentThrow,
+                    legsWon: gameViewModel.legsWon,
+                    matchFormat: gameViewModel.matchFormat
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 56)
+                
+                // Current throw display (always visible)
+                CurrentThrowDisplay(
+                    currentThrow: gameViewModel.currentThrow,
+                    selectedDartIndex: gameViewModel.selectedDartIndex,
+                    onDartTapped: { index in
+                        gameViewModel.selectDart(at: index)
+                    }
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                
+                VStack {
+                    if let checkout = gameViewModel.suggestedCheckout {
+                        CheckoutSuggestionView(checkout: checkout)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 0)
+                    }
+                }
+                .frame(height: 40, alignment: .center)
+                .padding(.bottom, 8)
+                
+                // Scoring button grid (center)
+                ScoringButtonGrid(
+                    onScoreSelected: { baseValue, scoreType in
+                        gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
+                    }
+                )
+                .padding(.horizontal, 16)
+                
                 Spacer()
                 
-                VStack(spacing: 0) {
-                    // Stacked player cards (current player in front)
-                    StackedPlayerCards(
-                        players: gameViewModel.players,
-                        currentPlayerIndex: gameViewModel.currentPlayerIndex,
-                        playerScores: gameViewModel.playerScores,
-                        currentThrow: gameViewModel.currentThrow
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 100)  // Extra padding to clear the notch area
+                // Save Score button container (fixed height to prevent layout shift)
+                ZStack {
+                    // Invisible placeholder to maintain layout space
+                    AppButton(role: .primary, action: {}) {
+                        Text("Save Score")
+                    }
+                    .opacity(0)
+                    .disabled(true)
                     
-                    // Current throw display (always visible)
-                    CurrentThrowDisplay(
-                        currentThrow: gameViewModel.currentThrow,
-                        selectedDartIndex: gameViewModel.selectedDartIndex,
-                        onDartTapped: { index in
-                            gameViewModel.selectDart(at: index)
-                        }
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
-                    VStack {
-                        if let checkout = gameViewModel.suggestedCheckout {
-                            CheckoutSuggestionView(checkout: checkout)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 0)
+                    // Actual button that pops in/out
+                    AppButton(
+                        role: gameViewModel.isWinningThrow ? .secondary : .primary,
+                        action: { gameViewModel.saveScore() }
+                    ) {
+                        if gameViewModel.isWinningThrow {
+                            Label("Game Over", systemImage: "trophy.fill")
+                        } else if gameViewModel.isBust {
+                            Text("Bust")
+                        } else {
+                            Label("Save Score", systemImage: "checkmark.circle.fill")
                         }
                     }
-                    .frame(height: 40, alignment: .center)
-                    
-                    .padding(.bottom, 8)
-                    
-                    
-                    
-                    // Scoring button grid (center)
-                    ScoringButtonGrid(
-                        onScoreSelected: { baseValue, scoreType in
-                            gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
-                        }
+                    .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
+                    .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
+                    // Reusable pop animation (applies to all button states)
+                    .popAnimation(
+                        active: gameViewModel.isTurnComplete,
+                        duration: gameViewModel.isWinningThrow ? 0.32 : 0.28,
+                        bounce: gameViewModel.isWinningThrow ? 0.28 : 0.22
                     )
-                    .padding(.horizontal, 16)
-                    
-                    Spacer()
-                    
-                    // Save Score button container (fixed height to prevent layout shift)
-                    ZStack {
-                        // Invisible placeholder to maintain layout space
-                        AppButton(role: .primary, action: {}) {
-                            Text("Save Score")
-                        }
-                        .opacity(0)
-                        .disabled(true)
-                        
-                        // Actual button that pops in/out
-                        AppButton(
-                            role: gameViewModel.isWinningThrow ? .secondary : .primary,
-                            action: { gameViewModel.saveScore() }
-                        ) {
-                            if gameViewModel.isWinningThrow {
-                                Label("Game Over", systemImage: "trophy.fill")
-                            } else if gameViewModel.isBust {
-                                Text("Bust")
-                            } else {
-                                Label("Save Score", systemImage: "checkmark.circle.fill")
-                            }
-                        }
-                        .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
-                        .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
-                        // Reusable pop animation (applies to all button states)
-                        .popAnimation(
-                            active: gameViewModel.isTurnComplete,
-                            duration: gameViewModel.isWinningThrow ? 0.32 : 0.28,
-                            bounce: gameViewModel.isWinningThrow ? 0.28 : 0.22
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 34)
                 }
-                
-                // Absolutely positioned more menu button
-                VStack {
-                    HStack {
-                        Spacer()
-                        
-                        Menu {
-                            Button("Instructions") {
-                                showInstructions = true
-                            }
-                            
-                            Button("Restart Game") {
-                                showRestartAlert = true
-                            }
-                            
-                            Button("Cancel Game", role: .destructive) {
-                                showExitAlert = true
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(Color("TextSecondary"))
-                                .frame(width: 44, height: 44)
-                                .background(Color("InputBackground").opacity(0.8))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
-                    Spacer()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 34)
+        }
+        .background(Color.black)
+        .navigationTitle(gameViewModel.matchFormat > 1 ? "Leg \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)" : game.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Instructions") { showInstructions = true }
+                    Button("Restart Game") { showRestartAlert = true }
+                    Button("Cancel Game", role: .destructive) { showExitAlert = true }
+                } label: {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color("TextSecondary"))
                 }
             }
         }
-        .navigationBarHidden(true)
+        .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .navigationBarBackButtonHidden(true)
+        .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
@@ -174,13 +155,31 @@ struct GameplayView: View {
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
         }
+        .onChange(of: gameViewModel.legWinner) { oldValue, newValue in
+            if newValue != nil && !gameViewModel.isMatchWon {
+                // Leg won but match continues - show celebration
+                showLegWinCelebration = true
+            }
+        }
         .onChange(of: gameViewModel.winner) { oldValue, newValue in
             if newValue != nil {
-                // Winner detected - navigate to game end screen after brief delay
+                // Match winner detected - navigate to game end screen after brief delay
                 // This ensures all state updates are complete
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     navigateToGameEnd = true
                 }
+            }
+        }
+        .alert("Leg Won!", isPresented: $showLegWinCelebration) {
+            Button("Next Leg") {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    gameViewModel.resetLeg()
+                }
+            }
+        } message: {
+            if let legWinner = gameViewModel.legWinner {
+                let winnerLegs = gameViewModel.legsWon[legWinner.id] ?? 0
+                Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
             }
         }
         .navigationDestination(isPresented: $navigateToGameEnd) {
@@ -203,7 +202,9 @@ struct GameplayView: View {
                         // Navigate back to games list
                         NavigationManager.shared.dismissToGamesList()
                         dismiss()
-                    }
+                    },
+                    matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
+                    legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil
                 )
             }
         }
@@ -213,6 +214,8 @@ struct GameplayView: View {
     // All game logic now handled by GameViewModel
 }
 
+
+
 // MARK: - Stacked Player Cards
 
 struct StackedPlayerCards: View {
@@ -220,6 +223,8 @@ struct StackedPlayerCards: View {
     let currentPlayerIndex: Int
     let playerScores: [UUID: Int]
     let currentThrow: [ScoredThrow]
+    let legsWon: [UUID: Int]
+    let matchFormat: Int
     
     var body: some View {
         VStack(spacing: 16) {
@@ -230,7 +235,9 @@ struct StackedPlayerCards: View {
                         player: player,
                         score: playerScores[player.id] ?? 301,
                         isCurrentPlayer: index == currentPlayerIndex,
-                        currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow]()
+                        currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
+                        legsWon: legsWon[player.id] ?? 0,
+                        matchFormat: matchFormat
                     )
                     .overlay(
                         // Background-colored overlay for depth effect
@@ -260,13 +267,12 @@ struct StackedPlayerCards: View {
         // Calculate position in stack (excluding current player)
         let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
         
-        // Much smaller offsets to ensure score is visible on each card
-        // The score is on the right side, so we need to show most of the card
+        // Adjusted offsets for new layout below navigation bar
         switch stackPosition {
-        case 1: return -46  // Card 1: Show most of the card including full score
-        case 2: return -68      // Card 2: Show at least half including score
-        case 3: return -90  // Card 3: Show quarter but ensure score is visible
-        default: return -CGFloat(stackPosition) * 12  // Additional cards
+        case 1: return -40  // Card 1: Show most of the card including full score
+        case 2: return -64      // Card 2: Show at least half including score
+        case 3: return -84  // Card 3: Show quarter but ensure score is visible
+        default: return -CGFloat(stackPosition) * 10  // Additional cards
         }
     }
     
@@ -295,9 +301,9 @@ struct StackedPlayerCards: View {
         
         // Progressive overlay opacity for depth effect
         switch stackPosition {
-        case 1: return 0.3   // Player 2: 30% dark overlay
-        case 2: return 0.5   // Player 3: 50% dark overlay
-        case 3: return 0.65  // Player 4: 65% dark overlay
+        case 1: return 0.5   // Player 2: 30% dark overlay
+        case 2: return 0.7   // Player 3: 50% dark overlay
+        case 3: return 0.9  // Player 4: 65% dark overlay
         default: return min(0.8, 0.3 + (CGFloat(stackPosition - 1) * 0.15))  // Additional players
         }
     }
@@ -349,6 +355,8 @@ struct PlayerScoreCard: View {
     let score: Int
     let isCurrentPlayer: Bool
     let currentThrow: [ScoredThrow]
+    let legsWon: Int
+    let matchFormat: Int
     
     var body: some View {
         VStack(spacing: 12) {
@@ -360,14 +368,27 @@ struct PlayerScoreCard: View {
                     borderColor: isCurrentPlayer ? Color("AccentPrimary") : nil
                 )
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(player.displayName)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(Color("TextPrimary"))
                     
-                    Text("@\(player.nickname)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary").opacity(0.8))
+                    HStack(spacing: 6) {
+                        Text("@\(player.nickname)")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("AccentPrimary").opacity(0.8))
+                        
+                        // Leg dots (only show for multi-leg matches)
+                        if matchFormat > 1 {
+                            HStack(spacing: 3) {
+                                ForEach(0..<matchFormat, id: \.self) { index in
+                                    Circle()
+                                        .fill(index < legsWon ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 Spacer()
@@ -473,24 +494,31 @@ struct CheckoutSuggestionView: View {
     }
 }
 
+
 // MARK: - Preview
 #Preview("Gameplay - 301") {
-    GameplayView(
-        game: Game.preview301,
-        players: [Player.mockGuest1, Player.mockGuest2]
-    )
+    NavigationStack {
+        GameplayView(
+            game: Game.preview301,
+            players: [Player.mockGuest1, Player.mockGuest2]
+        )
+    }
 }
 
 #Preview("Gameplay - 3 Players") {
-    GameplayView(
-        game: Game.preview301,
-        players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
-    )
+    NavigationStack {
+        GameplayView(
+            game: Game.preview301,
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
+        )
+    }
 }
 
 #Preview("Gameplay - 4 Players") {
-    GameplayView(
-        game: Game.preview301,
-        players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2]
-    )
+    NavigationStack {
+        GameplayView(
+            game: Game.preview301,
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2]
+        )
+    }
 }

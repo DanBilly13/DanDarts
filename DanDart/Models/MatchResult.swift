@@ -17,6 +17,8 @@ struct MatchResult: Identifiable, Codable, Hashable {
     let winnerId: UUID
     let timestamp: Date
     let duration: TimeInterval // in seconds
+    let matchFormat: Int // Total legs in match (1, 3, 5, or 7)
+    let totalLegsPlayed: Int // Actual number of legs played
     
     // Computed properties
     var winner: MatchPlayer? {
@@ -42,7 +44,9 @@ struct MatchResult: Identifiable, Codable, Hashable {
          players: [MatchPlayer],
          winnerId: UUID,
          timestamp: Date = Date(),
-         duration: TimeInterval) {
+         duration: TimeInterval,
+         matchFormat: Int = 1,
+         totalLegsPlayed: Int = 1) {
         self.id = id
         self.gameType = gameType
         self.gameName = gameName
@@ -50,6 +54,8 @@ struct MatchResult: Identifiable, Codable, Hashable {
         self.winnerId = winnerId
         self.timestamp = timestamp
         self.duration = duration
+        self.matchFormat = matchFormat
+        self.totalLegsPlayed = totalLegsPlayed
     }
     
     // Custom Hashable implementation (only hash stored properties)
@@ -61,6 +67,8 @@ struct MatchResult: Identifiable, Codable, Hashable {
         hasher.combine(winnerId)
         hasher.combine(timestamp)
         hasher.combine(duration)
+        hasher.combine(matchFormat)
+        hasher.combine(totalLegsPlayed)
     }
     
     // Custom Equatable implementation
@@ -71,7 +79,9 @@ struct MatchResult: Identifiable, Codable, Hashable {
         lhs.players == rhs.players &&
         lhs.winnerId == rhs.winnerId &&
         lhs.timestamp == rhs.timestamp &&
-        lhs.duration == rhs.duration
+        lhs.duration == rhs.duration &&
+        lhs.matchFormat == rhs.matchFormat &&
+        lhs.totalLegsPlayed == rhs.totalLegsPlayed
     }
 }
 
@@ -87,6 +97,37 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
     let startingScore: Int
     let totalDartsThrown: Int
     let turns: [MatchTurn]
+    let legsWon: Int // Number of legs won in multi-leg match
+    
+    // Coding keys for snake_case conversion
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case nickname
+        case avatarURL
+        case isGuest
+        case finalScore
+        case startingScore
+        case totalDartsThrown
+        case turns
+        case legsWon
+    }
+    
+    // Custom decoder to handle missing legsWon field (backwards compatibility)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        nickname = try container.decode(String.self, forKey: .nickname)
+        avatarURL = try container.decodeIfPresent(String.self, forKey: .avatarURL)
+        isGuest = try container.decode(Bool.self, forKey: .isGuest)
+        finalScore = try container.decode(Int.self, forKey: .finalScore)
+        startingScore = try container.decode(Int.self, forKey: .startingScore)
+        totalDartsThrown = try container.decode(Int.self, forKey: .totalDartsThrown)
+        turns = try container.decode([MatchTurn].self, forKey: .turns)
+        // Default to 0 if legsWon is missing (for old matches)
+        legsWon = try container.decodeIfPresent(Int.self, forKey: .legsWon) ?? 0
+    }
     
     // Computed properties
     var averageScore: Double {
@@ -107,7 +148,8 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
          finalScore: Int,
          startingScore: Int,
          totalDartsThrown: Int,
-         turns: [MatchTurn]) {
+         turns: [MatchTurn],
+         legsWon: Int = 0) {
         self.id = id
         self.displayName = displayName
         self.nickname = nickname
@@ -117,6 +159,7 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
         self.startingScore = startingScore
         self.totalDartsThrown = totalDartsThrown
         self.turns = turns
+        self.legsWon = legsWon
     }
     
     /// Create MatchPlayer from Player with game data
@@ -124,7 +167,8 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
                     finalScore: Int,
                     startingScore: Int,
                     totalDartsThrown: Int,
-                    turns: [MatchTurn]) -> MatchPlayer {
+                    turns: [MatchTurn],
+                    legsWon: Int = 0) -> MatchPlayer {
         return MatchPlayer(
             id: player.id,
             displayName: player.displayName,
@@ -134,7 +178,8 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
             finalScore: finalScore,
             startingScore: startingScore,
             totalDartsThrown: totalDartsThrown,
-            turns: turns
+            turns: turns,
+            legsWon: legsWon
         )
     }
 }

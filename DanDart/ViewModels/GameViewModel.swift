@@ -22,6 +22,13 @@ class GameViewModel: ObservableObject {
     @Published var suggestedCheckout: String? = nil
     @Published var selectedDartIndex: Int? = nil
     
+    // Multi-leg match tracking
+    @Published var currentLeg: Int = 1
+    @Published var legsWon: [UUID: Int] = [:] // Player ID to legs won
+    @Published var matchFormat: Int // Total legs in match (1, 3, 5, or 7)
+    @Published var legWinner: Player? = nil // Winner of current leg (before match winner)
+    @Published var isMatchWon: Bool = false // True when match is won (not just leg)
+    
     // Game configuration
     let game: Game
     let startingScore: Int
@@ -101,12 +108,23 @@ class GameViewModel: ObservableObject {
         return false
     }
     
+    /// Current leg status display (e.g., "Leg 2/5")
+    var legStatusText: String {
+        return "Leg \(currentLeg)/\(matchFormat)"
+    }
+    
+    /// Check if this is a multi-leg match
+    var isMultiLegMatch: Bool {
+        return matchFormat > 1
+    }
+    
     // MARK: - Initialization
     
-    init(game: Game, players: [Player]) {
+    init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         self.players = players
         self.matchStartTime = Date()
+        self.matchFormat = matchFormat
         
         // Determine starting score based on game type
         if game.title.contains("301") {
@@ -120,6 +138,7 @@ class GameViewModel: ObservableObject {
         // Initialize player scores
         for player in players {
             playerScores[player.id] = startingScore
+            legsWon[player.id] = 0
         }
     }
     
@@ -232,20 +251,46 @@ class GameViewModel: ObservableObject {
             isBust: false
         )
         
-        // Check for winner (must finish on exactly 0)
+        // Check for leg winner (must finish on exactly 0)
         if newScore == 0 {
-            winner = currentPlayer
+            legWinner = currentPlayer
             
-            // Play celebration sound
-            SoundManager.shared.playGameWin()
+            // Increment leg count for winner
+            legsWon[currentPlayer.id, default: 0] += 1
             
-            // Save match result to local storage
-            saveMatchResult()
+            // Calculate legs needed to win match
+            let legsNeededToWin = (matchFormat / 2) + 1 // Best of 3 = 2, Best of 5 = 3, etc.
+            let currentPlayerLegs = legsWon[currentPlayer.id] ?? 0
             
-            // Winner detected - clear state but don't switch players
-            currentThrow.removeAll()
-            selectedDartIndex = nil
-            return
+            // Check if match is won
+            if currentPlayerLegs >= legsNeededToWin {
+                // Match won!
+                winner = currentPlayer
+                isMatchWon = true
+                
+                // Play celebration sound
+                SoundManager.shared.playGameWin()
+                
+                // Save match result to local storage
+                saveMatchResult()
+                
+                // Winner detected - clear state but don't switch players
+                currentThrow.removeAll()
+                selectedDartIndex = nil
+                return
+            } else {
+                // Leg won but match continues
+                // Play lighter celebration for leg win
+                SoundManager.shared.playScoreSound()
+                
+                // Clear current throw and selection
+                currentThrow.removeAll()
+                selectedDartIndex = nil
+                
+                // Note: UI should show leg win celebration before calling resetLeg()
+                // Don't automatically reset here - let UI handle the transition
+                return
+            }
         }
         
         // Clear current throw, selection, and switch to next player
@@ -308,14 +353,42 @@ class GameViewModel: ObservableObject {
         // Reset all scores
         for player in players {
             playerScores[player.id] = startingScore
+            legsWon[player.id] = 0
         }
         
         // Reset game state
         currentPlayerIndex = 0
         currentThrow.removeAll()
         winner = nil
+        legWinner = nil
+        isMatchWon = false
         lastTurn = nil
         turnHistory.removeAll()
+        currentLeg = 1
+        
+        SoundManager.shared.resetMissCounter()
+    }
+    
+    /// Reset for a new leg (after leg win but match continues)
+    func resetLeg() {
+        // Reset scores for new leg
+        for player in players {
+            playerScores[player.id] = startingScore
+        }
+        
+        // Increment leg counter
+        currentLeg += 1
+        
+        // Reset leg-specific state
+        currentPlayerIndex = 0
+        currentThrow.removeAll()
+        selectedDartIndex = nil
+        legWinner = nil
+        lastTurn = nil
+        turnHistory.removeAll()
+        
+        // Update checkout for first player
+        updateCheckoutSuggestion()
         
         SoundManager.shared.resetMissCounter()
     }
@@ -467,12 +540,15 @@ class GameViewModel: ObservableObject {
             
             let totalDarts = playerTurns.reduce(0) { $0 + $1.darts.count }
             
+            let playerLegsWon = legsWon[player.id] ?? 0
+            
             return MatchPlayer.from(
                 player: player,
                 finalScore: finalScore,
                 startingScore: startingScore,
                 totalDartsThrown: totalDarts,
-                turns: matchTurns
+                turns: matchTurns,
+                legsWon: playerLegsWon
             )
         }
         
@@ -482,7 +558,9 @@ class GameViewModel: ObservableObject {
             gameName: game.title,
             players: matchPlayers,
             winnerId: winner.id,
-            duration: matchDuration
+            duration: matchDuration,
+            matchFormat: matchFormat,
+            totalLegsPlayed: currentLeg
         )
         
         // Save to local storage

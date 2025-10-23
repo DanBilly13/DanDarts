@@ -10,6 +10,7 @@ import SwiftUI
 struct PreGameHypeView: View {
     let game: Game
     let players: [Player]
+    let matchFormat: Int
     
     // Navigation state
     @State private var navigateToGameplay = false
@@ -212,7 +213,8 @@ struct PreGameHypeView: View {
             navigateToGameplay = true
         }
         .navigationDestination(isPresented: $navigateToGameplay) {
-            GameplayView(game: game, players: players)
+            GameplayView(game: game, players: players, matchFormat: matchFormat)
+                .navigationBarBackButtonHidden(true)
         }
         .background(Color.black)
         .preferredColorScheme(.dark)
@@ -258,20 +260,23 @@ struct PreGameHypeView: View {
 #Preview("Pre-Game Hype - 301") {
     PreGameHypeView(
         game: Game.preview301,
-        players: [Player.mockGuest1, Player.mockGuest2]
+        players: [Player.mockGuest1, Player.mockGuest2],
+        matchFormat: 1
     )
 }
 
 #Preview("Pre-Game Hype - 501") {
     PreGameHypeView(
         game: Game.preview501,
-        players: [Player.mockConnected1, Player.mockConnected2]
+        players: [Player.mockConnected1, Player.mockConnected2],
+        matchFormat: 3
     )
 }
 
 #Preview("Pre-Game Hype - Single Player") {
     PreGameHypeView(
         game: Game.previewHalveIt,
-        players: [Player.mockGuest1]
+        players: [Player.mockGuest1],
+        matchFormat: 1
     )
 }
