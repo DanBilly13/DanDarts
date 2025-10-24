@@ -125,39 +125,85 @@ struct ScoringButton: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Bull button - solid AccentPrimary
+                // Bull button (50)
                 if baseValue == 50 {
-                    Text(title)
-                        .font(.system(size: 16, weight: .semibold, design: .default))
-                        .foregroundColor(.white)
-                        .frame(width: 64, height: 64)
-                        .background(
-                            Circle()
-                                .fill(Color("AccentPrimary"))
-                        )
-                        .clipShape(Circle())
+                    // Two-circle design: blue inner, white outer ring
+                    // When pressed: outer ring fades out, inner expands to full size
+                    ZStack {
+                        // Outer circle - AccentQuinary (white) with dynamic opacity
+                        // Fades out when pressed to reveal solid blue button
+                        Circle()
+                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 0.0 : 0.25))
+                            .frame(width: 64, height: 64)
+                        
+                        // Inner circle - AccentPrimary (blue)
+                        // Expands from 44px to 64px when pressed
+                        Circle()
+                            .fill(Color("AccentPrimary"))
+                            .frame(width: isHighlighted ? 64 : 44, height: isHighlighted ? 64 : 44)
+                        
+                        Text(title)
+                            .font(.system(size: 16, weight: .semibold, design: .default))
+                            .foregroundColor(.white)
+                    }
                 } else if baseValue == 25 {
-                    // 25 button - solid AccentSecondary
-                    Text(title)
-                        .font(.system(size: 16, weight: .bold, design: .default))
-                        .foregroundColor(.white)
-                        .frame(width: 64, height: 64)
-                        .background(
-                            Circle()
-                                .fill(Color("AccentSecondary"))
-                        )
-                        .clipShape(Circle())
+                    // Two-circle design: dark inner, green outer ring
+                    // When pressed: outer fills to 100%, inner fades out, text becomes black
+                    ZStack {
+                        // Outer circle - AccentSecondary (green) with dynamic opacity
+                        // Default: 60% opacity, Pressed: 100% for solid green button
+                        Circle()
+                            .fill(Color("AccentSecondary").opacity(isHighlighted ? 1.0 : 0.6))
+                            .frame(width: 64, height: 64)
+                        
+                        // Inner circle - InputBackground, fades out when pressed
+                        Circle()
+                            .fill(Color("InputBackground"))
+                            .frame(width: 44, height: 44)
+                            .opacity(isHighlighted ? 0.0 : 1.0)
+                        
+                        Text(title)
+                            .font(.system(size: 16, weight: .bold, design: .default))
+                            .foregroundColor(isHighlighted ? .black : .white)
+                    }
+                } else if baseValue == 0 || baseValue == -1 {
+                    // Miss and Bust buttons - same two-circle design as numbers
+                    ZStack {
+                        // Outer circle - AccentQuinary (white) with dynamic opacity
+                        Circle()
+                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.15))
+                            .frame(width: 64, height: 64)
+                        
+                        // Inner circle - InputBackground, fades out when pressed
+                        Circle()
+                            .fill(Color("InputBackground"))
+                            .frame(width: 44, height: 44)
+                            .opacity(isHighlighted ? 0.0 : 1.0)
+                        
+                        Text(title)
+                            .font(.system(size: 14, weight: .semibold, design: .default))
+                            .foregroundColor(isHighlighted ? .black : .white)
+                    }
                 } else {
-                    // Standard button styling
-                    Text(title)
-                        .font(.system(size: 16, weight: .bold, design: .default))
-                        .foregroundColor(.white)
-                        .frame(width: 64, height: 64)
-                        .background(
-                            Circle()
-                                .fill(isHighlighted ? Color("AccentPrimary") : Color("InputBackground"))
-                        )
-                        .clipShape(Circle())
+                    // Standard buttons (1-20)
+                    // Two-circle design: outer fills in, inner fades out, text changes color
+                    ZStack {
+                        // Outer circle - AccentQuinary (white) with dynamic opacity
+                        // Default: 15% opacity for subtle ring, Pressed: 100% for solid button
+                        Circle()
+                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.15))
+                            .frame(width: 64, height: 64)
+                        
+                        // Inner circle - InputBackground, fades out when pressed
+                        Circle()
+                            .fill(Color("InputBackground"))
+                            .frame(width: 44, height: 44)
+                            .opacity(isHighlighted ? 0.0 : 1.0)
+                        
+                        Text(title)
+                            .font(.system(size: 16, weight: .bold, design: .default))
+                            .foregroundColor(isHighlighted ? .black : .white)
+                    }
                 }
             }
             .scaleEffect(isPressed ? 0.92 : 1.0)

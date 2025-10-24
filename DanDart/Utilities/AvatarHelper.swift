@@ -57,11 +57,39 @@ struct PlayerAvatarView: View {
                 .frame(width: size, height: size)
             
             if let avatarURL = avatarURL {
-                Image(avatarURL)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
+                let _ = print("🖼️ PlayerAvatarView - avatarURL: \(avatarURL)")
+                // Check if it's a URL or local asset
+                if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
+                    let _ = print("🌐 Loading remote URL: \(avatarURL)")
+                    // Remote URL - use AsyncImage
+                    AsyncImage(url: URL(string: avatarURL)) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: size, height: size)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: size, height: size)
+                                .clipShape(Circle())
+                        case .failure:
+                            // Failed to load - show placeholder
+                            Image(systemName: placeholder)
+                                .font(.system(size: size * 0.5, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                } else {
+                    // Local asset - use Image
+                    Image(avatarURL)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                }
             } else {
                 Image(systemName: placeholder)
                     .font(.system(size: size * 0.5, weight: .medium))

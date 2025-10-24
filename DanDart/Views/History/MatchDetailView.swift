@@ -59,22 +59,25 @@ struct MatchDetailView: View {
                     CompactPlayerCard(
                         player: match.players[0],
                         isWinner: match.players[0].id == match.winnerId,
-                        alignment: .leading
+                        alignment: .leading,
+                        playerIndex: 0
                     )
                     
                     CompactPlayerCard(
                         player: match.players[1],
                         isWinner: match.players[1].id == match.winnerId,
-                        alignment: .trailing
+                        alignment: .trailing,
+                        playerIndex: 1
                     )
                 }
             } else {
                 // Vertical stack for more than 2 players
                 VStack(spacing: 16) {
-                    ForEach(match.players) { player in
+                    ForEach(Array(match.players.enumerated()), id: \.element.id) { index, player in
                         MatchPlayerCard(
                             player: player,
-                            isWinner: player.id == match.winnerId
+                            isWinner: player.id == match.winnerId,
+                            playerIndex: index
                         )
                     }
                 }
@@ -177,6 +180,18 @@ struct CompactPlayerCard: View {
     let player: MatchPlayer
     let isWinner: Bool
     let alignment: HorizontalAlignment
+    let playerIndex: Int
+    
+    // Get border color based on player index
+    var borderColor: Color {
+        switch playerIndex {
+        case 0: return Color("AccentPrimary")
+        case 1: return Color("AccentSecondary")
+        case 2: return Color("AccentTertiary")
+        case 3: return Color("AccentQuaternary")
+        default: return Color("AccentPrimary")
+        }
+    }
     
     var body: some View {
         VStack(alignment: .center, spacing: 12) {
@@ -206,22 +221,21 @@ struct CompactPlayerCard: View {
                         .offset(y: -55)
                 }
             }
-            .overlay(
-                Circle()
-                    .stroke(isWinner ? Color("AccentTertiary") : Color("InputBackground"), lineWidth: 3)
-            )
             
             // Player info - centered
             VStack(alignment: .center, spacing: 4) {
                 Text(player.displayName)
-                    .font(.body.weight(.bold))
-                    .foregroundColor(isWinner ? Color("AccentTertiary") : Color("TextPrimary"))
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(isWinner ? Color("TextPrimary") : Color("TextPrimary"))
                     .multilineTextAlignment(.center)
                 
                 if !player.isGuest {
                     Text("@\(player.nickname)")
-                        .font(.caption.weight(.medium))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(Color("TextPrimary").opacity(0.8))
+                        .foregroundColor(Color("TextPrimary"))
                 }
             }
             
@@ -234,7 +248,7 @@ struct CompactPlayerCard: View {
                     
                     Text("WINNER")
                         .font(.subheadline.weight(.bold))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .foregroundColor(Color("TextPrimary"))
                         .tracking(1)
                 }
                 .padding(.vertical, 8)
@@ -242,11 +256,11 @@ struct CompactPlayerCard: View {
                 VStack(spacing: 4) {
                     Text("\(player.finalScore)")
                         .font(.title.weight(.bold))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .foregroundColor(Color("TextPrimary"))
                     
-                    Text("points remaining")
-                        .font(.caption2.weight(.medium))
-                        .foregroundColor(Color("AccentTertiary"))
+                    Text("Left on \(player.finalScore)")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(Color("TextPrimary"))
                 }
                 .padding(.vertical, 8)
             }
@@ -255,6 +269,10 @@ struct CompactPlayerCard: View {
         .padding(16)
         .background(Color("InputBackground"))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderColor, lineWidth: 2)
+        )
     }
 }
 
@@ -263,6 +281,18 @@ struct CompactPlayerCard: View {
 struct MatchPlayerCard: View {
     let player: MatchPlayer
     let isWinner: Bool
+    let playerIndex: Int
+    
+    // Get border color based on player index
+    var borderColor: Color {
+        switch playerIndex {
+        case 0: return Color("AccentPrimary")
+        case 1: return Color("AccentSecondary")
+        case 2: return Color("AccentTertiary")
+        case 3: return Color("AccentQuaternary")
+        default: return Color("AccentPrimary")
+        }
+    }
     
     var body: some View {
         HStack(spacing: 16) {
@@ -292,15 +322,12 @@ struct MatchPlayerCard: View {
                         .offset(y: -45)
                 }
             }
-            .overlay(
-                Circle()
-                    .stroke(isWinner ? Color("AccentPrimary") : Color("InputBackground"), lineWidth: 3)
-            )
             
             // Player Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(player.displayName)
-                    .font(.headline)
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
                     .foregroundColor(isWinner ? Color("AccentPrimary") : Color("TextPrimary"))
                 
                 if !player.isGuest {
@@ -343,6 +370,10 @@ struct MatchPlayerCard: View {
         .padding(16)
         .background(Color("InputBackground"))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderColor, lineWidth: 2)
+        )
     }
 }
 
