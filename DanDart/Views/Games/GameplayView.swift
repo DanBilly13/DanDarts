@@ -241,8 +241,8 @@ struct StackedPlayerCards: View {
                         playerIndex: index
                     )
                     .overlay(
-                        // Matched-radius dimming overlay for depth effect
-                        RoundedRectangle(cornerRadius: 40)
+                        // Matched-shape dimming overlay for depth effect
+                        Capsule()
                             .fill(Color.black.opacity(overlayOpacityForPlayer(index: index, currentIndex: currentPlayerIndex)))
                             .allowsHitTesting(false)
                     )
@@ -271,9 +271,9 @@ struct StackedPlayerCards: View {
         
         // Adjusted offsets for new layout below navigation bar
         switch stackPosition {
-        case 1: return -40  // Card 1: Show most of the card including full score
-        case 2: return -64      // Card 2: Show at least half including score
-        case 3: return -84  // Card 3: Show quarter but ensure score is visible
+        case 1: return -52  // Card 1: Show most of the card including full score
+        case 2: return -68      // Card 2: Show at least half including score
+        case 3: return -85  // Card 3: Show quarter but ensure score is visible
         default: return -CGFloat(stackPosition) * 10  // Additional cards
         }
     }
@@ -304,8 +304,8 @@ struct StackedPlayerCards: View {
         // Progressive overlay opacity for depth effect
         switch stackPosition {
         case 1: return 0.5   // Player 2: 30% dark overlay
-        case 2: return 0.7   // Player 3: 50% dark overlay
-        case 3: return 0.9  // Player 4: 65% dark overlay
+        case 2: return 0.6   // Player 3: 50% dark overlay
+        case 3: return 0.7  // Player 4: 65% dark overlay
         default: return min(0.8, 0.3 + (CGFloat(stackPosition - 1) * 0.15))  // Additional players
         }
     }
@@ -376,34 +376,36 @@ struct PlayerScoreCard: View {
         VStack(spacing: 12) {
             // Player info
             HStack(spacing: 12) {
+                // Avatar - 68px to match match detail
                 PlayerAvatarView(
                     avatarURL: player.avatarURL,
-                    size: 48,
+                    size: 68,
                     borderColor: nil
                 )
                 
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    // Player name - title3 rounded semibold
                     Text(player.displayName)
                         .font(.system(.title3, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundColor(Color("TextPrimary"))
                     
-                    HStack(spacing: 6) {
-                        Text("@\(player.nickname)")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(Color("TextPrimary").opacity(0.8))
-                        
-                        // Leg dots (only show for multi-leg matches)
-                        if matchFormat > 1 {
-                            HStack(spacing: 3) {
-                                ForEach(0..<matchFormat, id: \.self) { index in
-                                    Circle()
-                                        .fill(index < legsWon ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
-                                        .frame(width: 6, height: 6)
-                                }
+                    // Nickname - subheadline medium
+                    Text("@\(player.nickname)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    // Legs won indicator (dots) - 10px spacing from nickname
+                    if matchFormat > 1 && legsWon > 0 {
+                        HStack(spacing: 4) {
+                            ForEach(0..<legsWon, id: \.self) { _ in
+                                Circle()
+                                    .fill(borderColor)
+                                    .frame(width: 6, height: 6)
                             }
                         }
+                        .padding(.top, 6)
                     }
                 }
                 
@@ -421,12 +423,12 @@ struct PlayerScoreCard: View {
         .padding(.trailing, 24)
         .padding(.vertical, 16)
         .background(
-            RoundedRectangle(cornerRadius: 40)
+            Capsule()
                 .fill(Color("InputBackground"))
         )
-        .clipShape(RoundedRectangle(cornerRadius: 40))
+        .clipShape(Capsule())
         .overlay(
-            RoundedRectangle(cornerRadius: 40)
+            Capsule()
                 .strokeBorder(borderColor, lineWidth: 2)
         )
     }

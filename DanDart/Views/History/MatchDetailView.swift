@@ -58,7 +58,8 @@ struct MatchDetailView: View {
                 MatchPlayerCard(
                     player: player,
                     isWinner: player.id == match.winnerId,
-                    playerIndex: originalPlayerIndex(for: player)
+                    playerIndex: originalPlayerIndex(for: player),
+                    placement: index + 1
                 )
             }
         }
@@ -277,6 +278,7 @@ struct MatchPlayerCard: View {
     let player: MatchPlayer
     let isWinner: Bool
     let playerIndex: Int
+    let placement: Int
     
     // Get border color based on player index
     var borderColor: Color {
@@ -291,76 +293,72 @@ struct MatchPlayerCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Avatar
+            // Avatar - 68px
             ZStack {
                 Circle()
                     .fill(Color("InputBackground"))
-                    .frame(width: 80, height: 80)
+                    .frame(width: 68, height: 68)
                 
                 if let avatarURL = player.avatarURL {
                     Image(avatarURL)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 80, height: 80)
+                        .frame(width: 68, height: 68)
                         .clipShape(Circle())
                 } else {
                     Image(systemName: "person.circle.fill")
-                        .font(.system(size: 40, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
-                }
-                
-                // Winner crown
-                if isWinner {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(Color("AccentPrimary"))
-                        .offset(y: -45)
+                        .font(.system(size: 34, weight: .medium))
+                        .foregroundColor(borderColor)
                 }
             }
             
             // Player Info
             VStack(alignment: .leading, spacing: 4) {
+                // Player name - title3 rounded semibold
                 Text(player.displayName)
                     .font(.system(.title3, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(isWinner ? Color("AccentPrimary") : Color("TextPrimary"))
+                    .foregroundColor(Color("TextPrimary"))
                 
+                // Nickname - subheadline medium
                 if !player.isGuest {
                     Text("@\(player.nickname)")
-                        .font(.subheadline.weight(.medium))
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundColor(Color("TextSecondary"))
                 }
                 
-                Text("Average: \(player.formattedAverage)")
-                    .font(.caption)
-                    .foregroundColor(Color("TextSecondary"))
+                // Legs won indicator (dots) - 10px spacing from nickname
+                if player.legsWon > 0 {
+                    HStack(spacing: 4) {
+                        ForEach(0..<player.legsWon, id: \.self) { _ in
+                            Circle()
+                                .fill(borderColor)
+                                .frame(width: 6, height: 6)
+                        }
+                    }
+                    .padding(.top, 6)
+                }
             }
             
             Spacer()
             
-            // Winner badge or remaining points
-            if isWinner {
-                VStack(spacing: 4) {
-                    Image(systemName: "trophy.fill")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color("AccentPrimary"))
-                    
-                    Text("WINNER")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(Color("AccentPrimary"))
-                        .tracking(1)
-                }
-            } else {
-                VStack(spacing: 4) {
-                    Text("\(player.finalScore)")
-                        .font(.title.weight(.bold))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    Text("remaining")
-                        .font(.caption2.weight(.medium))
+            // Right side - 44px wide container
+            ZStack {
+                if isWinner {
+                    // Trophy icon - 36px (outline style, thinner stroke)
+                    Image(systemName: "trophy")
+                        .font(.system(size: 36, weight: .regular))
+                        .foregroundColor(Color("AccentTertiary"))
+                } else {
+                    // Placement text - Apple title3 style
+                    Text(placementText)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundColor(Color("TextSecondary"))
                 }
             }
+            .frame(width: 44)
         }
         .padding(16)
         .background(Color("InputBackground"))
@@ -369,6 +367,16 @@ struct MatchPlayerCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(borderColor, lineWidth: 2)
         )
+    }
+    
+    // Calculate placement text (2nd, 3rd, 4th, etc.)
+    private var placementText: String {
+        switch placement {
+        case 1: return "1st"
+        case 2: return "2nd"
+        case 3: return "3rd"
+        default: return "\(placement)th"
+        }
     }
 }
 
