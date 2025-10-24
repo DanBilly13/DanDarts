@@ -19,8 +19,8 @@ struct MatchDetailView: View {
                 // Players and Scores
                 playersSection
                 
-                // Stats Comparison (if 2 players)
-                if match.players.count == 2 {
+                // Stats Section (for all matches)
+                if !match.players.isEmpty {
                     statsComparisonSection
                 }
                 
@@ -52,37 +52,33 @@ struct MatchDetailView: View {
     }
     
     private var playersSection: some View {
-        Group {
-            if match.players.count == 2 {
-                // Side-by-side for 2 players
-                HStack(spacing: 12) {
-                    CompactPlayerCard(
-                        player: match.players[0],
-                        isWinner: match.players[0].id == match.winnerId,
-                        alignment: .leading,
-                        playerIndex: 0
-                    )
-                    
-                    CompactPlayerCard(
-                        player: match.players[1],
-                        isWinner: match.players[1].id == match.winnerId,
-                        alignment: .trailing,
-                        playerIndex: 1
-                    )
-                }
-            } else {
-                // Vertical stack for more than 2 players
-                VStack(spacing: 16) {
-                    ForEach(Array(match.players.enumerated()), id: \.element.id) { index, player in
-                        MatchPlayerCard(
-                            player: player,
-                            isWinner: player.id == match.winnerId,
-                            playerIndex: index
-                        )
-                    }
-                }
+        VStack(spacing: 16) {
+            // Sort players: winner first, then by final score (lowest remaining)
+            ForEach(Array(sortedPlayers.enumerated()), id: \.element.id) { index, player in
+                MatchPlayerCard(
+                    player: player,
+                    isWinner: player.id == match.winnerId,
+                    playerIndex: originalPlayerIndex(for: player)
+                )
             }
         }
+    }
+    
+    // Sorted players: winner first, then by final score
+    private var sortedPlayers: [MatchPlayer] {
+        match.players.sorted { player1, player2 in
+            // Winner always comes first
+            if player1.id == match.winnerId { return true }
+            if player2.id == match.winnerId { return false }
+            
+            // Then sort by final score (lower is better - closer to winning)
+            return player1.finalScore < player2.finalScore
+        }
+    }
+    
+    // Get original player index for color assignment
+    private func originalPlayerIndex(for player: MatchPlayer) -> Int {
+        match.players.firstIndex(where: { $0.id == player.id }) ?? 0
     }
     
     private var statsComparisonSection: some View {
@@ -91,50 +87,49 @@ struct MatchDetailView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundColor(Color("TextPrimary"))
             
-            VStack(spacing: 12) {
+            VStack(spacing: 20) {
                 // 180s thrown
-                StatComparisonRow(
+                StatCategorySection(
                     label: "180 thrown",
-                    player1Value: count180s(for: match.players[0]),
-                    player2Value: count180s(for: match.players[1])
+                    players: match.players,
+                    getValue: { count180s(for: $0) }
                 )
                 
                 // 140+ thrown
-                StatComparisonRow(
+                StatCategorySection(
                     label: "140+ thrown",
-                    player1Value: count140Plus(for: match.players[0]),
-                    player2Value: count140Plus(for: match.players[1])
+                    players: match.players,
+                    getValue: { count140Plus(for: $0) }
                 )
                 
                 // 100+ thrown
-                StatComparisonRow(
+                StatCategorySection(
                     label: "100+ thrown",
-                    player1Value: count100Plus(for: match.players[0]),
-                    player2Value: count100Plus(for: match.players[1])
+                    players: match.players,
+                    getValue: { count100Plus(for: $0) }
                 )
                 
                 // Highest visit
-                StatComparisonRow(
+                StatCategorySection(
                     label: "Highest visit",
-                    player1Value: highestVisit(for: match.players[0]),
-                    player2Value: highestVisit(for: match.players[1])
+                    players: match.players,
+                    getValue: { highestVisit(for: $0) }
                 )
                 
                 // 3-dart average
-                StatComparisonRow(
-                    label: "Average visit   ",
-                    player1Value: Int(match.players[0].averageScore),
-                    player2Value: Int(match.players[1].averageScore),
+                StatCategorySection(
+                    label: "Average visit",
+                    players: match.players,
+                    getValue: { Int($0.averageScore) },
                     isDecimal: true,
-                    player1Decimal: match.players[0].averageScore,
-                    player2Decimal: match.players[1].averageScore
+                    getDecimalValue: { $0.averageScore }
                 )
                 
                 // Number of turns
-                StatComparisonRow(
+                StatCategorySection(
                     label: "Number of turns",
-                    player1Value: match.players[0].turns.count,
-                    player2Value: match.players[1].turns.count
+                    players: match.players,
+                    getValue: { $0.turns.count }
                 )
             }
         }
@@ -404,95 +399,122 @@ struct InfoRow: View {
     }
 }
 
-// MARK: - Stat Comparison Row
+// MARK: - Stat Category Section
 
-struct StatComparisonRow: View {
+struct StatCategorySection: View {
     let label: String
-    let player1Value: Int
-    let player2Value: Int
+    let players: [MatchPlayer]
+    let getValue: (MatchPlayer) -> Int
     var isDecimal: Bool = false
-    var player1Decimal: Double = 0
-    var player2Decimal: Double = 0
+    var getDecimalValue: ((MatchPlayer) -> Double)?
     
+    // Calculate max value for scaling bars
     private var maxValue: Int {
-        max(player1Value, player2Value, 1) // Minimum 1 to avoid division by zero
-    }
-    
-    private var player1Percentage: CGFloat {
-        CGFloat(player1Value) / CGFloat(maxValue)
-    }
-    
-    private var player2Percentage: CGFloat {
-        CGFloat(player2Value) / CGFloat(maxValue)
+        let values = players.map { getValue($0) }
+        return max(values.max() ?? 1, 1) // Minimum 1 to avoid division by zero
     }
     
     var body: some View {
-        VStack(spacing: 4) {
-            // Top row: Value - Label - Value
-            HStack(spacing: 12) {
-                // Player 1 value (left)
-                Text(isDecimal ? String(format: "%.2f", player1Decimal) : "\(player1Value)")
-                    .font(.body.weight(.bold))
-                    .foregroundColor(Color("TextPrimary"))
-                    .frame(width: 50, alignment: .leading)
-                
-                Spacer()
-                
-                // Label (center)
-                Text(label)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(Color("TextPrimary"))
-                
-                Spacer()
-                
-                // Player 2 value (right)
-                Text(isDecimal ? String(format: "%.2f", player2Decimal) : "\(player2Value)")
-                    .font(.body.weight(.bold))
-                    .foregroundColor(Color("TextPrimary"))
-                    .frame(width: 50, alignment: .trailing)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            // Category label
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Color("TextSecondary"))
             
-            // Bottom row: Bars extending from center
-            ZStack {
-                // Background bars (full width, light gray)
-                HStack(spacing: 4) {
-                    // Left bar background
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color("BackgroundPrimary"))
-                        .frame(height: 8)
-                    
-                    // Right bar background
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color("BackgroundPrimary"))
-                        .frame(height: 8)
+            // Individual stat bars for each player
+            VStack(spacing: 6) {
+                ForEach(0..<players.count, id: \.self) { index in
+                    PlayerStatBar(
+                        player: players[index],
+                        playerIndex: index,
+                        value: getValue(players[index]),
+                        maxValue: maxValue,
+                        isDecimal: isDecimal,
+                        decimalValue: getDecimalValue?(players[index])
+                    )
                 }
-                
-                // Filled bars (proportional)
-                GeometryReader { geometry in
-                    HStack(spacing: 4) {
-                        // Left bar (Player 1) - grows from center to left
-                        HStack {
-                            Spacer()
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color("AccentPrimary"))
-                                .frame(width: (geometry.size.width / 2 - 2) * player1Percentage, height: 8)
-                        }
-                        .frame(width: geometry.size.width / 2 - 2)
-                        
-                        // Right bar (Player 2) - grows from center to right
-                        HStack {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color("AccentSecondary"))
-                                .frame(width: (geometry.size.width / 2 - 2) * player2Percentage, height: 8)
-                            Spacer()
-                        }
-                        .frame(width: geometry.size.width / 2 - 2)
-                    }
-                }
-                .frame(height: 8)
             }
         }
-        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Player Stat Bar
+
+struct PlayerStatBar: View {
+    let player: MatchPlayer
+    let playerIndex: Int
+    let value: Int
+    let maxValue: Int
+    var isDecimal: Bool = false
+    var decimalValue: Double?
+    
+    // Get player color based on index
+    private var playerColor: Color {
+        switch playerIndex {
+        case 0: return Color("AccentPrimary")
+        case 1: return Color("AccentSecondary")
+        case 2: return Color("AccentTertiary")
+        case 3: return Color("AccentQuaternary")
+        default: return Color("AccentPrimary")
+        }
+    }
+    
+    // Calculate percentage for bar width
+    private var percentage: CGFloat {
+        guard maxValue > 0 else { return 0 }
+        return CGFloat(value) / CGFloat(maxValue)
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Progress bar with avatar overlay
+            ZStack(alignment: .leading) {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // Background bar (gray)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color("BackgroundPrimary"))
+                            .frame(height: 24)
+                        
+                        // Filled bar (player's color)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(playerColor)
+                            .frame(width: geometry.size.width * percentage, height: 24)
+                    }
+                }
+                .frame(height: 24)
+                
+                // Player avatar (overlaid on left edge)
+                ZStack {
+                    Circle()
+                        .fill(Color("InputBackground"))
+                        .frame(width: 24, height: 24)
+                    
+                    if let avatarURL = player.avatarURL {
+                        Image(avatarURL)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 22, height: 22)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(playerColor)
+                    }
+                }
+                .overlay(
+                    Circle()
+                        .stroke(Color("BackgroundPrimary"), lineWidth: 1)
+                )
+                .offset(x: 0)
+            }
+            
+            // Value (right aligned, rounded up)
+            Text(isDecimal && decimalValue != nil ? "\(Int(ceil(decimalValue!)))" : "\(value)")
+                .font(.caption.weight(.bold))
+                .foregroundColor(Color("TextPrimary"))
+                .frame(width: 35, alignment: .trailing)
+        }
     }
 }
 
