@@ -11,9 +11,17 @@ struct MatchCard: View {
     let match: MatchResult
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Game Type Badge
-            gameBadge
+        HStack(spacing: 0) {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    gameBadge
+                    Spacer()
+                }
+                Spacer()
+            }
+            .frame(width: 84)
             
             // Match Info
             VStack(alignment: .leading, spacing: 6) {
@@ -25,62 +33,60 @@ struct MatchCard: View {
                     .font(.caption)
                     .foregroundColor(Color("TextSecondary"))
             }
-            
-            Spacer()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
-        .frame(minHeight: 100)
+        .frame(minHeight: 84)
         .background(Color("InputBackground"))
+        .overlay(alignment: .leading) {
+            Color("AccentPrimary")
+                .opacity(0.15)
+                .frame(width: 84)
+        }
         .cornerRadius(12)
     }
     
     // MARK: - Sub Views
-    
+
     private var gameBadge: some View {
         VStack(spacing: 4) {
             Text(match.gameType)
                 .font(.body.weight(.bold))
                 .foregroundColor(Color("AccentPrimary"))
-            
             Image(systemName: "target")
                 .font(.system(size: 20, weight: .medium))
                 .foregroundColor(Color("AccentPrimary"))
         }
-        .frame(width: 60, height: 60)
-        .background(Color("AccentPrimary").opacity(0.15))
-        .cornerRadius(8)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
     
     private var playersRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(match.players.prefix(2)) { player in
+            ForEach(match.players) { player in
                 HStack(spacing: 8) {
                     // Player name
                     Text(player.displayName)
                         .font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))
                         .foregroundColor(player.id == match.winnerId ? Color("TextPrimary") : Color("TextPrimary"))
                     
-                    // Winner indicator
-                    if player.id == match.winnerId {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color("AccentPrimary"))
-                    }
-                    
                     Spacer()
                     
-                    // Score
-                    Text("\(player.finalScore)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(Color("TextSecondary"))
+                    // Score/Icon container
+                    HStack {
+                        if player.id == match.winnerId {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Color("AccentTertiary"))
+                        } else {
+                            Text("\(player.finalScore)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(Color("TextSecondary"))
+                        }
+                    }
+                    .frame(width: 60)
+                    .multilineTextAlignment(.center)
                 }
-            }
-            
-            // Show "+X more" if more than 2 players
-            if match.players.count > 2 {
-                Text("+\(match.players.count - 2) more")
-                    .font(.caption)
-                    .foregroundColor(Color("TextSecondary"))
+                .frame(maxWidth: .infinity)
             }
         }
     }
