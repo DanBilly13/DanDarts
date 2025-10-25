@@ -271,9 +271,9 @@ struct StackedPlayerCards: View {
         
         // Adjusted offsets for new layout below navigation bar
         switch stackPosition {
-        case 1: return -52  // Card 1: Show most of the card including full score
+        case 1: return -48  // Card 1: Show most of the card including full score
         case 2: return -68      // Card 2: Show at least half including score
-        case 3: return -85  // Card 3: Show quarter but ensure score is visible
+        case 3: return -88  // Card 3: Show quarter but ensure score is visible
         default: return -CGFloat(stackPosition) * 10  // Additional cards
         }
     }
@@ -376,46 +376,34 @@ struct PlayerScoreCard: View {
         VStack(spacing: 12) {
             // Player info
             HStack(spacing: 12) {
-                // Avatar - 68px to match match detail
-                PlayerAvatarView(
-                    avatarURL: player.avatarURL,
-                    size: 68,
-                    borderColor: nil
+                // Player identity (avatar + name + nickname)
+                PlayerIdentity(
+                    player: player,
+                    avatarSize: 48,
+                    spacing: 0
                 )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    // Player name - title3 rounded semibold
-                    Text(player.displayName)
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundColor(Color("TextPrimary"))
-                    
-                    // Nickname - subheadline medium
-                    Text("@\(player.nickname)")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    // Legs won indicator (dots) - 10px spacing from nickname
-                    if matchFormat > 1 && legsWon > 0 {
-                        HStack(spacing: 4) {
-                            ForEach(0..<legsWon, id: \.self) { _ in
-                                Circle()
-                                    .fill(borderColor)
-                                    .frame(width: 6, height: 6)
-                            }
-                        }
-                        .padding(.top, 6)
-                    }
-                }
                 
                 Spacer()
                 
-                // Score
-                Text("\(score)")
-                    .font(.system(.title, design: .monospaced))
-                    .fontWeight(.bold)
-                    .foregroundColor(Color("TextPrimary"))
+                // Score and legs indicator
+                VStack(spacing: 4) {
+                    // Score
+                    Text("\(score)")
+                        .font(.system(.title, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(Color("TextPrimary"))
+                    
+                    // Legs indicator (dots) - show all legs with filled/unfilled states
+                    if matchFormat > 1 {
+                        LegIndicators(
+                            legsWon: legsWon,
+                            totalLegs: matchFormat,
+                            color: borderColor,
+                            dotSize: 8,
+                            spacing: 4
+                        )
+                    }
+                }
             }
             
         }
@@ -528,20 +516,41 @@ struct CheckoutSuggestionView: View {
     }
 }
 
-#Preview("Gameplay - 3 Players") {
+#Preview("Best of 3") {
     NavigationStack {
         GameplayView(
             game: Game.preview301,
-            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
+            players: [Player.mockGuest1, Player.mockGuest2],
+            matchFormat: 3
         )
     }
 }
 
-#Preview("Gameplay - 4 Players") {
+#Preview("Best of 5") {
+    NavigationStack {
+        GameplayView(
+            game: Game.preview501,
+            players: [Player.mockGuest1, Player.mockGuest2],
+            matchFormat: 5
+        )
+    }
+}
+
+#Preview("Best of 7 - 4 Players") {
     NavigationStack {
         GameplayView(
             game: Game.preview301,
-            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2]
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
+            matchFormat: 7
+        )
+    }
+}
+
+#Preview("3 Players") {
+    NavigationStack {
+        GameplayView(
+            game: Game.preview301,
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
         )
     }
 }

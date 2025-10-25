@@ -13,8 +13,8 @@ struct MatchDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Game Type Header with Date
-                gameTypeHeader
+                // Date and Time
+                dateHeader
                 
                 // Players and Scores
                 playersSection
@@ -33,22 +33,18 @@ struct MatchDetailView: View {
             .padding(.vertical, 24)
         }
         .background(Color("BackgroundPrimary"))
+        .navigationTitle(match.gameName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
     }
     
     // MARK: - Sub Views
     
-    private var gameTypeHeader: some View {
-        VStack(spacing: 8) {
-            Text(match.gameName)
-                .font(.largeTitle.weight(.bold))
-                .foregroundColor(Color("TextPrimary"))
-            
-            Text(match.formattedDate)
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(Color("TextSecondary"))
-        }
+    private var dateHeader: some View {
+        Text(match.formattedDate)
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(Color("TextSecondary"))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private var playersSection: some View {
@@ -59,7 +55,8 @@ struct MatchDetailView: View {
                     player: player,
                     isWinner: player.id == match.winnerId,
                     playerIndex: originalPlayerIndex(for: player),
-                    placement: index + 1
+                    placement: index + 1,
+                    matchFormat: match.matchFormat
                 )
             }
         }
@@ -89,32 +86,11 @@ struct MatchDetailView: View {
                 .foregroundColor(Color("TextPrimary"))
             
             VStack(spacing: 20) {
-                // 180s thrown
+                // Number of turns
                 StatCategorySection(
-                    label: "180 thrown",
+                    label: "Number of turns",
                     players: match.players,
-                    getValue: { count180s(for: $0) }
-                )
-                
-                // 140+ thrown
-                StatCategorySection(
-                    label: "140+ thrown",
-                    players: match.players,
-                    getValue: { count140Plus(for: $0) }
-                )
-                
-                // 100+ thrown
-                StatCategorySection(
-                    label: "100+ thrown",
-                    players: match.players,
-                    getValue: { count100Plus(for: $0) }
-                )
-                
-                // Highest visit
-                StatCategorySection(
-                    label: "Highest visit",
-                    players: match.players,
-                    getValue: { highestVisit(for: $0) }
+                    getValue: { $0.turns.count }
                 )
                 
                 // 3-dart average
@@ -126,15 +102,23 @@ struct MatchDetailView: View {
                     getDecimalValue: { $0.averageScore }
                 )
                 
-                // Number of turns
+                // Highest visit
                 StatCategorySection(
-                    label: "Number of turns",
+                    label: "Highest visit",
                     players: match.players,
-                    getValue: { $0.turns.count }
+                    getValue: { highestVisit(for: $0) }
+                )
+                
+                // 100+ thrown
+                StatCategorySection(
+                    label: "100+ thrown",
+                    players: match.players,
+                    getValue: { count100Plus(for: $0) }
                 )
             }
         }
-        .padding(16)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
         .background(Color("InputBackground"))
         .cornerRadius(12)
     }
@@ -279,6 +263,17 @@ struct MatchPlayerCard: View {
     let isWinner: Bool
     let playerIndex: Int
     let placement: Int
+    var matchFormat: Int = 1 // Total legs in match (1, 3, 5, or 7)
+    
+    // Check if this is a multi-leg match
+    private var isMultiLegMatch: Bool {
+        matchFormat > 1
+    }
+    
+    // Calculate total legs needed to win
+    private var totalLegsInMatch: Int {
+        (matchFormat / 2) + 1
+    }
     
     // Get border color based on player index
     var borderColor: Color {
@@ -293,58 +288,18 @@ struct MatchPlayerCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Avatar - 68px
-            ZStack {
-                Circle()
-                    .fill(Color("InputBackground"))
-                    .frame(width: 68, height: 68)
-                
-                if let avatarURL = player.avatarURL {
-                    Image(avatarURL)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 68, height: 68)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 34, weight: .medium))
-                        .foregroundColor(borderColor)
-                }
-            }
-            
-            // Player Info
-            VStack(alignment: .leading, spacing: 4) {
-                // Player name - title3 rounded semibold
-                Text(player.displayName)
-                    .font(.system(.title3, design: .rounded))
-                    .fontWeight(.semibold)
-                    .foregroundColor(Color("TextPrimary"))
-                
-                // Nickname - subheadline medium
-                if !player.isGuest {
-                    Text("@\(player.nickname)")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(Color("TextSecondary"))
-                }
-                
-                // Legs won indicator (dots) - 10px spacing from nickname
-                if player.legsWon > 0 {
-                    HStack(spacing: 4) {
-                        ForEach(0..<player.legsWon, id: \.self) { _ in
-                            Circle()
-                                .fill(borderColor)
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    .padding(.top, 6)
-                }
-            }
+            // Player identity (avatar + name + nickname)
+            PlayerIdentity(
+                matchPlayer: player,
+                avatarSize: 48,
+                borderColor: borderColor
+            )
             
             Spacer()
             
-            // Right side - 44px wide container
-            ZStack {
+            // Right side - Trophy/Position with legs below
+            VStack(spacing: 6) {
+                // Trophy icon or placement text
                 if isWinner {
                     // Trophy icon - 36px (outline style, thinner stroke)
                     Image(systemName: "trophy")
@@ -357,10 +312,28 @@ struct MatchPlayerCard: View {
                         .fontWeight(.semibold)
                         .foregroundColor(Color("TextSecondary"))
                 }
+                
+                // Show leg indicators for multi-leg matches OR "Left on X" for single-leg non-winners
+                if isMultiLegMatch {
+                    // Leg indicators using reusable component
+                    LegIndicators(
+                        legsWon: player.legsWon,
+                        totalLegs: matchFormat,
+                        color: borderColor,
+                        dotSize: 8,
+                        spacing: 4
+                    )
+                } else if !isWinner {
+                    // Single-leg game: show "Left on X" for non-winners
+                    Text("Left on \(player.finalScore)")
+                        .font(.caption)
+                        .foregroundColor(Color("TextSecondary"))
+                }
             }
             .frame(width: 44)
         }
-        .padding(16)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
         .background(Color("InputBackground"))
         .cornerRadius(12)
         .overlay(
@@ -480,33 +453,33 @@ struct PlayerStatBar: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         // Background bar (gray)
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 10)
                             .fill(Color("BackgroundPrimary"))
-                            .frame(height: 24)
+                            .frame(height: 20)
                         
                         // Filled bar (player's color)
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 10)
                             .fill(playerColor)
-                            .frame(width: geometry.size.width * percentage, height: 24)
+                            .frame(width: geometry.size.width * percentage, height: 20)
                     }
                 }
-                .frame(height: 24)
+                .frame(height: 20)
                 
                 // Player avatar (overlaid on left edge)
                 ZStack {
                     Circle()
                         .fill(Color("InputBackground"))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 20, height: 20)
                     
                     if let avatarURL = player.avatarURL {
                         Image(avatarURL)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(width: 22, height: 22)
+                            .frame(width: 18, height: 18)
                             .clipShape(Circle())
                     } else {
                         Image(systemName: "person.circle.fill")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(playerColor)
                     }
                 }
@@ -545,7 +518,8 @@ struct PlayerTurnBreakdown: View {
                 }
             }
         }
-        .padding(16)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
         .background(Color("InputBackground"))
         .cornerRadius(12)
     }

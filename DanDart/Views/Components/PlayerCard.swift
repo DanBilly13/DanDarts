@@ -10,46 +10,35 @@ import SwiftUI
 struct PlayerCard: View {
     let player: Player
     let showRemoveButton: Bool
+    let showCheckmark: Bool
     let onRemove: (() -> Void)?
     
-    init(player: Player, showRemoveButton: Bool = false, onRemove: (() -> Void)? = nil) {
+    init(player: Player, showRemoveButton: Bool = false, showCheckmark: Bool = false, onRemove: (() -> Void)? = nil) {
         self.player = player
         self.showRemoveButton = showRemoveButton
+        self.showCheckmark = showCheckmark
         self.onRemove = onRemove
     }
     
     var body: some View {
         HStack(spacing: 16) {
-            // Avatar (48pt, left)
-            AsyncAvatarImage(
-                avatarURL: player.avatarURL,
-                size: 48,
-                placeholderIcon: player.isGuest ? "person.circle.fill" : "person.circle"
+            // Player identity (avatar + name + nickname)
+            PlayerIdentity(
+                player: player,
+                avatarSize: 48,
+                spacing: 4
             )
             
-            // Display name and nickname (center)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(player.displayName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color("TextPrimary"))
-                    .lineLimit(1)
-                
+            // Guest badge
+            if player.isGuest {
                 HStack(spacing: 4) {
-                    if !player.isGuest {
-                        Text("@\(player.nickname)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
-                    } else {
-                        Text("Guest")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                    }
+                    Text("Guest")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
                     
-                    if player.isGuest {
-                        Image(systemName: "person.badge.minus")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                    }
+                    Image(systemName: "person.badge.minus")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
                 }
                 .lineLimit(1)
             }
@@ -57,11 +46,12 @@ struct PlayerCard: View {
             Spacer()
             
             // W/L stats (right)
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: 8) {
                 if player.totalGames > 0 {
                     Text("\(player.totalWins)W - \(player.totalLosses)L")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color("TextPrimary"))
+                       
                     
                     Text(player.winRatePercentage)
                         .font(.system(size: 12, weight: .medium))
@@ -75,6 +65,14 @@ struct PlayerCard: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color("TextSecondary"))
                 }
+            }
+            .padding(.top, 5)
+            
+            // Checkmark (if player is already selected)
+            if showCheckmark {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(.green)
             }
             
             // Remove button (if enabled)
@@ -93,12 +91,12 @@ struct PlayerCard: View {
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .moodCard(.red, radius: 48)
+        .background(Color("InputBackground"))
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 48)
-                .stroke(Color("TextSecondary").opacity(0.5), lineWidth: 2)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color("TextSecondary").opacity(0.3), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 48))
     }
 }
 
@@ -109,41 +107,15 @@ struct PlayerCardCompact: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Smaller avatar (32pt)
-            ZStack {
-                Circle()
-                    .fill(Color("InputBackground"))
-                    .frame(width: 32, height: 32)
-                
-                if let avatarURL = player.avatarURL {
-                    // Player with avatar from assets
-                    Image(avatarURL)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 32, height: 32)
-                        .clipShape(Circle())
-                } else {
-                    // No avatar - show placeholder
-                    Image(systemName: player.isGuest ? "person.circle.fill" : "person.circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(player.isGuest ? Color("TextSecondary") : Color("AccentPrimary"))
-                }
-            }
-            
-            // Name only
-            VStack(alignment: .leading, spacing: 2) {
-                Text(player.displayName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color("TextPrimary"))
-                    .lineLimit(1)
-                
-                if !player.isGuest {
-                    Text("@\(player.nickname)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("AccentSecondary"))
-                        .lineLimit(1)
-                }
-            }
+            // Player identity (avatar + name + nickname) - compact size
+            PlayerIdentity(
+                player: player,
+                avatarSize: 32,
+                nameFont: .system(size: 14, weight: .semibold),
+                nicknameFont: .system(size: 12, weight: .medium),
+                nicknameColor: Color("AccentSecondary"),
+                spacing: 2
+            )
             
             Spacer()
             

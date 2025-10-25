@@ -204,7 +204,7 @@ struct GameSetupView: View {
                 }
             }
             .sheet(isPresented: $showSearchPlayer) {
-                SearchPlayerSheet { player in
+                SearchPlayerSheet(selectedPlayers: selectedPlayers) { player in
                     addPlayer(player)
                 }
             }
@@ -226,6 +226,7 @@ struct GameSetupView: View {
 // MARK: - Placeholder Sheet Components
 
 struct SearchPlayerSheet: View {
+    let selectedPlayers: [Player]
     let onPlayerSelected: (Player) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var showAddGuestPlayer = false
@@ -307,16 +308,20 @@ struct SearchPlayerSheet: View {
                                 onPlayerSelected(currentUserAsPlayer)
                                 dismiss()
                             }) {
-                                PlayerCard(player: Player(
-                                    displayName: currentUser.displayName,
-                                    nickname: currentUser.nickname,
-                                    avatarURL: currentUser.avatarURL,
-                                    isGuest: false,
-                                    totalWins: currentUser.totalWins,
-                                    totalLosses: currentUser.totalLosses
-                                ))
+                                PlayerCard(
+                                    player: Player(
+                                        displayName: currentUser.displayName,
+                                        nickname: currentUser.nickname,
+                                        avatarURL: currentUser.avatarURL,
+                                        isGuest: false,
+                                        totalWins: currentUser.totalWins,
+                                        totalLosses: currentUser.totalLosses
+                                    ),
+                                    showCheckmark: selectedPlayers.contains(where: { $0.nickname == currentUser.nickname })
+                                )
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .disabled(selectedPlayers.contains(where: { $0.nickname == currentUser.nickname }))
                         }
                         
                         // Friends section
@@ -334,9 +339,13 @@ struct SearchPlayerSheet: View {
                                         onPlayerSelected(player)
                                         dismiss()
                                     }) {
-                                        PlayerCard(player: player)
+                                        PlayerCard(
+                                            player: player,
+                                            showCheckmark: selectedPlayers.contains(where: { $0.id == player.id })
+                                        )
                                     }
                                     .buttonStyle(PlainButtonStyle())
+                                    .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
                                 }
                             }
                         }
