@@ -28,45 +28,56 @@ struct GameSetupView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Top Bar with Back Button
-            HStack {
-                Button(action: {
-                    dismiss()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                        Text("Games")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundColor(Color("AccentPrimary"))
-                }
-                
-                Spacer()
-                
-                Text(game.title)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
-                
-                Spacer()
-                
-                // Placeholder for balance
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Games")
-                        .font(.system(size: 16, weight: .medium))
-                }
-                .opacity(0)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            .background(Color("BackgroundPrimary"))
-            
+        ZStack(alignment: .top) {
+            // Main content with ScrollView
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 0) {
+                    // Hero Header with Cover Image
+                    ZStack(alignment: .bottomLeading) {
+                        // Cover Image
+                        if let coverImage = UIImage(named: "game-cover/\(game.title)") {
+                            Image(uiImage: coverImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 280)
+                                .clipped()
+                        } else {
+                            // Fallback gradient if no image
+                            LinearGradient(
+                                colors: [
+                                    Color("AccentPrimary").opacity(0.6),
+                                    Color("AccentPrimary").opacity(0.3)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .frame(height: 280)
+                        }
+                        
+                        // Gradient overlay for text readability
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.0),
+                                Color.black.opacity(0.7)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 280)
+                        
+                        // Game Title
+                        Text(game.title)
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.leading, 20)
+                            .padding(.bottom, 24)
+                            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 280)
+                    
+                    // Content below header
+                    VStack(spacing: 24) {
                     // Legs Selection Section (301/501 only)
                     if supportsLegs {
                         VStack(spacing: 16) {
@@ -178,14 +189,40 @@ struct GameSetupView: View {
                     .cornerRadius(12)
                     
                     Spacer(minLength: 40)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 24)
-                .padding(.bottom, 16)
-            }
             }
             .background(Color("BackgroundPrimary"))
-            .navigationBarHidden(true)
+            .edgesIgnoringSafeArea(.top)
+            
+            // Transparent Navigation Bar Overlay
+            VStack {
+                HStack {
+                    // Back Button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                
+                Spacer()
+            }
+        }
+        .navigationBarHidden(true)
             .toolbar(.hidden, for: .tabBar)
             .navigationDestination(isPresented: $showGameView) {
                 // Always show black background to prevent white flash
@@ -230,6 +267,7 @@ struct SearchPlayerSheet: View {
     let onPlayerSelected: (Player) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var showAddGuestPlayer = false
+    @State private var guestPlayers: [Player] = []
     
     // Mock current user - in real app this would come from AuthService
     private let currentUser = User.mockUser1
@@ -350,6 +388,41 @@ struct SearchPlayerSheet: View {
                             }
                         }
                         
+                        // Guest Players section
+                        if !guestPlayers.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Guest Players")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(Color("TextPrimary"))
+                                    Spacer()
+                                }
+                                
+                                VStack(spacing: 12) {
+                                    ForEach(guestPlayers, id: \.id) { player in
+                                        Button(action: {
+                                            onPlayerSelected(player)
+                                            dismiss()
+                                        }) {
+                                            PlayerCard(
+                                                player: player,
+                                                showCheckmark: selectedPlayers.contains(where: { $0.id == player.id })
+                                            )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) {
+                                                deleteGuestPlayer(player)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
                         Spacer(minLength: 40)
                     }
                     .padding()
@@ -357,13 +430,32 @@ struct SearchPlayerSheet: View {
             }
             .background(Color("BackgroundPrimary"))
             .navigationBarHidden(true)
+            .onAppear {
+                loadGuestPlayers()
+            }
             .sheet(isPresented: $showAddGuestPlayer) {
                 AddGuestPlayerView { player in
                     onPlayerSelected(player)
-                    dismiss()
+                    // Reload guest players to show the newly added one
+                    loadGuestPlayers()
+                    // AddGuestPlayerView dismisses itself, so we also dismiss the SearchPlayerSheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        dismiss()
+                    }
                 }
             }
         }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func loadGuestPlayers() {
+        guestPlayers = GuestPlayerStorageManager.shared.loadGuestPlayers()
+    }
+    
+    private func deleteGuestPlayer(_ player: Player) {
+        GuestPlayerStorageManager.shared.deleteGuestPlayer(id: player.id)
+        loadGuestPlayers()
     }
 }
 

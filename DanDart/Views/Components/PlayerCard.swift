@@ -29,41 +29,35 @@ struct PlayerCard: View {
                 spacing: 4
             )
             
-            // Guest badge
-            if player.isGuest {
-                HStack(spacing: 4) {
+            Spacer()
+            
+            // Right side - Guest badge OR W/L stats
+            VStack(alignment: .trailing, spacing: 8) {
+                if player.isGuest {
+                    // Show "Guest" for guest players
                     Text("Guest")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Color("TextSecondary"))
-                    
-                    Image(systemName: "person.badge.minus")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                }
-                .lineLimit(1)
-            }
-            
-            Spacer()
-            
-            // W/L stats (right)
-            VStack(alignment: .trailing, spacing: 8) {
-                if player.totalGames > 0 {
-                    Text("\(player.totalWins)W - \(player.totalLosses)L")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
-                       
-                    
-                    Text(player.winRatePercentage)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
                 } else {
-                    Text("No games")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    Text("yet")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                    // Show stats for connected players
+                    if player.totalGames > 0 {
+                        Text("\(player.totalWins)W - \(player.totalLosses)L")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                           
+                        
+                        Text(player.winRatePercentage)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                    } else {
+                        Text("No games")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                        
+                        Text("yet")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                    }
                 }
             }
             .padding(.top, 5)

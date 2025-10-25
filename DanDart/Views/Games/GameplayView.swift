@@ -322,16 +322,16 @@ struct StackedPlayerCards: View {
     
     private func stackPositionForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> Int {
         // Calculate the position in the stack for non-current players
-        // Players after current index get positions 1, 2, 3...
-        // Players before current index get positions based on how many are after
+        // Use circular/modulo logic to maintain consistent order
+        // Next player (clockwise) gets position 1, then 2, 3, etc.
         
-        if index > currentIndex {
-            return index - currentIndex
-        } else {
-            // Players before current index
-            let playersAfterCurrent = totalPlayers - currentIndex - 1
-            return playersAfterCurrent + (currentIndex - index)
-        }
+        let relativePosition = (index - currentIndex + totalPlayers) % totalPlayers
+        
+        // relativePosition 0 is the current player (should never reach here due to early return)
+        // relativePosition 1 is the next player (position 1 in stack)
+        // relativePosition 2 is two players ahead (position 2 in stack), etc.
+        
+        return relativePosition
     }
     
     private func calculateStackHeight(playerCount: Int) -> CGFloat {

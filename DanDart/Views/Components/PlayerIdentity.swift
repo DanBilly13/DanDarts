@@ -64,8 +64,8 @@ struct PlayerIdentity: View {
                     .foregroundColor(Color("TextPrimary"))
                     .lineLimit(1)
                 
-                // Nickname (if not guest and nickname provided)
-                if !isGuest, let nickname = nickname {
+                // Nickname (if provided)
+                if let nickname = nickname {
                     Text("@\(nickname)")
                         .font(nicknameFont)
                         .foregroundColor(nicknameColor)

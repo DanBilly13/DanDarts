@@ -235,6 +235,9 @@ struct AddGuestPlayerView: View {
                 avatarURL: selectedAvatar
             )
             
+            // Save guest player to local storage
+            GuestPlayerStorageManager.shared.saveGuestPlayer(newPlayer)
+            
             onPlayerCreated(newPlayer)
             isLoading = false
             dismiss()
