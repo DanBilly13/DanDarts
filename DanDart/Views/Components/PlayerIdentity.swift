@@ -83,7 +83,7 @@ extension PlayerIdentity {
     init(
         player: Player,
         avatarSize: CGFloat = 48,
-        nameFont: Font = .system(.title3, design: .rounded).weight(.semibold),
+        nameFont: Font = .system(.headline, design: .rounded).weight(.semibold),
         nicknameFont: Font = .subheadline.weight(.medium),
         nicknameColor: Color = Color("TextSecondary"),
         spacing: CGFloat = 4,
@@ -109,7 +109,7 @@ extension PlayerIdentity {
     init(
         matchPlayer: MatchPlayer,
         avatarSize: CGFloat = 48,
-        nameFont: Font = .system(.title3, design: .rounded).weight(.semibold),
+        nameFont: Font = .system(.headline, design: .rounded).weight(.semibold),
         nicknameFont: Font = .subheadline.weight(.medium),
         nicknameColor: Color = Color("TextSecondary"),
         spacing: CGFloat = 4,

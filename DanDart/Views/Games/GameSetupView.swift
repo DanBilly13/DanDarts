@@ -129,21 +129,28 @@ struct GameSetupView: View {
                         
                         // Sequential Player Addition
                         VStack(spacing: 12) {
-                            // Show selected players first
-                            ForEach(Array(selectedPlayers.enumerated()), id: \.element.id) { index, player in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text("Player \(index + 1)")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(Color("AccentPrimary"))
-                                        Spacer()
-                                    }
-                                    
-                                    PlayerCard(player: player, showRemoveButton: true) {
-                                        removePlayer(player)
-                                    }
+                            // Show selected players in a List for swipe actions
+                            List {
+                                ForEach(Array(selectedPlayers.enumerated()), id: \.element.id) { index, player in
+                                    PlayerCard(player: player, playerNumber: index + 1)
+                                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button {
+                                                removePlayer(player)
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .foregroundColor(.red)
+                                            }
+                                            .tint(.clear)
+                                        }
                                 }
                             }
+                            .listStyle(.plain)
+                            .scrollDisabled(true)
+                            .frame(height: CGFloat(selectedPlayers.count * 92)) // 80pt card + 12pt spacing
+                            .background(Color.clear)
                             
                             // Add next player button (if under limit)
                             if selectedPlayers.count < playerLimit {
@@ -266,11 +273,9 @@ struct SearchPlayerSheet: View {
     let selectedPlayers: [Player]
     let onPlayerSelected: (Player) -> Void
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authService: AuthService
     @State private var showAddGuestPlayer = false
     @State private var guestPlayers: [Player] = []
-    
-    // Mock current user - in real app this would come from AuthService
-    private let currentUser = User.mockUser1
     
     var body: some View {
         NavigationView {
@@ -325,41 +330,43 @@ struct SearchPlayerSheet: View {
                         .padding(.top, 8)
                         
                         // Current User Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("You")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(Color("TextPrimary"))
-                                Spacer()
-                            }
-                            
-                            Button(action: {
-                                // Convert User to Player
-                                let currentUserAsPlayer = Player(
-                                    displayName: currentUser.displayName,
-                                    nickname: currentUser.nickname,
-                                    avatarURL: currentUser.avatarURL,
-                                    isGuest: false,
-                                    totalWins: currentUser.totalWins,
-                                    totalLosses: currentUser.totalLosses
-                                )
-                                onPlayerSelected(currentUserAsPlayer)
-                                dismiss()
-                            }) {
-                                PlayerCard(
-                                    player: Player(
+                        if let currentUser = authService.currentUser {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("You")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(Color("TextPrimary"))
+                                    Spacer()
+                                }
+                                
+                                Button(action: {
+                                    // Convert User to Player
+                                    let currentUserAsPlayer = Player(
                                         displayName: currentUser.displayName,
                                         nickname: currentUser.nickname,
                                         avatarURL: currentUser.avatarURL,
                                         isGuest: false,
                                         totalWins: currentUser.totalWins,
                                         totalLosses: currentUser.totalLosses
-                                    ),
-                                    showCheckmark: selectedPlayers.contains(where: { $0.nickname == currentUser.nickname })
-                                )
+                                    )
+                                    onPlayerSelected(currentUserAsPlayer)
+                                    dismiss()
+                                }) {
+                                    PlayerCard(
+                                        player: Player(
+                                            displayName: currentUser.displayName,
+                                            nickname: currentUser.nickname,
+                                            avatarURL: currentUser.avatarURL,
+                                            isGuest: false,
+                                            totalWins: currentUser.totalWins,
+                                            totalLosses: currentUser.totalLosses
+                                        ),
+                                        showCheckmark: selectedPlayers.contains(where: { $0.nickname == currentUser.nickname })
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .disabled(selectedPlayers.contains(where: { $0.nickname == currentUser.nickname }))
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .disabled(selectedPlayers.contains(where: { $0.nickname == currentUser.nickname }))
                         }
                         
                         // Friends section

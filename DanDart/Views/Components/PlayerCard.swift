@@ -9,19 +9,27 @@ import SwiftUI
 
 struct PlayerCard: View {
     let player: Player
-    let showRemoveButton: Bool
     let showCheckmark: Bool
-    let onRemove: (() -> Void)?
+    let playerNumber: Int?
     
-    init(player: Player, showRemoveButton: Bool = false, showCheckmark: Bool = false, onRemove: (() -> Void)? = nil) {
+    init(player: Player, showCheckmark: Bool = false, playerNumber: Int? = nil) {
         self.player = player
-        self.showRemoveButton = showRemoveButton
         self.showCheckmark = showCheckmark
-        self.onRemove = onRemove
+        self.playerNumber = playerNumber
     }
     
     var body: some View {
         HStack(spacing: 16) {
+            // Player number (if provided)
+            if let number = playerNumber {
+                Text("\(number)")
+                    .font(.system(.headline, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color("TextPrimary"))
+                    .frame(width: 16)
+                    
+            }
+            
             // Player identity (avatar + name + nickname)
             PlayerIdentity(
                 player: player,
@@ -67,18 +75,6 @@ struct PlayerCard: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 20, weight: .medium))
                     .foregroundColor(.green)
-            }
-            
-            // Remove button (if enabled)
-            if showRemoveButton {
-                Button(action: {
-                    onRemove?()
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                }
-                .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(.horizontal, 16)
@@ -149,14 +145,10 @@ struct PlayerCardCompact: View {
     .background(Color("BackgroundPrimary"))
 }
 
-#Preview("Player Card - With Remove Button") {
+#Preview("Player Card - With Player Numbers") {
     VStack(spacing: 16) {
-        PlayerCard(player: Player.mockConnected1, showRemoveButton: true) {
-            print("Remove \(Player.mockConnected1.displayName)")
-        }
-        PlayerCard(player: Player.mockGuest1, showRemoveButton: true) {
-            print("Remove \(Player.mockGuest1.displayName)")
-        }
+        PlayerCard(player: Player.mockConnected1, playerNumber: 1)
+        PlayerCard(player: Player.mockGuest1, playerNumber: 2)
     }
     .padding()
     .background(Color("BackgroundPrimary"))
@@ -176,9 +168,7 @@ struct PlayerCardCompact: View {
 #Preview("Player Card - Dark Mode") {
     VStack(spacing: 16) {
         PlayerCard(player: Player.mockConnected1)
-        PlayerCard(player: Player.mockGuest1, showRemoveButton: true) {
-            print("Remove player")
-        }
+        PlayerCard(player: Player.mockGuest1, playerNumber: 1)
         PlayerCardCompact(player: Player.mockConnected2)
     }
     .padding()

@@ -140,19 +140,19 @@ struct FriendsListView: View {
                 // Friends List
                 List {
                     ForEach(filteredFriends) { friend in
-                        NavigationLink(destination: FriendProfileView(friend: friend)) {
-                            PlayerCard(player: friend)
-                        }
-                        .listRowBackground(Color("BackgroundPrimary"))
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                friendToDelete = friend
-                                showDeleteConfirmation = true
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                        PlayerCard(player: friend)
+                            .listRowBackground(Color("BackgroundPrimary"))
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    friendToDelete = friend
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                                .tint(.clear)
                             }
-                        }
                     }
                 }
                 .listStyle(.plain)
@@ -285,12 +285,137 @@ struct FriendsListView: View {
 
 // MARK: - Preview
 
-#Preview {
+#Preview("Empty State") {
     FriendsListView()
         .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("With Friends") {
-    FriendsListView()
-        .environmentObject(AuthService.mockAuthenticated)
+    FriendsListViewPreview()
+}
+
+// Preview wrapper with mock data
+struct FriendsListViewPreview: View {
+    @StateObject private var authService = AuthService.mockAuthenticated
+    
+    var body: some View {
+        FriendsListViewWithMockData()
+            .environmentObject(authService)
+    }
+}
+
+struct FriendsListViewWithMockData: View {
+    @EnvironmentObject private var authService: AuthService
+    @StateObject private var friendsService = FriendsService()
+    
+    @State private var searchText: String = ""
+    @State private var showAddFriend: Bool = false
+    @State private var showSuccessAlert: Bool = false
+    @State private var successMessage: String = ""
+    @State private var showDeleteConfirmation: Bool = false
+    @State private var friendToDelete: Player? = nil
+    
+    // Mock friends data
+    @State private var friends: [Player] = Player.mockConnectedPlayers
+    @State private var isLoadingFriends: Bool = false
+    @State private var loadError: String?
+    
+    var filteredFriends: [Player] {
+        if searchText.isEmpty {
+            return friends
+        } else {
+            return friends.filter { friend in
+                friend.displayName.localizedCaseInsensitiveContains(searchText) ||
+                friend.nickname.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Search Bar
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    TextField("Search friends", text: $searchText)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextPrimary"))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color("InputBackground"))
+                .cornerRadius(12)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+            
+                // Friends List
+                List {
+                    ForEach(filteredFriends) { friend in
+                        PlayerCard(player: friend)
+                            .listRowBackground(Color("BackgroundPrimary"))
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    friendToDelete = friend
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                                .tint(.clear)
+                            }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color("BackgroundPrimary"))
+            }
+            .padding(.horizontal, 16)
+            .background(Color("BackgroundPrimary"))
+            .navigationTitle("Friends")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showAddFriend = true
+                    }) {
+                        Image(systemName: "person.badge.plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Color("AccentPrimary"))
+                    }
+                }
+            }
+            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+        .background(Color("BackgroundPrimary")).ignoresSafeArea()
+        .alert("Remove Friend?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove", role: .destructive) {
+                if let friend = friendToDelete {
+                    friends.removeAll { $0.id == friend.id }
+                }
+            }
+        } message: {
+            if let friend = friendToDelete {
+                Text("Are you sure you want to remove \(friend.displayName) from your friends?")
+            }
+        }
+    }
 }
