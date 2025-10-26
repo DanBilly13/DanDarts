@@ -67,10 +67,6 @@ struct AsyncAvatarImage: View {
                     .foregroundColor(Color("TextSecondary"))
             }
         }
-        .overlay(
-            Circle()
-                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-        )
     }
 }
 

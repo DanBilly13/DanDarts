@@ -66,7 +66,7 @@ struct AddGuestPlayerView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(Color("TextPrimary"))
                         
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 4), spacing: 20) {
                             ForEach(avatarOptions, id: \.id) { option in
                                 Button(action: {
                                     selectedAvatar = option.id
@@ -74,7 +74,7 @@ struct AddGuestPlayerView: View {
                                     AvatarOptionView(
                                         option: option,
                                         isSelected: selectedAvatar == option.id,
-                                        size: 60
+                                        size: 70
                                     )
                                 }
                                 .buttonStyle(PlainButtonStyle())
@@ -82,47 +82,38 @@ struct AddGuestPlayerView: View {
                         }
                     }
                     // Display Name Field
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Display Name")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                        
-                        TextField("Enter full name", text: $displayName)
-                            .textFieldStyle(DartTextFieldStyle())
-                            .disableAutocorrection(true)
-                            .onChange(of: displayName) { _, newValue in
-                                validateDisplayName(newValue)
-                            }
-                        
-                        if !displayNameError.isEmpty {
-                            Text(displayNameError)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("AccentSecondary"))
-                        }
+                    DartTextField(
+                        label: "Display Name",
+                        placeholder: "Enter full name",
+                        text: $displayName,
+                        errorMessage: displayNameError.isEmpty ? nil : displayNameError,
+                        textContentType: .name,
+                        autocapitalization: .words,
+                        autocorrectionDisabled: true
+                    )
+                    .onChange(of: displayName) { _, newValue in
+                        validateDisplayName(newValue)
                     }
                     
                     // Nickname Field
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Nickname")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                        
-                        TextField("Enter nickname", text: $nickname)
-                            .textFieldStyle(DartTextFieldStyle())
-                            .disableAutocorrection(true)
-                            .onChange(of: nickname) { _, newValue in
-                                validateNickname(newValue)
-                            }
-                        
-                        if !nicknameError.isEmpty {
-                            Text(nicknameError)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("AccentSecondary"))
+                        DartTextField(
+                            label: "Nickname",
+                            placeholder: "Enter nickname",
+                            text: $nickname,
+                            errorMessage: nicknameError.isEmpty ? nil : nicknameError,
+                            textContentType: .nickname,
+                            autocapitalization: .never,
+                            autocorrectionDisabled: true
+                        )
+                        .onChange(of: nickname) { _, newValue in
+                            validateNickname(newValue)
                         }
                         
                         Text("Used for quick identification during games")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(Color("TextSecondary"))
+                            .padding(.leading, 2)
                     }
                 }
                 .padding(.top, 32)
@@ -242,24 +233,6 @@ struct AddGuestPlayerView: View {
             isLoading = false
             dismiss()
         }
-    }
-}
-
-// MARK: - Custom Text Field Style
-
-struct DartTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color("InputBackground"))
-            /*.overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-            )*/
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .font(.system(size: 16, weight: .medium))
-            .foregroundColor(Color("TextPrimary"))
     }
 }
 

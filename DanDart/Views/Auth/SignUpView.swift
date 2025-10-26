@@ -21,8 +21,6 @@ struct SignUpView: View {
     // MARK: - UI State
     @State private var showErrors = false
     @State private var errorMessage = ""
-    @State private var showPassword = false
-    @State private var showConfirmPassword = false
     
     // MARK: - Computed Properties
     private var isFormValid: Bool {
@@ -63,25 +61,13 @@ struct SignUpView: View {
                     // Form Section
                     VStack(spacing: 20) {
                         // Display Name TextField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Display Name")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            TextField("Your full name", text: $displayName)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextPrimary"))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .background(Color("InputBackground"))
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                                )
-                                .textContentType(.name)
-                                .autocapitalization(.words)
-                        }
+                        DartTextField(
+                            label: "Display Name",
+                            placeholder: "Your full name",
+                            text: $displayName,
+                            textContentType: .name,
+                            autocapitalization: .words
+                        )
                         
                         // Nickname TextField
                         VStack(alignment: .leading, spacing: 8) {
@@ -114,116 +100,38 @@ struct SignUpView: View {
                         }
                         
                         // Email TextField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            TextField("Enter your email", text: $email)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextPrimary"))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .background(Color("InputBackground"))
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                                )
-                                .keyboardType(.emailAddress)
-                                .textContentType(.emailAddress)
-                                .autocapitalization(.none)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                .submitLabel(.next)
-                                .onChange(of: email) { oldValue, newValue in
-                                    // Fix Swedish keyboard @ symbol issue
-                                    let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
-                                    if correctedEmail != newValue {
-                                        email = correctedEmail
-                                    }
-                                }
+                        DartTextField(
+                            label: "Email",
+                            placeholder: "Enter your email",
+                            text: $email,
+                            keyboardType: .emailAddress,
+                            textContentType: .emailAddress,
+                            autocapitalization: .never,
+                            autocorrectionDisabled: true
+                        )
+                        .onChange(of: email) { oldValue, newValue in
+                            // Fix Swedish keyboard @ symbol issue
+                            let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
+                            if correctedEmail != newValue {
+                                email = correctedEmail
+                            }
                         }
                         
                         // Password SecureField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Password")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            HStack {
-                                if showPassword {
-                                    TextField("Create a password", text: $password)
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(Color("TextPrimary"))
-                                        .textContentType(.newPassword)
-                                        .autocapitalization(.none)
-                                        .autocorrectionDisabled()
-                                } else {
-                                    SecureField("Create a password", text: $password)
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(Color("TextPrimary"))
-                                        .textContentType(.newPassword)
-                                }
-                                
-                                Button(action: {
-                                    showPassword.toggle()
-                                }) {
-                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                        .font(.system(size: 16))
-                                        .foregroundColor(Color("TextSecondary"))
-                                }
-                                .padding(.trailing, 16)
-                            }
-                            .padding(.leading, 16)
-                            .padding(.vertical, 14)
-                            .background(Color("InputBackground"))
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                            )
-                        }
+                        DartSecureField(
+                            label: "Password",
+                            placeholder: "Create a password",
+                            text: $password,
+                            textContentType: .newPassword
+                        )
                         
                         // Confirm Password SecureField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Confirm Password")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            HStack {
-                                if showConfirmPassword {
-                                    TextField("Confirm your password", text: $confirmPassword)
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(Color("TextPrimary"))
-                                        .textContentType(.newPassword)
-                                        .autocapitalization(.none)
-                                        .autocorrectionDisabled()
-                                } else {
-                                    SecureField("Confirm your password", text: $confirmPassword)
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(Color("TextPrimary"))
-                                        .textContentType(.newPassword)
-                                }
-                                
-                                Button(action: {
-                                    showConfirmPassword.toggle()
-                                }) {
-                                    Image(systemName: showConfirmPassword ? "eye.slash.fill" : "eye.fill")
-                                        .font(.system(size: 16))
-                                        .foregroundColor(Color("TextSecondary"))
-                                }
-                                .padding(.trailing, 16)
-                            }
-                            .padding(.leading, 16)
-                            .padding(.vertical, 14)
-                            .background(Color("InputBackground"))
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                            )
-                        }
+                        DartSecureField(
+                            label: "Confirm Password",
+                            placeholder: "Confirm your password",
+                            text: $confirmPassword,
+                            textContentType: .newPassword
+                        )
                         
                         // Password Requirements
                         VStack(alignment: .leading, spacing: 4) {

@@ -603,6 +603,51 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Update user profile with display name and avatar URL (for EditProfileView)
+    /// - Parameters:
+    ///   - displayName: User's display name
+    ///   - avatarURL: Avatar URL (can be Supabase URL or predefined avatar)
+    func updateProfile(displayName: String, avatarURL: String) async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let currentUser = currentUser else {
+            throw AuthError.userNotFound
+        }
+        
+        do {
+            // Validate display name
+            let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty && trimmedName.count >= 2 && trimmedName.count <= 50 else {
+                throw AuthError.invalidDisplayName
+            }
+            
+            // Create updated user object
+            var updatedUser = currentUser
+            updatedUser.displayName = trimmedName
+            updatedUser.avatarURL = avatarURL
+            updatedUser.lastSeenAt = Date()
+            
+            // Update user profile in Supabase
+            try await supabaseService.client
+                .from("users")
+                .update(updatedUser)
+                .eq("id", value: currentUser.id)
+                .execute()
+            
+            // Update local state
+            self.currentUser = updatedUser
+            print("✅ Profile updated: \(updatedUser.displayName)")
+            
+        } catch let error as PostgrestError {
+            throw AuthError.networkError
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            throw AuthError.networkError
+        }
+    }
+    
     // MARK: - Private Helper Methods
     
     /// Validate sign up input parameters

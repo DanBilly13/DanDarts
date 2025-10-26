@@ -466,23 +466,11 @@ struct PlayerStatBar: View {
                 .frame(height: 20)
                 
                 // Player avatar (overlaid on left edge)
-                ZStack {
-                    Circle()
-                        .fill(Color("InputBackground"))
-                        .frame(width: 20, height: 20)
-                    
-                    if let avatarURL = player.avatarURL {
-                        Image(avatarURL)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 18, height: 18)
-                            .clipShape(Circle())
-                    } else {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(playerColor)
-                    }
-                }
+                AsyncAvatarImage(
+                    avatarURL: player.avatarURL,
+                    size: 20,
+                    placeholderIcon: "person.circle.fill"
+                )
                 .overlay(
                     Circle()
                         .stroke(Color("BackgroundPrimary"), lineWidth: 1)

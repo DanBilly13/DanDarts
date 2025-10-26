@@ -13,10 +13,7 @@ struct ProfileView: View {
     @StateObject private var soundManager = SoundManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var selectedAvatarImage: UIImage?
-    @State private var isUploadingAvatar: Bool = false
-    @State private var uploadError: String?
+    @State private var showEditProfile: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -25,10 +22,7 @@ struct ProfileView: View {
                     // Profile Header (Reusable Component)
                     if let currentUser = authService.currentUser {
                         ProfileHeaderView(
-                            player: currentUser.toPlayer(),
-                            showEditButton: true,
-                            selectedPhotoItem: $selectedPhotoItem,
-                            selectedAvatarImage: selectedAvatarImage
+                            player: currentUser.toPlayer()
                         )
                         .padding(.top, 24)
                     }
@@ -67,59 +61,9 @@ struct ProfileView: View {
             } message: {
                 Text("Are you sure you want to log out?")
             }
-            .onChange(of: selectedPhotoItem) { _, newItem in
-                Task {
-                    // Load the image data
-                    guard let data = try? await newItem?.loadTransferable(type: Data.self),
-                          let uiImage = UIImage(data: data) else {
-                        return
-                    }
-                    
-                    // Show the selected image immediately
-                    selectedAvatarImage = uiImage
-                    
-                    // Upload to Supabase Storage
-                    isUploadingAvatar = true
-                    uploadError = nil
-                    
-                    do {
-                        // Resize image to max 512x512 (good for avatars, keeps file size small)
-                        let resizedImage = uiImage.resized(toMaxDimension: 512)
-                        
-                        // Compress image to JPEG with 0.8 quality
-                        guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
-                            throw NSError(domain: "ImageCompression", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to compress image"])
-                        }
-                        
-                        print("📦 Original image size: \(data.count / 1024)KB, Compressed: \(jpegData.count / 1024)KB")
-                        
-                        // Upload avatar
-                        let avatarURL = try await authService.uploadAvatar(imageData: jpegData)
-                        print("✅ Avatar uploaded successfully: \(avatarURL)")
-                        
-                        // Clear selected image after successful upload
-                        selectedAvatarImage = nil
-                        
-                    } catch {
-                        print("❌ Avatar upload error: \(error)")
-                        uploadError = "Failed to upload avatar. Please try again."
-                        
-                        // Keep the selected image visible on error
-                        // User can try again or dismiss
-                    }
-                    
-                    isUploadingAvatar = false
-                }
-            }
-            .alert("Upload Error", isPresented: .constant(uploadError != nil)) {
-                Button("OK") {
-                    uploadError = nil
-                    selectedAvatarImage = nil
-                }
-            } message: {
-                if let error = uploadError {
-                    Text(error)
-                }
+            .sheet(isPresented: $showEditProfile) {
+                EditProfileView()
+                    .environmentObject(authService)
             }
         }
     }
@@ -138,7 +82,7 @@ struct ProfileView: View {
                     title: "Edit Profile",
                     showChevron: true
                 ) {
-                    // TODO: Navigate to edit profile
+                    showEditProfile = true
                 }
                 
                 Divider()

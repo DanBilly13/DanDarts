@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ProfileSetupView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,24 +14,13 @@ struct ProfileSetupView: View {
     
     // MARK: - Form State
     @State private var selectedAvatar: String = "avatar1" // Default to first avatar
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedAvatarImage: UIImage?
     
     // MARK: - UI State
     @State private var errorMessage = ""
     @State private var isCompleting = false
-    
-    // MARK: - Avatar Options (same as AddGuestPlayerView)
-    private let avatarOptions: [AvatarOption] = [
-        // Asset avatars
-        AvatarOption(id: "avatar1", type: .asset),
-        AvatarOption(id: "avatar2", type: .asset),
-        AvatarOption(id: "avatar3", type: .asset),
-        AvatarOption(id: "avatar4", type: .asset),
-        // SF Symbol avatars
-        AvatarOption(id: "person.circle.fill", type: .symbol),
-        AvatarOption(id: "person.crop.circle.fill", type: .symbol),
-        AvatarOption(id: "figure.wave.circle.fill", type: .symbol),
-        AvatarOption(id: "person.2.circle.fill", type: .symbol)
-    ]
+    @State private var isUploadingAvatar = false
     
     var body: some View {
         NavigationView {
@@ -42,32 +32,19 @@ struct ProfileSetupView: View {
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(Color("TextPrimary"))
                         
-                        Text("Pick an avatar to personalize your profile")
+                        Text("Upload your own photo or pick an avatar")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(Color("TextSecondary"))
                             .multilineTextAlignment(.center)
                     }
                     .padding(.top, 20)
                     
-                    // Avatar Selection (same as AddGuestPlayerView)
-                    VStack(spacing: 20) {
-                        // Avatar Options Grid
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
-                            ForEach(avatarOptions, id: \.id) { option in
-                                Button(action: {
-                                    selectedAvatar = option.id
-                                }) {
-                                    AvatarOptionView(
-                                        option: option,
-                                        isSelected: selectedAvatar == option.id,
-                                        size: 70
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                        .padding(.horizontal, 32)
-                    }
+                    // Avatar Selection Component
+                    AvatarSelectionView(
+                        selectedAvatar: $selectedAvatar,
+                        selectedPhotoItem: $selectedPhotoItem,
+                        selectedAvatarImage: $selectedAvatarImage
+                    )
                     
                     
                     // Error Message
@@ -137,21 +114,62 @@ struct ProfileSetupView: View {
                     .disabled(isCompleting)
                 }
             }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                Task {
+                    await handlePhotoSelection(newItem)
+                }
+            }
         }
+        .navigationBarBackButtonHidden(true)
     }
     
     // MARK: - Actions
+    
+    private func handlePhotoSelection(_ item: PhotosPickerItem?) async {
+        guard let item = item else { return }
+        
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else {
+                return
+            }
+            
+            selectedAvatarImage = uiImage
+        } catch {
+            print("Failed to load photo")
+            errorMessage = "Failed to load photo. Please try again."
+        }
+    }
+    
     private func handleCompleteSetup() async {
         errorMessage = ""
         isCompleting = true
         defer { isCompleting = false }
         
         do {
-            // Update user profile with selected avatar
+            var avatarURL = selectedAvatar
+            
+            // Upload photo if one was selected
+            if let selectedImage = selectedAvatarImage {
+                isUploadingAvatar = true
+                
+                // Resize and compress image
+                let resizedImage = selectedImage.resized(toMaxDimension: 512)
+                guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                    throw NSError(domain: "ImageError", code: -1)
+                }
+                
+                // Upload to Supabase
+                avatarURL = try await authService.uploadAvatar(imageData: jpegData)
+                
+                isUploadingAvatar = false
+            }
+            
+            // Update user profile with avatar
             try await authService.updateProfile(
-                handle: nil, // Handle not needed - nickname already set during signup
-                bio: nil, // Bio removed
-                avatarIcon: selectedAvatar
+                handle: nil,
+                bio: nil,
+                avatarIcon: avatarURL
             )
             
             // Navigate to main app

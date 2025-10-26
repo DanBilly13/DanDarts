@@ -40,38 +40,30 @@ struct SignInView: View {
                     // Form Section
                     VStack(spacing: 20) {
                         // Email TextField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            TextField("Enter your email", text: $email)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .keyboardType(.emailAddress)
-                                .textContentType(.emailAddress)
-                                .autocapitalization(.none)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                .submitLabel(.next)
-                                .onChange(of: email) { oldValue, newValue in
-                                    // Fix Swedish keyboard @ symbol issue
-                                    let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
-                                    if correctedEmail != newValue {
-                                        email = correctedEmail
-                                    }
-                                }
+                        DartTextField(
+                            label: "Email",
+                            placeholder: "Enter your email",
+                            text: $email,
+                            keyboardType: .emailAddress,
+                            textContentType: .emailAddress,
+                            autocapitalization: .never,
+                            autocorrectionDisabled: true
+                        )
+                        .onChange(of: email) { oldValue, newValue in
+                            // Fix Swedish keyboard @ symbol issue
+                            let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
+                            if correctedEmail != newValue {
+                                email = correctedEmail
+                            }
                         }
                         
                         // Password SecureField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Password")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            SecureField("Enter your password", text: $password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .textContentType(.password)
-                        }
+                        DartSecureField(
+                            label: "Password",
+                            placeholder: "Enter your password",
+                            text: $password,
+                            textContentType: .password
+                        )
                         
                         // Forgot Password Link
                         HStack {
@@ -302,22 +294,6 @@ struct SignInView: View {
 }
 
 // MARK: - Custom Styles
-
-struct CustomTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .font(.system(size: 16, weight: .medium))
-            .foregroundColor(Color("TextPrimary"))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color("InputBackground"))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-            )
-    }
-}
 
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
