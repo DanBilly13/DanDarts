@@ -40,6 +40,8 @@ struct DartTextField: View {
     var textContentType: UITextContentType? = nil
     var autocapitalization: TextInputAutocapitalization = .sentences
     var autocorrectionDisabled: Bool = false
+    var submitLabel: SubmitLabel = .done
+    var onSubmit: (() -> Void)? = nil
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -55,6 +57,10 @@ struct DartTextField: View {
                 .textContentType(textContentType)
                 .textInputAutocapitalization(autocapitalization)
                 .autocorrectionDisabled(autocorrectionDisabled)
+                .submitLabel(submitLabel)
+                .onSubmit {
+                    onSubmit?()
+                }
             
             // Error Message
             if let error = errorMessage, !error.isEmpty {

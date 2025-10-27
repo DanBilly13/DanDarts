@@ -14,6 +14,8 @@ struct EditProfileView: View {
     
     // MARK: - Form State
     @State private var displayName: String = ""
+    @State private var nickname: String = ""
+    @State private var email: String = ""
     @State private var selectedAvatar: String = "avatar1"
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedAvatarImage: UIImage?
@@ -23,12 +25,32 @@ struct EditProfileView: View {
     @State private var isUploadingAvatar: Bool = false
     @State private var errorMessage: String = ""
     @State private var showSuccessAlert: Bool = false
+    @FocusState private var focusedField: Field?
+    
+    // MARK: - Field Focus
+    enum Field {
+        case name, nickname, email
+    }
+    
+    // MARK: - Computed Properties
+    private var isGoogleUser: Bool {
+        authService.currentUser?.authProvider == .google
+    }
     
     // MARK: - Validation
     private var isValid: Bool {
-        !displayName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        displayName.count >= 2 &&
-        displayName.count <= 50
+        let nameValid = !displayName.trimmingCharacters(in: .whitespaces).isEmpty &&
+                       displayName.count >= 2 &&
+                       displayName.count <= 50
+        
+        let nicknameValid = !nickname.trimmingCharacters(in: .whitespaces).isEmpty &&
+                           nickname.count >= 2 &&
+                           nickname.count <= 20
+        
+        let emailValid = !email.trimmingCharacters(in: .whitespaces).isEmpty &&
+                        email.contains("@")
+        
+        return nameValid && nicknameValid && emailValid
     }
     
     var body: some View {
@@ -49,20 +71,103 @@ struct EditProfileView: View {
                         )
                     }
                     
-                    // Display Name Field
+                    // Name Field (locked for Google users)
+                    if isGoogleUser {
+                        LockedTextField(
+                            label: "Name",
+                            value: displayName
+                        )
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            DartTextField(
+                                label: "Name",
+                                placeholder: "Enter your name",
+                                text: $displayName,
+                                textContentType: .name,
+                                autocapitalization: .words,
+                                onSubmit: {
+                                    focusedField = nil
+                                }
+                            )
+                            
+                            // Show character count only when approaching limit or invalid
+                            if displayName.count > 45 || displayName.count < 2 && !displayName.isEmpty {
+                                Text("\(displayName.count)/50 characters")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(displayName.count > 50 || displayName.count < 2 ? .red : Color("TextSecondary"))
+                                    .padding(.leading, 2)
+                            }
+                        }
+                    }
+                    
+                    // Nickname Field (always editable)
                     VStack(alignment: .leading, spacing: 8) {
                         DartTextField(
-                            label: "Display Name",
-                            placeholder: "Enter your name",
-                            text: $displayName,
-                            textContentType: .name,
-                            autocapitalization: .words
+                            label: "Nickname",
+                            placeholder: "Your game nickname",
+                            text: $nickname,
+                            autocapitalization: .never,
+                            autocorrectionDisabled: true,
+                            onSubmit: {
+                                focusedField = nil
+                            }
                         )
                         
-                        Text("\(displayName.count)/50 characters")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                            .padding(.leading, 2)
+                        // Show character count only when approaching limit or invalid
+                        if nickname.count > 15 || nickname.count < 2 && !nickname.isEmpty {
+                            Text("\(nickname.count)/20 characters")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(nickname.count > 20 || nickname.count < 2 ? .red : Color("TextSecondary"))
+                                .padding(.leading, 2)
+                        }
+                    }
+                    
+                    // Email Field (locked for Google users)
+                    if isGoogleUser {
+                        LockedTextField(
+                            label: "Email",
+                            value: email
+                        )
+                    } else {
+                        DartTextField(
+                            label: "Email",
+                            placeholder: "Enter your email",
+                            text: $email,
+                            keyboardType: .emailAddress,
+                            textContentType: .emailAddress,
+                            autocapitalization: .never,
+                            autocorrectionDisabled: true,
+                            onSubmit: {
+                                focusedField = nil
+                            }
+                        )
+                    }
+                    
+                    // Change Password Button (email users only)
+                    if !isGoogleUser {
+                        Button(action: {
+                            // TODO: Implement change password flow
+                            print("Change password tapped")
+                        }) {
+                            HStack {
+                                Image(systemName: "lock.rotation")
+                                    .font(.system(size: 16, weight: .medium))
+                                Text("Change Password")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(Color("TextPrimary"))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(Color("InputBackground"))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                            )
+                        }
                     }
                     
                     // Error Message
@@ -111,6 +216,16 @@ struct EditProfileView: View {
             }
             .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focusedField = nil // Dismiss keyboard
+                    }
+                    .foregroundColor(Color("AccentPrimary"))
+                    .fontWeight(.semibold)
+                }
+            }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .onAppear {
                 loadCurrentProfile()
@@ -136,11 +251,35 @@ struct EditProfileView: View {
         guard let currentUser = authService.currentUser else { return }
         
         displayName = currentUser.displayName
+        nickname = currentUser.nickname
+        email = currentUser.email ?? ""
         
-        // Set avatar if it's a predefined one
-        if let avatarURL = currentUser.avatarURL,
-           !avatarURL.hasPrefix("http://") && !avatarURL.hasPrefix("https://") {
-            selectedAvatar = avatarURL
+        // Set avatar
+        if let avatarURL = currentUser.avatarURL {
+            if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
+                // It's a custom uploaded image - download it
+                Task {
+                    await loadCustomAvatar(from: avatarURL)
+                }
+            } else {
+                // It's a predefined avatar
+                selectedAvatar = avatarURL
+            }
+        }
+    }
+    
+    private func loadCustomAvatar(from urlString: String) async {
+        guard let url = URL(string: urlString) else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    selectedAvatarImage = image
+                }
+            }
+        } catch {
+            print("Failed to load custom avatar: \(error.localizedDescription)")
         }
     }
     
@@ -188,6 +327,8 @@ struct EditProfileView: View {
             // Update profile
             try await authService.updateProfile(
                 displayName: displayName.trimmingCharacters(in: .whitespaces),
+                nickname: nickname.trimmingCharacters(in: .whitespaces),
+                email: isGoogleUser ? nil : email.trimmingCharacters(in: .whitespaces),
                 avatarURL: avatarURL
             )
             
@@ -204,7 +345,12 @@ struct EditProfileView: View {
 }
 
 // MARK: - Preview
-#Preview {
+#Preview("Email User") {
     EditProfileView()
-        .environmentObject(AuthService.mockAuthenticated)
+        .environmentObject(AuthService.mockEmailUser)
+}
+
+#Preview("Google User") {
+    EditProfileView()
+        .environmentObject(AuthService.mockGoogleUser)
 }

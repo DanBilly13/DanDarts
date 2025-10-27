@@ -13,6 +13,8 @@ struct AvatarSelectionView: View {
     @Binding var selectedPhotoItem: PhotosPickerItem?
     @Binding var selectedAvatarImage: UIImage?
     
+    @State private var scrollPosition: String? = "camera"
+    
     // MARK: - Avatar Options
     private let avatarOptions: [AvatarOption] = [
         // Asset avatars
@@ -23,81 +25,42 @@ struct AvatarSelectionView: View {
         // SF Symbol avatars
         AvatarOption(id: "person.circle.fill", type: .symbol),
         AvatarOption(id: "person.crop.circle.fill", type: .symbol),
-        AvatarOption(id: "figure.wave.circle.fill", type: .symbol),
-        AvatarOption(id: "person.2.circle.fill", type: .symbol)
+        AvatarOption(id: "figure.wave.circle.fill", type: .symbol)
     ]
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Upload Photo Option
-            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                VStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color("InputBackground"))
-                            .frame(width: 100, height: 100)
-                        
-                        if let selectedImage = selectedAvatarImage {
-                            Image(uiImage: selectedImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                        } else {
-                            VStack(spacing: 8) {
+        ZStack(alignment: .leading) {
+            // Horizontal Scrolling Row (Behind)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    // Camera Upload Option (First in scroll)
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        ZStack {
+                            Circle()
+                                .fill(Color("InputBackground"))
+                                .frame(width: 64, height: 64)
+                            
+                            if let selectedImage = selectedAvatarImage {
+                                // Show uploaded image
+                                Image(uiImage: selectedImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 64, height: 64)
+                                    .clipShape(Circle())
+                            } else {
+                                // Show camera icon
                                 Image(systemName: "camera.fill")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundColor(Color("AccentPrimary"))
-                                
-                                Text("Upload Photo")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 20, weight: .medium))
                                     .foregroundColor(Color("AccentPrimary"))
                             }
                         }
                     }
-                    .overlay(
-                        Circle()
-                            .stroke(selectedAvatarImage != nil ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3), lineWidth: 2)
-                    )
+                    .buttonStyle(PlainButtonStyle())
+                    .scaleEffect(scrollPosition == "camera" ? 1.25 : 0.8)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
+                    .id("camera")
                     
-                    if selectedAvatarImage != nil {
-                        Button(action: {
-                            selectedAvatarImage = nil
-                            selectedPhotoItem = nil
-                        }) {
-                            Text("Remove Photo")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.red)
-                        }
-                    }
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            // Divider
-            HStack {
-                Rectangle()
-                    .fill(Color("TextSecondary").opacity(0.3))
-                    .frame(height: 1)
-                
-                Text("OR")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color("TextSecondary"))
-                    .padding(.horizontal, 8)
-                
-                Rectangle()
-                    .fill(Color("TextSecondary").opacity(0.3))
-                    .frame(height: 1)
-            }
-            .padding(.horizontal, 32)
-            
-            // Predefined Avatar Options
-            VStack(spacing: 12) {
-                Text("Choose an Avatar")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color("TextPrimary"))
-                
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 4), spacing: 20) {
+                    // Predefined Avatar Options
                     ForEach(avatarOptions, id: \.id) { option in
                         Button(action: {
                             selectedAvatar = option.id
@@ -107,15 +70,35 @@ struct AvatarSelectionView: View {
                         }) {
                             AvatarOptionView(
                                 option: option,
-                                isSelected: selectedAvatar == option.id && selectedAvatarImage == nil,
-                                size: 70
+                                isSelected: false,
+                                size: 64
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(scrollPosition == option.id ? 1.25 : 0.8)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
+                        .id(option.id)
                     }
                 }
+                .scrollTargetLayout()
+                .padding(.leading, 8)
+                .padding(.trailing, UIScreen.main.bounds.width - 96) // Leave space for last items to scroll into circle
             }
-            .padding(.horizontal, 24)
+            .scrollPosition(id: $scrollPosition)
+            .scrollTargetBehavior(.viewAligned)
+            
+            // Fixed Selection Circle Overlay (On Top)
+            Circle()
+                .stroke(Color("AccentPrimary"), lineWidth: 3)
+                .frame(width: 80, height: 80)
+                .allowsHitTesting(false) // Let touches pass through to avatars below
+        }
+        .frame(height: 100)
+        .onChange(of: selectedAvatarImage) { _, newImage in
+            // When custom image is selected, scroll to camera position
+            if newImage != nil {
+                scrollPosition = "camera"
+            }
         }
     }
 }

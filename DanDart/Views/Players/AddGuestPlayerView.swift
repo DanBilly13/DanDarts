@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import PhotosUI
 
 struct AddGuestPlayerView: View {
     @Environment(\.dismiss) private var dismiss
@@ -15,25 +16,13 @@ struct AddGuestPlayerView: View {
     @State private var displayName: String = ""
     @State private var nickname: String = ""
     @State private var selectedAvatar: String = "avatar1" // Default to first avatar
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedAvatarImage: UIImage?
     
     // Validation state
     @State private var displayNameError: String = ""
     @State private var nicknameError: String = ""
     @State private var isLoading: Bool = false
-    
-    // Avatar options: 4 assets + 4 SF Symbols
-    private let avatarOptions: [AvatarOption] = [
-        // Asset avatars
-        AvatarOption(id: "avatar1", type: .asset),
-        AvatarOption(id: "avatar2", type: .asset),
-        AvatarOption(id: "avatar3", type: .asset),
-        AvatarOption(id: "avatar4", type: .asset),
-        // SF Symbol avatars
-        AvatarOption(id: "person.circle.fill", type: .symbol),
-        AvatarOption(id: "person.crop.circle.fill", type: .symbol),
-        AvatarOption(id: "figure.wave.circle.fill", type: .symbol),
-        AvatarOption(id: "person.2.circle.fill", type: .symbol)
-    ]
     
     // Callback for when player is created
     let onPlayerCreated: (Player) -> Void
@@ -62,24 +51,15 @@ struct AddGuestPlayerView: View {
                 VStack(spacing: 24) {
                     // Avatar Selection
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Choose Avatar")
+                        Text("Profile Picture")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(Color("TextPrimary"))
                         
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 4), spacing: 20) {
-                            ForEach(avatarOptions, id: \.id) { option in
-                                Button(action: {
-                                    selectedAvatar = option.id
-                                }) {
-                                    AvatarOptionView(
-                                        option: option,
-                                        isSelected: selectedAvatar == option.id,
-                                        size: 70
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
+                        AvatarSelectionView(
+                            selectedAvatar: $selectedAvatar,
+                            selectedPhotoItem: $selectedPhotoItem,
+                            selectedAvatarImage: $selectedAvatarImage
+                        )
                     }
                     // Display Name Field
                     DartTextField(

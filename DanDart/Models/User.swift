@@ -7,12 +7,20 @@
 
 import Foundation
 
+/// Authentication provider type
+enum AuthProvider: String, Codable {
+    case email = "email"
+    case google = "google"
+}
+
 struct User: Codable, Identifiable {
     let id: UUID
     var displayName: String
-    let nickname: String
+    var nickname: String
+    var email: String?
     var handle: String?
     var avatarURL: String?
+    var authProvider: AuthProvider?
     let createdAt: Date
     var lastSeenAt: Date?
     
@@ -25,8 +33,10 @@ struct User: Codable, Identifiable {
         case id
         case displayName = "display_name"
         case nickname
+        case email
         case handle
         case avatarURL = "avatar_url"
+        case authProvider = "auth_provider"
         case createdAt = "created_at"
         case lastSeenAt = "last_seen_at"
     }
@@ -69,8 +79,10 @@ extension User {
         id: UUID(),
         displayName: "Dan Billingham",
         nickname: "danbilly",
+        email: "dan@example.com",
         handle: "@thearrow",
         avatarURL: "avatar1",
+        authProvider: .email,
         createdAt: Date().addingTimeInterval(-86400 * 30), // 30 days ago
         lastSeenAt: Date().addingTimeInterval(-3600), // 1 hour ago
         totalWins: 15,
@@ -81,8 +93,10 @@ extension User {
         id: UUID(),
         displayName: "Sarah Connor",
         nickname: "terminator",
+        email: "sarah@gmail.com",
         handle: nil,
         avatarURL: "avatar2",
+        authProvider: .google,
         createdAt: Date().addingTimeInterval(-86400 * 60), // 60 days ago
         lastSeenAt: Date().addingTimeInterval(-1800), // 30 minutes ago
         totalWins: 22,
@@ -93,8 +107,10 @@ extension User {
         id: UUID(),
         displayName: "Mike \"The Dart\" Johnson",
         nickname: "dartmaster",
+        email: "mike@example.com",
         handle: "@180king",
         avatarURL: "avatar3",
+        authProvider: .email,
         createdAt: Date().addingTimeInterval(-86400 * 90), // 90 days ago
         lastSeenAt: Date().addingTimeInterval(-86400), // 1 day ago
         totalWins: 45,

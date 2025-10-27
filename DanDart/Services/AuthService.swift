@@ -115,8 +115,10 @@ class AuthService: ObservableObject {
                 id: userId,
                 displayName: displayName,
                 nickname: nickname,
+                email: email,
                 handle: nil, // Can be set later in profile setup
                 avatarURL: nil,
+                authProvider: .email,
                 createdAt: Date(),
                 lastSeenAt: Date(),
                 totalWins: 0,
@@ -376,8 +378,10 @@ class AuthService: ObservableObject {
                     id: userId,
                     displayName: googleName.isEmpty ? "Google User" : googleName,
                     nickname: uniqueNickname,
+                    email: googleEmail,
                     handle: nil, // Will be set in Profile Setup
                     avatarURL: googleAvatarURL,
+                    authProvider: .google,
                     createdAt: Date(),
                     lastSeenAt: Date(),
                     totalWins: 0,
@@ -638,6 +642,71 @@ class AuthService: ObservableObject {
             // Update local state
             self.currentUser = updatedUser
             print("✅ Profile updated: \(updatedUser.displayName)")
+            
+        } catch let error as PostgrestError {
+            throw AuthError.networkError
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            throw AuthError.networkError
+        }
+    }
+    
+    /// Update user profile with all editable fields (for comprehensive EditProfileView)
+    /// - Parameters:
+    ///   - displayName: User's display name
+    ///   - nickname: User's nickname for games
+    ///   - email: User's email (nil for Google users - not editable)
+    ///   - avatarURL: Avatar URL (can be Supabase URL or predefined avatar)
+    func updateProfile(displayName: String, nickname: String, email: String?, avatarURL: String) async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let currentUser = currentUser else {
+            throw AuthError.userNotFound
+        }
+        
+        do {
+            // Validate display name
+            let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty && trimmedName.count >= 2 && trimmedName.count <= 50 else {
+                throw AuthError.invalidDisplayName
+            }
+            
+            // Validate nickname
+            let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedNickname.isEmpty && trimmedNickname.count >= 2 && trimmedNickname.count <= 20 else {
+                throw AuthError.invalidNickname
+            }
+            
+            // Validate email if provided (not provided for Google users)
+            if let email = email {
+                let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedEmail.isEmpty && trimmedEmail.contains("@") else {
+                    throw AuthError.invalidEmail
+                }
+            }
+            
+            // Create updated user object
+            var updatedUser = currentUser
+            updatedUser.displayName = trimmedName
+            updatedUser.nickname = trimmedNickname
+            if let email = email {
+                updatedUser.email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            updatedUser.avatarURL = avatarURL
+            updatedUser.lastSeenAt = Date()
+            
+            // Update user profile in Supabase
+            try await supabaseService.client
+                .from("users")
+                .update(updatedUser)
+                .eq("id", value: currentUser.id)
+                .execute()
+            
+            // Update local state
+            self.currentUser = updatedUser
+            print("✅ Profile updated: \(updatedUser.displayName) (@\(updatedUser.nickname))")
             
         } catch let error as PostgrestError {
             throw AuthError.networkError
@@ -921,6 +990,24 @@ extension AuthService {
         service.currentUser = nil
         service.isAuthenticated = false
         service.isLoading = true
+        return service
+    }
+    
+    /// Create a mock email user auth service for previews (all fields editable)
+    static var mockEmailUser: AuthService {
+        let service = AuthService()
+        service.currentUser = User.mockUser1 // mockUser1 is email user
+        service.isAuthenticated = true
+        service.isLoading = false
+        return service
+    }
+    
+    /// Create a mock Google user auth service for previews (name/email locked)
+    static var mockGoogleUser: AuthService {
+        let service = AuthService()
+        service.currentUser = User.mockUser2 // mockUser2 is Google user
+        service.isAuthenticated = true
+        service.isLoading = false
         return service
     }
 }
