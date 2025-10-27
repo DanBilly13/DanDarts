@@ -216,16 +216,6 @@ struct EditProfileView: View {
             }
             .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        focusedField = nil // Dismiss keyboard
-                    }
-                    .foregroundColor(Color("AccentPrimary"))
-                    .fontWeight(.semibold)
-                }
-            }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .onAppear {
                 loadCurrentProfile()

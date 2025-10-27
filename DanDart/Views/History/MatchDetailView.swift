@@ -79,11 +79,38 @@ struct MatchDetailView: View {
         match.players.firstIndex(where: { $0.id == player.id }) ?? 0
     }
     
+    // Get player color based on index
+    private func playerColor(for index: Int) -> Color {
+        switch index {
+        case 0: return Color("AccentPrimary")
+        case 1: return Color("AccentSecondary")
+        case 2: return Color("AccentTertiary")
+        case 3: return Color("AccentQuaternary")
+        default: return Color("AccentPrimary")
+        }
+    }
+    
     private var statsComparisonSection: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Stats title
             Text("Stats")
                 .font(.title3.weight(.semibold))
                 .foregroundColor(Color("TextPrimary"))
+            
+            // Color key legend
+            HStack(spacing: 12) {
+                ForEach(0..<match.players.count, id: \.self) { index in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(playerColor(for: index))
+                            .frame(width: 12, height: 12)
+                        
+                        Text(match.players[index].displayName)
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(Color("TextSecondary"))
+                    }
+                }
+            }
             
             VStack(spacing: 20) {
                 // Number of turns
@@ -291,14 +318,13 @@ struct MatchPlayerCard: View {
             // Player identity (avatar + name + nickname)
             PlayerIdentity(
                 matchPlayer: player,
-                avatarSize: 48,
-                borderColor: borderColor
+                avatarSize: 48
             )
             
             Spacer()
             
             // Right side - Trophy/Position with legs below
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {
                 // Trophy icon or placement text
                 if isWinner {
                     // Trophy icon - 36px (outline style, thinner stroke)
@@ -325,7 +351,7 @@ struct MatchPlayerCard: View {
                     )
                 } else if !isWinner {
                     // Single-leg game: show "Left on X" for non-winners
-                    Text("Left on \(player.finalScore)")
+                    Text("(\(player.finalScore)pts)")
                         .font(.caption)
                         .foregroundColor(Color("TextSecondary"))
                 }
@@ -448,35 +474,21 @@ struct PlayerStatBar: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Progress bar with avatar overlay
-            ZStack(alignment: .leading) {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        // Background bar (gray)
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color("BackgroundPrimary"))
-                            .frame(height: 20)
-                        
-                        // Filled bar (player's color)
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(playerColor)
-                            .frame(width: geometry.size.width * percentage, height: 20)
-                    }
+            // Progress bar (no avatar)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background bar (gray)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color("BackgroundPrimary"))
+                        .frame(height: 12)
+                    
+                    // Filled bar (player's color)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(playerColor)
+                        .frame(width: geometry.size.width * percentage, height: 12)
                 }
-                .frame(height: 20)
-                
-                // Player avatar (overlaid on left edge)
-                AsyncAvatarImage(
-                    avatarURL: player.avatarURL,
-                    size: 20,
-                    placeholderIcon: "person.circle.fill"
-                )
-                .overlay(
-                    Circle()
-                        .stroke(Color("BackgroundPrimary"), lineWidth: 1)
-                )
-                .offset(x: 0)
             }
+            .frame(height: 12)
             
             // Value (right aligned, rounded up)
             Text(isDecimal && decimalValue != nil ? "\(Int(ceil(decimalValue!)))" : "\(value)")

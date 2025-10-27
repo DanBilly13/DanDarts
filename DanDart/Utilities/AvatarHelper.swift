@@ -97,8 +97,12 @@ struct PlayerAvatarView: View {
             }
         }
         .overlay(
-            Circle()
-                .stroke(borderColor ?? Color("TextSecondary").opacity(0.2), lineWidth: 1)
+            Group {
+                if let borderColor = borderColor {
+                    Circle()
+                        .stroke(borderColor, lineWidth: 1)
+                }
+            }
         )
     }
 }
