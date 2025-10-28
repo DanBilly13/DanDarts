@@ -321,7 +321,7 @@ struct MatchPlayerCard: View {
             Spacer()
             
             // Right side - Trophy/Position with legs below
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 // Trophy icon or placement text
                 if isWinner {
                     // Trophy icon - 36px (outline style, thinner stroke)
@@ -353,7 +353,7 @@ struct MatchPlayerCard: View {
                         .foregroundColor(Color("TextSecondary"))
                 }
             }
-            .frame(width: 44)
+            .frame(width: 52)
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)

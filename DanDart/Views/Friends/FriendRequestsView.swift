@@ -27,7 +27,6 @@ struct FriendRequestsView: View {
                 VStack(spacing: 0) {
                     // Received Requests Section
                     VStack(alignment: .leading, spacing: 12) {
-                        // Section Header
                         Text("Received Requests")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(Color("TextPrimary"))
@@ -35,7 +34,6 @@ struct FriendRequestsView: View {
                             .padding(.top, 12)
                         
                         if isLoading && receivedRequests.isEmpty {
-                            // Loading State
                             HStack {
                                 Spacer()
                                 ProgressView()
@@ -44,7 +42,6 @@ struct FriendRequestsView: View {
                             }
                             .padding(.vertical, 32)
                         } else if receivedRequests.isEmpty {
-                            // Empty State
                             VStack(spacing: 12) {
                                 Image(systemName: "tray")
                                     .font(.system(size: 48, weight: .light))
@@ -57,7 +54,6 @@ struct FriendRequestsView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 32)
                         } else {
-                            // Requests List
                             VStack(spacing: 12) {
                                 ForEach(receivedRequests) { request in
                                     ReceivedRequestCard(
@@ -82,14 +78,12 @@ struct FriendRequestsView: View {
                     
                     // Sent Requests Section
                     VStack(alignment: .leading, spacing: 12) {
-                        // Section Header
                         Text("Sent Requests")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(Color("TextPrimary"))
                             .padding(.horizontal, 16)
                         
                         if isLoading && sentRequests.isEmpty {
-                            // Loading State
                             HStack {
                                 Spacer()
                                 ProgressView()
@@ -98,7 +92,6 @@ struct FriendRequestsView: View {
                             }
                             .padding(.vertical, 32)
                         } else if sentRequests.isEmpty {
-                            // Empty State
                             VStack(spacing: 12) {
                                 Image(systemName: "paperplane")
                                     .font(.system(size: 48, weight: .light))
@@ -111,15 +104,41 @@ struct FriendRequestsView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 32)
                         } else {
-                            // Requests List
+                            // Standalone List with swipe actions (matching GameSetupView pattern)
                             VStack(spacing: 12) {
-                                ForEach(sentRequests) { request in
-                                    SentRequestCard(
-                                        request: request,
-                                        isProcessing: processingRequestId == request.id,
-                                        onWithdraw: { withdrawRequest(request) }
-                                    )
+                                List {
+                                    ForEach(sentRequests) { request in
+                                        SentRequestCard(
+                                            request: request,
+                                            isProcessing: processingRequestId == request.id
+                                        )
+                                        .contentShape(Rectangle())
+                                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button {
+                                                withdrawRequest(request)
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .foregroundColor(.red)
+                                            }
+                                            .tint(.clear)
+                                            
+                                            Button {
+                                                sendAgainRequest(request)
+                                            } label: {
+                                                Image(systemName: "arrow.clockwise")
+                                                    .foregroundColor(Color("AccentSecondary"))
+                                            }
+                                            .tint(.clear)
+                                        }
+                                    }
                                 }
+                                .listStyle(.plain)
+                                .scrollDisabled(true)
+                                .frame(height: CGFloat(sentRequests.count * 92))
+                                .background(Color.clear)
                             }
                             .padding(.horizontal, 16)
                         }
@@ -309,7 +328,7 @@ struct FriendRequestsView: View {
         }
     }
     
-    /// Withdraw a sent friend request (Task 305)
+    /// Withdraw a friend request (Task 305)
     private func withdrawRequest(_ request: FriendRequest) {
         processingRequestId = request.id
         
@@ -335,6 +354,41 @@ struct FriendRequestsView: View {
                 // Error haptic feedback
                 let errorFeedback = UINotificationFeedbackGenerator()
                 errorFeedback.notificationOccurred(.error)
+            }
+        }
+    }
+    
+    /// Send friend request again - Send Again action
+    private func sendAgainRequest(_ request: FriendRequest) {
+        guard let currentUserId = authService.currentUser?.id else { return }
+        
+        processingRequestId = request.id
+        
+        Task {
+            do {
+                // First withdraw the old request
+                try await friendsService.withdrawFriendRequest(requestId: request.id)
+                
+                // Then send a new request
+                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: request.user.id)
+                
+                // Success haptic feedback
+                let successFeedback = UINotificationFeedbackGenerator()
+                successFeedback.notificationOccurred(.success)
+                
+                // Reload requests to show updated timestamp
+                loadRequests()
+                
+                processingRequestId = nil
+                
+            } catch {
+                print("❌ Send again error: \(error)")
+                
+                // Error haptic feedback
+                let errorFeedback = UINotificationFeedbackGenerator()
+                errorFeedback.notificationOccurred(.error)
+                
+                processingRequestId = nil
             }
         }
     }
@@ -402,51 +456,10 @@ struct ReceivedRequestCard: View {
 struct SentRequestCard: View {
     let request: FriendRequest
     let isProcessing: Bool
-    let onWithdraw: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Player Card
-            PlayerCard(player: request.user.toPlayer())
-            
-            // Withdraw Button
-            Button(action: onWithdraw) {
-                ZStack {
-                    if isProcessing {
-                        ProgressView()
-                            .tint(Color("TextSecondary"))
-                    } else {
-                        Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextSecondary"))
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(Color("TextSecondary").opacity(0.15))
-                )
-            }
-            .disabled(isProcessing)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color("InputBackground"))
-        .cornerRadius(12)
-        .overlay(
-            // Time ago label
-            VStack {
-                HStack {
-                    Spacer()
-                    Text(request.timeAgo)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                }
-                Spacer()
-            }
-        )
+        PlayerCard(player: request.user.toPlayer())
+            .opacity(isProcessing ? 0.5 : 1.0)
     }
 }
 
@@ -544,8 +557,7 @@ struct FriendRequestsViewWithMockData: View {
                             ForEach(sentRequests) { request in
                                 SentRequestCard(
                                     request: request,
-                                    isProcessing: false,
-                                    onWithdraw: {}
+                                    isProcessing: false
                                 )
                             }
                         }

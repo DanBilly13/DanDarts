@@ -48,11 +48,17 @@ struct PlayerCard: View {
                         .foregroundColor(Color("TextSecondary"))
                 } else {
                     // Show stats for connected players
-                    if player.totalGames > 0 {
-                        Text("\(player.totalWins)W - \(player.totalLosses)L")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                           
+                    if player.totalWins > 0 || player.totalLosses > 0 {
+                        // Colored W/L stats: 28W15L (green W, red L)
+                        HStack(spacing: 0) {
+                            Text("\(player.totalWins)W")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color("AccentSecondary"))
+                            
+                            Text("\(player.totalLosses)L")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color("AccentPrimary"))
+                        }
                         
                         Text(player.winRatePercentage)
                             .font(.system(size: 12, weight: .medium))
