@@ -133,7 +133,7 @@ struct ScoringButton: View {
                         // Outer circle - AccentQuinary (white) with dynamic opacity
                         // Fades out when pressed to reveal solid blue button
                         Circle()
-                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 0.0 : 0.25))
+                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 0.0 : 0.3))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - AccentPrimary (blue)
@@ -171,7 +171,7 @@ struct ScoringButton: View {
                     ZStack {
                         // Outer circle - AccentQuinary (white) with dynamic opacity
                         Circle()
-                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.15))
+                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.3))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - InputBackground, fades out when pressed
@@ -191,7 +191,7 @@ struct ScoringButton: View {
                         // Outer circle - AccentQuinary (white) with dynamic opacity
                         // Default: 15% opacity for subtle ring, Pressed: 100% for solid button
                         Circle()
-                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.15))
+                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.3))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - InputBackground, fades out when pressed

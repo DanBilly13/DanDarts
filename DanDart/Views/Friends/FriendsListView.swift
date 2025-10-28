@@ -22,6 +22,8 @@ struct FriendsListView: View {
     @State private var friends: [Player] = []
     @State private var isLoadingFriends: Bool = false
     @State private var loadError: String?
+    @State private var pendingRequestCount: Int = 0
+    @State private var showFriendRequests: Bool = false
     
     var filteredFriends: [Player] {
         if searchText.isEmpty {
@@ -64,7 +66,51 @@ struct FriendsListView: View {
                 .background(Color("InputBackground"))
                 .cornerRadius(12)
                 .padding(.top, 12)
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
+                
+                // Friend Requests Button (Task 308.1)
+                if pendingRequestCount > 0 {
+                    Button(action: {
+                        showFriendRequests = true
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "bell.badge.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(Color("AccentPrimary"))
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Friend Requests")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                
+                                Text("\(pendingRequestCount) pending")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color("TextSecondary"))
+                            }
+                            
+                            Spacer()
+                            
+                            // Badge
+                            Text("\(pendingRequestCount)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red)
+                                .cornerRadius(12)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color("TextSecondary"))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color("AccentPrimary").opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                }
             
             // Friends List, Loading, or Empty State
             if isLoadingFriends {
@@ -183,6 +229,15 @@ struct FriendsListView: View {
         .background(Color("BackgroundPrimary")).ignoresSafeArea()
         .onAppear {
             loadFriends()
+            loadPendingRequestCount()
+        }
+        .sheet(isPresented: $showFriendRequests) {
+            FriendRequestsView()
+                .environmentObject(authService)
+                .onDisappear {
+                    // Reload count when returning from requests view
+                    loadPendingRequestCount()
+                }
         }
         .alert("Success", isPresented: $showSuccessAlert) {
             Button("OK", role: .cancel) { }
@@ -278,6 +333,23 @@ struct FriendsListView: View {
                 print("❌ Remove friend error: \(error)")
                 successMessage = "Failed to remove friend"
                 showSuccessAlert = true
+            }
+        }
+    }
+    
+    /// Load pending friend request count (Task 308.1)
+    private func loadPendingRequestCount() {
+        guard let currentUserId = authService.currentUser?.id else {
+            pendingRequestCount = 0
+            return
+        }
+        
+        Task {
+            do {
+                pendingRequestCount = try await friendsService.getPendingRequestCount(userId: currentUserId)
+            } catch {
+                print("❌ Failed to load pending request count: \(error)")
+                pendingRequestCount = 0
             }
         }
     }

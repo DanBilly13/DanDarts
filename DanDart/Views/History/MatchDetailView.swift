@@ -97,8 +97,8 @@ struct MatchDetailView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundColor(Color("TextPrimary"))
             
-            // Color key legend
-            HStack(spacing: 12) {
+            // Color key legend (wraps to 2 rows if needed)
+            FlexibleLayout(spacing: 12) {
                 ForEach(0..<match.players.count, id: \.self) { index in
                     HStack(spacing: 6) {
                         Circle()
@@ -145,9 +145,6 @@ struct MatchDetailView: View {
             }
         }
         .padding(.vertical, 16)
-        .padding(.horizontal, 16)
-        .background(Color("InputBackground"))
-        .cornerRadius(12)
     }
     
     // MARK: - Stats Helpers
@@ -329,7 +326,7 @@ struct MatchPlayerCard: View {
                 if isWinner {
                     // Trophy icon - 36px (outline style, thinner stroke)
                     Image(systemName: "trophy")
-                        .font(.system(size: 36, weight: .regular))
+                        .font(.system(size: 32, weight: .regular))
                         .foregroundColor(Color("AccentTertiary"))
                 } else {
                     // Placement text - Apple title3 style
@@ -564,6 +561,60 @@ struct TurnRow: View {
                 .foregroundColor(Color("TextSecondary"))
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Flexible Layout (for wrapping color key)
+
+struct FlexibleLayout: Layout {
+    var spacing: CGFloat = 8
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlexResult(
+            in: proposal.replacingUnspecifiedDimensions().width,
+            subviews: subviews,
+            spacing: spacing
+        )
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlexResult(
+            in: bounds.width,
+            subviews: subviews,
+            spacing: spacing
+        )
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + result.frames[index].minX, y: bounds.minY + result.frames[index].minY), proposal: .unspecified)
+        }
+    }
+    
+    struct FlexResult {
+        var frames: [CGRect] = []
+        var size: CGSize = .zero
+        
+        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var currentX: CGFloat = 0
+            var currentY: CGFloat = 0
+            var lineHeight: CGFloat = 0
+            
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                
+                if currentX + size.width > maxWidth && currentX > 0 {
+                    // Move to next line
+                    currentX = 0
+                    currentY += lineHeight + spacing
+                    lineHeight = 0
+                }
+                
+                frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
+                lineHeight = max(lineHeight, size.height)
+                currentX += size.width + spacing
+            }
+            
+            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
+        }
     }
 }
 

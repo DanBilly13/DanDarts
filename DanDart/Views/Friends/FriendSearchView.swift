@@ -20,6 +20,7 @@ struct FriendSearchView: View {
     @State private var isAddingFriend: Bool = false
     @State private var addFriendError: String?
     @State private var showSuccessMessage: Bool = false
+    @State private var sentRequestUserId: UUID? = nil // Track which user has pending request
     
     var body: some View {
         NavigationView {
@@ -128,18 +129,23 @@ struct FriendSearchView: View {
                                     // Player Card (convert User to Player)
                                     PlayerCard(player: user.toPlayer())
                                     
-                                    // Add Friend Button
+                                    // Send Request Button
                                     Button(action: {
-                                        addFriend(user)
+                                        sendFriendRequest(user)
                                     }) {
                                         ZStack {
-                                            if isAddingFriend {
+                                            if isAddingFriend && sentRequestUserId == user.id {
                                                 ProgressView()
                                                     .tint(Color("AccentPrimary"))
-                                            } else if showSuccessMessage {
+                                            } else if showSuccessMessage && sentRequestUserId == user.id {
                                                 Image(systemName: "checkmark")
                                                     .font(.system(size: 20, weight: .bold))
                                                     .foregroundColor(.green)
+                                            } else if sentRequestUserId == user.id {
+                                                // Request Sent state
+                                                Image(systemName: "paperplane.fill")
+                                                    .font(.system(size: 18, weight: .semibold))
+                                                    .foregroundColor(Color("TextSecondary"))
                                             } else {
                                                 Image(systemName: "person.badge.plus")
                                                     .font(.system(size: 20, weight: .semibold))
@@ -149,10 +155,14 @@ struct FriendSearchView: View {
                                         .frame(width: 44, height: 44)
                                         .background(
                                             Circle()
-                                                .fill(Color("AccentPrimary").opacity(0.15))
+                                                .fill(
+                                                    sentRequestUserId == user.id 
+                                                    ? Color("TextSecondary").opacity(0.15)
+                                                    : Color("AccentPrimary").opacity(0.15)
+                                                )
                                         )
                                     }
-                                    .disabled(isAddingFriend || showSuccessMessage)
+                                    .disabled(isAddingFriend || sentRequestUserId == user.id)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -169,7 +179,7 @@ struct FriendSearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Add Friend")
+                    Text("Send Friend Request")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(Color("TextPrimary"))
                 }
@@ -239,21 +249,22 @@ struct FriendSearchView: View {
         }
     }
     
-    /// Add friend and dismiss sheet
-    private func addFriend(_ user: User) {
+    /// Send friend request (Task 301)
+    private func sendFriendRequest(_ user: User) {
         guard let currentUserId = authService.currentUser?.id else {
-            addFriendError = "You must be signed in to add friends"
+            addFriendError = "You must be signed in to send friend requests"
             return
         }
         
         // Set loading state
         isAddingFriend = true
+        sentRequestUserId = user.id
         addFriendError = nil
         
         Task {
             do {
-                // Create friendship in Supabase
-                try await friendsService.addFriend(userId: currentUserId, friendId: user.id)
+                // Send friend request in Supabase (status: pending)
+                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: user.id)
                 
                 // Success haptic feedback
                 let successFeedback = UINotificationFeedbackGenerator()
@@ -262,18 +273,18 @@ struct FriendSearchView: View {
                 // Show success message briefly
                 showSuccessMessage = true
                 
-                // Convert User to Player and call callback
-                onFriendAdded(user.toPlayer())
+                // Wait a moment to show success checkmark
+                try? await Task.sleep(nanoseconds: 800_000_000) // 0.8 seconds
                 
-                // Wait a moment to show success, then dismiss
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                
+                // Update button to "Request Sent" state
+                showSuccessMessage = false
                 isAddingFriend = false
-                dismiss()
+                // sentRequestUserId remains set to show "Request Sent" state
                 
             } catch let error as FriendsError {
                 // Handle specific friend errors
                 isAddingFriend = false
+                sentRequestUserId = nil
                 addFriendError = error.localizedDescription
                 
                 // Error haptic feedback
@@ -283,13 +294,14 @@ struct FriendSearchView: View {
             } catch {
                 // Handle generic errors
                 isAddingFriend = false
-                addFriendError = "Failed to add friend. Please try again."
+                sentRequestUserId = nil
+                addFriendError = "Failed to send friend request. Please try again."
                 
                 // Error haptic feedback
                 let errorFeedback = UINotificationFeedbackGenerator()
                 errorFeedback.notificationOccurred(.error)
                 
-                print("❌ Add friend error: \(error)")
+                print("❌ Send friend request error: \(error)")
             }
         }
     }
