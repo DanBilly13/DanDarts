@@ -15,12 +15,26 @@ struct FriendSearchView: View {
     @StateObject private var friendsService = FriendsService()
     @State private var searchQuery: String = ""
     @State private var searchResults: [User] = []
+    @State private var existingFriends: [User] = [] // Current friends
     @State private var isSearching: Bool = false
     @State private var searchError: String?
     @State private var isAddingFriend: Bool = false
     @State private var addFriendError: String?
     @State private var showSuccessMessage: Bool = false
     @State private var sentRequestUserId: UUID? = nil // Track which user has pending request
+    
+    // Computed: separate results into friends and non-friends
+    var friendResults: [User] {
+        searchResults.filter { user in
+            existingFriends.contains(where: { $0.id == user.id })
+        }
+    }
+    
+    var nonFriendResults: [User] {
+        searchResults.filter { user in
+            !existingFriends.contains(where: { $0.id == user.id })
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -121,53 +135,100 @@ struct FriendSearchView: View {
                     }
                     .padding(.horizontal, 32)
                 } else {
-                    // Search Results List
+                    // Search Results List - Mixed (Friends + New People)
                     ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(searchResults) { user in
-                                HStack(spacing: 16) {
-                                    // Player Card (convert User to Player)
-                                    PlayerCard(player: user.toPlayer())
+                        VStack(spacing: 16) {
+                            // Existing Friends Section
+                            if !friendResults.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Friends")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(Color("TextSecondary"))
+                                        .padding(.horizontal, 16)
                                     
-                                    // Send Request Button
-                                    Button(action: {
-                                        sendFriendRequest(user)
-                                    }) {
-                                        ZStack {
-                                            if isAddingFriend && sentRequestUserId == user.id {
-                                                ProgressView()
-                                                    .tint(Color("AccentPrimary"))
-                                            } else if showSuccessMessage && sentRequestUserId == user.id {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 20, weight: .bold))
+                                    ForEach(friendResults) { user in
+                                        HStack(spacing: 16) {
+                                            // Player Card
+                                            PlayerCard(player: user.toPlayer())
+                                            
+                                            // Already Friends Badge
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .font(.system(size: 16, weight: .semibold))
                                                     .foregroundColor(.green)
-                                            } else if sentRequestUserId == user.id {
-                                                // Request Sent state
-                                                Image(systemName: "paperplane.fill")
-                                                    .font(.system(size: 18, weight: .semibold))
+                                                Text("Friends")
+                                                    .font(.system(size: 14, weight: .semibold))
                                                     .foregroundColor(Color("TextSecondary"))
-                                            } else {
-                                                Image(systemName: "person.badge.plus")
-                                                    .font(.system(size: 20, weight: .semibold))
-                                                    .foregroundColor(Color("AccentPrimary"))
                                             }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 8)
+                                            .background(Color("TextSecondary").opacity(0.1))
+                                            .cornerRadius(20)
                                         }
-                                        .frame(width: 44, height: 44)
-                                        .background(
-                                            Circle()
-                                                .fill(
-                                                    sentRequestUserId == user.id 
-                                                    ? Color("TextSecondary").opacity(0.15)
-                                                    : Color("AccentPrimary").opacity(0.15)
-                                                )
-                                        )
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(Color("InputBackground"))
+                                        .cornerRadius(12)
                                     }
-                                    .disabled(isAddingFriend || sentRequestUserId == user.id)
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color("InputBackground"))
-                                .cornerRadius(12)
+                            }
+                            
+                            // New People Section
+                            if !nonFriendResults.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    if !friendResults.isEmpty {
+                                        Text("Add Friends")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(Color("TextSecondary"))
+                                            .padding(.horizontal, 16)
+                                    }
+                                    
+                                    ForEach(nonFriendResults) { user in
+                                        HStack(spacing: 16) {
+                                            // Player Card
+                                            PlayerCard(player: user.toPlayer())
+                                            
+                                            // Send Request Button
+                                            Button(action: {
+                                                sendFriendRequest(user)
+                                            }) {
+                                                ZStack {
+                                                    if isAddingFriend && sentRequestUserId == user.id {
+                                                        ProgressView()
+                                                            .tint(Color("AccentPrimary"))
+                                                    } else if showSuccessMessage && sentRequestUserId == user.id {
+                                                        Image(systemName: "checkmark")
+                                                            .font(.system(size: 20, weight: .bold))
+                                                            .foregroundColor(.green)
+                                                    } else if sentRequestUserId == user.id {
+                                                        // Request Sent state
+                                                        Image(systemName: "paperplane.fill")
+                                                            .font(.system(size: 18, weight: .semibold))
+                                                            .foregroundColor(Color("TextSecondary"))
+                                                    } else {
+                                                        Image(systemName: "person.badge.plus")
+                                                            .font(.system(size: 20, weight: .semibold))
+                                                            .foregroundColor(Color("AccentPrimary"))
+                                                    }
+                                                }
+                                                .frame(width: 44, height: 44)
+                                                .background(
+                                                    Circle()
+                                                        .fill(
+                                                            sentRequestUserId == user.id 
+                                                            ? Color("TextSecondary").opacity(0.15)
+                                                            : Color("AccentPrimary").opacity(0.15)
+                                                        )
+                                                )
+                                            }
+                                            .disabled(isAddingFriend || sentRequestUserId == user.id)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(Color("InputBackground"))
+                                        .cornerRadius(12)
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -179,7 +240,7 @@ struct FriendSearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Send Friend Request")
+                    Text("Find Friends")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(Color("TextPrimary"))
                 }
@@ -206,6 +267,9 @@ struct FriendSearchView: View {
                 if let error = addFriendError {
                     Text(error)
                 }
+            }
+            .onAppear {
+                loadExistingFriends()
             }
         }
     }
@@ -302,6 +366,23 @@ struct FriendSearchView: View {
                 errorFeedback.notificationOccurred(.error)
                 
                 print("❌ Send friend request error: \(error)")
+            }
+        }
+    }
+    
+    /// Load existing friends to show in mixed results
+    private func loadExistingFriends() {
+        guard let currentUserId = authService.currentUser?.id else {
+            return
+        }
+        
+        Task {
+            do {
+                existingFriends = try await friendsService.loadFriends(userId: currentUserId)
+                print("✅ Loaded \(existingFriends.count) existing friends for search")
+            } catch {
+                print("❌ Failed to load existing friends: \(error)")
+                existingFriends = []
             }
         }
     }

@@ -2,7 +2,7 @@
 //  FriendsListView.swift
 //  DanDart
 //
-//  Friends list view with search and add functionality
+//  Unified friends view with requests and friends list
 //
 
 import SwiftUI
@@ -11,8 +11,7 @@ struct FriendsListView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var friendsService = FriendsService()
     
-    @State private var searchText: String = ""
-    @State private var showAddFriend: Bool = false
+    @State private var showSearch: Bool = false
     @State private var showSuccessAlert: Bool = false
     @State private var successMessage: String = ""
     @State private var showDeleteConfirmation: Bool = false
@@ -20,203 +19,162 @@ struct FriendsListView: View {
     
     // Friends data loaded from Supabase
     @State private var friends: [Player] = []
+    @State private var receivedRequests: [FriendRequest] = []
+    @State private var sentRequests: [FriendRequest] = []
     @State private var isLoadingFriends: Bool = false
+    @State private var isLoadingRequests: Bool = false
     @State private var loadError: String?
-    @State private var pendingRequestCount: Int = 0
-    @State private var showFriendRequests: Bool = false
-    
-    var filteredFriends: [Player] {
-        if searchText.isEmpty {
-            return friends
-        } else {
-            return friends.filter { friend in
-                friend.displayName.localizedCaseInsensitiveContains(searchText) ||
-                friend.nickname.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-    }
+    @State private var processingRequestId: UUID? = nil
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Search Bar
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    TextField("Search friends", text: $searchText)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                    
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            searchText = ""
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+            List {
+                // Received Requests Section (only show if any exist)
+                if !receivedRequests.isEmpty {
+                    Section {
+                        ForEach(receivedRequests) { request in
+                            ReceivedRequestCard(
+                                request: request,
+                                isProcessing: processingRequestId == request.id,
+                                onAccept: { acceptRequest(request) },
+                                onDeny: { denyRequest(request) }
+                            )
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                         }
+                    } header: {
+                        Text("Friend Requests")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                            .textCase(nil)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color("InputBackground"))
-                .cornerRadius(12)
-                .padding(.top, 12)
-                .padding(.bottom, 12)
                 
-                // Friend Requests Button (Task 308.1)
-                if pendingRequestCount > 0 {
-                    Button(action: {
-                        showFriendRequests = true
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "bell.badge.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(Color("AccentPrimary"))
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Friend Requests")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Color("TextPrimary"))
-                                
-                                Text("\(pendingRequestCount) pending")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                            }
-                            
-                            Spacer()
-                            
-                            // Badge
-                            Text("\(pendingRequestCount)")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.red)
-                                .cornerRadius(12)
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Color("TextSecondary"))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color("AccentPrimary").opacity(0.1))
-                        .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                }
-            
-            // Friends List, Loading, or Empty State
-            if isLoadingFriends {
-                // Loading State
-                VStack(spacing: 16) {
-                    Spacer()
-                    
-                    ProgressView()
-                        .scaleEffect(1.2)
-                        .tint(Color("AccentPrimary"))
-                    
-                    Text("Loading friends...")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-            } else if friends.isEmpty {
-                // Empty State
-                VStack(spacing: 16) {
-                    Spacer()
-                    
-                    Image(systemName: "person.2.slash")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    VStack(spacing: 8) {
-                        Text("No friends yet")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                        
-                        Text("Add friends to challenge them to games")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    AppButton(role: .primary, controlSize: .regular) {
-                        showAddFriend = true
-                    } label: {
-                        Label("Add Your First Friend", systemImage: "person.badge.plus")
-                    }
-                    .frame(maxWidth: 280)
-                    .padding(.top, 8)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-            } else if filteredFriends.isEmpty {
-                // No Search Results
-                VStack(spacing: 16) {
-                    Spacer()
-                    
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    VStack(spacing: 8) {
-                        Text("No results")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                        
-                        Text("Try searching for a different name")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-            } else {
-                // Friends List
-                List {
-                    ForEach(filteredFriends) { friend in
-                        PlayerCard(player: friend)
-                            .listRowBackground(Color("BackgroundPrimary"))
-                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                // Sent Requests Section (only show if any exist)
+                if !sentRequests.isEmpty {
+                    Section {
+                        ForEach(sentRequests) { request in
+                            SentRequestCard(
+                                request: request,
+                                isProcessing: processingRequestId == request.id
+                            )
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button {
-                                    friendToDelete = friend
-                                    showDeleteConfirmation = true
+                                    withdrawRequest(request)
                                 } label: {
                                     Image(systemName: "trash")
                                         .foregroundColor(.red)
                                 }
                                 .tint(.clear)
+                                
+                                Button {
+                                    sendAgainRequest(request)
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(Color("AccentSecondary"))
+                                }
+                                .tint(.clear)
                             }
+                        }
+                    } header: {
+                        Text("Requests Sent")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                            .textCase(nil)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(Color("BackgroundPrimary"))
+                
+                // Friends Section
+                if !friends.isEmpty {
+                    Section {
+                        ForEach(friends) { friend in
+                            PlayerCard(player: friend)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button {
+                                        friendToDelete = friend
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                    }
+                                    .tint(.clear)
+                                }
+                        }
+                    } header: {
+                        Text("Friends")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Color("TextPrimary"))
+                            .textCase(nil)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } else if !isLoadingFriends && !isLoadingRequests {
+                    // Empty State - No friends
+                    Section {
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.2.slash")
+                                .font(.system(size: 64, weight: .light))
+                                .foregroundColor(Color("TextSecondary"))
+                            
+                            VStack(spacing: 8) {
+                                Text("No friends yet")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                
+                                Text("Search for friends to add them")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(Color("TextSecondary"))
+                                    .multilineTextAlignment(.center)
+                            }
+                            
+                            AppButton(role: .primary, controlSize: .regular) {
+                                showSearch = true
+                            } label: {
+                                Label("Find Friends", systemImage: "magnifyingglass")
+                            }
+                            .frame(maxWidth: 280)
+                            .padding(.top, 8)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                        .listRowInsets(EdgeInsets())
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+                
+                // Loading State
+                if isLoadingFriends || isLoadingRequests {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .tint(Color("AccentPrimary"))
+                            Spacer()
+                        }
+                        .padding(.vertical, 32)
+                        .listRowInsets(EdgeInsets())
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
             }
-            }
-            .padding(.horizontal, 16)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .background(Color("BackgroundPrimary"))
             .navigationTitle("Friends")
-            /*'/.foregroundColor(Color.accentColor)*/
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        showAddFriend = true
+                        showSearch = true
                     }) {
-                        Image(systemName: "person.badge.plus")
+                        Image(systemName: "magnifyingglass")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(Color("AccentPrimary"))
                     }
@@ -229,15 +187,16 @@ struct FriendsListView: View {
         .background(Color("BackgroundPrimary")).ignoresSafeArea()
         .onAppear {
             loadFriends()
-            loadPendingRequestCount()
+            loadRequests()
         }
-        .sheet(isPresented: $showFriendRequests) {
-            FriendRequestsView()
-                .environmentObject(authService)
-                .onDisappear {
-                    // Reload count when returning from requests view
-                    loadPendingRequestCount()
-                }
+        .sheet(isPresented: $showSearch) {
+            FriendSearchView { player in
+                // Reload after adding friend
+                loadFriends()
+                loadRequests()
+                successMessage = "Friend request sent to \(player.displayName)!"
+                showSuccessAlert = true
+            }
         }
         .alert("Success", isPresented: $showSuccessAlert) {
             Button("OK", role: .cancel) { }
@@ -254,11 +213,6 @@ struct FriendsListView: View {
         } message: {
             if let friend = friendToDelete {
                 Text("Are you sure you want to remove \(friend.displayName) from your friends?")
-            }
-        }
-        .sheet(isPresented: $showAddFriend) {
-            FriendSearchView { player in
-                addFriend(player)
             }
         }
     }
@@ -337,19 +291,145 @@ struct FriendsListView: View {
         }
     }
     
-    /// Load pending friend request count (Task 308.1)
-    private func loadPendingRequestCount() {
+    /// Load friend requests (received and sent)
+    private func loadRequests() {
         guard let currentUserId = authService.currentUser?.id else {
-            pendingRequestCount = 0
+            print("⚠️ No current user, cannot load requests")
             return
         }
         
+        isLoadingRequests = true
+        
         Task {
             do {
-                pendingRequestCount = try await friendsService.getPendingRequestCount(userId: currentUserId)
+                // Load received and sent requests separately
+                async let receivedTask = friendsService.loadReceivedRequests(userId: currentUserId)
+                async let sentTask = friendsService.loadSentRequests(userId: currentUserId)
+                
+                let (received, sent) = try await (receivedTask, sentTask)
+                
+                receivedRequests = received
+                sentRequests = sent
+                
+                isLoadingRequests = false
+                print("✅ Loaded \(received.count) received, \(sent.count) sent requests")
+                
             } catch {
-                print("❌ Failed to load pending request count: \(error)")
-                pendingRequestCount = 0
+                isLoadingRequests = false
+                print("❌ Load requests error: \(error)")
+                receivedRequests = []
+                sentRequests = []
+            }
+        }
+    }
+    
+    /// Accept friend request
+    private func acceptRequest(_ request: FriendRequest) {
+        processingRequestId = request.id
+        
+        Task {
+            do {
+                try await friendsService.acceptFriendRequest(requestId: request.id)
+                
+                // Success haptic
+                let successFeedback = UINotificationFeedbackGenerator()
+                successFeedback.notificationOccurred(.success)
+                
+                // Reload both friends and requests
+                loadFriends()
+                loadRequests()
+                
+                processingRequestId = nil
+                
+            } catch {
+                print("❌ Accept request error: \(error)")
+                
+                let errorFeedback = UINotificationFeedbackGenerator()
+                errorFeedback.notificationOccurred(.error)
+                
+                processingRequestId = nil
+            }
+        }
+    }
+    
+    /// Deny friend request
+    private func denyRequest(_ request: FriendRequest) {
+        processingRequestId = request.id
+        
+        Task {
+            do {
+                try await friendsService.denyFriendRequest(requestId: request.id)
+                
+                // Light haptic
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+                
+                // Reload requests
+                loadRequests()
+                
+                processingRequestId = nil
+                
+            } catch {
+                print("❌ Deny request error: \(error)")
+                processingRequestId = nil
+            }
+        }
+    }
+    
+    /// Withdraw sent friend request
+    private func withdrawRequest(_ request: FriendRequest) {
+        processingRequestId = request.id
+        
+        Task {
+            do {
+                try await friendsService.withdrawFriendRequest(requestId: request.id)
+                
+                // Light haptic
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+                
+                // Reload requests
+                loadRequests()
+                
+                processingRequestId = nil
+                
+            } catch {
+                print("❌ Withdraw request error: \(error)")
+                processingRequestId = nil
+            }
+        }
+    }
+    
+    /// Send friend request again
+    private func sendAgainRequest(_ request: FriendRequest) {
+        guard let currentUserId = authService.currentUser?.id else { return }
+        
+        processingRequestId = request.id
+        
+        Task {
+            do {
+                // First withdraw the old request
+                try await friendsService.withdrawFriendRequest(requestId: request.id)
+                
+                // Then send a new request
+                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: request.user.id)
+                
+                // Success haptic
+                let successFeedback = UINotificationFeedbackGenerator()
+                successFeedback.notificationOccurred(.success)
+                
+                // Reload requests
+                loadRequests()
+                
+                processingRequestId = nil
+                
+            } catch {
+                print("❌ Send again error: \(error)")
+                
+                let errorFeedback = UINotificationFeedbackGenerator()
+                errorFeedback.notificationOccurred(.error)
+                
+                processingRequestId = nil
             }
         }
     }

@@ -23,129 +23,106 @@ struct FriendRequestsView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Received Requests Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Received Requests")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                        
-                        if isLoading && receivedRequests.isEmpty {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .tint(Color("AccentPrimary"))
-                                Spacer()
-                            }
-                            .padding(.vertical, 32)
-                        } else if receivedRequests.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "tray")
-                                    .font(.system(size: 48, weight: .light))
-                                    .foregroundColor(Color("TextSecondary"))
-                                
-                                Text("No pending requests")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 32)
-                        } else {
-                            VStack(spacing: 12) {
-                                ForEach(receivedRequests) { request in
-                                    ReceivedRequestCard(
-                                        request: request,
-                                        isProcessing: processingRequestId == request.id,
-                                        onAccept: { acceptRequest(request) },
-                                        onDeny: { denyRequest(request) }
-                                    )
-                                }
-                            }
-                            .padding(.horizontal, 16)
+            List {
+                // Received Requests Section
+                Section {
+                    if isLoading && receivedRequests.isEmpty {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .tint(Color("AccentPrimary"))
+                            Spacer()
+                        }
+                    } else if receivedRequests.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 48, weight: .light))
+                                .foregroundColor(Color("TextSecondary"))
+                            
+                            Text("No pending requests")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                    } else {
+                        ForEach(receivedRequests) { request in
+                            ReceivedRequestCard(
+                                request: request,
+                                isProcessing: processingRequestId == request.id,
+                                onAccept: { acceptRequest(request) },
+                                onDeny: { denyRequest(request) }
+                            )
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                         }
                     }
-                    .padding(.bottom, 24)
-                    
-                    // Divider
-                    Rectangle()
-                        .fill(Color("TextSecondary").opacity(0.2))
-                        .frame(height: 1)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 24)
-                    
-                    // Sent Requests Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Sent Requests")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                            .padding(.horizontal, 16)
-                        
-                        if isLoading && sentRequests.isEmpty {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .tint(Color("AccentPrimary"))
-                                Spacer()
-                            }
-                            .padding(.vertical, 32)
-                        } else if sentRequests.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "paperplane")
-                                    .font(.system(size: 48, weight: .light))
-                                    .foregroundColor(Color("TextSecondary"))
-                                
-                                Text("No pending requests")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 32)
-                        } else {
-                            // Standalone List with swipe actions (matching GameSetupView pattern)
-                            VStack(spacing: 12) {
-                                List {
-                                    ForEach(sentRequests) { request in
-                                        SentRequestCard(
-                                            request: request,
-                                            isProcessing: processingRequestId == request.id
-                                        )
-                                        .contentShape(Rectangle())
-                                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                                        .listRowBackground(Color.clear)
-                                        .listRowSeparator(.hidden)
-                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                            Button {
-                                                withdrawRequest(request)
-                                            } label: {
-                                                Image(systemName: "trash")
-                                                    .foregroundColor(.red)
-                                            }
-                                            .tint(.clear)
-                                            
-                                            Button {
-                                                sendAgainRequest(request)
-                                            } label: {
-                                                Image(systemName: "arrow.clockwise")
-                                                    .foregroundColor(Color("AccentSecondary"))
-                                            }
-                                            .tint(.clear)
-                                        }
-                                    }
-                                }
-                                .listStyle(.plain)
-                                .scrollDisabled(true)
-                                .frame(height: CGFloat(sentRequests.count * 92))
-                                .background(Color.clear)
-                            }
-                            .padding(.horizontal, 16)
-                        }
-                    }
-                    .padding(.bottom, 16)
+                } header: {
+                    Text("Received Requests")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color("TextPrimary"))
+                        .textCase(nil)
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                
+                // Sent Requests Section
+                Section {
+                    if isLoading && sentRequests.isEmpty {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .tint(Color("AccentPrimary"))
+                            Spacer()
+                        }
+                    } else if sentRequests.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "paperplane")
+                                .font(.system(size: 48, weight: .light))
+                                .foregroundColor(Color("TextSecondary"))
+                            
+                            Text("No pending requests")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                    } else {
+                        ForEach(sentRequests) { request in
+                            SentRequestCard(
+                                request: request,
+                                isProcessing: processingRequestId == request.id
+                            )
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    withdrawRequest(request)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                                .tint(.clear)
+                                
+                                Button {
+                                    sendAgainRequest(request)
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(Color("AccentSecondary"))
+                                }
+                                .tint(.clear)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Sent Requests")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color("TextPrimary"))
+                        .textCase(nil)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .background(Color("BackgroundPrimary"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -168,9 +145,6 @@ struct FriendRequestsView: View {
                         .foregroundColor(Color("AccentPrimary"))
                     }
                 }
-            }
-            .refreshable {
-                await refreshRequests()
             }
             .onAppear {
                 loadRequests()
@@ -458,8 +432,54 @@ struct SentRequestCard: View {
     let isProcessing: Bool
     
     var body: some View {
-        PlayerCard(player: request.user.toPlayer())
-            .opacity(isProcessing ? 0.5 : 1.0)
+        HStack(spacing: 16) {
+            // Player identity (avatar + name + nickname)
+            PlayerIdentity(
+                player: request.user.toPlayer(),
+                avatarSize: 48,
+                spacing: 4
+            )
+            
+            Spacer()
+            
+            // W/L stats
+            VStack(alignment: .trailing, spacing: 8) {
+                if request.user.totalWins > 0 || request.user.totalLosses > 0 {
+                    HStack(spacing: 0) {
+                        Text("\(request.user.totalWins)W")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color("AccentSecondary"))
+                        
+                        Text("\(request.user.totalLosses)L")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color("AccentPrimary"))
+                    }
+                    
+                    Text("\(Int((Double(request.user.totalWins) / Double(request.user.totalWins + request.user.totalLosses)) * 100))%")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                } else {
+                    Text("No games")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    Text("yet")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .frame(height: 80)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color("InputBackground"))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color("TextSecondary").opacity(0.3), lineWidth: 1)
+        )
+        .opacity(isProcessing ? 0.5 : 1.0)
     }
 }
 

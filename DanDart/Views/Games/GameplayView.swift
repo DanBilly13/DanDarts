@@ -154,6 +154,8 @@ struct GameplayView: View {
         }
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .onChange(of: gameViewModel.legWinner) { oldValue, newValue in
             if newValue != nil && !gameViewModel.isMatchWon {
