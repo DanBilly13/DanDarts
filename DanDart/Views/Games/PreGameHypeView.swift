@@ -19,8 +19,7 @@ struct PreGameHypeView: View {
     @StateObject private var navigationManager = NavigationManager.shared
     
     // Animation states
-    @State private var showPlayer1 = false
-    @State private var showPlayer2 = false
+    @State private var showPlayers = false
     @State private var showVS = false
     @State private var showGetReady = false
     
@@ -47,126 +46,9 @@ struct PreGameHypeView: View {
                     
                     Spacer()
                     
-                    // Players and VS section
-                    HStack(spacing: 0) {
-                        // Player 1 (Left side)
-                        VStack(spacing: 16) {
-                            // Avatar
-                            PlayerAvatarView(
-                                avatarURL: players.first?.avatarURL,
-                                size: 120,
-                                borderColor: Color("AccentPrimary")
-                            )
-                            .scaleEffect(showPlayer1 ? 1.0 : 0.8)
-                            .opacity(showPlayer1 ? 1.0 : 0.0)
-                            .offset(x: showPlayer1 ? 0 : -100)
-                            
-                            // Player name and nickname
-                            VStack(spacing: 4) {
-                                Text(players.first?.displayName ?? "Player 1")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(Color("TextPrimary"))
-                                    .opacity(showPlayer1 ? 1.0 : 0.0)
-                                
-                                Text("@\(players.first?.nickname ?? "player1")")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                                    .opacity(showPlayer1 ? 1.0 : 0.0)
-                            }
-                            
-                            // Stats
-                            HStack(spacing: 12) {
-                                VStack(spacing: 2) {
-                                    Text("\(players.first?.totalWins ?? 0)")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(Color("AccentPrimary"))
-                                    Text("WINS")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color("TextSecondary"))
-                                        .tracking(1)
-                                }
-                                
-                                VStack(spacing: 2) {
-                                    Text("\(players.first?.totalLosses ?? 0)")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(Color("TextSecondary"))
-                                    Text("LOSSES")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color("TextSecondary"))
-                                        .tracking(1)
-                                }
-                            }
-                            .opacity(showPlayer1 ? 1.0 : 0.0)
-                        }
-                        .frame(maxWidth: .infinity)
-                        
-                        // VS in center
-                        VStack(spacing: 8) {
-                            Text("VS")
-                                .font(.system(size: 48, weight: .black, design: .default))
-                                .foregroundColor(Color("AccentPrimary"))
-                                .scaleEffect(showVS ? 1.0 : 0.5)
-                                .opacity(showVS ? 1.0 : 0.0)
-                            
-                            Rectangle()
-                                .fill(Color("AccentPrimary"))
-                                .frame(width: 40, height: 2)
-                                .opacity(showVS ? 1.0 : 0.0)
-                        }
-                        .frame(width: 100)
-                        
-                        // Player 2 (Right side)
-                        VStack(spacing: 16) {
-                            // Avatar
-                            PlayerAvatarView(
-                                avatarURL: players.count > 1 ? players[1].avatarURL : nil,
-                                size: 120,
-                                borderColor: Color("AccentSecondary")
-                            )
-                            .scaleEffect(showPlayer2 ? 1.0 : 0.8)
-                            .opacity(showPlayer2 ? 1.0 : 0.0)
-                            .offset(x: showPlayer2 ? 0 : 100)
-                            
-                            // Player name and nickname
-                            VStack(spacing: 4) {
-                                Text(players.count > 1 ? players[1].displayName : "Player 2")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(Color("TextPrimary"))
-                                    .opacity(showPlayer2 ? 1.0 : 0.0)
-                                
-                                Text("@\(players.count > 1 ? players[1].nickname : "player2")")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                                    .opacity(showPlayer2 ? 1.0 : 0.0)
-                            }
-                            
-                            // Stats
-                            HStack(spacing: 12) {
-                                VStack(spacing: 2) {
-                                    Text("\(players.count > 1 ? players[1].totalWins : 0)")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(Color("AccentSecondary"))
-                                    Text("WINS")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color("TextSecondary"))
-                                        .tracking(1)
-                                }
-                                
-                                VStack(spacing: 2) {
-                                    Text("\(players.count > 1 ? players[1].totalLosses : 0)")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(Color("TextSecondary"))
-                                    Text("LOSSES")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color("TextSecondary"))
-                                        .tracking(1)
-                                }
-                            }
-                            .opacity(showPlayer2 ? 1.0 : 0.0)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .padding(.horizontal, 32)
+                    // Players section - dynamic layout based on player count
+                    playersSection
+                        .padding(.horizontal, 16)
                     
                     Spacer()
                     
@@ -220,30 +102,170 @@ struct PreGameHypeView: View {
         .preferredColorScheme(.dark)
     }
     
+    // MARK: - Player Layouts
+    
+    @ViewBuilder
+    private var playersSection: some View {
+        if players.count == 2 {
+            twoPlayerLayout
+        } else if players.count == 3 {
+            threePlayerLayout
+        } else if players.count == 4 {
+            fourPlayerLayout
+        } else {
+            multiPlayerGrid
+        }
+    }
+    
+    // 2 Players: Side-by-side with VS (absolutely positioned)
+    private var twoPlayerLayout: some View {
+        ZStack {
+            // Players take full 50% width each (no space for VS)
+            HStack(spacing: 0) {
+                playerCard(players[0], index: 0)
+                    .frame(maxWidth: .infinity)
+             
+                
+                playerCard(players[1], index: 1)
+                    .frame(maxWidth: .infinity)
+            }
+            
+            // VS absolutely positioned in center (doesn't take layout space)
+            VStack(spacing: 8) {
+                Text("VS")
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundColor(Color("AccentPrimary"))
+                    .scaleEffect(showVS ? 1.0 : 0.5)
+                    .opacity(showVS ? 1.0 : 0.0)
+            }
+            .offset(y: -40) // Align with avatar center
+        }
+    }
+    
+    // 3 Players: Triangle layout (2 top, 1 bottom center)
+    private var threePlayerLayout: some View {
+        VStack(spacing: 40) {
+            HStack(spacing: 40) {
+                playerCard(players[0], index: 0)
+                playerCard(players[1], index: 1)
+            }
+            
+            playerCard(players[2], index: 2)
+        }
+    }
+    
+    // 4 Players: 2x2 grid
+    private var fourPlayerLayout: some View {
+        VStack(spacing: 40) {
+            HStack(spacing: 40) {
+                playerCard(players[0], index: 0)
+                playerCard(players[1], index: 1)
+            }
+            
+            HStack(spacing: 40) {
+                playerCard(players[2], index: 2)
+                playerCard(players[3], index: 3)
+            }
+        }
+    }
+    
+    // 5-6 Players: 2x3 grid
+    private var multiPlayerGrid: some View {
+        VStack(spacing: 40) {
+            HStack(spacing: 40) {
+                ForEach(Array(players.prefix(2).enumerated()), id: \.element.id) { index, player in
+                    playerCard(player, index: index)
+                }
+            }
+            
+            HStack(spacing: 40) {
+                ForEach(Array(players.dropFirst(2).prefix(2).enumerated()), id: \.element.id) { index, player in
+                    playerCard(player, index: index + 2)
+                }
+            }
+            
+            if players.count > 4 {
+                HStack(spacing: 40) {
+                    ForEach(Array(players.dropFirst(4).enumerated()), id: \.element.id) { index, player in
+                        playerCard(player, index: index + 4)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Player Card Component
+    
+    private func playerCard(_ player: Player, index: Int) -> some View {
+        return VStack(spacing: 0) {
+            // Avatar (96pt as per design) - no border
+            PlayerAvatarView(
+                avatarURL: player.avatarURL,
+                size: 96,
+                borderColor: .clear
+            )
+            .scaleEffect(showPlayers ? 1.0 : 0.8)
+            .opacity(showPlayers ? 1.0 : 0.0)
+            
+            // 16px spacing after avatar
+            Spacer()
+                .frame(height: 16)
+            
+            // Name and nickname grouped together (no spacing)
+            VStack(spacing: 0) {
+                // Player name (.subheadline)
+                Text(player.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color("TextPrimary"))
+                    .opacity(showPlayers ? 1.0 : 0.0)
+                
+                // Nickname (.footnote) - no spacing from name
+                Text("@\(player.nickname)")
+                    .font(.footnote)
+                    .foregroundColor(Color("TextSecondary"))
+                    .opacity(showPlayers ? 1.0 : 0.0)
+            }
+            
+            // 8px spacing before stats
+            Spacer()
+                .frame(height: 8)
+            
+            // Stats (.footnote) - W in AccentSecondary, L in AccentPrimary
+            HStack(spacing: 0) {
+                Text("W\(player.totalWins)")
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color("AccentSecondary"))
+                
+                Text("L\(player.totalLosses)")
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color("AccentPrimary"))
+            }
+            .opacity(showPlayers ? 1.0 : 0.0)
+        }
+    }
+    
     // MARK: - Animation Sequence
     
     private func startAnimationSequence() {
-        // Player 1 slides in from left
+        // Players appear
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-            showPlayer1 = true
+            showPlayers = true
         }
         
-        // Player 2 slides in from right (slight delay)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                showPlayer2 = true
-            }
-        }
-        
-        // VS appears with scale animation (after players)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            withAnimation(.easeInOut(duration: 0.4)) {
-                showVS = true
+        // VS appears (only for 2 players)
+        if players.count == 2 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    showVS = true
+                }
             }
         }
         
         // GET READY appears last
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             withAnimation(.easeInOut(duration: 0.4)) {
                 showGetReady = true
             }

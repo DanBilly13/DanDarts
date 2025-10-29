@@ -105,7 +105,7 @@ extension Player {
 extension Player {
     /// Mock guest players for testing
     static let mockGuest1 = Player(
-        displayName: "Alice",
+        displayName: "Alice Wonderland",
         nickname: "alice",
         avatarURL: "avatar1",
         isGuest: true,
@@ -114,7 +114,7 @@ extension Player {
     )
     
     static let mockGuest2 = Player(
-        displayName: "Bob",
+        displayName: "Bob Westwood",
         nickname: "bob",
         avatarURL: "avatar2",
         isGuest: true,
@@ -123,7 +123,7 @@ extension Player {
     )
     
     static let mockGuest3 = Player(
-        displayName: "Charlie",
+        displayName: "Charlie Baker",
         nickname: "charlie",
         avatarURL: "avatar3",
         isGuest: true,
