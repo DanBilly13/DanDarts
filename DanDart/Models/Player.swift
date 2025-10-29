@@ -17,6 +17,7 @@ struct Player: Identifiable, Codable {
     let isGuest: Bool
     let totalWins: Int
     let totalLosses: Int
+    let userId: UUID? // User ID for connected players (nil for guests)
     
     // Computed properties
     var totalGames: Int {
@@ -33,7 +34,7 @@ struct Player: Identifiable, Codable {
     }
     
     // Initializer for creating new players
-    init(id: UUID = UUID(), displayName: String, nickname: String, avatarURL: String? = nil, isGuest: Bool = true, totalWins: Int = 0, totalLosses: Int = 0) {
+    init(id: UUID = UUID(), displayName: String, nickname: String, avatarURL: String? = nil, isGuest: Bool = true, totalWins: Int = 0, totalLosses: Int = 0, userId: UUID? = nil) {
         self.id = id
         self.displayName = displayName
         self.nickname = nickname
@@ -41,6 +42,7 @@ struct Player: Identifiable, Codable {
         self.isGuest = isGuest
         self.totalWins = totalWins
         self.totalLosses = totalLosses
+        self.userId = userId
     }
 }
 

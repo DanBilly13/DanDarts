@@ -102,6 +102,12 @@ class MatchStorageManager {
         }
     }
     
+    /// Load a specific match by ID
+    func loadMatch(byId matchId: UUID) -> MatchResult? {
+        let matches = loadMatches()
+        return matches.first { $0.id == matchId }
+    }
+    
     /// Get matches for a specific game type
     func getMatches(forGameType gameType: String) -> [MatchResult] {
         return loadMatches().filter { $0.gameType == gameType }

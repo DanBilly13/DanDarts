@@ -206,7 +206,8 @@ struct GameplayView: View {
                         dismiss()
                     },
                     matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
-                    legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil
+                    legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
+                    matchId: gameViewModel.matchId
                 )
             }
         }

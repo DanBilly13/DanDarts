@@ -17,9 +17,11 @@ struct GameEndView: View {
     let onBackToGames: () -> Void
     let matchFormat: Int?
     let legsWon: [UUID: Int]?
+    let matchId: UUID? // For navigating to match details
     
     @Environment(\.dismiss) private var dismiss
     @State private var showCelebration = false
+    @State private var showMatchDetails = false
     
     // Computed property for match result text
     private var matchResultText: String? {
@@ -109,6 +111,20 @@ struct GameEndView: View {
                         .foregroundColor(Color("AccentPrimary"))
                         .opacity(showCelebration ? 1.0 : 0.0)
                         .animation(.easeIn(duration: 0.3).delay(0.6), value: showCelebration)
+                    
+                    // Match Details Link
+                    if matchId != nil {
+                        Button(action: {
+                            showMatchDetails = true
+                        }) {
+                            Text("View Match Details")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Color("AccentSecondary"))
+                                .underline()
+                        }
+                        .opacity(showCelebration ? 1.0 : 0.0)
+                        .animation(.easeIn(duration: 0.3).delay(0.7), value: showCelebration)
+                    }
                 }
                 .padding(.horizontal, 32)
                 
@@ -117,71 +133,68 @@ struct GameEndView: View {
                 // Action Buttons
                 VStack(spacing: 16) {
                     // Play Again Button (same players)
-                    Button(action: {
+                    AppButton(role: .primary, controlSize: .small, compact: true) {
                         onPlayAgain()
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 20, weight: .semibold))
-                            Text("Play Again")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 28)
-                                .fill(Color("AccentPrimary"))
-                        )
-                        .shadow(color: Color("AccentPrimary").opacity(0.3), radius: 10, x: 0, y: 5)
-                    }
-                    
-                    // New Game Button (same game, different players)
-                    Button(action: {
-                        onChangePlayers()
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                            Text("Change Players")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        .foregroundColor(Color("TextPrimary"))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 28)
-                                .fill(Color("InputBackground"))
-                        )
+                    } label: {
+                        Label("Play Again", systemImage: "arrow.clockwise")
                     }
                     
                     // Back to Games Button
-                    Button(action: {
+                    AppButton(role: .secondary, controlSize: .small, compact: true) {
                         onBackToGames()
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "house.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                            Text("Back to Games")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        .foregroundColor(Color("TextSecondary"))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            RoundedRectangle(cornerRadius: 28)
-                                .stroke(Color("TextSecondary").opacity(0.3), lineWidth: 2)
-                        )
+                    } label: {
+                        Label("Back to Games", systemImage: "house.fill")
                     }
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 40)
                 .opacity(showCelebration ? 1.0 : 0.0)
-                .animation(.easeIn(duration: 0.3).delay(0.7), value: showCelebration)
+                .animation(.easeIn(duration: 0.3).delay(0.8), value: showCelebration)
             }
         }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
+        .sheet(isPresented: $showMatchDetails) {
+            // Navigate to Match Detail View
+            if let matchId = matchId,
+               let matchResult = MatchStorageManager.shared.loadMatch(byId: matchId) {
+                NavigationStack {
+                    MatchDetailView(match: matchResult)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") {
+                                    showMatchDetails = false
+                                }
+                                .fontWeight(.semibold)
+                                .foregroundColor(Color("AccentPrimary"))
+                            }
+                        }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            } else {
+                // Fallback if match not found
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundColor(Color("AccentSecondary"))
+                    
+                    Text("Match details not available")
+                        .font(.headline)
+                        .foregroundColor(Color("TextPrimary"))
+                    
+                    Text("The match is being saved...")
+                        .font(.subheadline)
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    Button("Close") {
+                        showMatchDetails = false
+                    }
+                    .foregroundColor(Color("AccentPrimary"))
+                }
+                .padding(40)
+            }
+        }
         .onAppear {
             // Trigger celebration animation
             withAnimation {
@@ -204,7 +217,8 @@ struct GameEndView: View {
         onChangePlayers: { print("Change Players") },
         onBackToGames: { print("Back to Games") },
         matchFormat: nil,
-        legsWon: nil
+        legsWon: nil,
+        matchId: UUID()
     )
 }
 
@@ -220,6 +234,7 @@ struct GameEndView: View {
         onChangePlayers: { print("Change Players") },
         onBackToGames: { print("Back to Games") },
         matchFormat: 3,
-        legsWon: [player1.id: 2, player2.id: 1]
+        legsWon: [player1.id: 2, player2.id: 1],
+        matchId: UUID()
     )
 }

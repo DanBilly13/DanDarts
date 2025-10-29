@@ -29,6 +29,9 @@ class GameViewModel: ObservableObject {
     @Published var legWinner: Player? = nil // Winner of current leg (before match winner)
     @Published var isMatchWon: Bool = false // True when match is won (not just leg)
     
+    // Match saving
+    @Published var matchId: UUID? = nil // ID for saved match
+    
     // Game configuration
     let game: Game
     let startingScore: Int
@@ -125,6 +128,9 @@ class GameViewModel: ObservableObject {
         self.players = players
         self.matchStartTime = Date()
         self.matchFormat = matchFormat
+        
+        // Create match ID for saving
+        self.matchId = UUID()
         
         // Determine starting score based on game type
         if game.title.contains("301") {
@@ -402,8 +408,13 @@ class GameViewModel: ObservableObject {
         scoreAfter: Int,
         isBust: Bool
     ) {
+        // Calculate turn number for this player
+        let playerTurnCount = turnHistory.filter { $0.playerId == player.id }.count
+        
         let turn = TurnHistory(
             player: player,
+            playerId: player.id,
+            turnNumber: playerTurnCount,
             darts: darts,
             scoreBefore: scoreBefore,
             scoreAfter: scoreAfter,
@@ -519,9 +530,10 @@ class GameViewModel: ObservableObject {
     
     // MARK: - Match Storage
     
-    /// Save match result to local storage
+    /// Save match result to local storage and Supabase
     private func saveMatchResult() {
         guard let winner = winner else { return }
+        guard let matchId = matchId else { return }
         
         let matchDuration = Date().timeIntervalSince(matchStartTime)
         
@@ -558,8 +570,9 @@ class GameViewModel: ObservableObject {
             )
         }
         
-        // Create match result
+        // Create match result with the same matchId
         let matchResult = MatchResult(
+            id: matchId,
             gameType: game.title,
             gameName: game.title,
             players: matchPlayers,
@@ -574,6 +587,36 @@ class GameViewModel: ObservableObject {
         
         // Update player stats
         MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        
+        // Save to Supabase (async, non-blocking)
+        Task {
+            do {
+                let matchService = MatchService()
+                
+                // Determine game ID for database
+                let gameId = game.title.lowercased().replacingOccurrences(of: " ", with: "_")
+                
+                // Get winner's user ID (nil for guests)
+                let winnerId = winner.userId
+                
+                try await matchService.saveMatch(
+                    matchId: matchId,
+                    gameId: gameId,
+                    players: players,
+                    winnerId: winnerId,
+                    startedAt: matchStartTime,
+                    endedAt: Date(),
+                    turnHistory: turnHistory,
+                    matchFormat: matchFormat,
+                    legsWon: legsWon
+                )
+                
+                print("✅ Match saved to Supabase: \(matchId)")
+            } catch {
+                print("❌ Failed to save match to Supabase: \(error)")
+                // Don't block UI - match is still saved locally
+            }
+        }
     }
 }
 
@@ -582,6 +625,8 @@ class GameViewModel: ObservableObject {
 struct TurnHistory: Identifiable {
     let id = UUID()
     let player: Player
+    let playerId: UUID // For easier lookup
+    let turnNumber: Int // Turn index for this player
     let darts: [ScoredThrow]
     let scoreBefore: Int
     let scoreAfter: Int
