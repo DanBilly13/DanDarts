@@ -13,26 +13,32 @@ struct MatchDetailView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        if isSheet {
-            // Sheet presentation - use StandardSheetView
-            StandardSheetView(
-                title: match.gameName,
-                dismissButtonTitle: "Done",
-                onDismiss: { dismiss() }
-            ) {
-                contentView
-            }
+        // Route to game-specific detail view
+        if match.gameName == "Halve It" {
+            HalveItMatchDetailView(match: match, isSheet: isSheet)
         } else {
-            // Navigation push - use standard ScrollView
-            ScrollView {
-                contentView
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 24)
+            // 301/501 matches use generic view
+            if isSheet {
+                // Sheet presentation - use StandardSheetView
+                StandardSheetView(
+                    title: match.gameName,
+                    dismissButtonTitle: "Done",
+                    onDismiss: { dismiss() }
+                ) {
+                    contentView
+                }
+            } else {
+                // Navigation push - use standard ScrollView
+                ScrollView {
+                    contentView
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 24)
+                }
+                .background(Color("BackgroundPrimary"))
+                .navigationTitle(match.gameName)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .tabBar)
             }
-            .background(Color("BackgroundPrimary"))
-            .navigationTitle(match.gameName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .tabBar)
         }
     }
     

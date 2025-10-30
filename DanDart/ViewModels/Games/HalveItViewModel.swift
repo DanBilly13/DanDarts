@@ -15,6 +15,8 @@ class HalveItViewModel: ObservableObject {
     let players: [Player]
     let difficulty: HalveItDifficulty
     let targets: [HalveItTarget]
+    let matchId: UUID
+    let gameId: UUID
     
     // MARK: - Game State
     @Published var currentPlayerIndex: Int = 0
@@ -50,10 +52,12 @@ class HalveItViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(players: [Player], difficulty: HalveItDifficulty) {
+    init(players: [Player], difficulty: HalveItDifficulty, matchId: UUID = UUID(), gameId: UUID) {
         self.players = players
         self.difficulty = difficulty
         self.targets = difficulty.generateTargets()
+        self.matchId = matchId
+        self.gameId = gameId
         
         // Initialize all players with 0 score
         for player in players {
@@ -193,6 +197,113 @@ class HalveItViewModel: ObservableObject {
         }
         
         winner = winningPlayer
+        
+        // Save match result
+        saveMatchResult()
+    }
+    
+    // MARK: - Match Storage
+    
+    /// Save match result to local storage and Supabase
+    private func saveMatchResult() {
+        guard let winner = winner else { return }
+        
+        // Convert turn history to MatchTurn format
+        let matchTurns = convertTurnHistory()
+        
+        // Create match players with final scores
+        let matchPlayers = players.map { player in
+            let playerTurns = matchTurns.filter { $0.id == player.id }
+            let totalDarts = playerTurns.reduce(0) { $0 + $1.darts.count }
+            
+            return MatchPlayer(
+                id: player.id,
+                displayName: player.displayName,
+                nickname: player.nickname,
+                avatarURL: player.avatarURL,
+                isGuest: player.isGuest,
+                finalScore: playerScores[player.id] ?? 0,
+                startingScore: 0, // Halve-It starts at 0
+                totalDartsThrown: totalDarts,
+                turns: playerTurns,
+                legsWon: 0 // Halve-It doesn't use legs
+            )
+        }
+        
+        // Create match result
+        let matchResult = MatchResult(
+            id: matchId,
+            gameType: "Halve It",
+            gameName: "Halve It",
+            players: matchPlayers,
+            winnerId: winner.id,
+            timestamp: Date(),
+            duration: 600, // Approximate duration
+            matchFormat: 1,
+            totalLegsPlayed: 1
+        )
+        
+        // Save to local storage
+        MatchStorageManager.shared.saveMatch(matchResult)
+        
+        // Save to Supabase (async)
+        Task {
+            do {
+                let matchService = MatchService()
+                
+                // Get winner's user ID (nil for guests)
+                let winnerId = winner.userId
+                
+                // Convert turn history to TurnHistory format
+                let supabaseTurns = turnHistory.enumerated().map { index, turn in
+                    let player = players.first { $0.id == turn.playerId }!
+                    return TurnHistory(
+                        player: player,
+                        playerId: turn.playerId,
+                        turnNumber: index + 1,
+                        darts: turn.darts,
+                        scoreBefore: turn.scoreBefore,
+                        scoreAfter: turn.scoreAfter,
+                        isBust: false
+                    )
+                }
+                
+                try await matchService.saveMatch(
+                    matchId: matchId,
+                    gameId: gameId.uuidString,
+                    players: players,
+                    winnerId: winnerId,
+                    startedAt: Date().addingTimeInterval(-600), // Approximate start time
+                    endedAt: Date(),
+                    turnHistory: supabaseTurns,
+                    matchFormat: 1, // Halve-It doesn't use legs
+                    legsWon: [:] // Halve-It doesn't use legs
+                )
+            } catch {
+                print("Failed to save match to Supabase: \(error)")
+            }
+        }
+    }
+    
+    /// Convert turn history to generic format for storage
+    private func convertTurnHistory() -> [MatchTurn] {
+        return turnHistory.enumerated().map { index, turn in
+            let darts = turn.darts.map { dart in
+                MatchDart(
+                    baseValue: dart.baseValue,
+                    multiplier: dart.scoreType.multiplier
+                )
+            }
+            
+            return MatchTurn(
+                id: turn.playerId,
+                turnNumber: index + 1,
+                darts: darts,
+                scoreBefore: turn.scoreBefore,
+                scoreAfter: turn.scoreAfter,
+                isBust: false // Halve-It doesn't have busts
+            )
+        }
     }
     
     // MARK: - Game Reset

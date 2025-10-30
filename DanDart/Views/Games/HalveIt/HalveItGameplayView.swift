@@ -28,7 +28,7 @@ struct HalveItGameplayView: View {
         self.game = game
         self.players = players
         self.difficulty = difficulty
-        _viewModel = StateObject(wrappedValue: HalveItViewModel(players: players, difficulty: difficulty))
+        _viewModel = StateObject(wrappedValue: HalveItViewModel(players: players, difficulty: difficulty, gameId: game.id))
     }
     
     var body: some View {
@@ -163,7 +163,7 @@ struct HalveItGameplayView: View {
                     navigateToGameEnd = false
                 },
                 onChangePlayers: {
-                    NavigationManager.shared.dismissToGamesList()
+                    navigateToGameEnd = false
                     dismiss()
                 },
                 onBackToGames: {
@@ -172,7 +172,7 @@ struct HalveItGameplayView: View {
                 },
                 matchFormat: nil,
                 legsWon: nil,
-                matchId: nil
+                matchId: viewModel.matchId
             )
         }
     }
