@@ -133,14 +133,14 @@ struct GameEndView: View {
                 // Action Buttons
                 VStack(spacing: 16) {
                     // Play Again Button (same players)
-                    AppButton(role: .primary, controlSize: .small, compact: true) {
+                    AppButton(role: .primary, controlSize: .regular, compact: true) {
                         onPlayAgain()
                     } label: {
                         Label("Play Again", systemImage: "arrow.clockwise")
                     }
                     
                     // Back to Games Button
-                    AppButton(role: .secondary, controlSize: .small, compact: true) {
+                    AppButton(role: .primaryOutline, controlSize: .regular, compact: true) {
                         onBackToGames()
                     } label: {
                         Label("Back to Games", systemImage: "house.fill")
@@ -158,20 +158,9 @@ struct GameEndView: View {
             // Navigate to Match Detail View
             if let matchId = matchId,
                let matchResult = MatchStorageManager.shared.loadMatch(byId: matchId) {
-                NavigationStack {
-                    MatchDetailView(match: matchResult)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("Done") {
-                                    showMatchDetails = false
-                                }
-                                .fontWeight(.semibold)
-                                .foregroundColor(Color("AccentPrimary"))
-                            }
-                        }
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+                MatchDetailView(match: matchResult, isSheet: true)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             } else {
                 // Fallback if match not found
                 VStack(spacing: 16) {

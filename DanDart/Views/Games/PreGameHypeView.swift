@@ -54,7 +54,7 @@ struct PreGameHypeView: View {
                     
                     // GET READY section at bottom
                     VStack(spacing: 16) {
-                        Text("GET READY! 🎯")
+                        Text("GET READY!")
                             .font(.system(size: 32, weight: .black, design: .default))
                             .foregroundColor(Color("AccentPrimary"))
                             .tracking(2)
@@ -145,27 +145,35 @@ struct PreGameHypeView: View {
     // 3 Players: Triangle layout (2 top, 1 bottom center)
     private var threePlayerLayout: some View {
         VStack(spacing: 40) {
-            HStack(spacing: 40) {
+            HStack(spacing: 0) {
                 playerCard(players[0], index: 0)
+                    .frame(maxWidth: .infinity)
                 playerCard(players[1], index: 1)
+                    .frame(maxWidth: .infinity)
             }
             
             playerCard(players[2], index: 2)
+                .frame(maxWidth: .infinity)
         }
     }
     
     // 4 Players: 2x2 grid
     private var fourPlayerLayout: some View {
         VStack(spacing: 40) {
-            HStack(spacing: 40) {
+            HStack(spacing: 0) {
                 playerCard(players[0], index: 0)
+                    .frame(maxWidth: .infinity)
                 playerCard(players[1], index: 1)
+                    .frame(maxWidth: .infinity)
             }
             
-            HStack(spacing: 40) {
+            HStack(spacing: 0) {
                 playerCard(players[2], index: 2)
+                    .frame(maxWidth: .infinity)
                 playerCard(players[3], index: 3)
+                    .frame(maxWidth: .infinity)
             }
+            
         }
     }
     
@@ -234,12 +242,11 @@ struct PreGameHypeView: View {
             // Stats (.footnote) - W in AccentSecondary, L in AccentPrimary
             HStack(spacing: 0) {
                 Text("W\(player.totalWins)")
-                    .font(.footnote)
+                        .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundColor(Color("AccentSecondary"))
-                
-                Text("L\(player.totalLosses)")
-                    .font(.footnote)
+                Text("W\(player.totalLosses)")
+                        .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundColor(Color("AccentPrimary"))
             }
@@ -300,5 +307,21 @@ struct PreGameHypeView: View {
         game: Game.previewHalveIt,
         players: [Player.mockGuest1],
         matchFormat: 1
+    )
+}
+
+#Preview("Pre-Game Hype - 3 Players") {
+    PreGameHypeView(
+        game: Game.preview301,
+        players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1],
+        matchFormat: 1
+    )
+}
+
+#Preview("Pre-Game Hype - 4 Players") {
+    PreGameHypeView(
+        game: Game.preview501,
+        players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
+        matchFormat: 3
     )
 }

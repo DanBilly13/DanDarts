@@ -37,44 +37,47 @@ struct FriendSearchView: View {
     }
     
     var body: some View {
-        NavigationView {
+        StandardSheetView(
+            title: "Find Friends",
+            dismissButtonTitle: "Back",
+            useScrollView: false,  // We manage our own scrolling
+            onDismiss: { dismiss() }
+        ) {
             VStack(spacing: 0) {
-                // Search Bar
+                // Search Bar (fixed at top)
                 HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
-                    
-                    TextField("Search by name or @handle", text: $searchQuery)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: searchQuery) { oldValue, newValue in
-                            performSearch(query: newValue)
-                        }
-                    
-                    if !searchQuery.isEmpty {
-                        Button(action: {
-                            searchQuery = ""
-                            searchResults = []
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                        }
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color("TextSecondary"))
+                
+                TextField("Search by name or @handle", text: $searchQuery)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color("TextPrimary"))
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .onChange(of: searchQuery) { oldValue, newValue in
+                        performSearch(query: newValue)
+                    }
+                
+                if !searchQuery.isEmpty {
+                    Button(action: {
+                        searchQuery = ""
+                        searchResults = []
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color("InputBackground"))
-                .cornerRadius(12)
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 16)
-                
-                // Content Area
-                if isSearching {
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color("InputBackground"))
+            .cornerRadius(12)
+            .padding(.bottom, 16)
+            
+            // Content Area
+            if isSearching {
                     // Loading State
                     VStack(spacing: 16) {
                         Spacer()
@@ -89,7 +92,7 @@ struct FriendSearchView: View {
                         
                         Spacer()
                     }
-                } else if searchQuery.isEmpty {
+            } else if searchQuery.isEmpty {
                     // Empty State - No Search Yet
                     VStack(spacing: 16) {
                         Spacer()
@@ -112,7 +115,7 @@ struct FriendSearchView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 32)
-                } else if searchResults.isEmpty {
+            } else if searchResults.isEmpty {
                     // No Results State
                     VStack(spacing: 16) {
                         Spacer()
@@ -134,7 +137,7 @@ struct FriendSearchView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 32)
-                } else {
+            } else {
                     // Search Results List - Mixed (Friends + New People)
                     ScrollView {
                         VStack(spacing: 16) {
@@ -234,43 +237,20 @@ struct FriendSearchView: View {
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
                     }
-                }
             }
-            .background(Color("BackgroundPrimary"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Find Friends")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Back")
-                                .font(.system(size: 16, weight: .medium))
-                        }
-                        .foregroundColor(Color("AccentPrimary"))
-                    }
-                }
             }
-            .alert("Error", isPresented: .constant(addFriendError != nil)) {
-                Button("OK") {
-                    addFriendError = nil
-                }
-            } message: {
-                if let error = addFriendError {
-                    Text(error)
-                }
+        }
+        .alert("Error", isPresented: .constant(addFriendError != nil)) {
+            Button("OK") {
+                addFriendError = nil
             }
-            .onAppear {
-                loadExistingFriends()
+        } message: {
+            if let error = addFriendError {
+                Text(error)
             }
+        }
+        .onAppear {
+            loadExistingFriends()
         }
     }
     

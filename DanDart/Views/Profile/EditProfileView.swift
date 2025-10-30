@@ -54,184 +54,168 @@ struct EditProfileView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Avatar Selection
-                    VStack(spacing: 16) {
-                        Text("Profile Picture")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        AvatarSelectionView(
-                            selectedAvatar: $selectedAvatar,
-                            selectedPhotoItem: $selectedPhotoItem,
-                            selectedAvatarImage: $selectedAvatarImage
-                        )
-                    }
+        StandardSheetView(
+            title: "Edit Profile",
+            dismissButtonTitle: "Cancel",
+            primaryActionTitle: isSaving || isUploadingAvatar ? "Saving..." : "Save Changes",
+            primaryActionEnabled: isValid && !isSaving && !isUploadingAvatar,
+            onDismiss: { dismiss() },
+            onPrimaryAction: {
+                Task {
+                    await handleSave()
+                }
+            }
+        ) {
+            VStack(spacing: 24) {
+                // Avatar Selection
+                VStack(spacing: 16) {
+                    Text("Profile Picture")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(Color("TextPrimary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    // Name Field (locked for Google users)
-                    if isGoogleUser {
-                        LockedTextField(
-                            label: "Name",
-                            value: displayName
-                        )
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            DartTextField(
-                                label: "Name",
-                                placeholder: "Enter your name",
-                                text: $displayName,
-                                textContentType: .name,
-                                autocapitalization: .words,
-                                onSubmit: {
-                                    focusedField = nil
-                                }
-                            )
-                            
-                            // Show character count only when approaching limit or invalid
-                            if displayName.count > 45 || displayName.count < 2 && !displayName.isEmpty {
-                                Text("\(displayName.count)/50 characters")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(displayName.count > 50 || displayName.count < 2 ? .red : Color("TextSecondary"))
-                                    .padding(.leading, 2)
-                            }
-                        }
-                    }
-                    
-                    // Nickname Field (always editable)
+                    AvatarSelectionView(
+                        selectedAvatar: $selectedAvatar,
+                        selectedPhotoItem: $selectedPhotoItem,
+                        selectedAvatarImage: $selectedAvatarImage
+                    )
+                }
+                
+                // Name Field (locked for Google users)
+                if isGoogleUser {
+                    LockedTextField(
+                        label: "Name",
+                        value: displayName
+                    )
+                } else {
                     VStack(alignment: .leading, spacing: 8) {
                         DartTextField(
-                            label: "Nickname",
-                            placeholder: "Your game nickname",
-                            text: $nickname,
-                            autocapitalization: .never,
-                            autocorrectionDisabled: true,
+                            label: "Name",
+                            placeholder: "Enter your name",
+                            text: $displayName,
+                            textContentType: .name,
+                            autocapitalization: .words,
                             onSubmit: {
                                 focusedField = nil
                             }
                         )
                         
                         // Show character count only when approaching limit or invalid
-                        if nickname.count > 15 || nickname.count < 2 && !nickname.isEmpty {
-                            Text("\(nickname.count)/20 characters")
+                        if displayName.count > 45 || displayName.count < 2 && !displayName.isEmpty {
+                            Text("\(displayName.count)/50 characters")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(nickname.count > 20 || nickname.count < 2 ? .red : Color("TextSecondary"))
+                                .foregroundColor(displayName.count > 50 || displayName.count < 2 ? .red : Color("TextSecondary"))
                                 .padding(.leading, 2)
                         }
                     }
-                    
-                    // Email Field (locked for Google users)
-                    if isGoogleUser {
-                        LockedTextField(
-                            label: "Email",
-                            value: email
-                        )
-                    } else {
-                        DartTextField(
-                            label: "Email",
-                            placeholder: "Enter your email",
-                            text: $email,
-                            keyboardType: .emailAddress,
-                            textContentType: .emailAddress,
-                            autocapitalization: .never,
-                            autocorrectionDisabled: true,
-                            onSubmit: {
-                                focusedField = nil
-                            }
-                        )
-                    }
-                    
-                    // Change Password Button (email users only)
-                    if !isGoogleUser {
-                        Button(action: {
-                            // TODO: Implement change password flow
-                            print("Change password tapped")
-                        }) {
-                            HStack {
-                                Image(systemName: "lock.rotation")
-                                    .font(.system(size: 16, weight: .medium))
-                                Text("Change Password")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(Color("TextPrimary"))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(Color("InputBackground"))
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                            )
+                }
+                
+                // Nickname Field (always editable)
+                VStack(alignment: .leading, spacing: 8) {
+                    DartTextField(
+                        label: "Nickname",
+                        placeholder: "Your game nickname",
+                        text: $nickname,
+                        autocapitalization: .never,
+                        autocorrectionDisabled: true,
+                        onSubmit: {
+                            focusedField = nil
                         }
-                    }
+                    )
                     
-                    // Error Message
-                    if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.center)
+                    // Show character count only when approaching limit or invalid
+                    if nickname.count > 15 || nickname.count < 2 && !nickname.isEmpty {
+                        Text("\(nickname.count)/20 characters")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(nickname.count > 20 || nickname.count < 2 ? .red : Color("TextSecondary"))
+                            .padding(.leading, 2)
                     }
-                    
-                    // Save Button
-                    AppButton(
-                        role: .primary,
-                        controlSize: .regular,
-                        isDisabled: !isValid || isSaving || isUploadingAvatar
-                    ) {
-                        Task {
-                            await handleSave()
+                }
+                
+                // Email Field (locked for Google users)
+                if isGoogleUser {
+                    LockedTextField(
+                        label: "Email",
+                        value: email
+                    )
+                } else {
+                    DartTextField(
+                        label: "Email",
+                        placeholder: "Enter your email",
+                        text: $email,
+                        keyboardType: .emailAddress,
+                        textContentType: .emailAddress,
+                        autocapitalization: .never,
+                        autocorrectionDisabled: true,
+                        onSubmit: {
+                            focusedField = nil
                         }
-                    } label: {
+                    )
+                }
+                
+                // Change Password Button (email users only)
+                if !isGoogleUser {
+                    Button(action: {
+                        // TODO: Implement change password flow
+                        print("Change password tapped")
+                    }) {
                         HStack {
-                            if isSaving || isUploadingAvatar {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            }
-                            Text(isSaving || isUploadingAvatar ? "Saving..." : "Save Changes")
+                            Image(systemName: "lock.rotation")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Change Password")
+                                .font(.system(size: 16, weight: .semibold))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
                         }
+                        .foregroundColor(Color("TextPrimary"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(Color("InputBackground"))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                        )
                     }
-                    .padding(.top, 16)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 24)
-                .padding(.bottom, 40)
-            }
-            .background(Color("BackgroundPrimary"))
-            .navigationTitle("Edit Profile")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                
+                // Error Message
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Loading indicator when saving
+                if isSaving || isUploadingAvatar {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: Color("AccentPrimary")))
+                            .scaleEffect(0.8)
+                        Text(isUploadingAvatar ? "Uploading photo..." : "Saving changes...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
                     }
-                    .foregroundColor(Color("AccentPrimary"))
+                    .padding(.top, 8)
                 }
             }
-            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .onAppear {
-                loadCurrentProfile()
+        }
+        .onAppear {
+            loadCurrentProfile()
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            Task {
+                await handlePhotoSelection(newItem)
             }
-            .onChange(of: selectedPhotoItem) { _, newItem in
-                Task {
-                    await handlePhotoSelection(newItem)
-                }
+        }
+        .alert("Success", isPresented: $showSuccessAlert) {
+            Button("OK") {
+                dismiss()
             }
-            .alert("Success", isPresented: $showSuccessAlert) {
-                Button("OK") {
-                    dismiss()
-                }
-            } message: {
-                Text("Your profile has been updated successfully")
-            }
+        } message: {
+            Text("Your profile has been updated successfully")
         }
     }
     

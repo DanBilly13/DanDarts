@@ -9,33 +9,52 @@ import SwiftUI
 
 struct MatchDetailView: View {
     let match: MatchResult
+    var isSheet: Bool = false  // Set to true when presented as sheet
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Date and Time
-                dateHeader
-                
-                // Players and Scores
-                playersSection
-                
-                // Stats Section (for all matches)
-                if !match.players.isEmpty {
-                    statsComparisonSection
-                }
-                
-                // Turn-by-Turn Breakdown
-                if !match.players.isEmpty && !match.players[0].turns.isEmpty {
-                    turnBreakdownSection
-                }
+        if isSheet {
+            // Sheet presentation - use StandardSheetView
+            StandardSheetView(
+                title: match.gameName,
+                dismissButtonTitle: "Done",
+                onDismiss: { dismiss() }
+            ) {
+                contentView
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 24)
+        } else {
+            // Navigation push - use standard ScrollView
+            ScrollView {
+                contentView
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 24)
+            }
+            .background(Color("BackgroundPrimary"))
+            .navigationTitle(match.gameName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .tabBar)
         }
-        .background(Color("BackgroundPrimary"))
-        .navigationTitle(match.gameName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
+    }
+    
+    // Shared content for both contexts
+    private var contentView: some View {
+        VStack(spacing: 24) {
+            // Date and Time
+            dateHeader
+            
+            // Players and Scores
+            playersSection
+            
+            // Stats Section (for all matches)
+            if !match.players.isEmpty {
+                statsComparisonSection
+            }
+            
+            // Turn-by-Turn Breakdown
+            if !match.players.isEmpty && !match.players[0].turns.isEmpty {
+                turnBreakdownSection
+            }
+        }
     }
     
     // MARK: - Sub Views
@@ -476,7 +495,7 @@ struct PlayerStatBar: View {
                 ZStack(alignment: .leading) {
                     // Background bar (gray)
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color("BackgroundPrimary"))
+                        .fill(Color("InputBackground"))
                         .frame(height: 12)
                     
                     // Filled bar (player's color)
