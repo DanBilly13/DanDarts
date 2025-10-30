@@ -12,9 +12,15 @@ import SwiftUI
 
 struct ScoringButtonGrid: View {
     let onScoreSelected: (Int, ScoreType) -> Void
+    let showBustButton: Bool
     
     // Sequential numbers 1-20
     private let dartboardNumbers = Array(1...20)
+    
+    init(onScoreSelected: @escaping (Int, ScoreType) -> Void, showBustButton: Bool = true) {
+        self.onScoreSelected = onScoreSelected
+        self.showBustButton = showBustButton
+    }
     
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 5), spacing: 12) {
@@ -48,12 +54,14 @@ struct ScoringButtonGrid: View {
                 onScoreSelected: onScoreSelected
             )
             
-            // Bust
-            ScoringButton(
-                title: "Bust",
-                baseValue: -1, // -1 indicates bust
-                onScoreSelected: onScoreSelected
-            )
+            // Bust (conditionally shown)
+            if showBustButton {
+                ScoringButton(
+                    title: "Bust",
+                    baseValue: -1, // -1 indicates bust
+                    onScoreSelected: onScoreSelected
+                )
+            }
         }
     }
 }

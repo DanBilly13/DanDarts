@@ -30,16 +30,20 @@ enum HalveItTarget: Equatable, Codable {
     func isHit(by dart: ScoredThrow) -> Bool {
         switch self {
         case .single(let targetNum):
-            return dart.baseValue == targetNum && dart.scoreType == .single
+            // Singles are flexible: any multiplier of the target number counts
+            return dart.baseValue == targetNum
             
         case .double(let targetNum):
+            // Doubles are strict: must hit exactly double
             return dart.baseValue == targetNum && dart.scoreType == .double
             
         case .triple(let targetNum):
+            // Triples are strict: must hit exactly triple
             return dart.baseValue == targetNum && dart.scoreType == .triple
             
         case .bull:
-            return dart.baseValue == 25 // Both single and double bull count
+            // Accept both 25 (single bull) and 50 (double bull/Bull button)
+            return dart.baseValue == 25 || dart.baseValue == 50
         }
     }
     

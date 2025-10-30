@@ -46,10 +46,11 @@ struct HalveItGameplayView: View {
             .padding(.horizontal, 16)
             .padding(.top, 56)
             
-            // Current throw display (with tap-to-edit)
-            CurrentThrowDisplay(
+            // Current throw display (with tap-to-edit and target validation)
+            HalveItThrowDisplay(
                 currentThrow: viewModel.currentThrow,
                 selectedDartIndex: viewModel.selectedDartIndex,
+                currentTarget: viewModel.currentTarget,
                 onDartTapped: { index in
                     viewModel.selectDart(at: index)
                 }
@@ -64,11 +65,12 @@ struct HalveItGameplayView: View {
             )
             .padding(.top, 8)
             
-            // Scoring button grid
+            // Scoring button grid (no bust button for Halve-It)
             ScoringButtonGrid(
                 onScoreSelected: { baseValue, scoreType in
                     viewModel.recordThrow(baseValue: baseValue, scoreType: scoreType)
-                }
+                },
+                showBustButton: false
             )
             .padding(.horizontal, 16)
             .padding(.top, 16)
