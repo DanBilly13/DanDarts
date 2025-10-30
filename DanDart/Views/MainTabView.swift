@@ -100,8 +100,13 @@ struct GamesTabView: View {
             }
             .background(Color("BackgroundPrimary"))
             .navigationDestination(for: Game.self) { game in
-                GameSetupView(game: game)
-                    .background(Color.black)
+                if game.title == "Halve-It" {
+                    HalveItSetupView(game: game)
+                        .background(Color.black)
+                } else {
+                    GameSetupView(game: game)
+                        .background(Color.black)
+                }
             }
             .onChange(of: navigationManager.shouldDismissToGamesList) {
                 if navigationManager.shouldDismissToGamesList {

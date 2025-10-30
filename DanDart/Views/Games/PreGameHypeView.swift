@@ -11,9 +11,17 @@ struct PreGameHypeView: View {
     let game: Game
     let players: [Player]
     let matchFormat: Int
+    let halveItDifficulty: HalveItDifficulty?
     
     // Navigation state
     @State private var navigateToGameplay = false
+    
+    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil) {
+        self.game = game
+        self.players = players
+        self.matchFormat = matchFormat
+        self.halveItDifficulty = halveItDifficulty
+    }
     
     @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
@@ -95,8 +103,15 @@ struct PreGameHypeView: View {
             navigateToGameplay = true
         }
         .navigationDestination(isPresented: $navigateToGameplay) {
-            GameplayView(game: game, players: players, matchFormat: matchFormat)
-                .navigationBarBackButtonHidden(true)
+            if let difficulty = halveItDifficulty {
+                // Halve It game
+                HalveItGameplayView(game: game, players: players, difficulty: difficulty)
+                    .navigationBarBackButtonHidden(true)
+            } else {
+                // 301/501 games
+                GameplayView(game: game, players: players, matchFormat: matchFormat)
+                    .navigationBarBackButtonHidden(true)
+            }
         }
         .background(Color.black)
         .preferredColorScheme(.dark)

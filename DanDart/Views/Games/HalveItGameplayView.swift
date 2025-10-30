@@ -33,37 +33,35 @@ struct HalveItGameplayView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Target progression at top
-            TargetProgressView(
-                targets: viewModel.targets,
-                currentRound: viewModel.currentRound
-            )
-            .padding(.top, 56)
-            
-            // Player score cards
-            HalveItPlayerCards(
+            // Player score cards (reusing 301 component)
+            StackedPlayerCards(
                 players: viewModel.players,
                 currentPlayerIndex: viewModel.currentPlayerIndex,
                 playerScores: viewModel.playerScores,
-                currentThrow: viewModel.currentThrow
+                currentThrow: viewModel.currentThrow,
+                legsWon: [:],  // Not used in Halve It
+                matchFormat: 1  // Not used in Halve It
             )
             .padding(.horizontal, 16)
-            .padding(.top, 16)
+            .padding(.top, 56)
             
-            // Current throw display
+            // Current throw display (with tap-to-edit)
             CurrentThrowDisplay(
                 currentThrow: viewModel.currentThrow,
-                selectedDartIndex: nil,
-                onDartTapped: { _ in }
+                selectedDartIndex: viewModel.selectedDartIndex,
+                onDartTapped: { index in
+                    viewModel.selectDart(at: index)
+                }
             )
             .padding(.horizontal, 16)
             .padding(.top, 8)
             
-            // Round info
-            Text("Round \(viewModel.currentRound + 1)/6 • Target: \(viewModel.currentTarget.displayText)")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color("TextSecondary"))
-                .padding(.top, 8)
+            // Target progression (moved below current throw)
+            TargetProgressView(
+                targets: viewModel.targets,
+                currentRound: viewModel.currentRound
+            )
+            .padding(.top, 8)
             
             // Scoring button grid
             ScoringButtonGrid(
@@ -76,27 +74,30 @@ struct HalveItGameplayView: View {
             
             Spacer()
             
-            // Action buttons
-            HStack(spacing: 12) {
-                // Undo button
-                if !viewModel.currentThrow.isEmpty {
-                    AppButton(role: .secondary, action: {
-                        viewModel.undoLastDart()
-                    }) {
-                        Image(systemName: "arrow.uturn.backward")
-                    }
-                    .frame(width: 60)
+            // Save Score button container (fixed height to prevent layout shift)
+            ZStack {
+                // Invisible placeholder to maintain layout space
+                AppButton(role: .primary, action: {}) {
+                    Text("Save Score")
                 }
+                .opacity(0)
+                .disabled(true)
                 
-                // Save Score button
+                // Actual button that pops in/out
                 AppButton(
                     role: .primary,
                     action: { viewModel.completeTurn() }
                 ) {
                     Label("Save Score", systemImage: "checkmark.circle.fill")
                 }
-                .disabled(viewModel.currentThrow.isEmpty)
-                .opacity(viewModel.currentThrow.isEmpty ? 0.5 : 1.0)
+                .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
+                .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
+                // Pop animation when turn is complete (3 darts entered)
+                .popAnimation(
+                    active: viewModel.isTurnComplete,
+                    duration: 0.28,
+                    bounce: 0.22
+                )
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 34)
@@ -150,126 +151,39 @@ struct HalveItGameplayView: View {
             }
         }
         .navigationDestination(isPresented: $navigateToGameEnd) {
-            if let winner = viewModel.winner {
-                GameEndView(
-                    game: game,
-                    winner: winner,
-                    players: viewModel.players,
-                    onPlayAgain: {
-                        viewModel.resetGame()
-                        navigateToGameEnd = false
-                    },
-                    onChangePlayers: {
-                        NavigationManager.shared.dismissToGamesList()
-                        dismiss()
-                    },
-                    onBackToGames: {
-                        NavigationManager.shared.dismissToGamesList()
-                        dismiss()
-                    },
-                    matchFormat: nil,
-                    legsWon: nil,
-                    matchId: nil
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Halve It Player Cards
-
-struct HalveItPlayerCards: View {
-    let players: [Player]
-    let currentPlayerIndex: Int
-    let playerScores: [UUID: Int]
-    let currentThrow: [ScoredThrow]
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
-                HalveItPlayerCard(
-                    player: player,
-                    score: playerScores[player.id] ?? 0,
-                    isActive: index == currentPlayerIndex,
-                    currentThrow: index == currentPlayerIndex ? currentThrow : []
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Halve It Player Card
-
-struct HalveItPlayerCard: View {
-    let player: Player
-    let score: Int
-    let isActive: Bool
-    let currentThrow: [ScoredThrow]
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Avatar
-            AsyncAvatarImage(
-                avatarURL: player.avatarURL,
-                size: 40
+            GameEndView(
+                game: game,
+                winner: viewModel.winner ?? viewModel.players[0],
+                players: viewModel.players,
+                onPlayAgain: {
+                    viewModel.resetGame()
+                    navigateToGameEnd = false
+                },
+                onChangePlayers: {
+                    NavigationManager.shared.dismissToGamesList()
+                    dismiss()
+                },
+                onBackToGames: {
+                    NavigationManager.shared.dismissToGamesList()
+                    dismiss()
+                },
+                matchFormat: nil,
+                legsWon: nil,
+                matchId: nil
             )
-            
-            // Player info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(player.displayName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color("TextPrimary"))
-                
-                if let nickname = player.nickname {
-                    Text("@\(nickname)")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundColor(Color("TextSecondary"))
-                }
-            }
-            
-            Spacer()
-            
-            // Score display
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(score)")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(isActive ? Color("AccentPrimary") : Color("TextPrimary"))
-                
-                if isActive && !currentThrow.isEmpty {
-                    Text("+\(currentThrow.map { $0.totalValue }.reduce(0, +))")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color("AccentSecondary"))
-                }
-            }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color("InputBackground"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(
-                            isActive ? Color("AccentPrimary") : Color.clear,
-                            lineWidth: 2
-                        )
-                )
-        )
     }
 }
 
 // MARK: - Preview
 
 #Preview("Halve It Gameplay") {
-    NavigationStack {
+    let games = Game.loadGames()
+    let halveItGame = games.first(where: { $0.title == "Halve-It" })!
+    
+    return NavigationStack {
         HalveItGameplayView(
-            game: Game(
-                id: "halve_it",
-                title: "Halve It",
-                description: "Hit targets or halve your score",
-                iconName: "divide.circle.fill",
-                minPlayers: 1,
-                maxPlayers: 4
-            ),
+            game: halveItGame,
             players: [Player.mockGuest1, Player.mockGuest2],
             difficulty: .medium
         )

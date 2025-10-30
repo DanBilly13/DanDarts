@@ -20,6 +20,7 @@ class HalveItViewModel: ObservableObject {
     @Published var currentPlayerIndex: Int = 0
     @Published var currentRound: Int = 0  // 0-5 (6 rounds total)
     @Published var currentThrow: [ScoredThrow] = []
+    @Published var selectedDartIndex: Int? = nil  // For tap-to-edit functionality
     @Published var playerScores: [UUID: Int] = [:]  // Player ID -> current score
     @Published var isGameOver: Bool = false
     @Published var winner: Player?
@@ -40,6 +41,11 @@ class HalveItViewModel: ObservableObject {
         playerScores[currentPlayer.id] ?? 0
     }
     
+    var isTurnComplete: Bool {
+        // Turn is complete when all 3 darts are thrown
+        currentThrow.count == 3
+    }
+    
     // MARK: - Initialization
     init(players: [Player], difficulty: HalveItDifficulty) {
         self.players = players
@@ -56,21 +62,36 @@ class HalveItViewModel: ObservableObject {
     
     /// Record a dart throw
     func recordThrow(baseValue: Int, scoreType: ScoreType) {
-        guard currentThrow.count < 3 else { return }
-        
-        let dart = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
-        currentThrow.append(dart)
+        // If a dart is selected, replace it instead of appending
+        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
+            let dart = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
+            currentThrow[selectedIndex] = dart
+            selectedDartIndex = nil  // Clear selection after replacement
+        } else {
+            // Normal append behavior
+            guard currentThrow.count < 3 else { return }
+            let dart = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
+            currentThrow.append(dart)
+        }
+    }
+    
+    /// Select a dart for editing
+    func selectDart(at index: Int) {
+        guard index < currentThrow.count else { return }
+        selectedDartIndex = (selectedDartIndex == index) ? nil : index  // Toggle selection
     }
     
     /// Undo the last dart in current throw
     func undoLastDart() {
         guard !currentThrow.isEmpty else { return }
         currentThrow.removeLast()
+        selectedDartIndex = nil  // Clear selection when undoing
     }
     
     /// Clear all darts in current throw
     func clearThrow() {
         currentThrow.removeAll()
+        selectedDartIndex = nil  // Clear selection when clearing
     }
     
     // MARK: - Turn Management
@@ -116,8 +137,9 @@ class HalveItViewModel: ObservableObject {
         )
         turnHistory.append(turnRecord)
         
-        // Clear current throw
+        // Clear current throw and selection
         currentThrow.removeAll()
+        selectedDartIndex = nil
         
         // Move to next player or next round
         if currentPlayerIndex < players.count - 1 {
@@ -163,6 +185,7 @@ class HalveItViewModel: ObservableObject {
         currentPlayerIndex = 0
         currentRound = 0
         currentThrow.removeAll()
+        selectedDartIndex = nil
         isGameOver = false
         winner = nil
         turnHistory.removeAll()
