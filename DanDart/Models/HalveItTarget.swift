@@ -42,8 +42,8 @@ enum HalveItTarget: Equatable, Codable {
             return dart.baseValue == targetNum && dart.scoreType == .triple
             
         case .bull:
-            // Accept both 25 (single bull) and 50 (double bull/Bull button)
-            return dart.baseValue == 25 || dart.baseValue == 50
+            // Only accept 50 (double bull/Bull button), not 25 (single bull)
+            return dart.baseValue == 50
         }
     }
     

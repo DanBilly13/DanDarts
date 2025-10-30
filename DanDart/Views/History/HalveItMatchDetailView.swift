@@ -204,12 +204,14 @@ struct RoundRow: View {
                 ForEach(Array(players.enumerated()), id: \.offset) { playerIndex, player in
                     if roundIndex < player.turns.count {
                         let turn = player.turns[roundIndex]
+                        let hits = turn.darts.count
                         
                         // Dart indicators for this player (12px circles, 12px gap)
+                        // Filled circles = hits, gray circles = misses
                         HStack(spacing: 12) {
                             ForEach(0..<3) { dartIndex in
                                 Circle()
-                                    .fill(dartIndex < turn.darts.count ? playerColor(for: playerIndex) : Color("TextSecondary").opacity(0.3))
+                                    .fill(dartIndex < hits ? playerColor(for: playerIndex) : Color("TextSecondary").opacity(0.3))
                                     .frame(width: 12, height: 12)
                             }
                         }

@@ -133,13 +133,17 @@ class HalveItViewModel: ObservableObject {
         // Trigger score animation (arcade-style pop)
         showScoreAnimation = true
         
-        // Record turn in history
+        // Record turn in history (only include darts that hit the target)
+        let hitDarts = currentThrow.filter { dart in
+            currentTarget.isHit(by: dart)
+        }
+        
         let turnRecord = HalveItTurnHistory(
             playerId: currentPlayer.id,
             playerName: currentPlayer.displayName,
             round: currentRound,
             target: currentTarget,
-            darts: currentThrow,
+            darts: hitDarts, // Only darts that hit
             scoreBefore: scoreBefore,
             scoreAfter: scoreAfter,
             pointsScored: pointsScored,
