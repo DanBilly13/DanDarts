@@ -1,13 +1,13 @@
 //
-//  GameSetupView.swift
+//  CountdownSetupView.swift
 //  DanDart
 //
-//  Game setup screen for configuring players and game options
+//  Game setup screen for countdown games (301/501) with player selection and match format
 //
 
 import SwiftUI
 
-struct GameSetupView: View {
+struct CountdownSetupView: View {
     let game: Game
     @State private var selectedPlayers: [Player] = []
     @State private var showSearchPlayer: Bool = false
@@ -468,14 +468,14 @@ struct SearchPlayerSheet: View {
 
 // MARK: - Preview
 #Preview {
-    GameSetupView(game: Game.preview301)
+    CountdownSetupView(game: Game.preview301)
 }
 
-#Preview("GameSetup - 501") {
-    GameSetupView(game: Game.preview501)
+#Preview("CountdownSetup - 501") {
+    CountdownSetupView(game: Game.preview501)
 }
 
-#Preview("GameSetup - Dark Mode") {
-    GameSetupView(game: Game.previewHalveIt)
+#Preview("CountdownSetup - Dark Mode") {
+    CountdownSetupView(game: Game.preview301)
         .preferredColorScheme(.dark)
 }

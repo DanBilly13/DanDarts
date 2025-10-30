@@ -1,20 +1,20 @@
 //
-//  GameplayView.swift
+//  CountdownGameplayView.swift
 //  DanDart
 //
-//  Full-screen gameplay view for dart scoring (301 game mode)
+//  Full-screen gameplay view for countdown games (301/501)
 //  Design: Calculator-inspired scoring with dark theme
 //
 
 import SwiftUI
 
-struct GameplayView: View {
+struct CountdownGameplayView: View {
     let game: Game
     let players: [Player]
     let matchFormat: Int
     
     // Game state managed by ViewModel
-    @StateObject private var gameViewModel: GameViewModel
+    @StateObject private var gameViewModel: CountdownViewModel
     @StateObject private var menuCoordinator = MenuCoordinator.shared
     @State private var showInstructions: Bool = false
     @State private var showRestartAlert: Bool = false
@@ -29,7 +29,7 @@ struct GameplayView: View {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
-        _gameViewModel = StateObject(wrappedValue: GameViewModel(game: game, players: players, matchFormat: matchFormat))
+        _gameViewModel = StateObject(wrappedValue: CountdownViewModel(game: game, players: players, matchFormat: matchFormat))
     }
     
     var body: some View {
@@ -446,9 +446,9 @@ struct CheckoutSuggestionView: View {
 
 
 // MARK: - Preview
-#Preview("Gameplay - 301") {
+#Preview("Countdown - 301") {
     NavigationStack {
-        GameplayView(
+        CountdownGameplayView(
             game: Game.preview301,
             players: [Player.mockGuest1, Player.mockGuest2]
         )
@@ -457,7 +457,7 @@ struct CheckoutSuggestionView: View {
 
 #Preview("Best of 3") {
     NavigationStack {
-        GameplayView(
+        CountdownGameplayView(
             game: Game.preview301,
             players: [Player.mockGuest1, Player.mockGuest2],
             matchFormat: 3
@@ -467,7 +467,7 @@ struct CheckoutSuggestionView: View {
 
 #Preview("Best of 5") {
     NavigationStack {
-        GameplayView(
+        CountdownGameplayView(
             game: Game.preview501,
             players: [Player.mockGuest1, Player.mockGuest2],
             matchFormat: 5
@@ -477,7 +477,7 @@ struct CheckoutSuggestionView: View {
 
 #Preview("Best of 7 - 4 Players") {
     NavigationStack {
-        GameplayView(
+        CountdownGameplayView(
             game: Game.preview301,
             players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
             matchFormat: 7
@@ -487,7 +487,7 @@ struct CheckoutSuggestionView: View {
 
 #Preview("3 Players") {
     NavigationStack {
-        GameplayView(
+        CountdownGameplayView(
             game: Game.preview301,
             players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
         )

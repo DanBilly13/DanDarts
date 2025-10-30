@@ -108,8 +108,8 @@ struct PreGameHypeView: View {
                 HalveItGameplayView(game: game, players: players, difficulty: difficulty)
                     .navigationBarBackButtonHidden(true)
             } else {
-                // 301/501 games
-                GameplayView(game: game, players: players, matchFormat: matchFormat)
+                // 301/501 countdown games
+                CountdownGameplayView(game: game, players: players, matchFormat: matchFormat)
                     .navigationBarBackButtonHidden(true)
             }
         }

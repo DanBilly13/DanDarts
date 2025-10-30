@@ -1,15 +1,15 @@
 //
-//  GameViewModel.swift
+//  CountdownViewModel.swift
 //  DanDart
 //
-//  Game state manager for 301 dart game
+//  Game state manager for countdown games (301/501)
 //  Handles scoring, turn management, and win detection
 //
 
 import SwiftUI
 
 @MainActor
-class GameViewModel: ObservableObject {
+class CountdownViewModel: ObservableObject {
     // MARK: - Published Properties
     
     @Published var players: [Player]

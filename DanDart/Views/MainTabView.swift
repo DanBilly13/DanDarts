@@ -104,7 +104,7 @@ struct GamesTabView: View {
                     HalveItSetupView(game: game)
                         .background(Color.black)
                 } else {
-                    GameSetupView(game: game)
+                    CountdownSetupView(game: game)
                         .background(Color.black)
                 }
             }
