@@ -25,6 +25,9 @@ class HalveItViewModel: ObservableObject {
     @Published var isGameOver: Bool = false
     @Published var winner: Player?
     
+    // Animation state
+    @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
+    
     // MARK: - Turn History
     @Published var turnHistory: [HalveItTurnHistory] = []
     
@@ -123,6 +126,9 @@ class HalveItViewModel: ObservableObject {
         // Update player score
         playerScores[currentPlayer.id] = scoreAfter
         
+        // Trigger score animation (arcade-style pop)
+        showScoreAnimation = true
+        
         // Record turn in history
         let turnRecord = HalveItTurnHistory(
             playerId: currentPlayer.id,
@@ -141,20 +147,30 @@ class HalveItViewModel: ObservableObject {
         currentThrow.removeAll()
         selectedDartIndex = nil
         
-        // Move to next player or next round
-        if currentPlayerIndex < players.count - 1 {
-            // Next player's turn in same round
-            currentPlayerIndex += 1
-        } else {
-            // All players finished this round
-            currentPlayerIndex = 0
+        // Delay player/round switch to allow score animation to complete
+        Task {
+            // Wait for animation to complete (grow + immediate shrink)
+            try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
+            showScoreAnimation = false
             
-            if currentRound < targets.count - 1 {
-                // Move to next round
-                currentRound += 1
+            // Pause before rotating cards
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds pause
+            
+            // Move to next player or next round
+            if currentPlayerIndex < players.count - 1 {
+                // Next player's turn in same round
+                currentPlayerIndex += 1
             } else {
-                // Game over - all rounds complete
-                endGame()
+                // All players finished this round
+                currentPlayerIndex = 0
+                
+                if currentRound < targets.count - 1 {
+                    // Move to next round
+                    currentRound += 1
+                } else {
+                    // Game over - all rounds complete
+                    endGame()
+                }
             }
         }
     }

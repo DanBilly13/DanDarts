@@ -40,7 +40,8 @@ struct HalveItGameplayView: View {
                 playerScores: viewModel.playerScores,
                 currentThrow: viewModel.currentThrow,
                 legsWon: [:],  // Not used in Halve It
-                matchFormat: 1  // Not used in Halve It
+                matchFormat: 1,  // Not used in Halve It
+                showScoreAnimation: viewModel.showScoreAnimation
             )
             .padding(.horizontal, 16)
             .padding(.top, 56)

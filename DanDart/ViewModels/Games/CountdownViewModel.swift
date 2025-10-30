@@ -29,6 +29,9 @@ class CountdownViewModel: ObservableObject {
     @Published var legWinner: Player? = nil // Winner of current leg (before match winner)
     @Published var isMatchWon: Bool = false // True when match is won (not just leg)
     
+    // Animation state
+    @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
+    
     // Match saving
     @Published var matchId: UUID? = nil // ID for saved match
     
@@ -248,6 +251,9 @@ class CountdownViewModel: ObservableObject {
         // Valid score - update player score
         playerScores[currentPlayer.id] = newScore
         
+        // Trigger score animation (arcade-style pop)
+        showScoreAnimation = true
+        
         // Save turn history before checking for winner
         saveTurnHistory(
             player: currentPlayer,
@@ -299,13 +305,21 @@ class CountdownViewModel: ObservableObject {
             }
         }
         
-        // Clear current throw, selection, and switch to next player
+        // Clear current throw and selection
         currentThrow.removeAll()
         selectedDartIndex = nil
-        switchPlayer()
         
-        // Update checkout for new player
-        updateCheckoutSuggestion()
+        // Delay player switch to allow score animation to complete
+        Task {
+            // Wait for animation to complete (grow + immediate shrink)
+            try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
+            showScoreAnimation = false
+            
+            // Pause before rotating cards
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds pause
+            switchPlayer()
+            updateCheckoutSuggestion()
+        }
     }
     
     /// Handle bust scenario (player went over or hit bust button)

@@ -41,7 +41,8 @@ struct CountdownGameplayView: View {
                     playerScores: gameViewModel.playerScores,
                     currentThrow: gameViewModel.currentThrow,
                     legsWon: gameViewModel.legsWon,
-                    matchFormat: gameViewModel.matchFormat
+                    matchFormat: gameViewModel.matchFormat,
+                    showScoreAnimation: gameViewModel.showScoreAnimation
                 )
                 .padding(.horizontal, 16)
                 .padding(.top, 56)
@@ -228,6 +229,7 @@ struct StackedPlayerCards: View {
     let currentThrow: [ScoredThrow]
     let legsWon: [UUID: Int]
     let matchFormat: Int
+    let showScoreAnimation: Bool
     
     var body: some View {
         VStack(spacing: 16) {
@@ -241,7 +243,8 @@ struct StackedPlayerCards: View {
                         currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
                         legsWon: legsWon[player.id] ?? 0,
                         matchFormat: matchFormat,
-                        playerIndex: index
+                        playerIndex: index,
+                        showScoreAnimation: showScoreAnimation && index == currentPlayerIndex
                     )
                     .overlay(
                         // Matched-shape dimming overlay for depth effect
@@ -363,6 +366,7 @@ struct PlayerScoreCard: View {
     let legsWon: Int
     let matchFormat: Int
     let playerIndex: Int
+    let showScoreAnimation: Bool
     
     // Get border color based on player index
     var borderColor: Color {
@@ -390,11 +394,23 @@ struct PlayerScoreCard: View {
                 
                 // Score and legs indicator
                 VStack(spacing: 4) {
-                    // Score
+                    // Score with arcade-style pop animation
+                    // Fixed-width container to prevent layout shift
                     Text("\(score)")
                         .font(.system(.title, design: .monospaced))
                         .fontWeight(.bold)
                         .foregroundColor(Color("TextPrimary"))
+                        .frame(width: 70) // Fixed width to fit "888"
+                        .multilineTextAlignment(.center)
+                        .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
+                        .onChange(of: showScoreAnimation) { oldValue, newValue in
+                            if newValue {
+                                // Haptic feedback when score pops
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                            }
+                        }
                     
                     // Legs indicator (dots) - show all legs with filled/unfilled states
                     if matchFormat > 1 {
