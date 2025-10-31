@@ -114,9 +114,9 @@ struct GameEndView: View {
                     
                     // Match Details Link
                     if matchId != nil {
-                        Button(action: {
+                        Button {
                             showMatchDetails = true
-                        }) {
+                        } label: {
                             Text("View Match Details")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(Color("AccentSecondary"))

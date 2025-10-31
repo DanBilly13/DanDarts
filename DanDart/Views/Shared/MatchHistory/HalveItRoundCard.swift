@@ -23,24 +23,25 @@ struct HalveItRoundCard: View {
     
     var body: some View {
         RoundContainer {
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 // Process players in groups of 2
                 ForEach(Array(stride(from: 0, to: playerData.count, by: 2)), id: \.self) { rowIndex in
-                    HStack(spacing: 16) {
+                    HStack(spacing: 12) {
                         // Round label (only show on first row)
                         if rowIndex == 0 {
                             Text("R\(roundNumber)-\(targetDisplay)")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(Color("TextPrimary"))
-                                .frame(width: 80, alignment: .leading)
+                                .frame(minWidth: 50, alignment: .leading)
+                                .lineLimit(1)
                         } else {
                             // Empty space for alignment
                             Spacer()
-                                .frame(width: 80)
+                                .frame(minWidth: 50)
                         }
                         
                         // All dots first
-                        HStack(spacing: 24) {
+                        HStack(spacing: 16) {
                             // Player 1 dots
                             if rowIndex < playerData.count {
                                 DartHitIndicators(hits: playerData[rowIndex].hits, playerColor: playerData[rowIndex].color)
@@ -52,10 +53,10 @@ struct HalveItRoundCard: View {
                             }
                         }
                         
-                        Spacer()
+                        Spacer(minLength: 8)
                         
                         // All scores at the end
-                        HStack(spacing: 24) {
+                        HStack(spacing: 16) {
                             // Player 1 score
                             if rowIndex < playerData.count {
                                 RoundScoreDisplay(score: playerData[rowIndex].score, playerColor: playerData[rowIndex].color)

@@ -21,19 +21,19 @@ struct ThrowBreakdownCard: View {
     
     var body: some View {
         RoundContainer {
-            HStack(alignment: .center, spacing: 16) {
-                // Round number label (40px container)
+            HStack(alignment: .center, spacing: 12) {
+                // Round number label (flexible width)
                 Text("R\(roundNumber)")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Color("TextPrimary"))
-                    .frame(width: 40, alignment: .leading)
+                    .frame(minWidth: 30, alignment: .leading)
                 
                 // Players section - 2 per row
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     ForEach(Array(stride(from: 0, to: playerData.count, by: 2)), id: \.self) { rowIndex in
-                        HStack(spacing: 16) {
+                        HStack(spacing: 12) {
                             // All darts first
-                            HStack(spacing: 24) {
+                            HStack(spacing: 16) {
                                 // First player darts
                                 playerDarts(playerData[rowIndex])
                                 
@@ -43,10 +43,10 @@ struct ThrowBreakdownCard: View {
                                 }
                             }
                             
-                            Spacer()
+                            Spacer(minLength: 8)
                             
                             // All scores at the end
-                            HStack(spacing: 24) {
+                            HStack(spacing: 16) {
                                 // First player score
                                 playerScore(playerData[rowIndex])
                                 
