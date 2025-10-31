@@ -99,17 +99,6 @@ struct HalveItMatchDetailView: View {
         match.players.firstIndex(where: { $0.id == player.id }) ?? 0
     }
     
-    // Get player color based on index
-    private func playerColor(for index: Int) -> Color {
-        switch index {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
-        }
-    }
-    
     private var statsComparisonSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Stats title
@@ -174,73 +163,35 @@ struct HalveItMatchDetailView: View {
             let maxRounds = match.players.map { $0.turns.count }.max() ?? 0
             
             ForEach(0..<maxRounds, id: \.self) { roundIndex in
-                RoundRow(
+                // Get target display from first player's turn (all players have same target per round)
+                let targetDisplay = match.players.first?.turns[safe: roundIndex]?.targetDisplay ?? "?"
+                
+                let playerData = match.players.enumerated().map { playerIndex, player in
+                    let turn = roundIndex < player.turns.count ? player.turns[roundIndex] : nil
+                    let hits = turn?.darts.count ?? 0
+                    let score = turn?.scoreAfter ?? 0
+                    
+                    return HalveItRoundCard.PlayerRoundData(
+                        hits: hits,
+                        score: score,
+                        color: playerColor(for: playerIndex)
+                    )
+                }
+                
+                HalveItRoundCard(
                     roundNumber: roundIndex + 1,
-                    players: match.players,
-                    roundIndex: roundIndex
+                    targetDisplay: targetDisplay,
+                    playerData: playerData
                 )
             }
         }
-    }
-}
-
-// MARK: - Round Row (All Players Side-by-Side)
-
-struct RoundRow: View {
-    let roundNumber: Int
-    let players: [MatchPlayer]
-    let roundIndex: Int
-    
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            // Round label (40px container)
-            Text("R\(roundNumber)")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(Color("TextPrimary"))
-                .frame(width: 40, alignment: .leading)
-            
-            // All players' dart indicators side-by-side
-            HStack(spacing: 24) {
-                ForEach(Array(players.enumerated()), id: \.offset) { playerIndex, player in
-                    if roundIndex < player.turns.count {
-                        let turn = player.turns[roundIndex]
-                        let hits = turn.darts.count
-                        
-                        // Dart indicators for this player (12px circles, 12px gap)
-                        // Filled circles = hits, gray circles = misses
-                        HStack(spacing: 12) {
-                            ForEach(0..<3) { dartIndex in
-                                Circle()
-                                    .fill(dartIndex < hits ? playerColor(for: playerIndex) : Color("TextSecondary").opacity(0.3))
-                                    .frame(width: 12, height: 12)
-                            }
-                        }
-                    } else {
-                        // Empty placeholder if player doesn't have this round
-                        HStack(spacing: 12) {
-                            ForEach(0..<3) { _ in
-                                Circle()
-                                    .fill(Color("TextSecondary").opacity(0.3))
-                                    .frame(width: 12, height: 12)
-                            }
-                        }
-                    }
-                }
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color("InputBackground"))
-        .cornerRadius(12)
     }
     
     // Get player color based on index
     private func playerColor(for index: Int) -> Color {
         switch index {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
+        case 0: return Color("AccentSecondary")
+        case 1: return Color("AccentPrimary")
         case 2: return Color("AccentTertiary")
         case 3: return Color("AccentQuaternary")
         default: return Color("AccentPrimary")

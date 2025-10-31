@@ -37,6 +37,7 @@ struct MatchThrowRecord: Codable {
     let dart_scores: [Int]
     let score_before: Int
     let score_after: Int
+    let game_metadata: [String: String]? // Game-specific data (e.g., Halve-It targets)
     
     enum CodingKeys: String, CodingKey {
         case match_id
@@ -45,6 +46,7 @@ struct MatchThrowRecord: Codable {
         case dart_scores = "throws" // Map to database column name
         case score_before
         case score_after
+        case game_metadata
     }
 }
 
@@ -132,7 +134,8 @@ class MatchService: ObservableObject {
                 turn_index: turn.turnNumber,
                 dart_scores: turn.darts.map { $0.totalValue },
                 score_before: turn.scoreBefore,
-                score_after: turn.scoreAfter
+                score_after: turn.scoreAfter,
+                game_metadata: turn.gameMetadata // Include game-specific data
             )
             
             throwRecords.append(throwRecord)

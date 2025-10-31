@@ -432,7 +432,8 @@ class CountdownViewModel: ObservableObject {
             darts: darts,
             scoreBefore: scoreBefore,
             scoreAfter: scoreAfter,
-            isBust: isBust
+            isBust: isBust,
+            gameMetadata: nil // 301/501/Countdown don't use game-specific metadata
         )
         
         turnHistory.append(turn)
@@ -646,6 +647,7 @@ struct TurnHistory: Identifiable {
     let scoreAfter: Int
     let isBust: Bool
     let timestamp: Date = Date()
+    let gameMetadata: [String: String]? // Game-specific data (e.g., Halve-It: target_display)
     
     var throwTotal: Int {
         darts.reduce(0) { $0 + $1.totalValue }

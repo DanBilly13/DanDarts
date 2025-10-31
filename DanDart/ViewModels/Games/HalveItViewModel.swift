@@ -268,7 +268,8 @@ class HalveItViewModel: ObservableObject {
                         darts: turn.darts,
                         scoreBefore: turn.scoreBefore,
                         scoreAfter: turn.scoreAfter,
-                        isBust: false
+                        isBust: false,
+                        gameMetadata: ["target_display": turn.target.displayText] // Add target info
                     )
                 }
                 
@@ -305,7 +306,8 @@ class HalveItViewModel: ObservableObject {
                 darts: darts,
                 scoreBefore: turn.scoreBefore,
                 scoreAfter: turn.scoreAfter,
-                isBust: false // Halve-It doesn't have busts
+                isBust: false, // Halve-It doesn't have busts
+                targetDisplay: turn.target.displayText // Add target info for match history
             )
         }
     }

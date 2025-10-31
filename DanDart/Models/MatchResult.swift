@@ -193,9 +193,27 @@ struct MatchTurn: Identifiable, Codable, Hashable {
     let scoreBefore: Int
     let scoreAfter: Int
     let isBust: Bool
+    let targetDisplay: String? // For Halve-It: "15", "D20", "BULL", etc.
     
     var turnTotal: Int {
         darts.reduce(0) { $0 + $1.value }
+    }
+    
+    // Custom decoder for backwards compatibility
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        turnNumber = try container.decode(Int.self, forKey: .turnNumber)
+        darts = try container.decode([MatchDart].self, forKey: .darts)
+        scoreBefore = try container.decode(Int.self, forKey: .scoreBefore)
+        scoreAfter = try container.decode(Int.self, forKey: .scoreAfter)
+        isBust = try container.decode(Bool.self, forKey: .isBust)
+        // Default to nil if targetDisplay is missing (for old matches and non-Halve-It games)
+        targetDisplay = try container.decodeIfPresent(String.self, forKey: .targetDisplay)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, turnNumber, darts, scoreBefore, scoreAfter, isBust, targetDisplay
     }
     
     init(id: UUID = UUID(),
@@ -203,13 +221,15 @@ struct MatchTurn: Identifiable, Codable, Hashable {
          darts: [MatchDart],
          scoreBefore: Int,
          scoreAfter: Int,
-         isBust: Bool) {
+         isBust: Bool,
+         targetDisplay: String? = nil) {
         self.id = id
         self.turnNumber = turnNumber
         self.darts = darts
         self.scoreBefore = scoreBefore
         self.scoreAfter = scoreAfter
         self.isBust = isBust
+        self.targetDisplay = targetDisplay
     }
 }
 

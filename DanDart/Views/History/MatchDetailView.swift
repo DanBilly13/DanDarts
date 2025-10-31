@@ -196,8 +196,28 @@ struct MatchDetailView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(Color("TextPrimary"))
             
-            ForEach(match.players) { player in
-                PlayerTurnBreakdown(player: player)
+            // Get max turns across all players
+            let maxTurns = match.players.map { $0.turns.count }.max() ?? 0
+            
+            ForEach(0..<maxTurns, id: \.self) { roundIndex in
+                let playerData = match.players.enumerated().map { playerIndex, player in
+                    let turn = roundIndex < player.turns.count ? player.turns[roundIndex] : nil
+                    let darts = turn?.darts.map { $0.displayText } ?? []
+                    let scoreRemaining = turn?.scoreAfter ?? player.startingScore
+                    let isBust = turn?.isBust ?? false
+                    
+                    return ThrowBreakdownCard.PlayerTurnData(
+                        darts: darts,
+                        scoreRemaining: scoreRemaining,
+                        color: playerColor(for: playerIndex),
+                        isBust: isBust
+                    )
+                }
+                
+                ThrowBreakdownCard(
+                    roundNumber: roundIndex + 1,
+                    playerData: playerData
+                )
             }
         }
     }

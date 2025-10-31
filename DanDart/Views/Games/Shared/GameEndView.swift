@@ -155,12 +155,11 @@ struct GameEndView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showMatchDetails) {
-            // Navigate to Match Detail View
+            // Present match summary using dedicated sheet view
+            // This reuses components from MatchDetailView but avoids routing issues
             if let matchId = matchId,
                let matchResult = MatchStorageManager.shared.loadMatch(byId: matchId) {
-                MatchDetailView(match: matchResult, isSheet: true)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
+                MatchSummarySheetView(match: matchResult)
             } else {
                 // Fallback if match not found
                 VStack(spacing: 16) {
