@@ -17,7 +17,7 @@ struct HalveItMatchDetailView: View {
         if isSheet {
             // Sheet presentation - use StandardSheetView
             StandardSheetView(
-                title: match.gameName,
+                title: "\(match.gameName) - Level \(halveItLevel)",
                 dismissButtonTitle: "Done",
                 onDismiss: { dismiss() }
             ) {
@@ -31,7 +31,7 @@ struct HalveItMatchDetailView: View {
                     .padding(.vertical, 24)
             }
             .background(Color("BackgroundPrimary"))
-            .navigationTitle(match.gameName)
+            .navigationTitle("\(match.gameName) - Level \(halveItLevel)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .tabBar)
         }
@@ -125,9 +125,9 @@ struct HalveItMatchDetailView: View {
             VStack(spacing: 20) {
                 // Game accuracy (only stat bar for Halve-It)
                 StatCategorySection(
-                    label: "Game accuracy (%)",
+                    label: "Target hit rate (%)",
                     players: match.players,
-                    getValue: { Int(calculateAccuracy(for: $0) * 100) }
+                    getValue: { Int(calculateTargetHitRate(for: $0) * 100) }
                 )
             }
         }
@@ -136,14 +136,32 @@ struct HalveItMatchDetailView: View {
     
     // MARK: - Stats Helpers
     
-    private func calculateAccuracy(for player: MatchPlayer) -> Double {
-        let totalDarts = player.totalDartsThrown
+    // Calculate target hit rate - % of individual darts that hit the target
+    private func calculateTargetHitRate(for player: MatchPlayer) -> Double {
+        // Count total darts thrown across all turns
+        let totalDarts = player.turns.reduce(0) { $0 + $1.darts.count }
         guard totalDarts > 0 else { return 0 }
         
-        // Estimate hits based on score increase
-        let totalHits = player.turns.filter { $0.scoreAfter > $0.scoreBefore }.count * 2
+        // Count darts that scored points (hit the target)
+        // A dart hit if it contributed to the score increase
+        let dartsHit = player.turns.reduce(0) { total, turn in
+            // If score increased, count the darts that actually scored
+            if turn.scoreAfter > turn.scoreBefore {
+                return total + turn.darts.filter { $0.value > 0 }.count
+            }
+            return total
+        }
         
-        return Double(totalHits) / Double(totalDarts)
+        return Double(dartsHit) / Double(totalDarts)
+    }
+    
+    // Get Halve-It difficulty level from metadata
+    private var halveItLevel: String {
+        guard let difficulty = match.metadata?["difficulty"] else {
+            return "Easy" // Default fallback
+        }
+        // Capitalize first letter for display
+        return difficulty.prefix(1).uppercased() + difficulty.dropFirst()
     }
     
     private func highestRound(for player: MatchPlayer) -> Int {

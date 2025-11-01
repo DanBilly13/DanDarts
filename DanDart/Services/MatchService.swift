@@ -165,20 +165,40 @@ class MatchService: ObservableObject {
             
             let isWinner = userId == winnerId
             
-            // Upsert player stats
-            let statsRecord = PlayerStatsRecord(
-                user_id: userId.uuidString,
-                games_played: 1, // Will be incremented by database
-                wins: isWinner ? 1 : 0,
-                losses: isWinner ? 0 : 1,
-                last_updated: ISO8601DateFormatter().string(from: Date())
+            // Fetch current user stats
+            let currentUser: User = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: userId.uuidString)
+                .single()
+                .execute()
+                .value
+            
+            // Increment wins or losses
+            let newWins = currentUser.totalWins + (isWinner ? 1 : 0)
+            let newLosses = currentUser.totalLosses + (isWinner ? 0 : 1)
+            
+            // Create update record
+            struct UserStatsUpdate: Encodable {
+                let total_wins: Int
+                let total_losses: Int
+                let last_seen_at: String
+            }
+            
+            let updateRecord = UserStatsUpdate(
+                total_wins: newWins,
+                total_losses: newLosses,
+                last_seen_at: ISO8601DateFormatter().string(from: Date())
             )
             
-            // Use upsert to increment existing stats or create new
+            // Update user stats in users table
             try await supabaseService.client
-                .from("player_stats")
-                .upsert(statsRecord, onConflict: "user_id")
+                .from("users")
+                .update(updateRecord)
+                .eq("id", value: userId.uuidString)
                 .execute()
+            
+            print("✅ Updated stats for \(currentUser.displayName): \(newWins)W/\(newLosses)L")
         }
     }
     

@@ -168,6 +168,20 @@ struct MatchDetailView: View {
                     players: match.players,
                     getValue: { count100Plus(for: $0) }
                 )
+                
+                // 140+ thrown
+                StatCategorySection(
+                    label: "140+ thrown",
+                    players: match.players,
+                    getValue: { count140Plus(for: $0) }
+                )
+                
+                // 180s thrown
+                StatCategorySection(
+                    label: "180s thrown",
+                    players: match.players,
+                    getValue: { count180s(for: $0) }
+                )
             }
         }
         .padding(.vertical, 16)

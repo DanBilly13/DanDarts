@@ -342,12 +342,14 @@ struct SearchPlayerSheet: View {
                                 Button(action: {
                                     // Convert User to Player
                                     let currentUserAsPlayer = Player(
+                                        id: UUID(), // Generate new player ID
                                         displayName: currentUser.displayName,
                                         nickname: currentUser.nickname,
                                         avatarURL: currentUser.avatarURL,
                                         isGuest: false,
                                         totalWins: currentUser.totalWins,
-                                        totalLosses: currentUser.totalLosses
+                                        totalLosses: currentUser.totalLosses,
+                                        userId: currentUser.id // CRITICAL: Link to user account for stats
                                     )
                                     onPlayerSelected(currentUserAsPlayer)
                                     dismiss()

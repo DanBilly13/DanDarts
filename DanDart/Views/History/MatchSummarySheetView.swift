@@ -14,7 +14,7 @@ struct MatchSummarySheetView: View {
     
     var body: some View {
         StandardSheetView(
-            title: match.gameName,
+            title: match.gameName == "Halve It" ? "\(match.gameName) - Level \(halveItLevel)" : match.gameName,
             dismissButtonTitle: "Done",
             onDismiss: { dismiss() }
         ) {
@@ -65,9 +65,9 @@ struct MatchSummarySheetView: View {
                         if match.gameName == "Halve It" {
                             // Halve-It stats
                             StatCategorySection(
-                                label: "Game accuracy (%)",
+                                label: "Target hit rate (%)",
                                 players: match.players,
-                                getValue: { Int(calculateAccuracy(for: $0) * 100) }
+                                getValue: { Int(calculateTargetHitRate(for: $0) * 100) }
                             )
                         } else {
                             // Countdown (301/501) stats
@@ -96,6 +96,18 @@ struct MatchSummarySheetView: View {
                                     label: "100+ thrown",
                                     players: match.players,
                                     getValue: { count100Plus(for: $0) }
+                                )
+                                
+                                StatCategorySection(
+                                    label: "140+ thrown",
+                                    players: match.players,
+                                    getValue: { count140Plus(for: $0) }
+                                )
+                                
+                                StatCategorySection(
+                                    label: "180s thrown",
+                                    players: match.players,
+                                    getValue: { count180s(for: $0) }
                                 )
                             }
                         }
@@ -209,12 +221,40 @@ struct MatchSummarySheetView: View {
         player.turns.filter { $0.turnTotal >= 100 }.count
     }
     
-    // Halve-It stat helper
-    private func calculateAccuracy(for player: MatchPlayer) -> Double {
-        let totalDarts = player.totalDartsThrown
+    private func count140Plus(for player: MatchPlayer) -> Int {
+        player.turns.filter { $0.turnTotal >= 140 }.count
+    }
+    
+    private func count180s(for player: MatchPlayer) -> Int {
+        player.turns.filter { $0.turnTotal == 180 }.count
+    }
+    
+    // Halve-It stat helper - % of individual darts that hit the target
+    private func calculateTargetHitRate(for player: MatchPlayer) -> Double {
+        // Count total darts thrown across all turns
+        let totalDarts = player.turns.reduce(0) { $0 + $1.darts.count }
         guard totalDarts > 0 else { return 0 }
-        let totalHits = player.turns.filter { $0.scoreAfter > $0.scoreBefore }.count * 2
-        return Double(totalHits) / Double(totalDarts)
+        
+        // Count darts that scored points (hit the target)
+        // A dart hit if it contributed to the score increase
+        let dartsHit = player.turns.reduce(0) { total, turn in
+            // If score increased, count the darts that actually scored
+            if turn.scoreAfter > turn.scoreBefore {
+                return total + turn.darts.filter { $0.value > 0 }.count
+            }
+            return total
+        }
+        
+        return Double(dartsHit) / Double(totalDarts)
+    }
+    
+    // Get Halve-It difficulty level from metadata
+    private var halveItLevel: String {
+        guard let difficulty = match.metadata?["difficulty"] else {
+            return "Easy" // Default fallback
+        }
+        // Capitalize first letter for display
+        return difficulty.prefix(1).uppercased() + difficulty.dropFirst()
     }
 }
 

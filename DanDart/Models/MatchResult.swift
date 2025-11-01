@@ -19,6 +19,7 @@ struct MatchResult: Identifiable, Codable, Hashable {
     let duration: TimeInterval // in seconds
     let matchFormat: Int // Total legs in match (1, 3, 5, or 7)
     let totalLegsPlayed: Int // Actual number of legs played
+    let metadata: [String: String]? // Game-specific metadata (e.g., Halve-It difficulty)
     
     // Computed properties
     var winner: MatchPlayer? {
@@ -46,7 +47,8 @@ struct MatchResult: Identifiable, Codable, Hashable {
          timestamp: Date = Date(),
          duration: TimeInterval,
          matchFormat: Int = 1,
-         totalLegsPlayed: Int = 1) {
+         totalLegsPlayed: Int = 1,
+         metadata: [String: String]? = nil) {
         self.id = id
         self.gameType = gameType
         self.gameName = gameName
@@ -56,6 +58,7 @@ struct MatchResult: Identifiable, Codable, Hashable {
         self.duration = duration
         self.matchFormat = matchFormat
         self.totalLegsPlayed = totalLegsPlayed
+        self.metadata = metadata
     }
     
     // Custom Hashable implementation (only hash stored properties)
@@ -69,6 +72,8 @@ struct MatchResult: Identifiable, Codable, Hashable {
         hasher.combine(duration)
         hasher.combine(matchFormat)
         hasher.combine(totalLegsPlayed)
+        hasher.combine(metadata?.keys.sorted())
+        hasher.combine(metadata?.values.sorted())
     }
     
     // Custom Equatable implementation
@@ -81,7 +86,8 @@ struct MatchResult: Identifiable, Codable, Hashable {
         lhs.timestamp == rhs.timestamp &&
         lhs.duration == rhs.duration &&
         lhs.matchFormat == rhs.matchFormat &&
-        lhs.totalLegsPlayed == rhs.totalLegsPlayed
+        lhs.totalLegsPlayed == rhs.totalLegsPlayed &&
+        lhs.metadata == rhs.metadata
     }
 }
 

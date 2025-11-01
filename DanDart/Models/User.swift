@@ -62,13 +62,14 @@ struct User: Codable, Identifiable {
     /// Convert User to Player for use in components that expect Player type
     func toPlayer() -> Player {
         return Player(
-            id: id,
+            id: UUID(), // Generate new player ID (different from user ID)
             displayName: displayName,
             nickname: nickname,
             avatarURL: avatarURL,
             isGuest: false,
             totalWins: totalWins,
-            totalLosses: totalLosses
+            totalLosses: totalLosses,
+            userId: id // Link to user account for stats tracking
         )
     }
 }

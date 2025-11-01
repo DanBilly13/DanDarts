@@ -594,7 +594,8 @@ class CountdownViewModel: ObservableObject {
             winnerId: winner.id,
             duration: matchDuration,
             matchFormat: matchFormat,
-            totalLegsPlayed: currentLeg
+            totalLegsPlayed: currentLeg,
+            metadata: nil // No game-specific metadata for countdown games
         )
         
         // Save to local storage

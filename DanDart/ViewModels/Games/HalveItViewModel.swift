@@ -133,17 +133,13 @@ class HalveItViewModel: ObservableObject {
         // Trigger score animation (arcade-style pop)
         showScoreAnimation = true
         
-        // Record turn in history (only include darts that hit the target)
-        let hitDarts = currentThrow.filter { dart in
-            currentTarget.isHit(by: dart)
-        }
-        
+        // Record turn in history (include ALL darts thrown for accurate stats)
         let turnRecord = HalveItTurnHistory(
             playerId: currentPlayer.id,
             playerName: currentPlayer.displayName,
             round: currentRound,
             target: currentTarget,
-            darts: hitDarts, // Only darts that hit
+            darts: currentThrow, // All darts thrown (for accurate hit rate calculation)
             scoreBefore: scoreBefore,
             scoreAfter: scoreAfter,
             pointsScored: pointsScored,
@@ -234,7 +230,7 @@ class HalveItViewModel: ObservableObject {
             )
         }
         
-        // Create match result
+        // Create match result with difficulty metadata
         let matchResult = MatchResult(
             id: matchId,
             gameType: "Halve It",
@@ -244,7 +240,8 @@ class HalveItViewModel: ObservableObject {
             timestamp: Date(),
             duration: 600, // Approximate duration
             matchFormat: 1,
-            totalLegsPlayed: 1
+            totalLegsPlayed: 1,
+            metadata: ["difficulty": difficulty.rawValue]
         )
         
         // Save to local storage
@@ -254,6 +251,9 @@ class HalveItViewModel: ObservableObject {
         Task {
             do {
                 let matchService = MatchService()
+                
+                // Determine game ID for database (should be "halve_it", not UUID)
+                let supabaseGameId = "halve_it"
                 
                 // Get winner's user ID (nil for guests)
                 let winnerId = winner.userId
@@ -275,7 +275,7 @@ class HalveItViewModel: ObservableObject {
                 
                 try await matchService.saveMatch(
                     matchId: matchId,
-                    gameId: gameId.uuidString,
+                    gameId: supabaseGameId,
                     players: players,
                     winnerId: winnerId,
                     startedAt: Date().addingTimeInterval(-600), // Approximate start time
@@ -292,7 +292,7 @@ class HalveItViewModel: ObservableObject {
     
     /// Convert turn history to generic format for storage
     private func convertTurnHistory() -> [MatchTurn] {
-        return turnHistory.enumerated().map { index, turn in
+        return turnHistory.map { turn in
             let darts = turn.darts.map { dart in
                 MatchDart(
                     baseValue: dart.baseValue,
@@ -301,8 +301,8 @@ class HalveItViewModel: ObservableObject {
             }
             
             return MatchTurn(
-                id: turn.playerId,
-                turnNumber: index + 1,
+                // id auto-generates via default parameter
+                turnNumber: turn.round + 1,
                 darts: darts,
                 scoreBefore: turn.scoreBefore,
                 scoreAfter: turn.scoreAfter,

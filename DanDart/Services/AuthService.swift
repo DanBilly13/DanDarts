@@ -539,6 +539,31 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Refresh current user's profile from database (e.g., after match completion to update stats)
+    func refreshCurrentUser() async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.userNotFound
+        }
+        
+        do {
+            // Fetch latest user profile from database
+            let refreshedUser: User = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: userId.uuidString)
+                .single()
+                .execute()
+                .value
+            
+            // Update current user with fresh data
+            currentUser = refreshedUser
+            print("✅ User profile refreshed: \(refreshedUser.displayName) - \(refreshedUser.totalWins)W/\(refreshedUser.totalLosses)L")
+        } catch {
+            print("❌ Failed to refresh user profile: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
     /// Update user profile information
     func updateProfile(handle: String?, bio: String?, avatarIcon: String?) async throws {
         isLoading = true
