@@ -16,6 +16,12 @@ struct MatchRecord: Codable {
     let ended_at: String
     let winner_id: String?
     let metadata: MatchMetadata
+    
+    // Legacy columns for backward compatibility
+    let game_type: String
+    let game_name: String
+    let duration: Int
+    let timestamp: String
 }
 
 struct MatchMetadata: Codable {
@@ -87,6 +93,7 @@ class MatchService: ObservableObject {
         legsWon: [UUID: Int]
     ) async throws {
         // 1. Insert match record
+        let duration = Int(endedAt.timeIntervalSince(startedAt))
         let matchRecord = MatchRecord(
             id: matchId.uuidString,
             game_id: gameId,
@@ -96,7 +103,12 @@ class MatchService: ObservableObject {
             metadata: MatchMetadata(
                 match_format: matchFormat,
                 legs_won: legsWon.mapKeys { $0.uuidString }
-            )
+            ),
+            // Legacy columns for backward compatibility
+            game_type: gameId,
+            game_name: gameId.replacingOccurrences(of: "_", with: " ").capitalized,
+            duration: duration,
+            timestamp: ISO8601DateFormatter().string(from: endedAt)
         )
         
         try await supabaseService.client
