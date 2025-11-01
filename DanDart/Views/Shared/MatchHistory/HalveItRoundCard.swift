@@ -26,37 +26,36 @@ struct HalveItRoundCard: View {
             VStack(spacing: 12) {
                 // Process players in groups of 2
                 ForEach(Array(stride(from: 0, to: playerData.count, by: 2)), id: \.self) { rowIndex in
-                    HStack(spacing: 12) {
+                    HStack(spacing: 0) {
                         // Round label (only show on first row)
                         if rowIndex == 0 {
                             Text("R\(roundNumber)-\(targetDisplay)")
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(Color("TextPrimary"))
-                                .frame(minWidth: 50, alignment: .leading)
+                                .frame(minWidth: 60, alignment: .leading)
                                 .lineLimit(1)
                         } else {
                             // Empty space for alignment
                             Spacer()
-                                .frame(minWidth: 50)
+                                .frame(minWidth: 60)
                         }
                         
-                        // All dots first
-                        HStack(spacing: 16) {
-                            // Player 1 dots
+                        // Player dots centered between round and score
+                        Spacer()
+                        HStack(spacing: 20) {
                             if rowIndex < playerData.count {
                                 DartHitIndicators(hits: playerData[rowIndex].hits, playerColor: playerData[rowIndex].color)
                             }
-                            
-                            // Player 2 dots (if exists)
                             if rowIndex + 1 < playerData.count {
                                 DartHitIndicators(hits: playerData[rowIndex + 1].hits, playerColor: playerData[rowIndex + 1].color)
                             }
                         }
+                        Spacer()
                         
-                        Spacer(minLength: 8)
+                        
                         
                         // All scores at the end
-                        HStack(spacing: 16) {
+                        HStack(spacing: 0) {
                             // Player 1 score
                             if rowIndex < playerData.count {
                                 RoundScoreDisplay(score: playerData[rowIndex].score, playerColor: playerData[rowIndex].color)
@@ -80,8 +79,8 @@ struct HalveItRoundCard: View {
             roundNumber: 1,
             targetDisplay: "15",
             playerData: [
-                .init(hits: 2, score: 30, color: Color("AccentSecondary")),
-                .init(hits: 3, score: 45, color: Color("AccentPrimary"))
+                .init(hits: 2, score: 130, color: Color("AccentSecondary")),
+                .init(hits: 3, score: 145, color: Color("AccentPrimary"))
             ]
         )
         

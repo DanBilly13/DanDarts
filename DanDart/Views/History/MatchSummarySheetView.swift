@@ -3,7 +3,7 @@
 //  DanDart
 //
 //  Match summary view for sheet presentation
-//  Building up incrementally to identify issues
+//  Reuses components from MatchDetailView and HalveItMatchDetailView
 //
 
 import SwiftUI
@@ -18,7 +18,6 @@ struct MatchSummarySheetView: View {
             dismissButtonTitle: "Done",
             onDismiss: { dismiss() }
         ) {
-            // STEP 2: Add real player cards
             VStack(spacing: 24) {
                 // Date
                 Text(match.formattedDate)

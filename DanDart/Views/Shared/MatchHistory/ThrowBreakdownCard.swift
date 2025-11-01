@@ -24,16 +24,17 @@ struct ThrowBreakdownCard: View {
             HStack(alignment: .center, spacing: 12) {
                 // Round number label (flexible width)
                 Text("R\(roundNumber)")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(Color("TextPrimary"))
-                    .frame(minWidth: 30, alignment: .leading)
+                    .frame(width: 32, alignment: .leading)
+
                 
                 // Players section - 2 per row
                 VStack(spacing: 10) {
                     ForEach(Array(stride(from: 0, to: playerData.count, by: 2)), id: \.self) { rowIndex in
-                        HStack(spacing: 12) {
+                        HStack(spacing: 0) {
                             // All darts first
-                            HStack(spacing: 16) {
+                            HStack(spacing: 4) {
                                 // First player darts
                                 playerDarts(playerData[rowIndex])
                                 
@@ -42,11 +43,13 @@ struct ThrowBreakdownCard: View {
                                     playerDarts(playerData[rowIndex + 1])
                                 }
                             }
+                            .frame(maxWidth: .infinity)
+                            .layoutPriority(1)
                             
-                            Spacer(minLength: 8)
+                            Spacer()
                             
                             // All scores at the end
-                            HStack(spacing: 16) {
+                            HStack(spacing: 0) {
                                 // First player score
                                 playerScore(playerData[rowIndex])
                                 
@@ -55,6 +58,7 @@ struct ThrowBreakdownCard: View {
                                     playerScore(playerData[rowIndex + 1])
                                 }
                             }
+                            .layoutPriority(0)
                         }
                     }
                 }
@@ -64,14 +68,20 @@ struct ThrowBreakdownCard: View {
     
     @ViewBuilder
     private func playerDarts(_ data: PlayerTurnData) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             ForEach(data.darts, id: \.self) { dart in
                 Text(dart)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, design: .rounded))
+                    .fontWeight(.bold)
+                    .monospacedDigit()
                     .foregroundColor(data.color)
-                    .frame(minWidth: 28)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    
             }
         }
+        .frame(maxWidth: .infinity)
+        .layoutPriority(1)
     }
     
     @ViewBuilder
@@ -124,7 +134,7 @@ struct ThrowBreakdownCard: View {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(Color.yellow)
 }
 
 #Preview("4 Players") {

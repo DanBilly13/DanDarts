@@ -15,7 +15,9 @@ struct RoundScoreDisplay: View {
     
     var body: some View {
         Text("\(score)")
-            .font(.caption.weight(.bold))
+            .font(.system(size: 14, design: .rounded))
+            .monospacedDigit()
+            .fontWeight(.bold)
             .foregroundColor(playerColor)
             .frame(minWidth: 36, alignment: .trailing)
     }
