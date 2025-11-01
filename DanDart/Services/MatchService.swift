@@ -160,8 +160,13 @@ class MatchService: ObservableObject {
     
     /// Update player stats after a match
     private func updatePlayerStats(winnerId: UUID, players: [Player]) async throws {
+        print("🔍 Updating stats for \(players.count) players. Winner ID: \(winnerId)")
         for player in players {
-            guard let userId = player.userId else { continue } // Skip guests
+            print("🔍 Player: \(player.displayName), userId: \(player.userId?.uuidString ?? "nil"), isGuest: \(player.isGuest)")
+            guard let userId = player.userId else {
+                print("⚠️ Skipping \(player.displayName) - no userId (guest player)")
+                continue
+            } // Skip guests
             
             let isWinner = userId == winnerId
             
