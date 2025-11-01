@@ -274,6 +274,9 @@ struct SearchPlayerSheet: View {
     let onPlayerSelected: (Player) -> Void
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
+    @StateObject private var friendsService = FriendsService()
+    @State private var friends: [Player] = []
+    @State private var isLoadingFriends = false
     @State private var showAddGuestPlayer = false
     @State private var guestPlayers: [Player] = []
     
@@ -380,19 +383,31 @@ struct SearchPlayerSheet: View {
                                 Spacer()
                             }
                             
-                            VStack(spacing: 12) {
-                                ForEach(Player.mockConnectedPlayers, id: \.id) { player in
-                                    Button(action: {
-                                        onPlayerSelected(player)
-                                        dismiss()
-                                    }) {
-                                        PlayerCard(
-                                            player: player,
-                                            showCheckmark: selectedPlayers.contains(where: { $0.id == player.id })
-                                        )
+                            if isLoadingFriends {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                            } else if friends.isEmpty {
+                                Text("No friends yet")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color("TextSecondary"))
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                            } else {
+                                VStack(spacing: 12) {
+                                    ForEach(friends, id: \.id) { player in
+                                        Button(action: {
+                                            onPlayerSelected(player)
+                                            dismiss()
+                                        }) {
+                                            PlayerCard(
+                                                player: player,
+                                                showCheckmark: selectedPlayers.contains(where: { $0.id == player.id })
+                                            )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
                                     }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
                                 }
                             }
                         }
@@ -441,6 +456,7 @@ struct SearchPlayerSheet: View {
             .navigationBarHidden(true)
             .onAppear {
                 loadGuestPlayers()
+                loadFriends()
             }
             .sheet(isPresented: $showAddGuestPlayer) {
                 AddGuestPlayerView { player in
@@ -457,6 +473,27 @@ struct SearchPlayerSheet: View {
     }
     
     // MARK: - Helper Methods
+    
+    private func loadFriends() {
+        guard let currentUser = authService.currentUser else { return }
+        
+        isLoadingFriends = true
+        Task {
+            do {
+                let friendUsers = try await friendsService.loadFriends(userId: currentUser.id)
+                // Convert Users to Players with userId properly set
+                await MainActor.run {
+                    friends = friendUsers.map { $0.toPlayer() }
+                    isLoadingFriends = false
+                }
+            } catch {
+                print("❌ Failed to load friends: \(error)")
+                await MainActor.run {
+                    isLoadingFriends = false
+                }
+            }
+        }
+    }
     
     private func loadGuestPlayers() {
         guestPlayers = GuestPlayerStorageManager.shared.loadGuestPlayers()
