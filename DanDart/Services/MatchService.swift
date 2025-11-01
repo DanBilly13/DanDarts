@@ -22,6 +22,7 @@ struct MatchRecord: Codable {
     let game_name: String
     let duration: Int
     let timestamp: String
+    let players: String // JSONB as string (will be encoded as JSON)
 }
 
 struct MatchMetadata: Codable {
@@ -94,6 +95,19 @@ class MatchService: ObservableObject {
     ) async throws {
         // 1. Insert match record
         let duration = Int(endedAt.timeIntervalSince(startedAt))
+        
+        // Create legacy players JSONB (simplified player data)
+        let legacyPlayers = players.map { player in
+            [
+                "id": player.id.uuidString,
+                "displayName": player.displayName,
+                "nickname": player.nickname,
+                "isGuest": player.isGuest ? "true" : "false"
+            ]
+        }
+        let playersJSON = try JSONSerialization.data(withJSONObject: legacyPlayers)
+        let playersString = String(data: playersJSON, encoding: .utf8) ?? "[]"
+        
         let matchRecord = MatchRecord(
             id: matchId.uuidString,
             game_id: gameId,
@@ -108,7 +122,8 @@ class MatchService: ObservableObject {
             game_type: gameId,
             game_name: gameId.replacingOccurrences(of: "_", with: " ").capitalized,
             duration: duration,
-            timestamp: ISO8601DateFormatter().string(from: endedAt)
+            timestamp: ISO8601DateFormatter().string(from: endedAt),
+            players: playersString
         )
         
         try await supabaseService.client
