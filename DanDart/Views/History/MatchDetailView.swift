@@ -81,7 +81,8 @@ struct MatchDetailView: View {
                     isWinner: player.id == match.winnerId,
                     playerIndex: originalPlayerIndex(for: player),
                     placement: index + 1,
-                    matchFormat: match.matchFormat
+                    matchFormat: match.matchFormat,
+                    gameType: match.gameName
                 )
             }
         }
@@ -333,15 +334,16 @@ struct MatchPlayerCard: View {
     let playerIndex: Int
     let placement: Int
     var matchFormat: Int = 1 // Total legs in match (1, 3, 5, or 7)
+    var gameType: String = "301" // Game type to determine score display logic
     
     // Check if this is a multi-leg match
     private var isMultiLegMatch: Bool {
         matchFormat > 1
     }
     
-    // Calculate total legs needed to win
-    private var totalLegsInMatch: Int {
-        (matchFormat / 2) + 1
+    // Determine if this is a countdown game (301, 501) or accumulation game (Halve It, Cricket, etc.)
+    private var isCountdownGame: Bool {
+        gameType == "301" || gameType == "501"
     }
     
     // Get border color based on player index
@@ -365,40 +367,8 @@ struct MatchPlayerCard: View {
             
             Spacer()
             
-            // Right side - Trophy/Position with legs below
-            VStack(spacing: 4) {
-                // Trophy icon or placement text
-                if isWinner {
-                    // Trophy icon - 36px (outline style, thinner stroke)
-                    Image(systemName: "trophy")
-                        .font(.system(size: 32, weight: .regular))
-                        .foregroundColor(Color("AccentTertiary"))
-                } else {
-                    // Placement text - Apple title3 style
-                    Text(placementText)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Color("TextSecondary"))
-                }
-                
-                // Show leg indicators for multi-leg matches OR "Left on X" for single-leg non-winners
-                if isMultiLegMatch {
-                    // Leg indicators using reusable component
-                    LegIndicators(
-                        legsWon: player.legsWon,
-                        totalLegs: matchFormat,
-                        color: borderColor,
-                        dotSize: 8,
-                        spacing: 4
-                    )
-                } else if !isWinner {
-                    // Single-leg game: show "Left on X" for non-winners
-                    Text("(\(player.finalScore)pts)")
-                        .font(.caption)
-                        .foregroundColor(Color("TextSecondary"))
-                }
-            }
-            .frame(width: 52)
+            // Right side - Score display (type depends on game)
+            scoreDisplayView
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
@@ -410,13 +380,31 @@ struct MatchPlayerCard: View {
         )
     }
     
-    // Calculate placement text (2nd, 3rd, 4th, etc.)
-    private var placementText: String {
-        switch placement {
-        case 1: return "1st"
-        case 2: return "2nd"
-        case 3: return "3rd"
-        default: return "\(placement)th"
+    // Score display component based on game type
+    @ViewBuilder
+    private var scoreDisplayView: some View {
+        if isCountdownGame {
+            // Countdown games: 301, 501 (lower is better, winner = 0)
+            CountdownScoreDisplay(
+                isWinner: isWinner,
+                placement: placement,
+                finalScore: player.finalScore,
+                borderColor: borderColor,
+                isMultiLegMatch: isMultiLegMatch,
+                legsWon: player.legsWon,
+                totalLegs: matchFormat
+            )
+        } else {
+            // Accumulation games: Halve It, Cricket, etc. (higher is better)
+            AccumulationScoreDisplay(
+                isWinner: isWinner,
+                placement: placement,
+                finalScore: player.finalScore,
+                borderColor: borderColor,
+                isMultiLegMatch: isMultiLegMatch,
+                legsWon: player.legsWon,
+                totalLegs: matchFormat
+            )
         }
     }
 }

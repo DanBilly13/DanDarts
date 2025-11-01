@@ -23,47 +23,47 @@ struct HalveItRoundCard: View {
     
     var body: some View {
         RoundContainer {
-            VStack(spacing: 12) {
-                // Process players in groups of 2
-                ForEach(Array(stride(from: 0, to: playerData.count, by: 2)), id: \.self) { rowIndex in
-                    HStack(spacing: 0) {
-                        // Round label (only show on first row)
-                        if rowIndex == 0 {
-                            Text("R\(roundNumber)-\(targetDisplay)")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Color("TextPrimary"))
-                                .frame(minWidth: 60, alignment: .leading)
-                                .lineLimit(1)
-                        } else {
-                            // Empty space for alignment
-                            Spacer()
-                                .frame(minWidth: 60)
-                        }
-                        
-                        // Player dots centered between round and score
-                        Spacer()
-                        HStack(spacing: 20) {
-                            if rowIndex < playerData.count {
-                                DartHitIndicators(hits: playerData[rowIndex].hits, playerColor: playerData[rowIndex].color)
-                            }
-                            if rowIndex + 1 < playerData.count {
-                                DartHitIndicators(hits: playerData[rowIndex + 1].hits, playerColor: playerData[rowIndex + 1].color)
-                            }
-                        }
-                        Spacer()
-                        
-                        
-                        
-                        // All scores at the end
+            HStack(alignment: .center, spacing: 0) {
+                // Round label - vertically centered
+                Text("R\(roundNumber)-\(targetDisplay)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color("TextPrimary"))
+                    .frame(minWidth: 60, alignment: .leading)
+                    .lineLimit(1)
+                
+                // Player rows
+                VStack(spacing: 8) {
+                    // Process players in groups of 2
+                    ForEach(Array(stride(from: 0, to: playerData.count, by: 2)), id: \.self) { rowIndex in
                         HStack(spacing: 0) {
-                            // Player 1 score
-                            if rowIndex < playerData.count {
-                                RoundScoreDisplay(score: playerData[rowIndex].score, playerColor: playerData[rowIndex].color)
+                            // Player dots
+                            Spacer()
+                            HStack(spacing: 20) {
+                                if rowIndex < playerData.count {
+                                    DartHitIndicators(hits: playerData[rowIndex].hits, playerColor: playerData[rowIndex].color)
+                                }
+                                if rowIndex + 1 < playerData.count {
+                                    DartHitIndicators(hits: playerData[rowIndex + 1].hits, playerColor: playerData[rowIndex + 1].color)
+                                } else if playerData.count == 3 && rowIndex == 2 {
+                                    // Invisible spacer for 3rd player to align with 1st player
+                                    DartHitIndicators(hits: 0, playerColor: .clear)
+                                        .opacity(0)
+                                }
                             }
+                            Spacer()
                             
-                            // Player 2 score (if exists)
-                            if rowIndex + 1 < playerData.count {
-                                RoundScoreDisplay(score: playerData[rowIndex + 1].score, playerColor: playerData[rowIndex + 1].color)
+                            // Scores at the end
+                            HStack(spacing: 0) {
+                                if rowIndex < playerData.count {
+                                    RoundScoreDisplay(score: playerData[rowIndex].score, playerColor: playerData[rowIndex].color)
+                                }
+                                if rowIndex + 1 < playerData.count {
+                                    RoundScoreDisplay(score: playerData[rowIndex + 1].score, playerColor: playerData[rowIndex + 1].color)
+                                } else if playerData.count == 3 && rowIndex == 2 {
+                                    // Invisible spacer for score alignment
+                                    RoundScoreDisplay(score: 0, playerColor: .clear)
+                                        .opacity(0)
+                                }
                             }
                         }
                     }

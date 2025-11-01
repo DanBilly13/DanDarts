@@ -251,16 +251,16 @@ struct SignUpView: View {
                     Spacer(minLength: 20)
                     
                     // Sign In Link
-                    HStack {
-                        Text("Already have an account?")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                        
-                        Button("Sign In") {
-                            // TODO: Navigate to sign in
+                    NavigationLink(destination: SignInView()) {
+                        HStack {
+                            Text("Already have an account?")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color("TextSecondary"))
+                            
+                            Text("Sign In")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Color("AccentPrimary"))
                         }
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color("AccentPrimary"))
                     }
                     .padding(.bottom, 32)
                 }

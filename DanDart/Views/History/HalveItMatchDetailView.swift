@@ -76,7 +76,8 @@ struct HalveItMatchDetailView: View {
                     isWinner: player.id == match.winnerId,
                     playerIndex: originalPlayerIndex(for: player),
                     placement: index + 1,
-                    matchFormat: match.matchFormat
+                    matchFormat: match.matchFormat,
+                    gameType: match.gameName
                 )
             }
         }
@@ -236,7 +237,7 @@ struct HalveItMatchDetailView: View {
                         nickname: "alice",
                         avatarURL: nil,
                         isGuest: true,
-                        finalScore: 87,
+                        finalScore: 187,
                         startingScore: 0,
                         totalDartsThrown: 18,
                         turns: [

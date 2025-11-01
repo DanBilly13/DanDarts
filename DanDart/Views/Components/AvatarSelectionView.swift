@@ -29,63 +29,64 @@ struct AvatarSelectionView: View {
     ]
     
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Horizontal Scrolling Row (Behind)
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    // Camera Upload Option (First in scroll)
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        ZStack {
-                            Circle()
-                                .fill(Color("InputBackground"))
-                                .frame(width: 64, height: 64)
+        ZStack(alignment: .center) {
+            GeometryReader { proxy in
+                let itemSize: CGFloat = 64                // avatar diameter
+                let selectorInner: CGFloat = itemSize     // the avatar we want centered under the ring
+                let sideInset: CGFloat = max((proxy.size.width - selectorInner) / 2, 0)
+            
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        // Camera Upload Option (First in scroll)
+                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color("InputBackground"))
+                                    .frame(width: itemSize, height: itemSize)
                             
-                            if let selectedImage = selectedAvatarImage {
-                                // Show uploaded image
-                                Image(uiImage: selectedImage)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 64, height: 64)
-                                    .clipShape(Circle())
-                            } else {
-                                // Show camera icon
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(Color("AccentPrimary"))
+                                if let selectedImage = selectedAvatarImage {
+                                    Image(uiImage: selectedImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: itemSize, height: itemSize)
+                                        .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(Color("AccentPrimary"))
+                                }
                             }
                         }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .scaleEffect(scrollPosition == "camera" ? 1.25 : 0.8)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
-                    .id("camera")
-                    
-                    // Predefined Avatar Options
-                    ForEach(avatarOptions, id: \.id) { option in
-                        Button(action: {
-                            selectedAvatar = option.id
-                            // Clear photo selection when choosing predefined avatar
-                            selectedAvatarImage = nil
-                            selectedPhotoItem = nil
-                        }) {
-                            AvatarOptionView(
-                                option: option,
-                                isSelected: false,
-                                size: 64
-                            )
-                        }
                         .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(scrollPosition == option.id ? 1.25 : 0.8)
+                        .scaleEffect(scrollPosition == "camera" ? 1.25 : 0.8)
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
-                        .id(option.id)
+                        .id("camera")
+                    
+                        // Predefined Avatar Options
+                        ForEach(avatarOptions, id: \.id) { option in
+                            Button(action: {
+                                selectedAvatar = option.id
+                                selectedAvatarImage = nil
+                                selectedPhotoItem = nil
+                            }) {
+                                AvatarOptionView(
+                                    option: option,
+                                    isSelected: false,
+                                    size: itemSize
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .scaleEffect(scrollPosition == option.id ? 1.25 : 0.8)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
+                            .id(option.id)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
-                .padding(.leading, 8)
-                .padding(.trailing, UIScreen.main.bounds.width - 96) // Leave space for last items to scroll into circle
+                .contentMargins(.horizontal, sideInset, for: .scrollContent)
+                .scrollPosition(id: $scrollPosition)
+                .scrollTargetBehavior(.viewAligned)
             }
-            .scrollPosition(id: $scrollPosition)
-            .scrollTargetBehavior(.viewAligned)
             
             // Fixed Selection Circle Overlay (On Top)
             Circle()

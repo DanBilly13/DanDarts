@@ -127,7 +127,11 @@ struct StandardSheetView<Content: View>: View {
                     .padding(.bottom, primaryActionTitle != nil ? 100 : 20)
                 }
             } else {
-                content
+                VStack(spacing: 16) {
+                    content
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
             }
             
             // Primary action button (if provided)

@@ -33,7 +33,8 @@ struct MatchSummarySheetView: View {
                             isWinner: player.id == match.winnerId,
                             playerIndex: originalPlayerIndex(for: player),
                             placement: index + 1,
-                            matchFormat: match.matchFormat
+                            matchFormat: match.matchFormat,
+                            gameType: match.gameName
                         )
                     }
                 }

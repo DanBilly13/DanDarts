@@ -31,13 +31,70 @@ struct SignInView: View {
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(Color("TextPrimary"))
                         
-                        Text("Sign in to your account")
+                       /* Text("Sign in to your account")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(Color("TextSecondary"))*/
                     }
                     .padding(.top, 32)
                     
-                    // Form Section
+                    // Google Sign-In Button (Primary)
+                    AppButton(
+                        role: .primary,
+                        controlSize: .regular,
+                        isDisabled: isLoading,
+                        compact: true,
+                        action: {
+                            Task {
+                                await signInWithGoogle()
+                            }
+                        }
+                    ) {
+                        HStack(spacing: 8) {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            Text(isLoading ? "Signing in with Google..." : "Sign in with Google")
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                    
+                    // Divider
+                    HStack {
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                        
+                        Text("or email")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                            .padding(.horizontal, 16)
+                        
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 24)
+                    
+                    // Error Message
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                            .padding(.horizontal, 32)
+                    }
+                    
+                    // Email Sign-In Form Section
                     VStack(spacing: 20) {
                         // Email TextField
                         DartTextField(
@@ -72,129 +129,52 @@ struct SignInView: View {
                                 // TODO: Implement forgot password
                             }
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(Color("TextSecondary"))
+                        }
+                        
+                        // Sign In with Email Button (Primary Outline)
+                        AppButton(
+                            role: .primaryOutline,
+                            controlSize: .regular,
+                            isDisabled: isLoading,
+                            compact: true,
+                            action: {
+                                Task {
+                                    await signIn()
+                                }
+                            }
+                        ) {
+                            HStack(spacing: 8) {
+                                if isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: Color("AccentPrimary")))
+                                        .scaleEffect(0.8)
+                                }
+                                Text(isLoading ? "Signing In..." : "Sign in with Email")
+                            }
                         }
                     }
                     .padding(.horizontal, 32)
+          
                     
-                    // Error Message
-                    if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                            .padding(.vertical, 8)
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(8)
-                            .padding(.horizontal, 32)
-                    }
-                    
-                    // Buttons Section
-                    VStack(spacing: 16) {
-                        // Sign In Button
-                        Button(action: {
-                            Task {
-                                await signIn()
-                            }
-                        }) {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                }
-                                Text(isLoading ? "Signing In..." : "Sign In")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color("AccentPrimary"), Color("AccentPrimary").opacity(0.8)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(25)
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .disabled(isLoading)
-                        
-                        // Divider
-                        HStack {
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundColor(Color("TextSecondary").opacity(0.3))
-                            
-                            Text("or")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                                .padding(.horizontal, 16)
-                            
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundColor(Color("TextSecondary").opacity(0.3))
-                        }
-                        
-                        // Sign in with Google Button
-                        Button(action: {
-                            Task {
-                                await signInWithGoogle()
-                            }
-                        }) {
-                            HStack(spacing: 12) {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: Color("TextPrimary")))
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "globe")
-                                        .font(.system(size: 16, weight: .medium))
-                                }
-                                
-                                Text(isLoading ? "Signing in with Google..." : "Sign in with Google")
-                                    .font(.system(size: 17, weight: .semibold))
-                            }
-                            .foregroundColor(Color("TextPrimary"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color("BackgroundSecondary"))
-                            .cornerRadius(25)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 25)
-                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .disabled(isLoading)
-                    }
-                    .padding(.horizontal, 32)
-                    
-                    Spacer(minLength: 32)
+                    Spacer(minLength: 8)
                     
                     // Bottom Links
                     VStack(spacing: 16) {
                         // Sign Up Link
-                        HStack {
-                            Text("Don't have an account?")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            Button("Sign Up") {
-                                // TODO: Navigate to sign up
+                        NavigationLink(destination: SignUpView()) {
+                            HStack {
+                                Text("Don't have an account?")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(Color("TextSecondary"))
+                                
+                                Text("Sign Up")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(Color("AccentPrimary"))
                             }
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color("AccentPrimary"))
                         }
                         
-                        // Continue as Guest Link
-                        Button("Continue as Guest") {
-                            // TODO: Navigate to main app as guest
-                        }
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        
                     }
                 }
             }
