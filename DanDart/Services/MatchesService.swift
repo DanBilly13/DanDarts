@@ -110,12 +110,18 @@ class MatchesService: ObservableObject {
     func loadMatches(userId: UUID) async throws -> [MatchResult] {
         do {
             // Query matches where user is a participant
-            let supabaseMatches: [SupabaseMatch] = try await supabaseService.client
+            // Note: We're using the old flattened schema with JSONB players column
+            let response = try await supabaseService.client
                 .from("matches")
                 .select()
                 .order("timestamp", ascending: false)
                 .execute()
-                .value
+            
+            // Decode manually to handle JSONB properly
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let supabaseMatches = try decoder.decode([SupabaseMatch].self, from: response.data)
             
             // Convert to MatchResult
             let matches = supabaseMatches.map { $0.toMatchResult() }
@@ -125,6 +131,7 @@ class MatchesService: ObservableObject {
             
         } catch {
             print("❌ Load matches failed: \(error)")
+            print("   Error details: \(error.localizedDescription)")
             throw MatchSyncError.loadFailed
         }
     }
