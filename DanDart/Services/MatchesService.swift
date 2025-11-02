@@ -111,15 +111,34 @@ class MatchesService: ObservableObject {
         do {
             // Query matches where user is a participant
             // Note: We're using the old flattened schema with JSONB players column
+            // We need to cast players to text to avoid JSONB parsing issues
             let response = try await supabaseService.client
                 .from("matches")
-                .select()
+                .select("""
+                    id,
+                    game_type,
+                    game_name,
+                    winner_id,
+                    timestamp,
+                    duration,
+                    players::text,
+                    match_format,
+                    total_legs_played,
+                    synced_at
+                """)
                 .order("timestamp", ascending: false)
                 .execute()
+            
+            print("📦 Raw response data: \(String(data: response.data, encoding: .utf8) ?? "unable to decode")")
             
             // Decode manually to handle JSONB properly
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
+            
+            // First decode as raw JSON to see structure
+            if let json = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+                print("📊 JSON structure: \(json)")
+            }
             
             let supabaseMatches = try decoder.decode([SupabaseMatch].self, from: response.data)
             
@@ -132,6 +151,9 @@ class MatchesService: ObservableObject {
         } catch {
             print("❌ Load matches failed: \(error)")
             print("   Error details: \(error.localizedDescription)")
+            if let decodingError = error as? DecodingError {
+                print("   Decoding error: \(decodingError)")
+            }
             throw MatchSyncError.loadFailed
         }
     }

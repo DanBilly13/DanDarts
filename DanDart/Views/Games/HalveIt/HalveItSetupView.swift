@@ -147,7 +147,7 @@ struct HalveItSetupView: View {
                                 
                                 // Add next player button (if under limit)
                                 if selectedPlayers.count < playerLimit {
-                                    AppButton(role: .primaryOutline, controlSize: .regular, compact: true) {
+                                    AppButton(role: .primaryOutline, controlSize: .large, compact: true) {
                                         showSearchPlayer = true
                                     } label: {
                                         Label("Add Player \(selectedPlayers.count + 1)", systemImage: "plus")
@@ -159,7 +159,7 @@ struct HalveItSetupView: View {
                         
                         // Start Game Button
                         VStack(spacing: 12) {
-                            AppButton(role: .primary, controlSize: .regular, isDisabled: !canStartGame) {
+                            AppButton(role: .primary, controlSize: .large, isDisabled: !canStartGame) {
                                 showGameView = true
                             } label: {
                                 Text("Start Game")
