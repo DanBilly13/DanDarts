@@ -15,7 +15,7 @@
     "title": "Halve-It",
     "subtitle": "Accuracy Under Pressure",
     "players": "2 or more",
-    "instructions": "A popular darts game that can be played with a large group. Select six different targets on the dartboard, and each player takes turns trying to hit those targets.\n\nFor every target hit, add that score to your total.\n\nFor example, if the first target is single 20 and you hit two single 20s, you add 40 points.\n\nIf you fail to hit a target with three darts, you must halve your total score.\n\nThe winner is the player with the highest score at the end of the game.\n\nMake the game easier or harder depending on your group.\n\nEasier: aim for singles or segments.\n\nHarder: target bullseye, doubles, or trebles."
+    "instructions": "Halve It is a darts game of accuracy and pressure played over six rounds. You have three chances to hit each target — every hit adds to your score, but miss all three in a round and your total is halved.\n\nEveryone starts on zero points. Each round has a different target, and players take turns throwing. Player 1 throws three darts at the target, then Player 2 throws, and so on.\n\nFor example, if the target is single 20 and you hit it twice, you score 40 points.\n\nIf you miss the target with all three darts, your score is halved — but it can’t drop below zero.\n\nChoose your difficulty — Easy, Medium, Hard, or Pro — and the app will automatically set the six targets for you.\n\nEasy: mostly singles.\nMedium: a mix of singles and doubles.\nHard: more doubles and trebles.\nPro: all doubles and trebles.\n\nAfter all six rounds, the player with the highest score wins."
   },
   {
     "title": "Knockout",

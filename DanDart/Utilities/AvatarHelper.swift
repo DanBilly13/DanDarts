@@ -60,27 +60,21 @@ struct PlayerAvatarView: View {
                 let _ = print("🖼️ PlayerAvatarView - avatarURL: \(avatarURL)")
                 // Check if it's a URL or local asset
                 if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
-                    let _ = print("🌐 Loading remote URL: \(avatarURL)")
-                    // Remote URL - use AsyncImage
-                    AsyncImage(url: URL(string: avatarURL)) { phase in
-                        switch phase {
-                        case .empty:
+                    let _ = print("🌐 Loading remote URL (cached): \(avatarURL)")
+                    // Remote URL - use CachedAsyncImage for better performance
+                    if let url = URL(string: avatarURL) {
+                        CachedAsyncImage(url: url) {
                             ProgressView()
                                 .frame(width: size, height: size)
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: size, height: size)
-                                .clipShape(Circle())
-                        case .failure:
-                            // Failed to load - show placeholder
-                            Image(systemName: placeholder)
-                                .font(.system(size: size * 0.5, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                        @unknown default:
-                            EmptyView()
                         }
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                    } else {
+                        // Invalid URL - show placeholder
+                        Image(systemName: placeholder)
+                            .font(.system(size: size * 0.5, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
                     }
                 } else {
                     // Local asset - use Image

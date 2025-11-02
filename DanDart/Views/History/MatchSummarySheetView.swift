@@ -159,7 +159,15 @@ struct MatchSummarySheetView: View {
                                 let playerData = match.players.enumerated().map { playerIndex, player in
                                     let turn = turnIndex < player.turns.count ? player.turns[turnIndex] : nil
                                     let darts = turn?.darts.map { $0.displayText } ?? []
-                                    let scoreRemaining = turn?.scoreAfter ?? player.startingScore
+                                    // If no turn, use previous turn's scoreAfter, or startingScore if first round
+                                    let scoreRemaining: Int
+                                    if let turn = turn {
+                                        scoreRemaining = turn.scoreAfter
+                                    } else if turnIndex > 0, let previousTurn = player.turns.last {
+                                        scoreRemaining = previousTurn.scoreAfter
+                                    } else {
+                                        scoreRemaining = player.startingScore
+                                    }
                                     let isBust = turn?.isBust ?? false
                                     
                                     return ThrowBreakdownCard.PlayerTurnData(
