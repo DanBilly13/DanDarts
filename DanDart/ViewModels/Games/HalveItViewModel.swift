@@ -55,7 +55,7 @@ class HalveItViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(players: [Player], difficulty: HalveItDifficulty, gameId: UUID, authService: AuthService = AuthService.shared) {
+    init(players: [Player], difficulty: HalveItDifficulty, gameId: UUID, authService: AuthService) {
         self.players = players
         self.difficulty = difficulty
         self.targets = difficulty.generateTargets()

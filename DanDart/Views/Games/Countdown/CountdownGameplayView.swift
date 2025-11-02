@@ -23,13 +23,15 @@ struct CountdownGameplayView: View {
     @State private var showLegWinCelebration: Bool = false
     
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authService: AuthService
     
     // Initialize with game and players
     init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
-        _gameViewModel = StateObject(wrappedValue: CountdownViewModel(game: game, players: players, matchFormat: matchFormat))
+        // Note: gameViewModel will be initialized in onAppear with authService
+        _gameViewModel = StateObject(wrappedValue: CountdownViewModel(game: game, players: players, matchFormat: matchFormat, authService: AuthService()))
     }
     
     var body: some View {
@@ -81,7 +83,7 @@ struct CountdownGameplayView: View {
                 // Save Score button container (fixed height to prevent layout shift)
                 ZStack {
                     // Invisible placeholder to maintain layout space
-                    AppButton(role: .primary, action: {}) {
+                    AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
                         Text("Save Score")
                     }
                     .opacity(0)
@@ -89,7 +91,7 @@ struct CountdownGameplayView: View {
                     
                     // Actual button that pops in/out
                     AppButton(
-                        role: gameViewModel.isWinningThrow ? .secondary : .primary,
+                        role: gameViewModel.isWinningThrow ? .secondary : .primary, controlSize: .extraLarge,
                         action: { gameViewModel.saveScore() }
                     ) {
                         if gameViewModel.isWinningThrow {

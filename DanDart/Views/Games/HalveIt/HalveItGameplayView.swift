@@ -22,13 +22,15 @@ struct HalveItGameplayView: View {
     @State private var navigateToGameEnd: Bool = false
     
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authService: AuthService
     
     // Initialize with game, players, and difficulty
     init(game: Game, players: [Player], difficulty: HalveItDifficulty) {
         self.game = game
         self.players = players
         self.difficulty = difficulty
-        _viewModel = StateObject(wrappedValue: HalveItViewModel(players: players, difficulty: difficulty, gameId: game.id))
+        // Note: viewModel will use authService from environment at runtime
+        _viewModel = StateObject(wrappedValue: HalveItViewModel(players: players, difficulty: difficulty, gameId: game.id, authService: AuthService()))
     }
     
     var body: some View {
@@ -80,7 +82,7 @@ struct HalveItGameplayView: View {
             // Save Score button container (fixed height to prevent layout shift)
             ZStack {
                 // Invisible placeholder to maintain layout space
-                AppButton(role: .primary, action: {}) {
+                AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
                     Text("Save Score")
                 }
                 .opacity(0)
@@ -89,6 +91,7 @@ struct HalveItGameplayView: View {
                 // Actual button that pops in/out
                 AppButton(
                     role: .primary,
+                    controlSize: .extraLarge,
                     action: { viewModel.completeTurn() }
                 ) {
                     Label("Save Score", systemImage: "checkmark.circle.fill")

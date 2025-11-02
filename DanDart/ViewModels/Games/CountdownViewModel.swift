@@ -129,7 +129,7 @@ class CountdownViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(game: Game, players: [Player], matchFormat: Int = 1, authService: AuthService = AuthService.shared) {
+    init(game: Game, players: [Player], matchFormat: Int = 1, authService: AuthService) {
         self.game = game
         self.players = players
         self.authService = authService
