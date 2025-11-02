@@ -30,6 +30,9 @@ class HalveItViewModel: ObservableObject {
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
     
+    // Services
+    private let authService: AuthService
+    
     // MARK: - Turn History
     @Published var turnHistory: [HalveItTurnHistory] = []
     
@@ -52,12 +55,13 @@ class HalveItViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(players: [Player], difficulty: HalveItDifficulty, matchId: UUID = UUID(), gameId: UUID) {
+    init(players: [Player], difficulty: HalveItDifficulty, gameId: UUID, authService: AuthService = AuthService.shared) {
         self.players = players
         self.difficulty = difficulty
         self.targets = difficulty.generateTargets()
-        self.matchId = matchId
         self.gameId = gameId
+        self.authService = authService
+        self.matchId = UUID()
         
         // Initialize all players with 0 score
         for player in players {
@@ -284,6 +288,12 @@ class HalveItViewModel: ObservableObject {
                     matchFormat: 1, // Halve-It doesn't use legs
                     legsWon: [:] // Halve-It doesn't use legs
                 )
+                
+                print("✅ Match saved to Supabase: \(matchId)")
+                
+                // Refresh current user's profile to show updated stats
+                try? await authService.refreshCurrentUser()
+                print("✅ User profile refreshed with updated stats")
             } catch {
                 print("Failed to save match to Supabase: \(error)")
             }
