@@ -30,7 +30,7 @@ class CountdownViewModel: ObservableObject {
     @Published var isMatchWon: Bool = false // True when match is won (not just leg)
     
     // Services
-    private let authService: AuthService
+    private var authService: AuthService?
     
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
@@ -127,12 +127,17 @@ class CountdownViewModel: ObservableObject {
         return matchFormat > 1
     }
     
+    /// Inject AuthService from the view (must be called after init)
+    func setAuthService(_ service: AuthService) {
+        self.authService = service
+    }
+    
     // MARK: - Initialization
     
-    init(game: Game, players: [Player], matchFormat: Int = 1, authService: AuthService) {
+    init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         self.players = players
-        self.authService = authService
+        self.authService = nil
         self.matchStartTime = Date()
         self.matchFormat = matchFormat
         
@@ -634,7 +639,7 @@ class CountdownViewModel: ObservableObject {
                 print("✅ Match saved to Supabase: \(matchId)")
                 
                 // Refresh current user's profile to show updated stats
-                try? await authService.refreshCurrentUser()
+                try? await authService?.refreshCurrentUser()
                 print("✅ User profile refreshed with updated stats")
             } catch {
                 print("❌ Failed to save match to Supabase: \(error)")

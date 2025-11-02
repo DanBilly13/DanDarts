@@ -59,8 +59,8 @@ struct AppButton<Label: View>: View {
         case .small: base = .system(size: 14, weight: .semibold)
         case .regular: base = .system(size: 16, weight: .semibold)
         case .large: base = .system(size: 16, weight: .semibold)
-        case .extraLarge: base = .system(size: 21, weight: .semibold)
-        @unknown default: base = .system(size: 17, weight: .semibold)
+        case .extraLarge: base = .system(size: 16, weight: .semibold)
+        @unknown default: base = .system(size: 16, weight: .semibold)
         }
         if sizeCategory.isAccessibilityCategory {
             return .system(size: 17, weight: .semibold)

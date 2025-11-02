@@ -29,8 +29,7 @@ struct HalveItGameplayView: View {
         self.game = game
         self.players = players
         self.difficulty = difficulty
-        // Note: viewModel will use authService from environment at runtime
-        _viewModel = StateObject(wrappedValue: HalveItViewModel(players: players, difficulty: difficulty, gameId: game.id, authService: AuthService()))
+        _viewModel = StateObject(wrappedValue: HalveItViewModel(players: players, difficulty: difficulty, gameId: game.id))
     }
     
     var body: some View {
@@ -131,6 +130,10 @@ struct HalveItGameplayView: View {
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
+        .onAppear {
+            // Inject authService into the ViewModel
+            viewModel.setAuthService(authService)
+        }
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {

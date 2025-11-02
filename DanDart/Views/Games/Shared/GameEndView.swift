@@ -134,14 +134,14 @@ struct GameEndView: View {
                 // Action Buttons
                 VStack(spacing: 16) {
                     // Play Again Button (same players)
-                    AppButton(role: .primary, controlSize: .regular, compact: true) {
+                    AppButton(role: .primary, controlSize: .extraLarge, compact: true) {
                         onPlayAgain()
                     } label: {
                         Label("Play Again", systemImage: "arrow.clockwise")
                     }
                     
                     // Back to Games Button
-                    AppButton(role: .primaryOutline, controlSize: .regular, compact: true) {
+                    AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
                         onBackToGames()
                     } label: {
                         Label("Back to Games", systemImage: "house.fill")

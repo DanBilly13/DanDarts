@@ -30,8 +30,7 @@ struct CountdownGameplayView: View {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
-        // Note: gameViewModel will be initialized in onAppear with authService
-        _gameViewModel = StateObject(wrappedValue: CountdownViewModel(game: game, players: players, matchFormat: matchFormat, authService: AuthService()))
+        _gameViewModel = StateObject(wrappedValue: CountdownViewModel(game: game, players: players, matchFormat: matchFormat))
     }
     
     var body: some View {
@@ -137,6 +136,10 @@ struct CountdownGameplayView: View {
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
+        .onAppear {
+            // Inject authService into the ViewModel
+            gameViewModel.setAuthService(authService)
+        }
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {
