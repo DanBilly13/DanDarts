@@ -109,41 +109,85 @@ class MatchesService: ObservableObject {
     /// - Returns: Array of match results
     func loadMatches(userId: UUID) async throws -> [MatchResult] {
         do {
-            // Query matches where user is a participant
-            // Note: We're using the old flattened schema with JSONB players column
-            // We need to cast players to text to avoid JSONB parsing issues
+            // Query matches - RLS policy will filter to matches where user participated
             let response = try await supabaseService.client
                 .from("matches")
-                .select("""
-                    id,
-                    game_type,
-                    game_name,
-                    winner_id,
-                    timestamp,
-                    duration,
-                    players::text,
-                    match_format,
-                    total_legs_played,
-                    synced_at
-                """)
+                .select("id, game_type, game_name, winner_id, timestamp, duration, players, match_format, total_legs_played")
                 .order("timestamp", ascending: false)
                 .execute()
             
-            print("📦 Raw response data: \(String(data: response.data, encoding: .utf8) ?? "unable to decode")")
-            
-            // Decode manually to handle JSONB properly
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            // First decode as raw JSON to see structure
-            if let json = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
-                print("📊 JSON structure: \(json)")
+            // Parse the response manually to handle JSONB
+            guard let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+                print("❌ Failed to parse response as JSON array")
+                return []
             }
             
-            let supabaseMatches = try decoder.decode([SupabaseMatch].self, from: response.data)
+            var matches: [MatchResult] = []
             
-            // Convert to MatchResult
-            let matches = supabaseMatches.map { $0.toMatchResult() }
+            for json in jsonArray {
+                // Extract fields manually
+                guard let idString = json["id"] as? String,
+                      let id = UUID(uuidString: idString),
+                      let gameType = json["game_type"] as? String,
+                      let gameName = json["game_name"] as? String,
+                      let winnerIdString = json["winner_id"] as? String,
+                      let winnerId = UUID(uuidString: winnerIdString),
+                      let timestampString = json["timestamp"] as? String,
+                      let duration = json["duration"] as? Int else {
+                    print("⚠️ Skipping match with missing required fields")
+                    continue
+                }
+                
+                // Parse timestamp
+                let formatter = ISO8601DateFormatter()
+                guard let timestamp = formatter.date(from: timestampString) else {
+                    print("⚠️ Skipping match with invalid timestamp")
+                    continue
+                }
+                
+                // Parse JSONB players array
+                // Note: Supabase returns JSONB as either a parsed object or a string depending on the query
+                let players: [MatchPlayer]
+                
+                if let playersString = json["players"] as? String {
+                    // Case 1: players is a JSON string - convert to Data and decode
+                    guard let playersJsonData = playersString.data(using: .utf8) else {
+                        print("⚠️ Skipping match - could not convert players string to data")
+                        continue
+                    }
+                    let decoder = JSONDecoder()
+                    players = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                    
+                } else if let playersArray = json["players"] as? [[String: Any]] {
+                    // Case 2: players is already parsed as an array - serialize and decode
+                    let playersJsonData = try JSONSerialization.data(withJSONObject: playersArray)
+                    let decoder = JSONDecoder()
+                    players = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                    
+                } else {
+                    print("⚠️ Skipping match - players data is neither string nor array")
+                    continue
+                }
+                
+                // Get optional fields
+                let matchFormat = json["match_format"] as? Int ?? 1
+                let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
+                
+                // Create MatchResult
+                let match = MatchResult(
+                    id: id,
+                    gameType: gameType,
+                    gameName: gameName,
+                    players: players,
+                    winnerId: winnerId,
+                    timestamp: timestamp,
+                    duration: TimeInterval(duration),
+                    matchFormat: matchFormat,
+                    totalLegsPlayed: totalLegsPlayed
+                )
+                
+                matches.append(match)
+            }
             
             print("✅ Loaded \(matches.count) matches from Supabase")
             return matches
@@ -151,9 +195,6 @@ class MatchesService: ObservableObject {
         } catch {
             print("❌ Load matches failed: \(error)")
             print("   Error details: \(error.localizedDescription)")
-            if let decodingError = error as? DecodingError {
-                print("   Decoding error: \(decodingError)")
-            }
             throw MatchSyncError.loadFailed
         }
     }

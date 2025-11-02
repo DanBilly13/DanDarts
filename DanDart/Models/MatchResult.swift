@@ -119,18 +119,28 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
         case legsWon
     }
     
-    // Custom decoder to handle missing legsWon field (backwards compatibility)
+    // Custom decoder to handle missing legsWon field and isGuest as string (backwards compatibility)
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         displayName = try container.decode(String.self, forKey: .displayName)
         nickname = try container.decode(String.self, forKey: .nickname)
         avatarURL = try container.decodeIfPresent(String.self, forKey: .avatarURL)
-        isGuest = try container.decode(Bool.self, forKey: .isGuest)
-        finalScore = try container.decode(Int.self, forKey: .finalScore)
-        startingScore = try container.decode(Int.self, forKey: .startingScore)
-        totalDartsThrown = try container.decode(Int.self, forKey: .totalDartsThrown)
-        turns = try container.decode([MatchTurn].self, forKey: .turns)
+        
+        // Handle isGuest as either Bool or String (for backwards compatibility)
+        if let isGuestBool = try? container.decode(Bool.self, forKey: .isGuest) {
+            isGuest = isGuestBool
+        } else if let isGuestString = try? container.decode(String.self, forKey: .isGuest) {
+            isGuest = (isGuestString.lowercased() == "true")
+        } else {
+            isGuest = false // Default to false if missing
+        }
+        
+        // Handle optional fields that may be missing in minimal player data
+        finalScore = try container.decodeIfPresent(Int.self, forKey: .finalScore) ?? 0
+        startingScore = try container.decodeIfPresent(Int.self, forKey: .startingScore) ?? 0
+        totalDartsThrown = try container.decodeIfPresent(Int.self, forKey: .totalDartsThrown) ?? 0
+        turns = try container.decodeIfPresent([MatchTurn].self, forKey: .turns) ?? []
         // Default to 0 if legsWon is missing (for old matches)
         legsWon = try container.decodeIfPresent(Int.self, forKey: .legsWon) ?? 0
     }
