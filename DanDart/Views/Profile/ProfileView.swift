@@ -14,6 +14,7 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
     @State private var showEditProfile: Bool = false
+    @State private var showClearMatchesConfirmation: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -65,7 +66,26 @@ struct ProfileView: View {
                 EditProfileView()
                     .environmentObject(authService)
             }
+            .alert("Clear Local Matches", isPresented: $showClearMatchesConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    clearLocalMatches()
+                }
+            } message: {
+                Text("This will delete all locally stored match history. Matches synced to the cloud will not be affected.\n\nThis cannot be undone.")
+            }
         }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func clearLocalMatches() {
+        MatchStorageManager.shared.deleteAllMatches()
+        print("✅ All local matches cleared")
+        
+        // Haptic feedback
+        let feedback = UINotificationFeedbackGenerator()
+        feedback.notificationOccurred(.success)
     }
     
     // MARK: - Sub Views
@@ -142,6 +162,19 @@ struct ProfileView: View {
                     showChevron: true
                 ) {
                     // TODO: Navigate to help
+                }
+                
+                Divider()
+                    .background(Color("TextSecondary").opacity(0.2))
+                    .padding(.leading, 44)
+                
+                SettingsRow(
+                    icon: "trash",
+                    title: "Clear Local Matches",
+                    showChevron: false,
+                    destructive: true
+                ) {
+                    showClearMatchesConfirmation = true
                 }
             }
             .background(Color("InputBackground"))
@@ -304,6 +337,7 @@ struct SettingsRow: View {
     let icon: String
     let title: String
     var showChevron: Bool = true
+    var destructive: Bool = false
     let action: () -> Void
     
     var body: some View {
@@ -311,12 +345,12 @@ struct SettingsRow: View {
             HStack(spacing: 16) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(destructive ? .red : Color("AccentPrimary"))
                     .frame(width: 28)
                 
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(destructive ? .red : Color("TextPrimary"))
                 
                 Spacer()
                 
