@@ -49,7 +49,7 @@ struct WelcomeView: View {
                 // Bottom section with buttons
                 VStack(spacing: 16) {
                     // Sign In Button
-                    AppButton(role: .primary, controlSize: .small) {
+                    AppButton(role: .primary, controlSize: .large) {
                         showingSignIn = true
                     } label: {
                         Text("Get Started")
@@ -57,7 +57,7 @@ struct WelcomeView: View {
                     .frame(maxWidth: .infinity)
                     
                     // Sign Up Button
-                    AppButton(role: .secondary, controlSize: .small) {
+                    AppButton(role: .secondary, controlSize: .large) {
                         showingSignUp = true
                     } label: {
                         Text("Sign Up")

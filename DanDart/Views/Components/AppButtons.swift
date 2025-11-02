@@ -41,8 +41,8 @@ struct AppButton<Label: View>: View {
     var body: some View {
         Button(action: action) {
             label()
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, minHeight: minHeight(for: controlSize))
+                .font(font(for: controlSize))
+                .frame(maxWidth: .infinity)
                 .contentShape(Capsule())
         }
         .controlSize(controlSize)
@@ -50,21 +50,28 @@ struct AppButton<Label: View>: View {
         .disabled(isDisabled)
     }
 
-    private func minHeight(for size: ControlSize) -> CGFloat {
-        if sizeCategory.isAccessibilityCategory { return 44 }
+    private func font(for size: ControlSize) -> Font {
+        // Map control sizes to a consistent, legible font
+        // Keep at least the standard size for accessibility categories
+        let base: Font
         switch size {
-        case .mini: return 32
-        case .small: return 36
-        case .regular: return 44
-        case .large: return 48
-        case .extraLarge: return 52
-        @unknown default: return 44
+        case .mini: base = .system(size: 13, weight: .semibold)
+        case .small: base = .system(size: 14, weight: .semibold)
+        case .regular: base = .system(size: 16, weight: .semibold)
+        case .large: base = .system(size: 16, weight: .semibold)
+        case .extraLarge: base = .system(size: 21, weight: .semibold)
+        @unknown default: base = .system(size: 17, weight: .semibold)
         }
+        if sizeCategory.isAccessibilityCategory {
+            return .system(size: 17, weight: .semibold)
+        }
+        return base
     }
 }
 
 // MARK: - Style
 private struct AppButtonStyle: ButtonStyle {
+    @Environment(\.sizeCategory) private var sizeCategory
     @Environment(\.isEnabled) private var isEnabled
     let role: AppButtonRole
     let controlSize: ControlSize
@@ -73,6 +80,7 @@ private struct AppButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
         return configuration.label
+            .frame(minHeight: contentMinHeight)
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .background(backgroundShape(pressed: pressed))
@@ -174,6 +182,27 @@ private struct AppButtonStyle: ButtonStyle {
         case .extraLarge: return 14
         @unknown default: return 10
         }
+    }
+
+    private func targetHeight(for size: ControlSize) -> CGFloat {
+        // Final button heights per control size (including padding)
+        // These align with common iOS touch targets while offering compact variants
+        if sizeCategory.isAccessibilityCategory { return 44 }
+        switch size {
+        case .mini: return 32
+        case .small: return 36
+        case .regular: return 44
+        case .large: return 48
+        case .extraLarge: return 52
+        @unknown default: return 44
+        }
+    }
+
+    private var contentMinHeight: CGFloat {
+        // Ensure final height == targetHeight by subtracting vertical padding applied above
+        let total = targetHeight(for: controlSize)
+        let inner = total - (verticalPadding * 2)
+        return max(inner, 0)
     }
 }
 

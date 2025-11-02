@@ -118,7 +118,7 @@ struct FriendsListView: View {
                     Section {
                         VStack(spacing: 16) {
                             Image(systemName: "person.2.slash")
-                                .font(.system(size: 64, weight: .light))
+                                .font(.system(size: 48, weight: .light))
                                 .foregroundColor(Color("TextSecondary"))
                             
                             VStack(spacing: 8) {

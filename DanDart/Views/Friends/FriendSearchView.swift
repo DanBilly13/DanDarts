@@ -147,31 +147,16 @@ struct FriendSearchView: View {
                                     Text("Friends")
                                         .font(.system(size: 16, weight: .semibold))
                                         .foregroundColor(Color("TextSecondary"))
-                                        .padding(.horizontal, 16)
                                     
                                     ForEach(friendResults) { user in
-                                        HStack(spacing: 16) {
-                                            // Player Card
-                                            PlayerCard(player: user.toPlayer())
-                                            
-                                            // Already Friends Badge
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundColor(.green)
-                                                Text("Friends")
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(Color("TextSecondary"))
-                                            }
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 8)
-                                            .background(Color("TextSecondary").opacity(0.1))
-                                            .cornerRadius(20)
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(Color("InputBackground"))
-                                        .cornerRadius(12)
+                                        FriendSearchResultCard(
+                                            user: user,
+                                            isFriend: true,
+                                            isLoading: false,
+                                            showSuccess: false,
+                                            requestSent: false,
+                                            onAction: {}
+                                        )
                                     }
                                 }
                             }
@@ -183,58 +168,21 @@ struct FriendSearchView: View {
                                         Text("Add Friends")
                                             .font(.system(size: 16, weight: .semibold))
                                             .foregroundColor(Color("TextSecondary"))
-                                            .padding(.horizontal, 16)
                                     }
                                     
                                     ForEach(nonFriendResults) { user in
-                                        HStack(spacing: 16) {
-                                            // Player Card
-                                            PlayerCard(player: user.toPlayer())
-                                            
-                                            // Send Request Button
-                                            Button(action: {
-                                                sendFriendRequest(user)
-                                            }) {
-                                                ZStack {
-                                                    if isAddingFriend && sentRequestUserId == user.id {
-                                                        ProgressView()
-                                                            .tint(Color("AccentPrimary"))
-                                                    } else if showSuccessMessage && sentRequestUserId == user.id {
-                                                        Image(systemName: "checkmark")
-                                                            .font(.system(size: 20, weight: .bold))
-                                                            .foregroundColor(.green)
-                                                    } else if sentRequestUserId == user.id {
-                                                        // Request Sent state
-                                                        Image(systemName: "paperplane.fill")
-                                                            .font(.system(size: 18, weight: .semibold))
-                                                            .foregroundColor(Color("TextSecondary"))
-                                                    } else {
-                                                        Image(systemName: "person.badge.plus")
-                                                            .font(.system(size: 20, weight: .semibold))
-                                                            .foregroundColor(Color("AccentPrimary"))
-                                                    }
-                                                }
-                                                .frame(width: 44, height: 44)
-                                                .background(
-                                                    Circle()
-                                                        .fill(
-                                                            sentRequestUserId == user.id 
-                                                            ? Color("TextSecondary").opacity(0.15)
-                                                            : Color("AccentPrimary").opacity(0.15)
-                                                        )
-                                                )
-                                            }
-                                            .disabled(isAddingFriend || sentRequestUserId == user.id)
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(Color("InputBackground"))
-                                        .cornerRadius(12)
+                                        FriendSearchResultCard(
+                                            user: user,
+                                            isFriend: false,
+                                            isLoading: isAddingFriend && sentRequestUserId == user.id,
+                                            showSuccess: showSuccessMessage && sentRequestUserId == user.id,
+                                            requestSent: sentRequestUserId == user.id,
+                                            onAction: { sendFriendRequest(user) }
+                                        )
                                     }
                                 }
                             }
                         }
-                        .padding(.horizontal, 16)
                         .padding(.bottom, 16)
                     }
             }
@@ -368,11 +316,205 @@ struct FriendSearchView: View {
     }
 }
 
+// MARK: - Friend Search Result Card
+
+struct FriendSearchResultCard: View {
+    let user: User
+    let isFriend: Bool
+    let isLoading: Bool
+    let showSuccess: Bool
+    let requestSent: Bool
+    let onAction: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Player Identity (avatar + name + handle) - using consistent component
+            PlayerIdentity(player: user.toPlayer())
+            
+            Spacer()
+            
+            // Action Button
+            if isFriend {
+                // Already Friends Badge
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.green)
+                    Text("Friends")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color("TextSecondary"))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color("TextSecondary").opacity(0.1))
+                .cornerRadius(20)
+            } else {
+                // Invite Icon Button
+                Button(action: onAction) {
+                    ZStack {
+                        if isLoading {
+                            ProgressView()
+                                .scaleEffect(0.9)
+                                .tint(Color("AccentPrimary"))
+                        } else if showSuccess {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.green)
+                        } else if requestSent {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(Color("TextSecondary"))
+                        } else {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(Color("AccentPrimary"))
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(
+                                requestSent 
+                                ? Color("TextSecondary").opacity(0.15)
+                                : Color("AccentPrimary").opacity(0.15)
+                            )
+                    )
+                }
+                .disabled(isLoading || requestSent)
+            }
+        }
+        .padding(16)  // 16px padding all around
+        .background(Color("SurfacePrimary"))
+        .cornerRadius(12)
+    }
+}
+
 // MARK: - Preview
 
-#Preview {
+#Preview("Empty State") {
     FriendSearchView { player in
         print("Added friend: \(player.displayName)")
     }
     .environmentObject(AuthService.mockAuthenticated)
+}
+
+#Preview("Search Results") {
+    struct PreviewWrapper: View {
+        @StateObject private var authService = AuthService.mockAuthenticated
+        
+        var body: some View {
+            FriendSearchResultsPreview()
+                .environmentObject(authService)
+        }
+    }
+    
+    return PreviewWrapper()
+}
+
+// Preview helper with fake search results
+private struct FriendSearchResultsPreview: View {
+    @State private var searchQuery = "ben"
+    @State private var searchResults: [User] = [
+        User(
+            id: UUID(),
+            displayName: "Ben Johnson",
+            nickname: "benny",
+            email: "ben@example.com",
+            handle: "benjohnson",
+            avatarURL: "avatar2",
+            authProvider: .email,
+            createdAt: Date(),
+            lastSeenAt: Date(),
+            totalWins: 5,
+            totalLosses: 3
+        ),
+        User(
+            id: UUID(),
+            displayName: "Benjamin Smith",
+            nickname: "bensmith",
+            email: "bensmith@example.com",
+            handle: "bensmith",
+            avatarURL: "avatar3",
+            authProvider: .email,
+            createdAt: Date(),
+            lastSeenAt: Date(),
+            totalWins: 0,
+            totalLosses: 0
+        ),
+        User(
+            id: UUID(),
+            displayName: "Ben Williams",
+            nickname: "benwilliams",
+            email: "benwilliams@example.com",
+            handle: "benwilliams",
+            avatarURL: "avatar1",
+            authProvider: .google,
+            createdAt: Date(),
+            lastSeenAt: Date(),
+            totalWins: 12,
+            totalLosses: 8
+        )
+    ]
+    @State private var sentRequestUserId: UUID?
+    
+    var body: some View {
+        StandardSheetView(
+            title: "Find Friends",
+            dismissButtonTitle: "Back",
+            useScrollView: false,
+            onDismiss: {}
+        ) {
+            VStack(spacing: 0) {
+                // Search Bar
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                    
+                    TextField("Search by name or @handle", text: $searchQuery)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextPrimary"))
+                        .autocorrectionDisabled()
+                    
+                    Button(action: {
+                        searchQuery = ""
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color("InputBackground"))
+                .cornerRadius(12)
+                .padding(.bottom, 16)
+                
+                // Search Results
+                ScrollView {
+                    VStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Results")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Color("TextSecondary"))
+                            
+                            ForEach(searchResults) { user in
+                                FriendSearchResultCard(
+                                    user: user,
+                                    isFriend: false,
+                                    isLoading: false,
+                                    showSuccess: false,
+                                    requestSent: sentRequestUserId == user.id,
+                                    onAction: {
+                                        sentRequestUserId = user.id
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    .padding(.bottom, 16)
+                }
+            }
+        }
+    }
 }
