@@ -39,6 +39,8 @@ struct User: Codable, Identifiable {
         case authProvider = "auth_provider"
         case createdAt = "created_at"
         case lastSeenAt = "last_seen_at"
+        case totalWins = "total_wins"
+        case totalLosses = "total_losses"
     }
     
     // Computed properties

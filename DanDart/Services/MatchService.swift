@@ -181,6 +181,9 @@ class MatchService: ObservableObject {
         }
         
         print("✅ Match saved successfully: \(matchId)")
+        
+        // Note: The calling ViewModel should refresh the current user's profile
+        // after this method completes to show updated stats immediately
     }
     
     // MARK: - Player Stats

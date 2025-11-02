@@ -104,6 +104,16 @@ class AuthService: ObservableObject {
             print("📧 Sign up response received")
             print("   User ID: \(customResponse.user.id)")
             print("   Email: \(customResponse.user.email ?? "none")")
+            print("   Access Token: \(customResponse.accessToken.prefix(20))...")
+            
+            // CRITICAL: Set the session with the access token so the user is authenticated
+            // This is required for RLS policies to work when inserting the profile
+            print("🔐 Setting session with access token...")
+            try await supabaseService.client.auth.setSession(
+                accessToken: customResponse.accessToken,
+                refreshToken: customResponse.refreshToken
+            )
+            print("✅ Session set successfully!")
             
             // Get the user ID from the auth response
             let userId = customResponse.user.id
@@ -215,6 +225,8 @@ class AuthService: ObservableObject {
                     .value
                 
                 print("✅ User profile fetched: \(userProfile.displayName)")
+                print("   Stats: \(userProfile.totalWins)W / \(userProfile.totalLosses)L")
+                print("   Games played: \(userProfile.gamesPlayed)")
             } catch let fetchError {
                 // User profile doesn't exist - this can happen if signup partially failed
                 print("⚠️ User profile not found in database: \(fetchError)")
@@ -352,7 +364,8 @@ class AuthService: ObservableObject {
             let userId = session.user.id
             
             do {
-                // Try to fetch existing user profile
+                // Try to fetch existing user profile (force fresh data, no cache)
+                print("🔍 Fetching user profile for ID: \(userId)")
                 let existingUser: User = try await supabaseService.client
                     .from("users")
                     .select()
@@ -360,6 +373,10 @@ class AuthService: ObservableObject {
                     .single()
                     .execute()
                     .value
+                
+                print("✅ User profile fetched: \(existingUser.displayName)")
+                print("   Stats: \(existingUser.totalWins)W / \(existingUser.totalLosses)L")
+                print("   Games played: \(existingUser.gamesPlayed)")
                 
                 // User exists, set authentication state
                 currentUser = existingUser

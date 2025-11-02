@@ -20,6 +20,7 @@ struct GameEndView: View {
     let matchId: UUID? // For navigating to match details
     
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authService: AuthService
     @State private var showCelebration = false
     @State private var showMatchDetails = false
     
@@ -187,6 +188,16 @@ struct GameEndView: View {
             // Trigger celebration animation
             withAnimation {
                 showCelebration = true
+            }
+            
+            // Refresh current user profile to show updated stats
+            Task {
+                do {
+                    try await authService.refreshCurrentUser()
+                    print("✅ User profile refreshed after match")
+                } catch {
+                    print("⚠️ Failed to refresh user profile: \(error)")
+                }
             }
             
             // Play celebration sound

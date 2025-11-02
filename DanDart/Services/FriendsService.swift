@@ -96,17 +96,25 @@ class FriendsService: ObservableObject {
     /// - Parameter userId: User's ID
     /// - Returns: Array of friend User objects
     func loadFriends(userId: UUID) async throws -> [User] {
-        // Query friendships table and join with users table
+        // Query friendships where user is EITHER requester OR addressee, and status is accepted
+        // This handles bidirectional friendships
         let friendships: [Friendship] = try await supabaseService.client
             .from("friendships")
             .select()
-            .eq("user_id", value: userId)
+            .or("requester_id.eq.\(userId.uuidString),addressee_id.eq.\(userId.uuidString)")
             .eq("status", value: "accepted")
             .execute()
             .value
         
-        // Get friend IDs
-        let friendIds = friendships.map { $0.friendId }
+        // Extract friend IDs (the OTHER person in each friendship)
+        let friendIds = friendships.map { friendship -> UUID in
+            // If current user is requester, friend is addressee (and vice versa)
+            if friendship.requesterId == userId {
+                return friendship.addresseeId
+            } else {
+                return friendship.requesterId
+            }
+        }
         
         guard !friendIds.isEmpty else {
             return []
@@ -128,11 +136,11 @@ class FriendsService: ObservableObject {
     ///   - userId: Current user's ID
     ///   - friendId: Friend's user ID
     func removeFriend(userId: UUID, friendId: UUID) async throws {
+        // Delete friendship where users are in EITHER direction (bidirectional)
         try await supabaseService.client
             .from("friendships")
             .delete()
-            .eq("user_id", value: userId)
-            .eq("friend_id", value: friendId)
+            .or("and(requester_id.eq.\(userId.uuidString),addressee_id.eq.\(friendId.uuidString)),and(requester_id.eq.\(friendId.uuidString),addressee_id.eq.\(userId.uuidString))")
             .execute()
     }
     
