@@ -227,13 +227,16 @@ class MatchService: ObservableObject {
             )
             
             // Update user stats in users table
-            try await supabaseService.client
+            print("📝 Updating user \(userId.uuidString) from \(currentUser.totalWins)W/\(currentUser.totalLosses)L to \(newWins)W/\(newLosses)L")
+            
+            let response = try await supabaseService.client
                 .from("users")
                 .update(updateRecord)
                 .eq("id", value: userId.uuidString)
                 .execute()
             
             print("✅ Updated stats for \(currentUser.displayName): \(newWins)W/\(newLosses)L")
+            print("   Response status: \(response.response.statusCode)")
         }
     }
     
