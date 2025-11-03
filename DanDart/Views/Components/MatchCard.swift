@@ -12,19 +12,17 @@ struct MatchCard: View {
     
     var body: some View {
         HStack(spacing: 0) {
+            // Left side: Placeholder for future game graphic
             VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    gameBadge
-                    Spacer()
-                }
                 Spacer()
             }
             .frame(width: 84)
             
             // Match Info
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Game name chip
+                gameNameChip
+                
                 // Players with scores
                 playersRow
                 
@@ -36,7 +34,6 @@ struct MatchCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minHeight: 84)
         .background(Color("InputBackground"))
         .overlay(alignment: .leading) {
             Color("AccentPrimary")
@@ -48,16 +45,16 @@ struct MatchCard: View {
     
     // MARK: - Sub Views
 
-    private var gameBadge: some View {
-        VStack(spacing: 4) {
-            Text(match.gameType)
-                .font(.body.weight(.bold))
-                .foregroundColor(Color("AccentPrimary"))
-            Image(systemName: "target")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundColor(Color("AccentPrimary"))
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
+    private var gameNameChip: some View {
+        Text(match.gameName)
+            .font(.caption.weight(.semibold))
+            .foregroundColor(Color("AccentPrimary"))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(Color("AccentPrimary").opacity(0.15))
+            )
     }
     
     private var playersRow: some View {
