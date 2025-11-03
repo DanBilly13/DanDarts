@@ -19,6 +19,14 @@ struct HalveItRoundCard: View {
         let hits: Int // 0-3
         let score: Int
         let color: Color
+        let hitSequence: [Bool]? // Optional: exact sequence of hits/misses
+        
+        init(hits: Int, score: Int, color: Color, hitSequence: [Bool]? = nil) {
+            self.hits = hits
+            self.score = score
+            self.color = color
+            self.hitSequence = hitSequence
+        }
     }
     
     var body: some View {
@@ -40,10 +48,18 @@ struct HalveItRoundCard: View {
                             Spacer()
                             HStack(spacing: 20) {
                                 if rowIndex < playerData.count {
-                                    DartHitIndicators(hits: playerData[rowIndex].hits, playerColor: playerData[rowIndex].color)
+                                    DartHitIndicators(
+                                        hits: playerData[rowIndex].hits, 
+                                        playerColor: playerData[rowIndex].color,
+                                        hitSequence: playerData[rowIndex].hitSequence
+                                    )
                                 }
                                 if rowIndex + 1 < playerData.count {
-                                    DartHitIndicators(hits: playerData[rowIndex + 1].hits, playerColor: playerData[rowIndex + 1].color)
+                                    DartHitIndicators(
+                                        hits: playerData[rowIndex + 1].hits, 
+                                        playerColor: playerData[rowIndex + 1].color,
+                                        hitSequence: playerData[rowIndex + 1].hitSequence
+                                    )
                                 } else if playerData.count == 3 && rowIndex == 2 {
                                     // Invisible spacer for 3rd player to align with 1st player
                                     DartHitIndicators(hits: 0, playerColor: .clear)

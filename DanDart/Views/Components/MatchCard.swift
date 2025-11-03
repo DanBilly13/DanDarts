@@ -46,15 +46,7 @@ struct MatchCard: View {
     // MARK: - Sub Views
 
     private var gameNameChip: some View {
-        Text(match.gameName)
-            .font(.caption.weight(.semibold))
-            .foregroundColor(Color("AccentPrimary"))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(Color("AccentPrimary").opacity(0.15))
-            )
+        Chip(title: match.gameName)
     }
     
     private var playersRow: some View {
