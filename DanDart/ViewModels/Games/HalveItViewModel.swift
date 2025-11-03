@@ -30,8 +30,13 @@ class HalveItViewModel: ObservableObject {
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
     
-    // Services (using singleton)
-    // AuthService.shared is accessed directly when needed
+    // Services
+    private var authService: AuthService?
+    
+    /// Inject AuthService from the view
+    func setAuthService(_ service: AuthService) {
+        self.authService = service
+    }
     
     // MARK: - Turn History
     @Published var turnHistory: [HalveItTurnHistory] = []
@@ -250,6 +255,11 @@ class HalveItViewModel: ObservableObject {
         // Save to local storage
         MatchStorageManager.shared.saveMatch(matchResult)
         
+        // Capture current user ID before entering Task (to avoid race conditions)
+        let currentUserId = authService?.currentUser?.id
+        print("🔍 Captured current user ID before Task: \(currentUserId?.uuidString ?? "nil")")
+        print("🔍 AuthService injected: \(authService != nil)")
+        
         // Save to Supabase (async)
         Task {
             do {
@@ -285,7 +295,8 @@ class HalveItViewModel: ObservableObject {
                     endedAt: Date(),
                     turnHistory: supabaseTurns,
                     matchFormat: 1, // Halve-It doesn't use legs
-                    legsWon: [:] // Halve-It doesn't use legs
+                    legsWon: [:], // Halve-It doesn't use legs
+                    currentUserId: currentUserId
                 )
                 
                 print("✅ Match saved to Supabase: \(matchId)")
@@ -293,8 +304,9 @@ class HalveItViewModel: ObservableObject {
                 // Update AuthService with the fresh user data directly (no need to query again!)
                 if let updatedUser = updatedUser {
                     await MainActor.run {
-                        AuthService.shared.currentUser = updatedUser
-                        AuthService.shared.objectWillChange.send()
+                        // Update the injected authService (which is the same as AuthService.shared)
+                        self.authService?.currentUser = updatedUser
+                        self.authService?.objectWillChange.send()
                     }
                     print("✅ User profile updated with fresh stats: \(updatedUser.totalWins)W/\(updatedUser.totalLosses)L")
                 }
