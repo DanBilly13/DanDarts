@@ -112,7 +112,7 @@ class MatchesService: ObservableObject {
             // Query matches - RLS policy will filter to matches where user participated
             let response = try await supabaseService.client
                 .from("matches")
-                .select("id, game_type, game_name, winner_id, timestamp, duration, players, match_format, total_legs_played")
+                .select("id, game_type, game_name, winner_id, timestamp, duration, players, match_format, total_legs_played, metadata")
                 .order("timestamp", ascending: false)
                 .execute()
             
@@ -145,9 +145,8 @@ class MatchesService: ObservableObject {
                     continue
                 }
                 
-                // Parse JSONB players array
-                // Note: Supabase returns JSONB as either a parsed object or a string depending on the query
-                let players: [MatchPlayer]
+                // Parse JSONB players array (basic info only - turns will be loaded separately)
+                let basicPlayers: [MatchPlayer]
                 
                 if let playersString = json["players"] as? String {
                     // Case 1: players is a JSON string - convert to Data and decode
@@ -156,13 +155,13 @@ class MatchesService: ObservableObject {
                         continue
                     }
                     let decoder = JSONDecoder()
-                    players = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                    basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
                     
                 } else if let playersArray = json["players"] as? [[String: Any]] {
                     // Case 2: players is already parsed as an array - serialize and decode
                     let playersJsonData = try JSONSerialization.data(withJSONObject: playersArray)
                     let decoder = JSONDecoder()
-                    players = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                    basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
                     
                 } else {
                     print("⚠️ Skipping match - players data is neither string nor array")
@@ -173,23 +172,33 @@ class MatchesService: ObservableObject {
                 let matchFormat = json["match_format"] as? Int ?? 1
                 let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
                 
-                // Create MatchResult
+                // Parse metadata (for Halve-It difficulty, etc.)
+                var metadata: [String: String]? = nil
+                if let metadataDict = json["metadata"] as? [String: Any] {
+                    metadata = metadataDict.compactMapValues { $0 as? String }
+                }
+                
+                // Load turn data from match_throws table
+                let playersWithTurns = try await loadTurnsForMatch(matchId: id, players: basicPlayers)
+                
+                // Create MatchResult with complete turn data
                 let match = MatchResult(
                     id: id,
                     gameType: gameType,
                     gameName: gameName,
-                    players: players,
+                    players: playersWithTurns,
                     winnerId: winnerId,
                     timestamp: timestamp,
                     duration: TimeInterval(duration),
                     matchFormat: matchFormat,
-                    totalLegsPlayed: totalLegsPlayed
+                    totalLegsPlayed: totalLegsPlayed,
+                    metadata: metadata
                 )
                 
                 matches.append(match)
             }
             
-            print("✅ Loaded \(matches.count) matches from Supabase")
+            print("✅ Loaded \(matches.count) matches from Supabase (with turn data)")
             return matches
             
         } catch {
@@ -197,6 +206,101 @@ class MatchesService: ObservableObject {
             print("   Error details: \(error.localizedDescription)")
             throw MatchSyncError.loadFailed
         }
+    }
+    
+    /// Load turn data for a specific match from match_throws table
+    /// - Parameters:
+    ///   - matchId: The match ID
+    ///   - players: Basic player data (without turns)
+    /// - Returns: Players with complete turn data
+    private func loadTurnsForMatch(matchId: UUID, players: [MatchPlayer]) async throws -> [MatchPlayer] {
+        // Query match_throws table for this match
+        let response = try await supabaseService.client
+            .from("match_throws")
+            .select("player_order, turn_index, throws, score_before, score_after, game_metadata")
+            .eq("match_id", value: matchId.uuidString)
+            .order("player_order")
+            .order("turn_index")
+            .execute()
+        
+        // Parse throws data
+        guard let throwsArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+            print("⚠️ No turn data found for match \(matchId), returning players with empty turns")
+            return players
+        }
+        
+        // Group throws by player_order
+        var playerTurns: [Int: [MatchTurn]] = [:]
+        
+        for throwJson in throwsArray {
+            guard let playerOrder = throwJson["player_order"] as? Int,
+                  let turnIndex = throwJson["turn_index"] as? Int,
+                  let dartScores = throwJson["throws"] as? [Int],
+                  let scoreBefore = throwJson["score_before"] as? Int,
+                  let scoreAfter = throwJson["score_after"] as? Int else {
+                continue
+            }
+            
+            // Get game_metadata (for Halve-It target display)
+            var targetDisplay: String? = nil
+            if let gameMetadata = throwJson["game_metadata"] as? [String: Any],
+               let target = gameMetadata["target_display"] as? String {
+                targetDisplay = target
+            }
+            
+            // Convert dart scores to MatchDart objects
+            // Note: We only have total values, so we need to infer multipliers
+            let darts = dartScores.map { score -> MatchDart in
+                // For now, assume all are singles (baseValue = value, multiplier = 1)
+                // This is a limitation - we lose the double/triple info
+                // But for Halve-It, what matters is whether the dart hit the target (value > 0)
+                return MatchDart(baseValue: score, multiplier: 1)
+            }
+            
+            let turn = MatchTurn(
+                turnNumber: turnIndex,
+                darts: darts,
+                scoreBefore: scoreBefore,
+                scoreAfter: scoreAfter,
+                isBust: false,
+                targetDisplay: targetDisplay
+            )
+            
+            if playerTurns[playerOrder] == nil {
+                playerTurns[playerOrder] = []
+            }
+            playerTurns[playerOrder]?.append(turn)
+        }
+        
+        // Reconstruct players with turn data
+        var playersWithTurns: [MatchPlayer] = []
+        
+        for (index, player) in players.enumerated() {
+            let turns = playerTurns[index] ?? []
+            let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
+            
+            // Calculate final score and starting score from turn data
+            // For Halve-It: starting score is always 0, final score is the last turn's scoreAfter
+            let startingScore = turns.first?.scoreBefore ?? 0
+            let finalScore = turns.last?.scoreAfter ?? 0
+            
+            let playerWithTurns = MatchPlayer(
+                id: player.id,
+                displayName: player.displayName,
+                nickname: player.nickname,
+                avatarURL: player.avatarURL,
+                isGuest: player.isGuest,
+                finalScore: finalScore,
+                startingScore: startingScore,
+                totalDartsThrown: totalDarts,
+                turns: turns,
+                legsWon: player.legsWon
+            )
+            
+            playersWithTurns.append(playerWithTurns)
+        }
+        
+        return playersWithTurns
     }
     
     // MARK: - Retry Failed Syncs

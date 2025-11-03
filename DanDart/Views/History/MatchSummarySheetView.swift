@@ -131,13 +131,22 @@ struct MatchSummarySheetView: View {
                                 
                                 let playerData = match.players.enumerated().map { playerIndex, player in
                                     let turn = roundIndex < player.turns.count ? player.turns[roundIndex] : nil
-                                    let hits = turn?.darts.count ?? 0
+                                    
+                                    // Create hit sequence showing which specific darts hit (true) or missed (false)
+                                    let hitSequence: [Bool] = turn?.darts.map { $0.value > 0 } ?? []
+                                    
+                                    // Count only darts that actually hit the target (scored points)
+                                    let hits = hitSequence.filter { $0 }.count
+                                    
+                                    // Show cumulative score (total score after this round)
+                                    // Halve-It is about building up points, so we show the running total
                                     let score = turn?.scoreAfter ?? 0
                                     
                                     return HalveItRoundCard.PlayerRoundData(
                                         hits: hits,
                                         score: score,
-                                        color: playerColor(for: playerIndex)
+                                        color: playerColor(for: playerIndex),
+                                        hitSequence: hitSequence
                                     )
                                 }
                                 

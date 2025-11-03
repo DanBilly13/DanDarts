@@ -216,12 +216,33 @@ class HalveItViewModel: ObservableObject {
     private func saveMatchResult() {
         guard let winner = winner else { return }
         
-        // Convert turn history to MatchTurn format
-        let matchTurns = convertTurnHistory()
-        
         // Create match players with final scores
         let matchPlayers = players.map { player in
-            let playerTurns = matchTurns.filter { $0.id == player.id }
+            // Filter turn history for this specific player BEFORE converting
+            let playerTurnHistory = turnHistory.filter { $0.playerId == player.id }
+            
+            // Convert this player's turns to MatchTurn format
+            let playerTurns = playerTurnHistory.map { turn in
+                // For Halve-It: Only save non-zero value if dart HIT the target
+                // This allows hit indicators to work correctly when loading from Supabase
+                let darts = turn.darts.map { dart in
+                    let hitTarget = turn.target.isHit(by: dart)
+                    return MatchDart(
+                        baseValue: hitTarget ? dart.baseValue : 0,
+                        multiplier: hitTarget ? dart.scoreType.multiplier : 1
+                    )
+                }
+                
+                return MatchTurn(
+                    turnNumber: turn.round + 1,
+                    darts: darts,
+                    scoreBefore: turn.scoreBefore,
+                    scoreAfter: turn.scoreAfter,
+                    isBust: false, // Halve-It doesn't have busts
+                    targetDisplay: turn.target.displayText // Add target info for match history
+                )
+            }
+            
             let totalDarts = playerTurns.reduce(0) { $0 + $1.darts.count }
             
             return MatchPlayer(
@@ -319,27 +340,6 @@ class HalveItViewModel: ObservableObject {
         }
     }
     
-    /// Convert turn history to generic format for storage
-    private func convertTurnHistory() -> [MatchTurn] {
-        return turnHistory.map { turn in
-            let darts = turn.darts.map { dart in
-                MatchDart(
-                    baseValue: dart.baseValue,
-                    multiplier: dart.scoreType.multiplier
-                )
-            }
-            
-            return MatchTurn(
-                // id auto-generates via default parameter
-                turnNumber: turn.round + 1,
-                darts: darts,
-                scoreBefore: turn.scoreBefore,
-                scoreAfter: turn.scoreAfter,
-                isBust: false, // Halve-It doesn't have busts
-                targetDisplay: turn.target.displayText // Add target info for match history
-            )
-        }
-    }
     
     // MARK: - Game Reset
     
