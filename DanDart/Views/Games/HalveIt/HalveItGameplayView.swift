@@ -130,10 +130,6 @@ struct HalveItGameplayView: View {
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
-        .onAppear {
-            // Inject authService into the ViewModel
-            viewModel.setAuthService(authService)
-        }
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {

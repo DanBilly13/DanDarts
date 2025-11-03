@@ -82,6 +82,7 @@ class MatchService: ObservableObject {
     ///   - turnHistory: Array of all turns played
     ///   - matchFormat: Number of legs (1, 3, 5, or 7)
     ///   - legsWon: Dictionary of player ID to legs won
+    ///   - currentUserId: UUID of the current user (optional)
     func saveMatch(
         matchId: UUID,
         gameId: String,
@@ -91,8 +92,12 @@ class MatchService: ObservableObject {
         endedAt: Date,
         turnHistory: [TurnHistory],
         matchFormat: Int,
-        legsWon: [UUID: Int]
-    ) async throws {
+        legsWon: [UUID: Int],
+        currentUserId: UUID? = nil
+    ) async throws -> User? {
+        // Debug: Check AuthService state at the start
+        print("🔍 saveMatch called. AuthService.shared.currentUser: \(AuthService.shared.currentUser?.displayName ?? "nil")")
+        
         // 1. Insert match record
         let duration = Int(endedAt.timeIntervalSince(startedAt))
         
@@ -175,22 +180,26 @@ class MatchService: ObservableObject {
                 .execute()
         }
         
-        // 4. Update player stats for connected players
+        // 4. Update player stats for connected players and get updated user
+        var updatedUser: User? = nil
         if let winnerId = winnerId {
-            try await updatePlayerStats(winnerId: winnerId, players: players)
+            updatedUser = try await updatePlayerStats(winnerId: winnerId, players: players, currentUserId: currentUserId)
         }
         
         print("✅ Match saved successfully: \(matchId)")
         
-        // Note: The calling ViewModel should refresh the current user's profile
-        // after this method completes to show updated stats immediately
+        // Return updated user so caller can update AuthService directly
+        return updatedUser
     }
     
     // MARK: - Player Stats
     
-    /// Update player stats after a match
-    private func updatePlayerStats(winnerId: UUID, players: [Player]) async throws {
+    /// Update player stats after a match and return updated user if current user was in the match
+    private func updatePlayerStats(winnerId: UUID, players: [Player], currentUserId: UUID?) async throws -> User? {
         print("🔍 Updating stats for \(players.count) players. Winner ID: \(winnerId)")
+        print("🔍 Current user ID passed: \(currentUserId?.uuidString ?? "nil")")
+        var updatedCurrentUser: User? = nil
+        
         for player in players {
             print("🔍 Player: \(player.displayName), userId: \(player.userId?.uuidString ?? "nil"), isGuest: \(player.isGuest)")
             guard let userId = player.userId else {
@@ -237,7 +246,29 @@ class MatchService: ObservableObject {
             
             print("✅ Updated stats for \(currentUser.displayName): \(newWins)W/\(newLosses)L")
             print("   Response status: \(response.response.statusCode)")
+            
+            // Create updated user object with new stats
+            var updatedUser = currentUser
+            updatedUser.totalWins = newWins
+            updatedUser.totalLosses = newLosses
+            updatedUser.lastSeenAt = Date()
+            
+            // Store ONLY if this is the authenticated current user
+            // This ensures we return YOUR stats, not your opponent's stats
+            if let passedUserId = currentUserId {
+                print("🔍 Checking if \(userId.uuidString) == \(passedUserId.uuidString)")
+                if userId == passedUserId {
+                    updatedCurrentUser = updatedUser
+                    print("📌 This is the authenticated user - will return their updated data")
+                } else {
+                    print("⚠️ Not the authenticated user - skipping")
+                }
+            } else {
+                print("⚠️ No currentUserId was passed to updatePlayerStats")
+            }
         }
+        
+        return updatedCurrentUser
     }
     
     // MARK: - Match Loading

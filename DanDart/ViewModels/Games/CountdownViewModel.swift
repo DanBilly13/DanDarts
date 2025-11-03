@@ -32,6 +32,11 @@ class CountdownViewModel: ObservableObject {
     // Services
     private var authService: AuthService?
     
+    /// Inject AuthService from the view
+    func setAuthService(_ service: AuthService) {
+        self.authService = service
+    }
+    
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
     
@@ -127,17 +132,11 @@ class CountdownViewModel: ObservableObject {
         return matchFormat > 1
     }
     
-    /// Inject AuthService from the view (must be called after init)
-    func setAuthService(_ service: AuthService) {
-        self.authService = service
-    }
-    
     // MARK: - Initialization
     
     init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         self.players = players
-        self.authService = nil
         self.matchStartTime = Date()
         self.matchFormat = matchFormat
         
@@ -613,6 +612,11 @@ class CountdownViewModel: ObservableObject {
         // Update player stats
         MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
         
+        // Capture current user ID before entering Task (to avoid race conditions)
+        let currentUserId = authService?.currentUser?.id
+        print("🔍 Captured current user ID before Task: \(currentUserId?.uuidString ?? "nil")")
+        print("🔍 AuthService injected: \(authService != nil)")
+        
         // Save to Supabase (async, non-blocking)
         Task {
             do {
@@ -624,7 +628,7 @@ class CountdownViewModel: ObservableObject {
                 // Get winner's user ID (nil for guests)
                 let winnerId = winner.userId
                 
-                try await matchService.saveMatch(
+                let updatedUser = try await matchService.saveMatch(
                     matchId: matchId,
                     gameId: gameId,
                     players: players,
@@ -633,14 +637,24 @@ class CountdownViewModel: ObservableObject {
                     endedAt: Date(),
                     turnHistory: turnHistory,
                     matchFormat: matchFormat,
-                    legsWon: legsWon
+                    legsWon: legsWon,
+                    currentUserId: currentUserId
                 )
                 
                 print("✅ Match saved to Supabase: \(matchId)")
                 
-                // Refresh current user's profile to show updated stats
-                try? await authService?.refreshCurrentUser()
-                print("✅ User profile refreshed with updated stats")
+                // Update AuthService with the fresh user data directly (no need to query again!)
+                if let updatedUser = updatedUser {
+                    await MainActor.run {
+                        // Update the injected authService (which is the same as AuthService.shared)
+                        self.authService?.currentUser = updatedUser
+                        self.authService?.objectWillChange.send()
+                    }
+                    print("✅ User profile updated with fresh stats: \(updatedUser.totalWins)W/\(updatedUser.totalLosses)L")
+                }
+                
+                // Notify that match completed so other views can refresh
+                NotificationCenter.default.post(name: NSNotification.Name("MatchCompleted"), object: nil)
             } catch {
                 print("❌ Failed to save match to Supabase: \(error)")
                 // Don't block UI - match is still saved locally

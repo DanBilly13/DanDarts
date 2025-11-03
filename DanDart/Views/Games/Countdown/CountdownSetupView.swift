@@ -458,6 +458,10 @@ struct SearchPlayerSheet: View {
                 loadGuestPlayers()
                 loadFriends()
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
+                // Reload friends to get updated stats after a match
+                loadFriends()
+            }
             .sheet(isPresented: $showAddGuestPlayer) {
                 AddGuestPlayerView { player in
                     onPlayerSelected(player)

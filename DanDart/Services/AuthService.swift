@@ -47,6 +47,9 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
 
 @MainActor
 class AuthService: ObservableObject {
+    // MARK: - Singleton
+    static let shared = AuthService()
+    
     // MARK: - Published Properties
     @Published var currentUser: User?
     @Published var isAuthenticated: Bool = false
@@ -572,8 +575,12 @@ class AuthService: ObservableObject {
                 .execute()
                 .value
             
-            // Update current user with fresh data
-            currentUser = refreshedUser
+            // Update current user with fresh data on main thread
+            await MainActor.run {
+                self.currentUser = refreshedUser
+                // Force objectWillChange to fire
+                self.objectWillChange.send()
+            }
             print("✅ User profile refreshed: \(refreshedUser.displayName) - \(refreshedUser.totalWins)W/\(refreshedUser.totalLosses)L")
         } catch {
             print("❌ Failed to refresh user profile: \(error.localizedDescription)")

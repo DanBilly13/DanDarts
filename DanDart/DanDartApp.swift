@@ -9,7 +9,7 @@ import SwiftUI
 
 @main
 struct DanDartApp: App {
-    @StateObject private var authService = AuthService()
+    @StateObject private var authService = AuthService.shared
     
     var body: some Scene {
         WindowGroup {

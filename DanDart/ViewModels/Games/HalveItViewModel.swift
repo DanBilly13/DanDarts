@@ -30,8 +30,8 @@ class HalveItViewModel: ObservableObject {
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
     
-    // Services
-    private var authService: AuthService?
+    // Services (using singleton)
+    // AuthService.shared is accessed directly when needed
     
     // MARK: - Turn History
     @Published var turnHistory: [HalveItTurnHistory] = []
@@ -55,17 +55,11 @@ class HalveItViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    /// Inject AuthService from the view (must be called after init)
-    func setAuthService(_ service: AuthService) {
-        self.authService = service
-    }
-    
     init(players: [Player], difficulty: HalveItDifficulty, gameId: UUID) {
         self.players = players
         self.difficulty = difficulty
         self.targets = difficulty.generateTargets()
         self.gameId = gameId
-        self.authService = nil
         self.matchId = UUID()
         
         // Initialize all players with 0 score
@@ -282,7 +276,7 @@ class HalveItViewModel: ObservableObject {
                     )
                 }
                 
-                try await matchService.saveMatch(
+                let updatedUser = try await matchService.saveMatch(
                     matchId: matchId,
                     gameId: supabaseGameId,
                     players: players,
@@ -296,9 +290,17 @@ class HalveItViewModel: ObservableObject {
                 
                 print("✅ Match saved to Supabase: \(matchId)")
                 
-                // Refresh current user's profile to show updated stats
-                try? await authService?.refreshCurrentUser()
-                print("✅ User profile refreshed with updated stats")
+                // Update AuthService with the fresh user data directly (no need to query again!)
+                if let updatedUser = updatedUser {
+                    await MainActor.run {
+                        AuthService.shared.currentUser = updatedUser
+                        AuthService.shared.objectWillChange.send()
+                    }
+                    print("✅ User profile updated with fresh stats: \(updatedUser.totalWins)W/\(updatedUser.totalLosses)L")
+                }
+                
+                // Notify that match completed so other views can refresh
+                NotificationCenter.default.post(name: NSNotification.Name("MatchCompleted"), object: nil)
             } catch {
                 print("Failed to save match to Supabase: \(error)")
             }
