@@ -90,25 +90,8 @@ struct CountdownSetupView: View {
                             }
                             
                             // Segmented control for legs selection
-                            HStack(spacing: 8) {
-                                ForEach([1, 3, 5, 7], id: \.self) { legs in
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            selectedLegs = legs
-                                        }
-                                    }) {
-                                        Text("Best of \(legs)")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(selectedLegs == legs ? .white : Color("TextSecondary"))
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 12)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(selectedLegs == legs ? Color("AccentPrimary") : Color("InputBackground"))
-                                            )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
+                            SegmentedControl(options: [1, 3, 5, 7], selection: $selectedLegs) { legs in
+                                "Best of \(legs)"
                             }
                         }
                     }

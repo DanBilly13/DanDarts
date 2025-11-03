@@ -84,25 +84,8 @@ struct HalveItSetupView: View {
                             }
                             
                             // Segmented control for difficulty selection
-                            HStack(spacing: 8) {
-                                ForEach(HalveItDifficulty.allCases, id: \.self) { difficulty in
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            selectedDifficulty = difficulty
-                                        }
-                                    }) {
-                                        Text(difficulty.rawValue)
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(selectedDifficulty == difficulty ? .white : Color("TextSecondary"))
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 12)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(selectedDifficulty == difficulty ? Color("AccentPrimary") : Color("InputBackground"))
-                                            )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
+                            SegmentedControl(options: HalveItDifficulty.allCases, selection: $selectedDifficulty) { difficulty in
+                                difficulty.rawValue
                             }
                         }
                         
