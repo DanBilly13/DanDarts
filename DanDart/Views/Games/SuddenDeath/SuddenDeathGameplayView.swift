@@ -15,9 +15,9 @@ struct SuddenDeathGameplayView: View {
     @StateObject private var viewModel: SuddenDeathViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @State private var showMenu = false
     @State private var showInstructions = false
     @State private var showExitConfirmation = false
+    @StateObject private var menuCoordinator = MenuCoordinator.shared
     
     // Initialize with game, players, and starting lives
     init(game: Game, players: [Player], startingLives: Int) {
@@ -33,36 +33,38 @@ struct SuddenDeathGameplayView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Game Title
-                gameHeader
-                
                 // Avatar Lineup
                 avatarLineup
-                    .padding(.top, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                 
                 // Player Cards
                 playerCardsSection
-                    .padding(.top, 24)
+                    .padding(.bottom, 4)
                 
-                // Current Throw Display
+                // Current throw display (always visible)
                 CurrentThrowDisplay(
                     currentThrow: viewModel.currentThrow,
                     selectedDartIndex: viewModel.selectedDartIndex,
                     onDartTapped: { index in
                         viewModel.selectDart(at: index)
                     },
-                    showScore: false // KEY: Don't show score in throw display
+                    showScore: false
                 )
                 .padding(.horizontal, 16)
-                .padding(.top, 24)
                 
-                // Points Needed Text
-                Text(viewModel.pointsNeededText)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color("AccentSecondary"))
-                    .padding(.top, 12)
+                // Points needed text (like checkout suggestion)
+                VStack {
+                    Text(viewModel.pointsNeededText)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color("AccentSecondary"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 0)
+                }
+                .frame(height: 40, alignment: .center)
+                .padding(.bottom, 8)
                 
-                // Scoring Buttons
+                // Scoring button grid (center)
                 ScoringButtonGrid(
                     onScoreSelected: { baseValue, scoreType in
                         let scoredThrow = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
@@ -71,54 +73,65 @@ struct SuddenDeathGameplayView: View {
                     showBustButton: false
                 )
                 .padding(.horizontal, 16)
-                .padding(.top, 20)
                 
-                // Save Score Button
-                if viewModel.isTurnComplete {
-                    Button(action: {
-                        viewModel.completeTurn()
-                    }) {
+                Spacer()
+                
+                // Save Score button container (fixed height to prevent layout shift)
+                ZStack {
+                    // Invisible placeholder to maintain layout space
+                    AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
                         Text("Save Score")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color("AccentPrimary"))
-                            .cornerRadius(12)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .popAnimation(active: viewModel.isTurnComplete)
+                    .opacity(0)
+                    .disabled(true)
+                    
+                    // Actual button that pops in/out
+                    AppButton(
+                        role: .primary,
+                        controlSize: .extraLarge,
+                        action: { viewModel.completeTurn() }
+                    ) {
+                        Label("Save Score", systemImage: "checkmark.circle.fill")
+                    }
+                    .popAnimation(
+                        active: viewModel.isTurnComplete,
+                        duration: 0.28,
+                        bounce: 0.22
+                    )
                 }
-                
-                Spacer(minLength: 20)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 34)
             }
         }
-        .navigationBarBackButtonHidden(true)
+        .background(Color.black)
+        .navigationTitle(game.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showMenu = true
-                }) {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(action: { showInstructions = true }) {
+                        Label("Instructions", systemImage: "info.circle")
+                    }
+                    Button(action: { viewModel.restartGame() }) {
+                        Label("Restart Game", systemImage: "arrow.clockwise")
+                    }
+                    Button(role: .destructive, action: { showExitConfirmation = true }) {
+                        Label("Exit Game", systemImage: "xmark.circle")
+                    }
+                } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 24))
                         .foregroundColor(Color("TextPrimary"))
                 }
             }
         }
-        .confirmationDialog("Game Menu", isPresented: $showMenu) {
-            Button("Instructions") {
-                showInstructions = true
-            }
-            Button("Restart Game") {
-                viewModel.restartGame()
-            }
-            Button("Exit Game", role: .destructive) {
-                showExitConfirmation = true
-            }
-            Button("Cancel", role: .cancel) {}
-        }
+        .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .navigationBarBackButtonHidden(true)
+        .interactiveDismissDisabled()
+        .ignoresSafeArea(.container, edges: .bottom)
         .alert("Exit Game?", isPresented: $showExitConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Exit", role: .destructive) {
@@ -153,36 +166,25 @@ struct SuddenDeathGameplayView: View {
         }
     }
     
-    // MARK: - Game Header
-    
-    private var gameHeader: some View {
-        Text("Sudden death")
-            .font(.system(size: 28, weight: .bold))
-            .foregroundColor(Color("TextPrimary"))
-            .padding(.top, 8)
-    }
     
     // MARK: - Avatar Lineup
     
     private var avatarLineup: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(viewModel.players) { player in
-                    AvatarLineupItem(
-                        player: player,
-                        isCurrentPlayer: player.id == viewModel.currentPlayer.id,
-                        isEliminated: viewModel.eliminatedPlayers.contains(player.id)
-                    )
-                }
+        HStack(spacing: -2) {
+            ForEach(viewModel.players) { player in
+                AvatarLineupItem(
+                    player: player,
+                    isCurrentPlayer: player.id == viewModel.currentPlayer.id,
+                    isEliminated: viewModel.eliminatedPlayers.contains(player.id)
+                )
             }
-            .padding(.horizontal, 16)
         }
     }
     
     // MARK: - Player Cards Section
     
     private var playerCardsSection: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 8) {
             // Player to Beat Card (Red/AccentPrimary)
             SuddenDeathPlayerCard(
                 player: viewModel.playerToBeat,
@@ -215,20 +217,33 @@ struct AvatarLineupItem: View {
     
     var body: some View {
         ZStack {
-            // Outer border for current player (AccentSecondary)
             if isCurrentPlayer {
+                // Outer green circle (32px)
                 Circle()
-                    .stroke(Color("AccentSecondary"), lineWidth: 3)
-                    .frame(width: 38, height: 38)
+                    .fill(Color("AccentSecondary"))
+                    .frame(width: 32, height: 32)
+                
+                // Inner black circle (28px)
+                Circle()
+                    .fill(Color.black)
+                    .frame(width: 28, height: 28)
+                
+                // Avatar (24px to fit inside black circle)
+                AsyncAvatarImage(
+                    avatarURL: player.avatarURL,
+                    size: 24
+                )
+                .opacity(isEliminated ? 0.3 : 1.0)
+            } else {
+                // Regular avatar (32px)
+                AsyncAvatarImage(
+                    avatarURL: player.avatarURL,
+                    size: 32
+                )
+                .opacity(isEliminated ? 0.3 : 1.0)
             }
-            
-            // Avatar
-            AsyncAvatarImage(
-                avatarURL: player.avatarURL,
-                size: 32
-            )
-            .opacity(isEliminated ? 0.3 : 1.0)
         }
+        .frame(width: 32, height: 32)
     }
 }
 
@@ -248,7 +263,6 @@ struct SuddenDeathPlayerCard: View {
                 avatarURL: player.avatarURL,
                 size: 44
             )
-            .padding(.leading, 8)
             
             // Player Info
             VStack(alignment: .leading, spacing: 2) {
@@ -290,15 +304,19 @@ struct SuddenDeathPlayerCard: View {
                     .foregroundColor(Color("TextPrimary"))
                     .frame(width: 60, alignment: .trailing)
             }
-            .padding(.trailing, 8)
         }
-        .frame(height: 60)
-        .background(Color("InputBackground"))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: 8)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
+        .padding(.leading, 8)
+        .padding(.trailing, 24)
+        .background(
+            Capsule()
+                .fill(Color("InputBackground"))
         )
-        .cornerRadius(8)
+        .overlay(
+            Capsule()
+                .stroke(borderColor, lineWidth: 2)
+        )
     }
 }
 
