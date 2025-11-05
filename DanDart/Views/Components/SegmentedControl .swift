@@ -35,7 +35,7 @@ struct SegmentedControl<Value: Hashable>: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            Capsule()
                                 .fill(selection == option ? Color("AccentPrimary") : Color("InputBackground"))
                         )
                 }
@@ -59,3 +59,4 @@ private struct SegmentedControlPreviewWrapper: View {
 #Preview {
     SegmentedControlPreviewWrapper()
 }
+

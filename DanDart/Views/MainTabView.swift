@@ -103,6 +103,9 @@ struct GamesTabView: View {
                 if game.title == "Halve-It" {
                     HalveItSetupView(game: game)
                         .background(Color.black)
+                } else if game.title == "Sudden Death" {
+                    SuddenDeathSetupView(game: game)
+                        .background(Color.black)
                 } else {
                     CountdownSetupView(game: game)
                         .background(Color.black)

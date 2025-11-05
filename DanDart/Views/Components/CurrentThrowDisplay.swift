@@ -12,6 +12,7 @@ struct CurrentThrowDisplay: View {
     let currentThrow: [ScoredThrow]
     let selectedDartIndex: Int?
     let onDartTapped: (Int) -> Void
+    var showScore: Bool = true // Optional parameter to show/hide score total
     
     var body: some View {
         HStack(spacing: 12) {
@@ -50,19 +51,22 @@ struct CurrentThrowDisplay: View {
                 .allowsHitTesting(hasDart)
             }
             
-            // Equals sign
-            Text("=")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(Color("TextSecondary"))
-                .padding(.horizontal, 8)
-            
-            // Total score
-            Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
-                .font(.system(size: 20, weight: .bold, design: .monospaced))
-                .foregroundColor(Color("TextPrimary"))
-                .frame(width: 50, height: 40)
-                .background(Color("TextPrimary").opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Score section (optional)
+            if showScore {
+                // Equals sign
+                Text("=")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color("TextSecondary"))
+                    .padding(.horizontal, 8)
+                
+                // Total score
+                Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color("TextPrimary"))
+                    .frame(width: 50, height: 40)
+                    .background(Color("TextPrimary").opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 8)

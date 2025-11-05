@@ -16,6 +16,23 @@ struct Game: Identifiable, Codable, Hashable {
     let players: String
     let instructions: String
     
+    // Custom initializer to allow creating Game instances
+    init(title: String, subtitle: String, players: String, instructions: String) {
+        self.title = title
+        self.subtitle = subtitle
+        self.players = players
+        self.instructions = instructions
+    }
+    
+    // Decodable initializer for JSON decoding
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.subtitle = try container.decode(String.self, forKey: .subtitle)
+        self.players = try container.decode(String.self, forKey: .players)
+        self.instructions = try container.decode(String.self, forKey: .instructions)
+    }
+    
     // Computed properties for backwards compatibility
     var name: String { title }
     var tagline: String { subtitle }
