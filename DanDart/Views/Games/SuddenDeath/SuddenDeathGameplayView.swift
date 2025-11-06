@@ -62,9 +62,13 @@ struct SuddenDeathGameplayView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 0)
                     }
-                    .frame(alignment: .center)
+                    .frame(height: 16, alignment: .center)
+                    
                     Spacer()
                 }
+
+                // Insert flexible spacer between the two main sections
+                Spacer(minLength: 0)
                
                 VStack (spacing: 0) {
                     // Scoring button grid (center)
@@ -76,8 +80,6 @@ struct SuddenDeathGameplayView: View {
                         showBustButton: false
                     )
                     .padding(.horizontal, 16)
-                    
-                    // THIS SPACER)
                     
                     Color.clear.frame(height: 24)
                     
@@ -107,9 +109,6 @@ struct SuddenDeathGameplayView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 34)
                 }
-                
-                
-                
             }
         }
         .background(Color.black)
