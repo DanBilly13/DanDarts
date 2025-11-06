@@ -2,97 +2,224 @@
 //  SuddenDeathSetupView.swift
 //  DanDart
 //
-//  Created by DanDarts Team
+//  Game setup screen for Sudden Death with player selection and lives selection
 //
 
 import SwiftUI
 
 struct SuddenDeathSetupView: View {
     let game: Game
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
-    
-    // MARK: - State
-    
     @State private var selectedPlayers: [Player] = []
-    @State private var selectedLives: Int = 3
-    @State private var showAddGuestSheet = false
-    @State private var showFriendSearchSheet = false
-    @State private var showGameView = false
-    @State private var isLoadingFriends = false
-    @State private var friends: [Player] = []
+    @State private var showSearchPlayer: Bool = false
+    @State private var showGameView: Bool = false
+    @State private var selectedLives: Int = 3 // 1, 3, or 5 lives
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
+    @EnvironmentObject private var authService: AuthService
     
-    // MARK: - Constants
-    
-    private let livesOptions = [1, 3, 5]
-    private let maxPlayers = 10
-    
-    // MARK: - Body
+    private let playerLimit = 10 // Maximum players for Sudden Death
+    private var canStartGame: Bool {
+        selectedPlayers.count >= 2
+    }
     
     var body: some View {
-        ZStack {
-            Color("BackgroundPrimary")
-                .ignoresSafeArea()
-            
+        ZStack(alignment: .top) {
+            // Main content with ScrollView
             ScrollView {
-                VStack(spacing: 24) {
-                    // Game Title
-                    Text(game.title)
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundColor(Color("TextPrimary"))
-                        .padding(.top, 20)
+                VStack(spacing: 0) {
+                    // Hero Header with Cover Image
+                    ZStack(alignment: .bottomLeading) {
+                        // Cover Image
+                        if let coverImage = UIImage(named: "game-cover/\(game.title)") {
+                            Image(uiImage: coverImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 280)
+                                .clipped()
+                        } else {
+                            // Fallback gradient if no image
+                            LinearGradient(
+                                colors: [
+                                    Color("AccentPrimary").opacity(0.6),
+                                    Color("AccentPrimary").opacity(0.3)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .frame(height: 280)
+                        }
+                        
+                        // Gradient overlay for text readability
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.0),
+                                Color.black.opacity(0.7)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 280)
+                        
+                        // Game Title
+                        Text(game.title)
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.leading, 20)
+                            .padding(.bottom, 24)
+                            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 280)
                     
-                    // Lives Selector
-                    livesSelector
-                    
-                    // Player Selection Section
-                    playerSelectionSection
-                    
-                    // Selected Players
-                    if !selectedPlayers.isEmpty {
-                        selectedPlayersSection
+                    // Content below header
+                    VStack(spacing: 24) {
+                        // Lives Selection Section
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Lives")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                
+                                Spacer()
+                            }
+                            
+                            // Segmented control for lives selection
+                            SegmentedControl(options: [1, 3, 5], selection: $selectedLives) { lives in
+                                "\(lives) \(lives == 1 ? "Life" : "Lives")"
+                            }
+                        }
+                        
+                        // Player Selection Section
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Players")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundColor(Color("TextPrimary"))
+                                
+                                Spacer()
+                                
+                                Text("\(selectedPlayers.count) of \(playerLimit)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color("TextSecondary"))
+                            }
+                            
+                            // Sequential Player Addition
+                            VStack(spacing: 12) {
+                                // Show selected players in a List for swipe actions
+                                List {
+                                    ForEach(Array(selectedPlayers.enumerated()), id: \.element.id) { index, player in
+                                        PlayerCard(player: player, playerNumber: index + 1)
+                                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                                            .listRowBackground(Color.clear)
+                                            .listRowSeparator(.hidden)
+                                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                                Button {
+                                                    removePlayer(player)
+                                                } label: {
+                                                    Image(systemName: "trash")
+                                                        .foregroundColor(.red)
+                                                }
+                                                .tint(.clear)
+                                            }
+                                    }
+                                }
+                                .listStyle(.plain)
+                                .scrollDisabled(true)
+                                .frame(height: CGFloat(selectedPlayers.count * 92)) // 80pt card + 12pt spacing
+                                .background(Color.clear)
+                                
+                                // Add next player button (if under limit)
+                                if selectedPlayers.count < playerLimit {
+                                    AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
+                                        showSearchPlayer = true
+                                    } label: {
+                                        Label("Add Player \(selectedPlayers.count + 1)", systemImage: "plus")
+                                            .font(.system(size: 16))
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Start Game Button
+                        VStack(spacing: 12) {
+                            AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canStartGame) {
+                                showGameView = true
+                            } label: {
+                                Text("Start Game")
+                            }
+                            .frame(maxWidth: .infinity)
+
+                            if !canStartGame && selectedPlayers.count == 1 {
+                                Text("Add at least one more player")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color("TextSecondary"))
+                            }
+                        }
+                        
+                        // Game Instructions (moved to bottom)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How to Play")
+                                .font(.headline)
+                                .foregroundStyle(Color("TextPrimary"))
+                            
+                            Text(game.instructions)
+                                .font(.body)
+                                .foregroundStyle(Color("TextSecondary"))
+                        }
+                        .padding(16)
+                        .background(Color("InputBackground"))
+                        .cornerRadius(12)
+                        
+                        Spacer(minLength: 40)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+                    .padding(.bottom, 16)
+                }
+            }
+            .background(Color("BackgroundPrimary"))
+            .edgesIgnoringSafeArea(.top)
+            
+            // Transparent Navigation Bar Overlay
+            VStack {
+                HStack {
+                    // Back Button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                     }
                     
-                    // Start Game Button
-                    startGameButton
-                    
-                    Spacer(minLength: 40)
+                    Spacer()
                 }
                 .padding(.horizontal, 16)
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showAddGuestSheet) {
-            AddGuestPlayerView { newPlayer in
-                addPlayer(newPlayer)
-            }
-        }
-        .sheet(isPresented: $showFriendSearchSheet) {
-            FriendSearchView { selectedFriend in
-                addPlayer(selectedFriend)
+                .padding(.top, 8)
+                
+                Spacer()
             }
         }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $showGameView) {
+            // Always show black background to prevent white flash
             ZStack {
                 Color.black.ignoresSafeArea()
                 
                 if !navigationManager.shouldDismissToGamesList {
-                    PreGameHypeView(
-                        game: game,
-                        players: selectedPlayers,
-                        matchFormat: 1
-                    )
-                    .navigationDestination(isPresented: .constant(true)) {
-                        SuddenDeathGameplayView(
-                            game: game,
-                            players: selectedPlayers,
-                            startingLives: selectedLives
-                        )
-                    }
+                    PreGameHypeView(game: game, players: selectedPlayers, matchFormat: 1)
+                        .navigationDestination(isPresented: .constant(true)) {
+                            SuddenDeathGameplayView(
+                                game: game,
+                                players: selectedPlayers,
+                                startingLives: selectedLives
+                            )
+                        }
                 }
             }
         }
@@ -102,226 +229,34 @@ struct SuddenDeathSetupView: View {
                 dismiss()
             }
         }
-        .onAppear {
-            loadFriends()
-        }
-    }
-    
-    // MARK: - Lives Selector
-    
-    private var livesSelector: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Lives")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
-            
-            HStack(spacing: 12) {
-                ForEach(livesOptions, id: \.self) { lives in
-                    Button(action: {
-                        selectedLives = lives
-                    }) {
-                        Text("\(lives)")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(selectedLives == lives ? Color("TextPrimary") : Color("TextSecondary"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                selectedLives == lives ?
-                                Color("AccentPrimary") :
-                                Color("InputBackground")
-                            )
-                            .cornerRadius(12)
-                    }
-                }
+        .sheet(isPresented: $showSearchPlayer) {
+            SearchPlayerSheet(selectedPlayers: selectedPlayers) { player in
+                addPlayer(player)
             }
         }
-    }
-    
-    // MARK: - Player Selection Section
-    
-    private var playerSelectionSection: some View {
-        VStack(spacing: 12) {
-            // Add Guest Player Button
-            Button(action: {
-                showAddGuestSheet = true
-            }) {
-                HStack {
-                    Image(systemName: "person.badge.plus")
-                        .font(.system(size: 20))
-                    Text("Add Guest Player")
-                        .font(.system(size: 17, weight: .semibold))
-                }
-                .foregroundColor(Color("TextPrimary"))
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Color("InputBackground"))
-                .cornerRadius(12)
-            }
-            .disabled(selectedPlayers.count >= maxPlayers)
-            .opacity(selectedPlayers.count >= maxPlayers ? 0.5 : 1.0)
-            
-            // Search for Player Button
-            Button(action: {
-                showFriendSearchSheet = true
-            }) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 20))
-                    Text("Search for Player")
-                        .font(.system(size: 17, weight: .semibold))
-                }
-                .foregroundColor(Color("TextPrimary"))
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Color("InputBackground"))
-                .cornerRadius(12)
-            }
-            .disabled(selectedPlayers.count >= maxPlayers)
-            .opacity(selectedPlayers.count >= maxPlayers ? 0.5 : 1.0)
-            
-            // Quick Add Friends
-            if !friends.isEmpty {
-                quickAddFriendsSection
-            }
-        }
-    }
-    
-    // MARK: - Quick Add Friends
-    
-    private var quickAddFriendsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Quick Add")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(friends.prefix(5)) { friend in
-                        if !selectedPlayers.contains(where: { $0.id == friend.id }) {
-                            Button(action: {
-                                addPlayer(friend)
-                            }) {
-                                VStack(spacing: 8) {
-                                    AsyncAvatarImage(
-                                        avatarURL: friend.avatarURL,
-                                        size: 48
-                                    )
-                                    
-                                    Text(friend.displayName)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(Color("TextPrimary"))
-                                        .lineLimit(1)
-                                }
-                                .frame(width: 80)
-                            }
-                            .disabled(selectedPlayers.count >= maxPlayers)
-                            .opacity(selectedPlayers.count >= maxPlayers ? 0.5 : 1.0)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Selected Players Section
-    
-    private var selectedPlayersSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Players (\(selectedPlayers.count)/\(maxPlayers))")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color("TextPrimary"))
-                
-                Spacer()
-                
-                if selectedPlayers.count >= 2 {
-                    Text("Ready!")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
-                }
-            }
-            
-            VStack(spacing: 12) {
-                ForEach(selectedPlayers) { player in
-                    HStack {
-                        PlayerCard(player: player)
-                        
-                        Button(action: {
-                            removePlayer(player)
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(Color("TextSecondary"))
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Start Game Button
-    
-    private var startGameButton: some View {
-        Button(action: {
-            startGame()
-        }) {
-            Text("Start Game")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(
-                    selectedPlayers.count >= 2 ?
-                    Color("AccentPrimary") :
-                    Color("InputBackground")
-                )
-                .cornerRadius(16)
-        }
-        .disabled(selectedPlayers.count < 2)
-        .opacity(selectedPlayers.count < 2 ? 0.5 : 1.0)
     }
     
     // MARK: - Helper Methods
     
     private func addPlayer(_ player: Player) {
-        guard selectedPlayers.count < maxPlayers else { return }
-        guard !selectedPlayers.contains(where: { $0.id == player.id }) else { return }
-        
-        selectedPlayers.append(player)
+        if selectedPlayers.count < playerLimit && !selectedPlayers.contains(where: { $0.id == player.id }) {
+            selectedPlayers.append(player)
+        }
     }
     
     private func removePlayer(_ player: Player) {
         selectedPlayers.removeAll { $0.id == player.id }
     }
-    
-    private func loadFriends() {
-        guard let currentUser = authService.currentUser else { return }
-        
-        isLoadingFriends = true
-        
-        Task {
-            do {
-                let loadedFriends = try await friendsService.loadFriends(userId: currentUser.id)
-                friends = loadedFriends.map { $0.toPlayer() }
-                isLoadingFriends = false
-            } catch {
-                print("❌ Failed to load friends: \(error)")
-                isLoadingFriends = false
-            }
-        }
-    }
-    
-    private func startGame() {
-        guard selectedPlayers.count >= 2 else { return }
-        showGameView = true
-    }
 }
 
 // MARK: - Preview
-
-#Preview("Setup View") {
+#Preview("Sudden Death Setup") {
     NavigationStack {
-        SuddenDeathSetupView(game: Game.preview301)
-            .environmentObject(AuthService())
+        SuddenDeathSetupView(game: Game(
+            title: "Sudden Death",
+            subtitle: "Fast and Ruthless Fun",
+            players: "2-10 players",
+            instructions: "Each player throws three darts per round. The player with the lowest score is eliminated. Last player standing wins!"
+        ))
     }
 }

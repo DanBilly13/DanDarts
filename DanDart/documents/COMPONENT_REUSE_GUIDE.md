@@ -25,6 +25,7 @@
 | **ProfileHeaderView** | Profile header with stats | Profile screens | Profile tab |
 | **StandardSheetView** | Modal sheet wrapper | Any modal presentation | Settings, modals |
 | **TopBar** | Navigation top bar | Custom navigation headers | Some views |
+| **GameplayMenuButton** | Menu button (•••) for gameplay | All gameplay screens | 301/501, Halve-It, Sudden Death |
 
 ---
 

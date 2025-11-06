@@ -118,15 +118,11 @@ struct CountdownGameplayView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Instructions") { showInstructions = true }
-                    Button("Restart Game") { showRestartAlert = true }
-                    Button("Cancel Game", role: .destructive) { showExitAlert = true }
-                } label: {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextSecondary"))
-                }
+                GameplayMenuButton(
+                    onInstructions: { showInstructions = true },
+                    onRestart: { showRestartAlert = true },
+                    onExit: { showExitAlert = true }
+                )
             }
         }
         .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
@@ -473,6 +469,7 @@ struct CheckoutSuggestionView: View {
             game: Game.preview301,
             players: [Player.mockGuest1, Player.mockGuest2]
         )
+        .environmentObject(AuthService())
     }
 }
 
@@ -483,6 +480,7 @@ struct CheckoutSuggestionView: View {
             players: [Player.mockGuest1, Player.mockGuest2],
             matchFormat: 3
         )
+        .environmentObject(AuthService())
     }
 }
 
@@ -493,6 +491,7 @@ struct CheckoutSuggestionView: View {
             players: [Player.mockGuest1, Player.mockGuest2],
             matchFormat: 5
         )
+        .environmentObject(AuthService())
     }
 }
 
@@ -503,6 +502,7 @@ struct CheckoutSuggestionView: View {
             players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
             matchFormat: 7
         )
+        .environmentObject(AuthService())
     }
 }
 
@@ -512,5 +512,6 @@ struct CheckoutSuggestionView: View {
             game: Game.preview301,
             players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
         )
+        .environmentObject(AuthService())
     }
 }

@@ -112,15 +112,11 @@ struct HalveItGameplayView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Instructions") { showInstructions = true }
-                    Button("Restart Game") { showRestartAlert = true }
-                    Button("Cancel Game", role: .destructive) { showExitAlert = true }
-                } label: {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextSecondary"))
-                }
+                GameplayMenuButton(
+                    onInstructions: { showInstructions = true },
+                    onRestart: { showRestartAlert = true },
+                    onExit: { showExitAlert = true }
+                )
             }
         }
         .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
@@ -196,5 +192,6 @@ struct HalveItGameplayView: View {
             players: [Player.mockGuest1, Player.mockGuest2],
             difficulty: .medium
         )
+        .environmentObject(AuthService())
     }
 }

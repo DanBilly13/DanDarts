@@ -68,7 +68,7 @@ struct CurrentThrowDisplay: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 0)
         .padding(.horizontal, 8)
     }
 }
@@ -80,7 +80,7 @@ struct CurrentThrowDisplay: View {
         selectedDartIndex: nil,
         onDartTapped: { _ in }
     )
-    .padding()
+    .padding(.vertical,0)
     .background(Color("BackgroundPrimary"))
 }
 
@@ -107,6 +107,6 @@ struct CurrentThrowDisplay: View {
         selectedDartIndex: 2,
         onDartTapped: { _ in }
     )
-    .padding()
+    .padding(.vertical,0)
     .background(Color("BackgroundPrimary"))
 }

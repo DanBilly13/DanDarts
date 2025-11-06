@@ -33,74 +33,83 @@ struct SuddenDeathGameplayView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Avatar Lineup
-                avatarLineup
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
                 
-                // Player Cards
-                playerCardsSection
-                    .padding(.bottom, 4)
-                
-                // Current throw display (always visible)
-                CurrentThrowDisplay(
-                    currentThrow: viewModel.currentThrow,
-                    selectedDartIndex: viewModel.selectedDartIndex,
-                    onDartTapped: { index in
-                        viewModel.selectDart(at: index)
-                    },
-                    showScore: false
-                )
-                .padding(.horizontal, 16)
-                
-                // Points needed text (like checkout suggestion)
-                VStack {
-                    Text(viewModel.pointsNeededText)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("AccentSecondary"))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 0)
-                }
-                .frame(height: 40, alignment: .center)
-                .padding(.bottom, 8)
-                
-                // Scoring button grid (center)
-                ScoringButtonGrid(
-                    onScoreSelected: { baseValue, scoreType in
-                        let scoredThrow = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
-                        viewModel.recordThrow(scoredThrow)
-                    },
-                    showBustButton: false
-                )
-                .padding(.horizontal, 16)
-                
-                Spacer()
-                
-                // Save Score button container (fixed height to prevent layout shift)
-                ZStack {
-                    // Invisible placeholder to maintain layout space
-                    AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
-                        Text("Save Score")
-                    }
-                    .opacity(0)
-                    .disabled(true)
+                VStack (spacing: 0) {  // Avatar Lineup
+                    avatarLineup
+                    Spacer()
                     
-                    // Actual button that pops in/out
-                    AppButton(
-                        role: .primary,
-                        controlSize: .extraLarge,
-                        action: { viewModel.completeTurn() }
-                    ) {
-                        Label("Save Score", systemImage: "checkmark.circle.fill")
-                    }
-                    .popAnimation(
-                        active: viewModel.isTurnComplete,
-                        duration: 0.28,
-                        bounce: 0.22
+                    // Player Cards
+                    playerCardsSection
+                    Spacer()
+                    
+                    // Current throw display (always visible)
+                    CurrentThrowDisplay(
+                        currentThrow: viewModel.currentThrow,
+                        selectedDartIndex: viewModel.selectedDartIndex,
+                        onDartTapped: { index in
+                            viewModel.selectDart(at: index)
+                        },
+                        showScore: false
                     )
+                    .padding(.horizontal, 16)
+                    Spacer()
+                    
+                    // Points needed text (like checkout suggestion)
+                    VStack {
+                        Text(viewModel.pointsNeededText)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color("AccentSecondary"))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 0)
+                    }
+                    .frame(alignment: .center)
+                    Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 34)
+               
+                VStack (spacing: 0) {
+                    // Scoring button grid (center)
+                    ScoringButtonGrid(
+                        onScoreSelected: { baseValue, scoreType in
+                            let scoredThrow = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
+                            viewModel.recordThrow(scoredThrow)
+                        },
+                        showBustButton: false
+                    )
+                    .padding(.horizontal, 16)
+                    
+                    // THIS SPACER)
+                    
+                    Color.clear.frame(height: 24)
+                    
+                    // Save Score button container (fixed height to prevent layout shift)
+                    ZStack {
+                        // Invisible placeholder to maintain layout space
+                        AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
+                            Text("Save Score")
+                        }
+                        .opacity(0)
+                        .disabled(true)
+                        
+                        // Actual button that pops in/out
+                        AppButton(
+                            role: .primary,
+                            controlSize: .extraLarge,
+                            action: { viewModel.completeTurn() }
+                        ) {
+                            Label("Save Score", systemImage: "checkmark.circle.fill")
+                        }
+                        .popAnimation(
+                            active: viewModel.isTurnComplete,
+                            duration: 0.28,
+                            bounce: 0.22
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 34)
+                }
+                
+                
+                
             }
         }
         .background(Color.black)
@@ -108,21 +117,11 @@ struct SuddenDeathGameplayView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(action: { showInstructions = true }) {
-                        Label("Instructions", systemImage: "info.circle")
-                    }
-                    Button(action: { viewModel.restartGame() }) {
-                        Label("Restart Game", systemImage: "arrow.clockwise")
-                    }
-                    Button(role: .destructive, action: { showExitConfirmation = true }) {
-                        Label("Exit Game", systemImage: "xmark.circle")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color("TextPrimary"))
-                }
+                GameplayMenuButton(
+                    onInstructions: { showInstructions = true },
+                    onRestart: { viewModel.restartGame() },
+                    onExit: { showExitConfirmation = true }
+                )
             }
         }
         .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
@@ -132,13 +131,14 @@ struct SuddenDeathGameplayView: View {
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
-        .alert("Exit Game?", isPresented: $showExitConfirmation) {
+        .alert("Exit Game", isPresented: $showExitConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Exit", role: .destructive) {
+            Button("Leave Game", role: .destructive) {
+                NavigationManager.shared.dismissToGamesList()
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to exit? Progress will be lost.")
+            Text("Are you sure you want to leave the game? Your progress will be lost.")
         }
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
@@ -153,9 +153,11 @@ struct SuddenDeathGameplayView: View {
                         viewModel.restartGame()
                     },
                     onChangePlayers: {
+                        NavigationManager.shared.dismissToGamesList()
                         dismiss()
                     },
                     onBackToGames: {
+                        NavigationManager.shared.dismissToGamesList()
                         dismiss()
                     },
                     matchFormat: nil,
@@ -184,7 +186,7 @@ struct SuddenDeathGameplayView: View {
     // MARK: - Player Cards Section
     
     private var playerCardsSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             // Player to Beat Card (Red/AccentPrimary)
             SuddenDeathPlayerCard(
                 player: viewModel.playerToBeat,
