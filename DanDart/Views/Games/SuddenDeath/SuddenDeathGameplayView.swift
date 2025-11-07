@@ -36,7 +36,7 @@ struct SuddenDeathGameplayView: View {
             VStack(spacing: 0) {
                 
                 VStack (spacing: 0) {
-                  
+                    
                     
                     // Score to Beat
                     ScoreToBeatView(score: viewModel.scoreToBeat)
@@ -45,7 +45,7 @@ struct SuddenDeathGameplayView: View {
                     // Current Player Card
                     currentPlayerCard
                         .padding(.horizontal, 16)
-                       
+                    
                     Spacer()
                     // Current throw display (always visible)
                     CurrentThrowDisplay(
@@ -71,18 +71,18 @@ struct SuddenDeathGameplayView: View {
                     
                     // Avatar Lineup
                     avatarLineup
-                   
-                   
+                    
+                    
                     
                     Spacer()
                 }
                 .safeAreaInset(edge: .top) {
                     Color.clear.frame(height: 4)
                 }
-
+                
                 // Insert flexible spacer between the two main sections
                 Spacer(minLength: 0)
-               
+                
                 VStack (spacing: 0) {
                     // Scoring button grid (center)
                     ScoringButtonGrid(
@@ -273,8 +273,16 @@ struct SuddenDeathPlayerCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
                     Text(player.displayName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.headline)
+                        .fontWeight(.bold)
                         .foregroundColor(Color("TextPrimary"))
+                        .lineLimit(1)
+                }
+                HStack(spacing: 8) {
+                    Text(player.nickname)
+                        .font(.footnote)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color("TextSecondary"))
                         .lineLimit(1)
                     
                     // Lives (hearts)
@@ -287,10 +295,6 @@ struct SuddenDeathPlayerCard: View {
                     }
                 }
                 
-                Text(player.nickname)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
-                    .lineLimit(1)
             }
             
             Spacer()
@@ -305,7 +309,8 @@ struct SuddenDeathPlayerCard: View {
                 }
                 
                 Text("\(score)")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.title2)
+                    .fontWeight(.semibold)
                     .foregroundColor(Color("TextPrimary"))
                     .frame(width: 60, alignment: .trailing)
             }

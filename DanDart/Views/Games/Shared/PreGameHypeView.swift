@@ -12,15 +12,17 @@ struct PreGameHypeView: View {
     let players: [Player]
     let matchFormat: Int
     let halveItDifficulty: HalveItDifficulty?
+    let suddenDeathLives: Int?
     
     // Navigation state
     @State private var navigateToGameplay = false
     
-    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil) {
+    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, suddenDeathLives: Int? = nil) {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
         self.halveItDifficulty = halveItDifficulty
+        self.suddenDeathLives = suddenDeathLives
     }
     
     @Environment(\.dismiss) private var dismiss
@@ -106,6 +108,10 @@ struct PreGameHypeView: View {
             if let difficulty = halveItDifficulty {
                 // Halve It game
                 HalveItGameplayView(game: game, players: players, difficulty: difficulty)
+                    .navigationBarBackButtonHidden(true)
+            } else if let lives = suddenDeathLives {
+                // Sudden Death game
+                SuddenDeathGameplayView(game: game, players: players, startingLives: lives)
                     .navigationBarBackButtonHidden(true)
             } else {
                 // 301/501 countdown games

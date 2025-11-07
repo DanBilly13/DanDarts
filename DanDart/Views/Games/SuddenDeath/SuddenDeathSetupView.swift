@@ -212,14 +212,12 @@ struct SuddenDeathSetupView: View {
                 Color.black.ignoresSafeArea()
                 
                 if !navigationManager.shouldDismissToGamesList {
-                    PreGameHypeView(game: game, players: selectedPlayers, matchFormat: 1)
-                        .navigationDestination(isPresented: .constant(true)) {
-                            SuddenDeathGameplayView(
-                                game: game,
-                                players: selectedPlayers,
-                                startingLives: selectedLives
-                            )
-                        }
+                    PreGameHypeView(
+                        game: game,
+                        players: selectedPlayers,
+                        matchFormat: 1,
+                        suddenDeathLives: selectedLives
+                    )
                 }
             }
         }
