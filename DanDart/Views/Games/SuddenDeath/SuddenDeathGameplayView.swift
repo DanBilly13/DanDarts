@@ -17,6 +17,7 @@ struct SuddenDeathGameplayView: View {
     
     @State private var showInstructions = false
     @State private var showExitConfirmation = false
+    @State private var navigateToGameEnd = false
     @StateObject private var menuCoordinator = MenuCoordinator.shared
     
     // Initialize with game, players, and starting lives
@@ -34,14 +35,18 @@ struct SuddenDeathGameplayView: View {
             
             VStack(spacing: 0) {
                 
-                VStack (spacing: 0) {  // Avatar Lineup
-                    avatarLineup
+                VStack (spacing: 0) {
+                  
+                    
+                    // Score to Beat
+                    ScoreToBeatView(score: viewModel.scoreToBeat)
                     Spacer()
                     
-                    // Player Cards
-                    playerCardsSection
+                    // Current Player Card
+                    currentPlayerCard
+                        .padding(.horizontal, 16)
+                       
                     Spacer()
-                    
                     // Current throw display (always visible)
                     CurrentThrowDisplay(
                         currentThrow: viewModel.currentThrow,
@@ -51,20 +56,28 @@ struct SuddenDeathGameplayView: View {
                         },
                         showScore: false
                     )
-                    .padding(.horizontal, 16)
-                    Spacer()
+                    Color.clear.frame(height: 12)
+                    
                     
                     // Points needed text (like checkout suggestion)
                     VStack {
                         Text(viewModel.pointsNeededText)
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("AccentSecondary"))
+                            .foregroundColor(Color("AccentTertiary"))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 0)
                     }
-                    .frame(height: 16, alignment: .center)
+                    Spacer()
+                    
+                    // Avatar Lineup
+                    avatarLineup
+                   
+                   
                     
                     Spacer()
+                }
+                .safeAreaInset(edge: .top) {
+                    Color.clear.frame(height: 4)
                 }
 
                 // Insert flexible spacer between the two main sections
@@ -142,28 +155,32 @@ struct SuddenDeathGameplayView: View {
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
         }
-        .navigationDestination(isPresented: $viewModel.isGameOver) {
-            if let winner = viewModel.winner {
-                GameEndView(
-                    game: game,
-                    winner: winner,
-                    players: viewModel.players,
-                    onPlayAgain: {
-                        viewModel.restartGame()
-                    },
-                    onChangePlayers: {
-                        NavigationManager.shared.dismissToGamesList()
-                        dismiss()
-                    },
-                    onBackToGames: {
-                        NavigationManager.shared.dismissToGamesList()
-                        dismiss()
-                    },
-                    matchFormat: nil,
-                    legsWon: nil,
-                    matchId: nil
-                )
+        .onChange(of: viewModel.isGameOver) { _, isOver in
+            if isOver {
+                navigateToGameEnd = true
             }
+        }
+        .navigationDestination(isPresented: $navigateToGameEnd) {
+            GameEndView(
+                game: game,
+                winner: viewModel.winner ?? viewModel.players[0],
+                players: viewModel.players,
+                onPlayAgain: {
+                    viewModel.restartGame()
+                    navigateToGameEnd = false
+                },
+                onChangePlayers: {
+                    navigateToGameEnd = false
+                    dismiss()
+                },
+                onBackToGames: {
+                    NavigationManager.shared.dismissToGamesList()
+                    dismiss()
+                },
+                matchFormat: nil,
+                legsWon: nil,
+                matchId: nil
+            )
         }
     }
     
@@ -182,29 +199,16 @@ struct SuddenDeathGameplayView: View {
         }
     }
     
-    // MARK: - Player Cards Section
+    // MARK: - Current Player Card
     
-    private var playerCardsSection: some View {
-        VStack(spacing: 10) {
-            // Player to Beat Card (Red/AccentPrimary)
-            SuddenDeathPlayerCard(
-                player: viewModel.playerToBeat,
-                lives: viewModel.playerLives[viewModel.playerToBeat.id] ?? 0,
-                score: viewModel.scoreToBeat,
-                isPlayerToBeat: true,
-                borderColor: Color("AccentPrimary")
-            )
-            
-            // Current Player Card (Green/AccentSecondary)
-            SuddenDeathPlayerCard(
-                player: viewModel.currentPlayer,
-                lives: viewModel.playerLives[viewModel.currentPlayer.id] ?? 0,
-                score: viewModel.currentTurnTotal,
-                isPlayerToBeat: false,
-                borderColor: Color("AccentSecondary")
-            )
-        }
-        .padding(.horizontal, 16)
+    private var currentPlayerCard: some View {
+        SuddenDeathPlayerCard(
+            player: viewModel.currentPlayer,
+            lives: viewModel.playerLives[viewModel.currentPlayer.id] ?? 0,
+            score: viewModel.currentTurnTotal,
+            isPlayerToBeat: false,
+            borderColor: Color("AccentSecondary")
+        )
     }
     
 }
