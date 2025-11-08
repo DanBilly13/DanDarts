@@ -60,14 +60,14 @@ struct SuddenDeathGameplayView: View {
                     Color.clear.frame(height: 12)
                     
                     
-                    // Points needed text (like checkout suggestion)
-                    VStack {
-                        Text(viewModel.pointsNeededText)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("AccentTertiary"))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 0)
-                    }
+                    // Points needed text (like checkout suggestion) - HIDDEN for now
+                    // VStack {
+                    //     Text(viewModel.pointsNeededText)
+                    //         .font(.system(size: 14, weight: .medium))
+                    //         .foregroundColor(Color("AccentTertiary"))
+                    //         .padding(.horizontal, 16)
+                    //         .padding(.vertical, 0)
+                    // }
                     Spacer()
                     
                     // Avatar Lineup
@@ -210,7 +210,9 @@ struct SuddenDeathGameplayView: View {
         SuddenDeathPlayerCard(
             player: viewModel.currentPlayer,
             lives: viewModel.playerLives[viewModel.currentPlayer.id] ?? 0,
+            startingLives: viewModel.startingLives,
             score: viewModel.currentTurnTotal,
+            scoreToBeat: viewModel.scoreToBeat,
             isPlayerToBeat: false,
             borderColor: Color("AccentSecondary")
         )
@@ -262,7 +264,9 @@ struct AvatarLineupItem: View {
 struct SuddenDeathPlayerCard: View {
     let player: Player
     let lives: Int
+    let startingLives: Int
     let score: Int
+    let scoreToBeat: Int
     let isPlayerToBeat: Bool
     let borderColor: Color
     
@@ -290,22 +294,20 @@ struct SuddenDeathPlayerCard: View {
                         .foregroundColor(Color("TextSecondary"))
                         .lineLimit(1)
                     
-                    // Lives (hearts)
+                    // Lives (hearts) - show all hearts, lost ones filled with background
                     HStack(spacing: 4) {
-                        ForEach(0..<lives, id: \.self) { _ in
+                        ForEach(0..<startingLives, id: \.self) { index in
                             Image(systemName: "heart.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(.white)
+                                .foregroundColor(index < lives ? .white : Color.white.opacity(0.5))
                         }
                     }
                 }
-                
             }
-            
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             // Score Section
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 // Crown for player to beat
                 if isPlayerToBeat {
                     Image(systemName: "crown.fill")
@@ -318,6 +320,31 @@ struct SuddenDeathPlayerCard: View {
                     .fontWeight(.semibold)
                     .foregroundColor(Color("TextPrimary"))
                     .frame(width: 60, alignment: .trailing)
+                
+                // Points needed indicator
+                HStack(spacing: 0) {
+                    if score > scoreToBeat {
+                        Image(systemName: "arrow.up")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color("AccentSecondary"))
+                    } else if score < scoreToBeat {
+                        Image(systemName: "arrow.down")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color("AccentPrimary"))
+                    } else if scoreToBeat > 0 {
+                        Image(systemName: "minus")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color("TextSecondary"))
+                    }
+                    
+                    if scoreToBeat > 0 {
+                        Text("\(abs(score - scoreToBeat))")
+                            .font(.headline)
+                        .foregroundColor(score >= scoreToBeat ? Color("AccentSecondary") : Color("AccentPrimary"))                    }
+                }
             }
         }
         .padding(.top, 8)
@@ -353,5 +380,6 @@ struct SuddenDeathPlayerCard: View {
             ],
             startingLives: 3
         )
+        .environmentObject(AuthService.mockAuthenticated)
     }
 }
