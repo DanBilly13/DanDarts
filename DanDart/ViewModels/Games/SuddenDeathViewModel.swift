@@ -89,9 +89,15 @@ class SuddenDeathViewModel: ObservableObject {
     // MARK: - Game Actions
     
     func recordThrow(_ scoredThrow: ScoredThrow) {
-        guard currentThrow.count < 3 else { return }
-        
-        currentThrow.append(scoredThrow)
+        // If a dart is selected, replace it instead of appending
+        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
+            currentThrow[selectedIndex] = scoredThrow
+            selectedDartIndex = nil  // Clear selection after replacement
+        } else {
+            // Normal append behavior
+            guard currentThrow.count < 3 else { return }
+            currentThrow.append(scoredThrow)
+        }
         
         // Play appropriate sound
         if scoredThrow.totalValue == 0 {

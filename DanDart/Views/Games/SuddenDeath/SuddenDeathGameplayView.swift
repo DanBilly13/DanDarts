@@ -77,7 +77,7 @@ struct SuddenDeathGameplayView: View {
                     Spacer()
                 }
                 .safeAreaInset(edge: .top) {
-                    Color.clear.frame(height: 4)
+                    Color.clear.frame(height: 8)
                 }
                 
                 // Insert flexible spacer between the two main sections
