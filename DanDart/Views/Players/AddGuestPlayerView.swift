@@ -150,6 +150,11 @@ struct AddGuestPlayerView: View {
             }
             .background(Color("BackgroundPrimary"))
             .navigationBarBackButtonHidden(true)
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                Task {
+                    await handlePhotoSelection(newItem)
+                }
+            }
         }
     }
     
@@ -190,6 +195,21 @@ struct AddGuestPlayerView: View {
     
     // MARK: - Actions
     
+    private func handlePhotoSelection(_ item: PhotosPickerItem?) async {
+        guard let item = item else { return }
+        
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else {
+                return
+            }
+            
+            selectedAvatarImage = uiImage
+        } catch {
+            print("Failed to load photo: \(error.localizedDescription)")
+        }
+    }
+    
     private func savePlayer() {
         guard isSaveEnabled else { return }
         
@@ -200,16 +220,46 @@ struct AddGuestPlayerView: View {
             let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            let newPlayer = Player.createGuestWithAvatar(
-                displayName: trimmedDisplayName,
-                nickname: trimmedNickname,
-                avatarURL: selectedAvatar
-            )
+            // Determine avatar URL
+            var avatarURL = selectedAvatar
             
-            // Save guest player to local storage
-            GuestPlayerStorageManager.shared.saveGuestPlayer(newPlayer)
+            // If custom image was selected, save it to local storage
+            if let customImage = selectedAvatarImage {
+                let playerId = UUID()
+                if let savedPath = GuestPlayerStorageManager.shared.saveCustomAvatar(image: customImage, for: playerId) {
+                    avatarURL = savedPath
+                    print("✅ Saved custom avatar for guest player")
+                } else {
+                    print("⚠️ Failed to save custom avatar, using default")
+                }
+                
+                // Create player with the saved avatar path
+                let newPlayer = Player(
+                    id: playerId,
+                    displayName: trimmedDisplayName,
+                    nickname: trimmedNickname,
+                    avatarURL: avatarURL,
+                    isGuest: true
+                )
+                
+                // Save guest player to local storage
+                GuestPlayerStorageManager.shared.saveGuestPlayer(newPlayer)
+                
+                onPlayerCreated(newPlayer)
+            } else {
+                // No custom image, use predefined avatar
+                let newPlayer = Player.createGuestWithAvatar(
+                    displayName: trimmedDisplayName,
+                    nickname: trimmedNickname,
+                    avatarURL: avatarURL
+                )
+                
+                // Save guest player to local storage
+                GuestPlayerStorageManager.shared.saveGuestPlayer(newPlayer)
+                
+                onPlayerCreated(newPlayer)
+            }
             
-            onPlayerCreated(newPlayer)
             isLoading = false
             dismiss()
         }

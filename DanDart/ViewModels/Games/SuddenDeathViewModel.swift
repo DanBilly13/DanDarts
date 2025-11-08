@@ -33,6 +33,11 @@ class SuddenDeathViewModel: ObservableObject {
     
     let startingLives: Int
     private let soundManager = SoundManager.shared
+    private let matchId = UUID()
+    private let matchStartTime = Date()
+    
+    // Services (optional for Supabase sync)
+    var authService: AuthService?
     
     // MARK: - Computed Properties
     
@@ -198,6 +203,92 @@ class SuddenDeathViewModel: ObservableObject {
             isGameOver = true
             soundManager.playGameWin()
             print("🎉 \(lastPlayer.displayName) wins Sudden Death!")
+            
+            // Save match result
+            saveMatchResult()
+        }
+    }
+    
+    // MARK: - Match Storage
+    
+    /// Save match result to local storage and Supabase
+    private func saveMatchResult() {
+        guard let winner = winner else { return }
+        
+        // Calculate match duration
+        let duration = Date().timeIntervalSince(matchStartTime)
+        
+        // Create match players with final lives remaining
+        let matchPlayers = players.map { player in
+            MatchPlayer(
+                id: player.id,
+                displayName: player.displayName,
+                nickname: player.nickname,
+                avatarURL: player.avatarURL,
+                isGuest: player.isGuest,
+                finalScore: playerLives[player.id] ?? 0,
+                startingScore: startingLives,
+                totalDartsThrown: 0, // Sudden Death doesn't track individual darts
+                turns: [], // Sudden Death doesn't track turn-by-turn history
+                legsWon: 0
+            )
+        }
+        
+        // Create match result
+        let matchResult = MatchResult(
+            id: matchId,
+            gameType: "Sudden Death",
+            gameName: "Sudden Death",
+            players: matchPlayers,
+            winnerId: winner.id,
+            timestamp: matchStartTime,
+            duration: duration,
+            matchFormat: 1,
+            totalLegsPlayed: 1,
+            metadata: ["starting_lives": "\(startingLives)"]
+        )
+        
+        // Save to local storage
+        MatchStorageManager.shared.saveMatch(matchResult)
+        
+        // Update player stats
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        
+        // Capture current user ID before Task
+        let currentUserId = authService?.currentUser?.id
+        
+        // Sync to Supabase (async, non-blocking)
+        Task {
+            do {
+                let matchService = MatchService()
+                
+                // Get winner's user ID (nil for guests)
+                let winnerId = winner.userId
+                
+                let updatedUser = try await matchService.saveMatch(
+                    matchId: matchId,
+                    gameId: "sudden_death",
+                    players: players,
+                    winnerId: winnerId,
+                    startedAt: matchStartTime,
+                    endedAt: Date(),
+                    turnHistory: [], // Sudden Death doesn't track turn history
+                    matchFormat: 1,
+                    legsWon: [:], // Sudden Death doesn't use legs
+                    currentUserId: currentUserId
+                )
+                
+                print("✅ Sudden Death match saved to Supabase: \(matchId)")
+                
+                // Update AuthService with fresh user data
+                if let updatedUser = updatedUser {
+                    await MainActor.run {
+                        self.authService?.currentUser = updatedUser
+                    }
+                }
+            } catch {
+                print("❌ Failed to save Sudden Death match to Supabase: \(error)")
+            }
         }
     }
     

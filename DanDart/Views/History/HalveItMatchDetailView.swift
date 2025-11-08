@@ -127,7 +127,8 @@ struct HalveItMatchDetailView: View {
                 StatCategorySection(
                     label: "Target hit rate (%)",
                     players: match.players,
-                    getValue: { Int(calculateTargetHitRate(for: $0) * 100) }
+                    getValue: { Int(calculateTargetHitRate(for: $0) * 100) },
+                    forceMaxValue: 100  // Scale to 100% for percentage stats
                 )
             }
         }

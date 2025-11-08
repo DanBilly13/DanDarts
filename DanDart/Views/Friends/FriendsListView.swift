@@ -92,18 +92,27 @@ struct FriendsListView: View {
                 if !friends.isEmpty {
                     Section {
                         ForEach(friends) { friend in
-                            PlayerCard(player: friend)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button {
-                                        friendToDelete = friend
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
-                                    }
-                                    .tint(.clear)
+                            ZStack {
+                                NavigationLink(destination: FriendProfileView(friend: friend)) {
+                                    EmptyView()
                                 }
+                                .opacity(0)
+                                
+                                PlayerCard(player: friend)
+                            }
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    friendToDelete = friend
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                                .tint(.clear)
+                            }
                         }
                     } header: {
                         Text("Friends")
@@ -111,8 +120,6 @@ struct FriendsListView: View {
                             .foregroundColor(Color("TextPrimary"))
                             .textCase(nil)
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
                 } else if !isLoadingFriends && !isLoadingRequests {
                     // Empty State - No friends
                     Section {
@@ -263,7 +270,9 @@ struct FriendsListView: View {
     
     /// Remove friend with confirmation
     private func removeFriend(_ player: Player) {
-        guard let currentUserId = authService.currentUser?.id else {
+        guard let currentUserId = authService.currentUser?.id,
+              let friendUserId = player.userId else {
+            print("⚠️ Cannot remove friend: missing user ID")
             return
         }
         
@@ -271,13 +280,13 @@ struct FriendsListView: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
+        // Optimistically remove from UI immediately
+        friends.removeAll { $0.id == player.id }
+        
         Task {
             do {
                 // Remove friendship from Supabase
-                try await friendsService.removeFriend(userId: currentUserId, friendId: player.id)
-                
-                // Reload friends list
-                loadFriends()
+                try await friendsService.removeFriend(userId: currentUserId, friendId: friendUserId)
                 
                 // Show success message
                 successMessage = "\(player.displayName) removed from friends"
@@ -285,6 +294,8 @@ struct FriendsListView: View {
                 
             } catch {
                 print("❌ Remove friend error: \(error)")
+                // Reload on error to restore the friend
+                loadFriends()
                 successMessage = "Failed to remove friend"
                 showSuccessAlert = true
             }
@@ -339,6 +350,9 @@ struct FriendsListView: View {
                 loadFriends()
                 loadRequests()
                 
+                // Notify MainTabView to update badge
+                NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+                
                 processingRequestId = nil
                 
             } catch {
@@ -366,6 +380,9 @@ struct FriendsListView: View {
                 
                 // Reload requests
                 loadRequests()
+                
+                // Notify MainTabView to update badge
+                NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
                 
                 processingRequestId = nil
                 

@@ -13,6 +13,7 @@ struct SuddenDeathGameplayView: View {
     let startingLives: Int
     
     @StateObject private var viewModel: SuddenDeathViewModel
+    @EnvironmentObject private var authService: AuthService
     @Environment(\.dismiss) private var dismiss
     
     @State private var showInstructions = false
@@ -154,6 +155,10 @@ struct SuddenDeathGameplayView: View {
         }
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
+        }
+        .onAppear {
+            // Inject authService for match saving
+            viewModel.authService = authService
         }
         .onChange(of: viewModel.isGameOver) { _, isOver in
             if isOver {

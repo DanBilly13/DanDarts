@@ -39,6 +39,7 @@ class CountdownViewModel: ObservableObject {
     
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
+    @Published var isTransitioningPlayers: Bool = false // True during player switch animation
     
     // Match saving
     @Published var matchId: UUID? = nil // ID for saved match
@@ -73,6 +74,24 @@ class CountdownViewModel: ObservableObject {
     
     var currentThrowTotal: Int {
         currentThrow.reduce(0) { $0 + $1.totalValue }
+    }
+    
+    /// Determines if a bust is mathematically possible with remaining darts
+    var canBust: Bool {
+        // Hide bust button during player transition to prevent flicker
+        guard !isTransitioningPlayers else { return false }
+        
+        let currentScore = playerScores[currentPlayer.id] ?? startingScore
+        let throwTotal = currentThrowTotal
+        let remainingScore = currentScore - throwTotal
+        
+        // Calculate maximum possible score with remaining darts (60 per dart = T20)
+        let dartsRemaining = 3 - currentThrow.count
+        let maxPossibleScore = dartsRemaining * 60
+        
+        // Bust is impossible if: remainingScore - maxPossibleScore > 1
+        // (Can't go below 2, which is the minimum non-bust score)
+        return remainingScore - maxPossibleScore <= 1
     }
     
     var isBust: Bool {
@@ -249,10 +268,19 @@ class CountdownViewModel: ObservableObject {
             
             currentThrow.removeAll()
             selectedDartIndex = nil
+            
+            // Set transition flag to hide bust button during switch
+            isTransitioningPlayers = true
             switchPlayer()
             
             // Update checkout for new player
             updateCheckoutSuggestion()
+            
+            // Clear transition flag after brief delay
+            Task {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                isTransitioningPlayers = false
+            }
             return
         }
         
@@ -317,6 +345,9 @@ class CountdownViewModel: ObservableObject {
         currentThrow.removeAll()
         selectedDartIndex = nil
         
+        // Set transition flag to hide bust button during animation
+        isTransitioningPlayers = true
+        
         // Delay player switch to allow score animation to complete
         Task {
             // Wait for animation to complete (grow + immediate shrink)
@@ -327,6 +358,9 @@ class CountdownViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds pause
             switchPlayer()
             updateCheckoutSuggestion()
+            
+            // Clear transition flag after player switch completes
+            isTransitioningPlayers = false
         }
     }
     

@@ -466,9 +466,13 @@ struct StatCategorySection: View {
     let getValue: (MatchPlayer) -> Int
     var isDecimal: Bool = false
     var getDecimalValue: ((MatchPlayer) -> Double)?
+    var forceMaxValue: Int? = nil  // Force specific max value (e.g., 100 for percentages)
     
     // Calculate max value for scaling bars
     private var maxValue: Int {
+        if let forced = forceMaxValue {
+            return forced
+        }
         let values = players.map { getValue($0) }
         return max(values.max() ?? 1, 1) // Minimum 1 to avoid division by zero
     }

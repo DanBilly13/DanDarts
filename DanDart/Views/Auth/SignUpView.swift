@@ -21,6 +21,7 @@ struct SignUpView: View {
     // MARK: - UI State
     @State private var showErrors = false
     @State private var errorMessage = ""
+    @State private var useEmail = false
     
     // MARK: - Computed Properties
     private var isFormValid: Bool {
@@ -58,144 +59,31 @@ struct SignUpView: View {
                     }
                     .padding(.top, 20)
                     
-                    // Form Section
-                    VStack(spacing: 20) {
-                        // Display Name TextField
-                        DartTextField(
-                            label: "Display Name",
-                            placeholder: "Your full name",
-                            text: $displayName,
-                            textContentType: .name,
-                            autocapitalization: .words
-                        )
-                        
-                        // Nickname TextField
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Nickname")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            HStack(spacing: 0) {
-                                Text("@")
+                    // Google Sign Up Button (match SignInView style)
+                    AppButton(
+                        role: .primary,
+                        controlSize: .extraLarge,
+                        isDisabled: authService.isLoading,
+                        compact: true,
+                        action: {
+                            Task { await handleGoogleSignUp() }
+                        }
+                    ) {
+                        HStack(spacing: 8) {
+                            if authService.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "globe")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
-                                    .padding(.leading, 16)
-                                    .padding(.trailing, 4)
-                                
-                                TextField("username", text: $nickname)
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextPrimary"))
-                                    .textContentType(.nickname)
-                                    .autocapitalization(.none)
-                                    .autocorrectionDisabled()
-                                    .padding(.trailing, 16)
-                                    .padding(.vertical, 14)
                             }
-                            .background(Color("InputBackground"))
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                            )
+                            Text(authService.isLoading ? "Signing up with Google..." : "Continue with Google")
                         }
-                        
-                        // Email TextField
-                        DartTextField(
-                            label: "Email",
-                            placeholder: "Enter your email",
-                            text: $email,
-                            keyboardType: .emailAddress,
-                            textContentType: .emailAddress,
-                            autocapitalization: .never,
-                            autocorrectionDisabled: true
-                        )
-                        .onChange(of: email) { oldValue, newValue in
-                            // Fix Swedish keyboard @ symbol issue
-                            let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
-                            if correctedEmail != newValue {
-                                email = correctedEmail
-                            }
-                        }
-                        
-                        // Password SecureField
-                        DartSecureField(
-                            label: "Password",
-                            placeholder: "Create a password",
-                            text: $password,
-                            textContentType: .newPassword
-                        )
-                        
-                        // Confirm Password SecureField
-                        DartSecureField(
-                            label: "Confirm Password",
-                            placeholder: "Confirm your password",
-                            text: $confirmPassword,
-                            textContentType: .newPassword
-                        )
-                        
-                        // Password Requirements
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Password must contain:")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                            
-                            HStack(spacing: 8) {
-                                Image(systemName: isPasswordValid ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(isPasswordValid ? .green : Color("TextSecondary").opacity(0.6))
-                                Text("At least 8 characters")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(isPasswordValid ? .green : Color("TextSecondary"))
-                                Spacer()
-                            }
-                        }
-                        .padding(.horizontal, 4)
                     }
                     .padding(.horizontal, 32)
                     
-                    // Error Message
-                    if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
                     
-                    // Create Account Button
-                    VStack(spacing: 16) {
-                        Button(action: {
-                            Task {
-                                await handleSignUp()
-                            }
-                        }) {
-                            HStack {
-                                if authService.isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                }
-                                Text(authService.isLoading ? "Creating Account..." : "Create Account")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color("AccentPrimary"), Color("AccentPrimary").opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(25)
-                        }
-                        .disabled(!isFormValid || authService.isLoading)
-                        .opacity((isFormValid && !authService.isLoading) ? 1.0 : 0.6)
-                        .scaleEffect(1.0)
-                        .animation(.easeInOut(duration: 0.1), value: false)
-                    }
-                    .padding(.horizontal, 32)
                     
                     // OR Divider
                     HStack {
@@ -214,42 +102,57 @@ struct SignUpView: View {
                     }
                     .padding(.horizontal, 32)
                     
-                    // Google Sign Up Button
-                    Button(action: {
-                        Task {
-                            await handleGoogleSignUp()
-                        }
-                    }) {
-                        HStack(spacing: 12) {
-                            if authService.isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: Color("TextPrimary")))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(Color("TextPrimary"))
+                    // Collapsible two-step email sign-up (now single-step expand)
+                    Group {
+                        if !useEmail {
+                            // Closed state: show a clear action to reveal the full email form
+                            AppButton(
+                                role: .primaryOutline,
+                                controlSize: .extraLarge,
+                                compact: true,
+                                action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) { useEmail = true }
+                                }
+                            ) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "envelope")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text("Sign up with email")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
                             }
+                            .padding(.horizontal, 32)
                             
-                            Text(authService.isLoading ? "Signing up with Google..." : "Continue with Google")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color("TextPrimary"))
+                        } else {
+                            // Expanded: full email form
+                            EmailSignUpForm(
+                                displayName: $displayName,
+                                nickname: $nickname,
+                                email: $email,
+                                password: $password,
+                                confirmPassword: $confirmPassword,
+                                isLoading: authService.isLoading,
+                                isFormValid: isFormValid,
+                                errorMessage: $errorMessage,
+                                onSubmit: {
+                                    Task { await handleSignUp() }
+                                }
+                            )
+                            
+                            // Collapse control for the expanded state
+                            Button(action: { withAnimation(.easeInOut(duration: 0.2)) {
+                                useEmail = false
+                                errorMessage = ""
+                                // Keep field values as-is so user doesn't lose work
+                            }}) {
+                                Text("Hide email sign-up")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color("TextSecondary"))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 4)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color("BackgroundSecondary"))
-                        .cornerRadius(25)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 25)
-                                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                        )
                     }
-                    .disabled(authService.isLoading)
-                    .opacity(authService.isLoading ? 0.6 : 1.0)
-                    .padding(.horizontal, 32)
-                    
-                    Spacer(minLength: 20)
-                    
                     // Sign In Link
                     NavigationLink(destination: SignInView()) {
                         HStack {

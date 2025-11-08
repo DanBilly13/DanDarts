@@ -51,36 +51,95 @@ struct MatchCard: View {
     
     private var playersRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(match.players) { player in
+            ForEach(rankedPlayers) { player in
                 HStack(spacing: 8) {
                     // Player name
                     Text(player.displayName)
                         .font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))
-                        .foregroundColor(player.id == match.winnerId ? Color("TextPrimary") : Color("TextPrimary"))
+                        .foregroundColor(Color("TextPrimary"))
                     
                     Spacer()
                     
-                    // Score/Icon container
-                    HStack {
-                        if player.id == match.winnerId {
-                            Image(systemName: "trophy.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color("AccentTertiary"))
+                    // Score/Icon/Placement container
+                    Group {
+                        if isRankingBasedGame {
+                            // Show placement for Sudden Death and Halve-It
+                            placementView(for: playerPlacement(player))
                         } else {
-                            Text("\(player.finalScore)")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(Color("TextSecondary"))
+                            // Show trophy for winner, score for others (301/501)
+                            if player.id == match.winnerId {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(Color("AccentTertiary"))
+                            } else {
+                                Text("\(player.finalScore)")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(Color("TextSecondary"))
+                            }
                         }
                     }
                     .frame(width: 60)
-                    .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity)
             }
         }
     }
     
+    /// Get placement number for a player in ranked games
+    private func playerPlacement(_ player: MatchPlayer) -> Int {
+        guard let index = rankedPlayers.firstIndex(where: { $0.id == player.id }) else {
+            return rankedPlayers.count
+        }
+        return index + 1
+    }
+    
+    @ViewBuilder
+    private func placementView(for place: Int) -> some View {
+        if place == 1 {
+            // Trophy for 1st place (consistent with 301/501)
+            Image(systemName: "trophy.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(Color("AccentTertiary"))
+        } else {
+            // Text-only for 2nd, 3rd, etc.
+            Text("\(place)\(placementSuffix(place))")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Color("TextSecondary"))
+        }
+    }
+    
+    private func placementSuffix(_ place: Int) -> String {
+        switch place {
+        case 1: return "st"
+        case 2: return "nd"
+        case 3: return "rd"
+        default: return "th"
+        }
+    }
+    
     // MARK: - Computed Properties
+    
+    /// Check if this is a ranking-based game (Sudden Death, Halve-It)
+    private var isRankingBasedGame: Bool {
+        let gameType = match.gameType.lowercased()
+        return gameType == "sudden death" || gameType == "sudden_death" ||
+               gameType == "halve it" || gameType == "halve_it"
+    }
+    
+    /// Players ranked by final score (highest to lowest for Halve-It, lowest to highest for Sudden Death)
+    private var rankedPlayers: [MatchPlayer] {
+        let gameType = match.gameType.lowercased()
+        
+        if gameType == "sudden death" || gameType == "sudden_death" {
+            // For Sudden Death: higher lives = better placement
+            return match.players.sorted { $0.finalScore > $1.finalScore }
+        } else if gameType == "halve it" || gameType == "halve_it" {
+            // For Halve-It: higher score = better placement
+            return match.players.sorted { $0.finalScore > $1.finalScore }
+        } else {
+            // For other games: keep original order
+            return match.players
+        }
+    }
     
     private var relativeDate: String {
         let calendar = Calendar.current

@@ -57,10 +57,8 @@ struct PlayerAvatarView: View {
                 .frame(width: size, height: size)
             
             if let avatarURL = avatarURL {
-                let _ = print("🖼️ PlayerAvatarView - avatarURL: \(avatarURL)")
-                // Check if it's a URL or local asset
+                // Check if it's a URL, file path, or local asset
                 if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
-                    let _ = print("🌐 Loading remote URL (cached): \(avatarURL)")
                     // Remote URL - use CachedAsyncImage for better performance
                     if let url = URL(string: avatarURL) {
                         CachedAsyncImage(url: url) {
@@ -70,11 +68,37 @@ struct PlayerAvatarView: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: size, height: size)
                         .clipShape(Circle())
+                        .onAppear {
+                            print("🌐 Loading remote URL: \(avatarURL)")
+                        }
                     } else {
                         // Invalid URL - show placeholder
                         Image(systemName: placeholder)
                             .font(.system(size: size * 0.5, weight: .medium))
                             .foregroundColor(Color("TextSecondary"))
+                    }
+                } else if avatarURL.hasPrefix("/") || avatarURL.contains("/Documents/") {
+                    // File path - load from local storage
+                    let fileURL = URL(fileURLWithPath: avatarURL)
+                    if let imageData = try? Data(contentsOf: fileURL),
+                       let uiImage = UIImage(data: imageData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size, height: size)
+                            .clipShape(Circle())
+                            .onAppear {
+                                print("✅ Loaded avatar from file: \(avatarURL)")
+                            }
+                    } else {
+                        // Failed to load file - show placeholder
+                        Image(systemName: placeholder)
+                            .font(.system(size: size * 0.5, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                            .onAppear {
+                                print("⚠️ Failed to load avatar from file: \(avatarURL)")
+                                print("   File exists: \(FileManager.default.fileExists(atPath: avatarURL))")
+                            }
                     }
                 } else {
                     // Local asset - use Image
@@ -83,6 +107,9 @@ struct PlayerAvatarView: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: size, height: size)
                         .clipShape(Circle())
+                        .onAppear {
+                            print("🎨 Loading from asset: \(avatarURL)")
+                        }
                 }
             } else {
                 Image(systemName: placeholder)

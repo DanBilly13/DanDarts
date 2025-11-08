@@ -88,7 +88,8 @@ struct CountdownGameplayView: View {
                     ScoringButtonGrid(
                         onScoreSelected: { baseValue, scoreType in
                             gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
-                        }
+                        },
+                        showBustButton: gameViewModel.canBust
                     )
                     .padding(.horizontal, 16)
                     

@@ -408,7 +408,7 @@ struct ReceivedRequestCard: View {
                 }
                 
                 // Accept Button
-                AppButton(role: .secondary, controlSize: .small, isDisabled: isProcessing, compact: true) {
+                AppButton(role: .primary, controlSize: .small, isDisabled: isProcessing, compact: true) {
                     onAccept()
                 } label: {
                     if isProcessing {

@@ -40,7 +40,7 @@ struct SignInView: View {
                     // Google Sign-In Button (Primary)
                     AppButton(
                         role: .primary,
-                        controlSize: .regular,
+                        controlSize: .extraLarge,
                         isDisabled: isLoading,
                         compact: true,
                         action: {
@@ -135,7 +135,7 @@ struct SignInView: View {
                         // Sign In with Email Button (Primary Outline)
                         AppButton(
                             role: .primaryOutline,
-                            controlSize: .regular,
+                            controlSize: .extraLarge,
                             isDisabled: isLoading,
                             compact: true,
                             action: {

@@ -9,7 +9,9 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
+    @StateObject private var friendsService = FriendsService()
     @State private var showProfile: Bool = false
+    @State private var pendingRequestCount: Int = 0
     
     var body: some View {
         TabView {
@@ -22,12 +24,24 @@ struct MainTabView: View {
                 .tag(0)
             
             // Friends Tab
-            FriendsTabView(showProfile: $showProfile)
-                .tabItem {
-                    Image(systemName: "person.2.fill")
-                    Text("Friends")
+            Group {
+                if pendingRequestCount > 0 {
+                    FriendsTabView(showProfile: $showProfile)
+                        .tabItem {
+                            Image(systemName: "person.2.fill")
+                            Text("Friends")
+                        }
+                        .badge(pendingRequestCount)
+                        .tag(1)
+                } else {
+                    FriendsTabView(showProfile: $showProfile)
+                        .tabItem {
+                            Image(systemName: "person.2.fill")
+                            Text("Friends")
+                        }
+                        .tag(1)
                 }
-                .tag(1)
+            }
             
             // History Tab
             HistoryTabView(showProfile: $showProfile)
@@ -44,6 +58,40 @@ struct MainTabView: View {
         }
         .onAppear {
             configureTabBarAppearance()
+            loadPendingRequestCount()
+            
+            // Listen for friend request changes
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("FriendRequestsChanged"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                loadPendingRequestCount()
+            }
+        }
+        .onChange(of: authService.currentUser?.id) { _, _ in
+            loadPendingRequestCount()
+        }
+    }
+    
+    private func loadPendingRequestCount() {
+        guard let currentUser = authService.currentUser else {
+            pendingRequestCount = 0
+            return
+        }
+        
+        Task {
+            do {
+                let count = try await friendsService.getPendingRequestCount(userId: currentUser.id)
+                await MainActor.run {
+                    pendingRequestCount = count
+                }
+            } catch {
+                print("❌ Failed to load pending request count: \(error)")
+                await MainActor.run {
+                    pendingRequestCount = 0
+                }
+            }
         }
     }
     
