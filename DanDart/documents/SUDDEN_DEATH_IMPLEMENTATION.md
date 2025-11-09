@@ -80,11 +80,11 @@
 8. **ScoreType** - Single/Double/Triple enum
 9. **Player** - Player data model
 
-### 🆕 New Components Created (5)
+### 🎯 Key Components
 1. **SuddenDeathViewModel** - Game logic, lives tracking, elimination
-2. **SuddenDeathSetupView** - Lives selector, player selection
+2. **GameSetupView** (with SuddenDeathSetupConfig) - Lives selector, player selection
 3. **SuddenDeathGameplayView** - Main game screen
-4. **SuddenDeathPreGameHypeView** - Navigation wrapper
+4. **PreGameHypeView** (shared) - Pre-game animation, routes to gameplay
 5. **Avatar lineup components** - AvatarLineupItem, SuddenDeathPlayerCard
 
 ### 📊 Reuse Score
@@ -118,10 +118,6 @@
   - Points needed text
   - ScoringButtonGrid
   - Menu (instructions, restart, exit)
-
-- `/Views/Games/SuddenDeath/SuddenDeathPreGameHypeView.swift` (35 lines)
-  - Navigation wrapper
-  - Connects PreGameHypeView → SuddenDeathGameplayView
 
 ### Documentation
 - `/documents/SUDDEN_DEATH_IMPLEMENTATION.md` (this file)
