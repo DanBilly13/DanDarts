@@ -32,6 +32,8 @@ class SuddenDeathViewModel: ObservableObject {
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers score to beat pop animation
     @Published var showSkullWiggle: Bool = false // Triggers skull wiggle when player fails
+    @Published var animatingLifeLoss: UUID? = nil // Player ID whose life is animating
+    @Published var animatingPlayerTransition: Bool = false // Triggers player card fade transition
     
     // MARK: - Properties
     
@@ -167,18 +169,37 @@ class SuddenDeathViewModel: ObservableObject {
             } else {
                 // Lost a life
                 if let currentLives = playerLives[currentPlayer.id] {
-                    playerLives[currentPlayer.id] = max(0, currentLives - 1)
                     soundManager.playMissSound()
                     triggerSkullWiggle()
                     
-                    // Check if player is eliminated
-                    if playerLives[currentPlayer.id] == 0 {
-                        print("💀 \(currentPlayer.displayName) is eliminated!")
+                    // Trigger life loss animation
+                    triggerLifeLossAnimation(for: currentPlayer.id)
+                    
+                    // Wait for life loss animation, then update lives
+                    Task {
+                        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s for life animation + small buffer
+                        await MainActor.run {
+                            playerLives[currentPlayer.id] = max(0, currentLives - 1)
+                            
+                            // Check if player is eliminated
+                            if playerLives[currentPlayer.id] == 0 {
+                                print("💀 \(currentPlayer.displayName) is eliminated!")
+                            }
+                            
+                            // After life is lost, proceed with turn completion
+                            finishTurnTransition()
+                        }
                     }
+                    return // Exit early, finishTurnTransition will handle the rest
                 }
             }
         }
         
+        // If no life was lost, proceed immediately
+        finishTurnTransition()
+    }
+    
+    private func finishTurnTransition() {
         // Clear current throw
         clearThrow()
         
@@ -188,8 +209,16 @@ class SuddenDeathViewModel: ObservableObject {
             return
         }
         
-        // Move to next active player
-        moveToNextPlayer()
+        // Trigger player transition animation
+        triggerPlayerTransition()
+        
+        // Switch player immediately so avatar lineup animates during fade-in
+        Task {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s - small delay for fade-out to start
+            await MainActor.run {
+                moveToNextPlayer() // Avatar lineup changes here, animates during fade-in
+            }
+        }
     }
     
     private func moveToNextPlayer() {
@@ -310,6 +339,8 @@ class SuddenDeathViewModel: ObservableObject {
         isGameOver = false
         showScoreAnimation = false
         showSkullWiggle = false
+        animatingLifeLoss = nil
+        animatingPlayerTransition = false
         
         // Reset lives
         for player in players {
@@ -337,6 +368,26 @@ class SuddenDeathViewModel: ObservableObject {
             // Wait for wiggle animation to complete
             try? await Task.sleep(nanoseconds: 400_000_000) // 0.4 seconds
             showSkullWiggle = false
+        }
+    }
+    
+    private func triggerLifeLossAnimation(for playerId: UUID) {
+        animatingLifeLoss = playerId
+        
+        Task {
+            // Wait for life loss animation to complete (pop + shrink)
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            animatingLifeLoss = nil
+        }
+    }
+    
+    private func triggerPlayerTransition() {
+        animatingPlayerTransition = true
+        
+        Task {
+            // Wait for fade transition to complete
+            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4 seconds
+            animatingPlayerTransition = false
         }
     }
 }

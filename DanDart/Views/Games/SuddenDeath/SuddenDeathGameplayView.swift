@@ -215,8 +215,11 @@ struct SuddenDeathGameplayView: View {
             score: viewModel.currentTurnTotal,
             scoreToBeat: viewModel.scoreToBeat,
             isPlayerToBeat: false,
-            borderColor: Color("AccentSecondary")
+            borderColor: Color("AccentSecondary"),
+            animatingLifeLoss: viewModel.animatingLifeLoss == viewModel.currentPlayer.id,
+            animatingTransition: viewModel.animatingPlayerTransition
         )
+        .animation(.easeInOut(duration: 0.4), value: viewModel.animatingPlayerTransition)
     }
     
 }
@@ -230,33 +233,27 @@ struct AvatarLineupItem: View {
     
     var body: some View {
         ZStack {
-            if isCurrentPlayer {
-                // Outer green circle (32px)
-                Circle()
-                    .fill(Color("AccentSecondary"))
-                    .frame(width: 36, height: 36)
-                
-                // Inner black circle (28px)
-                Circle()
-                    .fill(Color.black)
-                    .frame(width: 32, height: 32)
-                
-                // Avatar (24px to fit inside black circle)
-                AsyncAvatarImage(
-                    avatarURL: player.avatarURL,
-                    size: 28
-                )
-                .opacity(isEliminated ? 0.3 : 1.0)
-            } else {
-                // Regular avatar (32px)
-                AsyncAvatarImage(
-                    avatarURL: player.avatarURL,
-                    size: 36
-                )
-                .opacity(isEliminated ? 0.3 : 1.0)
-            }
+            // Outer green circle - only visible when current player
+            Circle()
+                .fill(Color("AccentSecondary"))
+                .frame(width: 36, height: 36)
+                .opacity(isCurrentPlayer ? 1.0 : 0.0)
+            
+            // Inner black circle - only visible when current player
+            Circle()
+                .fill(Color.black)
+                .frame(width: 32, height: 32)
+                .opacity(isCurrentPlayer ? 1.0 : 0.0)
+            
+            // Avatar - always present, just changes size
+            AsyncAvatarImage(
+                avatarURL: player.avatarURL,
+                size: isCurrentPlayer ? 28 : 36
+            )
+            .opacity(isEliminated ? 0.3 : 1.0)
         }
         .frame(width: 36, height: 36)
+        .animation(.easeInOut(duration: 1.2), value: isCurrentPlayer)
     }
 }
 
@@ -270,6 +267,8 @@ struct SuddenDeathPlayerCard: View {
     let scoreToBeat: Int
     let isPlayerToBeat: Bool
     let borderColor: Color
+    let animatingLifeLoss: Bool
+    let animatingTransition: Bool
     
     var body: some View {
         HStack(spacing: 12) {
@@ -278,6 +277,7 @@ struct SuddenDeathPlayerCard: View {
                 avatarURL: player.avatarURL,
                 size: 48
             )
+            .opacity(animatingTransition ? 0 : 1)
             
             // Player Info
             VStack(alignment: .leading, spacing: 2) {
@@ -298,14 +298,18 @@ struct SuddenDeathPlayerCard: View {
                     // Lives (hearts) - show all hearts, lost ones filled with background
                     HStack(spacing: 4) {
                         ForEach(0..<startingLives, id: \.self) { index in
+                            let isLosingLife = animatingLifeLoss && index == (lives - 1)
                             Image(systemName: "heart.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(index < lives ? .white : Color.white.opacity(0.25))
+                                .scaleEffect(isLosingLife ? 3.0 : 1.0)
+                                .animation(.timingCurve(0.5, 1.4, 0.5, 1.0, duration: 0.15), value: isLosingLife)
                         }
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(animatingTransition ? 0 : 1)
             
             // Score Section
             HStack(spacing: 6) {
@@ -353,6 +357,7 @@ struct SuddenDeathPlayerCard: View {
                     .cornerRadius(9)
                 }
             }
+            .opacity(animatingTransition ? 0 : 1)
         }
         .padding(.top, 16)
         .padding(.bottom, 16)

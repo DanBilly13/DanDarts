@@ -18,8 +18,9 @@ struct SuddenDeathSetupConfig: GameSetupConfigurable {
     
     func optionView(selection: Binding<Int>) -> AnyView {
         AnyView(
-            SegmentedControl(options: livesOptions, selection: selection) { lives in
-                "\(lives) \(lives == 1 ? "Life" : "Lives")"
+            SegmentedControl(options: [0, 1, 2], selection: selection) { index in
+                let lives = livesOptions[index]
+                return "\(lives) \(lives == 1 ? "Life" : "Lives")"
             }
         )
     }
