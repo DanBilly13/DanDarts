@@ -93,6 +93,7 @@ struct PlayerCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color("TextSecondary").opacity(0.3), lineWidth: 1)
         )
+        .opacity(showCheckmark ? 0.5 : 1.0)
     }
 }
 

@@ -349,11 +349,11 @@ struct SearchPlayerSheet: View {
                                             totalWins: currentUser.totalWins,
                                             totalLosses: currentUser.totalLosses
                                         ),
-                                        showCheckmark: selectedPlayers.contains(where: { $0.nickname == currentUser.nickname })
+                                        showCheckmark: selectedPlayers.contains(where: { $0.userId == currentUser.id })
                                     )
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .disabled(selectedPlayers.contains(where: { $0.nickname == currentUser.nickname }))
+                                .disabled(selectedPlayers.contains(where: { $0.userId == currentUser.id }))
                             }
                         }
                         
