@@ -385,11 +385,11 @@ struct SearchPlayerSheet: View {
                                         }) {
                                             PlayerCard(
                                                 player: player,
-                                                showCheckmark: selectedPlayers.contains(where: { $0.id == player.id })
+                                                showCheckmark: selectedPlayers.contains(where: { $0.userId == player.userId })
                                             )
                                         }
                                         .buttonStyle(PlainButtonStyle())
-                                        .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
+                                        .disabled(selectedPlayers.contains(where: { $0.userId == player.userId }))
                                     }
                                 }
                             }
