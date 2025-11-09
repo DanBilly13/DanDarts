@@ -148,16 +148,8 @@ struct GamesTabView: View {
             }
             .background(Color("BackgroundPrimary"))
             .navigationDestination(for: Game.self) { game in
-                if game.title == "Halve-It" {
-                    HalveItSetupView(game: game)
-                        .background(Color.black)
-                } else if game.title == "Sudden Death" {
-                    SuddenDeathSetupView(game: game)
-                        .background(Color.black)
-                } else {
-                    CountdownSetupView(game: game)
-                        .background(Color.black)
-                }
+                GameSetupView(config: gameConfig(for: game))
+                    .background(Color.black)
             }
             .onChange(of: navigationManager.shouldDismissToGamesList) {
                 if navigationManager.shouldDismissToGamesList {
@@ -165,6 +157,20 @@ struct GamesTabView: View {
                     navigationPath.removeLast(navigationPath.count)
                 }
             }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Returns the appropriate configuration for the given game
+    private func gameConfig(for game: Game) -> any GameSetupConfigurable {
+        switch game.title {
+        case "Halve-It":
+            return HalveItSetupConfig(game: game)
+        case "Sudden Death":
+            return SuddenDeathSetupConfig(game: game)
+        default: // 301, 501, or any other countdown game
+            return CountdownSetupConfig(game: game)
         }
     }
 }
