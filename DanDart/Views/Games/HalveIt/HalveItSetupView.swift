@@ -15,6 +15,7 @@ struct HalveItSetupView: View {
     @State private var selectedDifficulty: HalveItDifficulty = .easy
     @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
+    @StateObject private var friendsCache = FriendsCache()
     @EnvironmentObject private var authService: AuthService
     
     private let playerLimit = 8
@@ -228,9 +229,9 @@ struct HalveItSetupView: View {
             }
         }
         .sheet(isPresented: $showSearchPlayer) {
-            SearchPlayerSheet(selectedPlayers: selectedPlayers) { player in
+            SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
                 addPlayer(player)
-            }
+            }, friendsCache: friendsCache)
         }
     }
     

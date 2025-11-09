@@ -15,6 +15,7 @@ struct SuddenDeathSetupView: View {
     @State private var selectedLives: Int = 3 // 1, 3, or 5 lives
     @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
+    @StateObject private var friendsCache = FriendsCache()
     @EnvironmentObject private var authService: AuthService
     
     private let playerLimit = 10 // Maximum players for Sudden Death
@@ -228,9 +229,9 @@ struct SuddenDeathSetupView: View {
             }
         }
         .sheet(isPresented: $showSearchPlayer) {
-            SearchPlayerSheet(selectedPlayers: selectedPlayers) { player in
+            SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
                 addPlayer(player)
-            }
+            }, friendsCache: friendsCache)
         }
     }
     

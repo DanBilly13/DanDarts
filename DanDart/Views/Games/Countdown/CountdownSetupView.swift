@@ -15,6 +15,7 @@ struct CountdownSetupView: View {
     @State private var selectedLegs: Int = 1 // Best of 1, 3, 5, or 7
     @Environment(\.dismiss) private var dismiss
     @StateObject private var navigationManager = NavigationManager.shared
+    @StateObject private var friendsCache = FriendsCache() // Persists friends across sheet presentations
     @EnvironmentObject private var authService: AuthService
     
     private let playerLimit = 8 // Maximum players for MVP
@@ -231,9 +232,9 @@ struct CountdownSetupView: View {
                 }
             }
             .sheet(isPresented: $showSearchPlayer) {
-                SearchPlayerSheet(selectedPlayers: selectedPlayers) { player in
+                SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
                     addPlayer(player)
-                }
+                }, friendsCache: friendsCache)
             }
     }
     
@@ -250,15 +251,22 @@ struct CountdownSetupView: View {
     }
 }
 
+// MARK: - Friends Cache (persists across sheet presentations)
+
+class FriendsCache: ObservableObject {
+    @Published var friends: [Player] = []
+    @Published var hasFriendsLoaded = false
+}
+
 // MARK: - Placeholder Sheet Components
 
 struct SearchPlayerSheet: View {
     let selectedPlayers: [Player]
     let onPlayerSelected: (Player) -> Void
+    @ObservedObject var friendsCache: FriendsCache // Injected from parent
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @StateObject private var friendsService = FriendsService()
-    @State private var friends: [Player] = []
     @State private var isLoadingFriends = false
     @State private var showAddGuestPlayer = false
     @State private var guestPlayers: [Player] = []
@@ -370,7 +378,7 @@ struct SearchPlayerSheet: View {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                            } else if friends.isEmpty {
+                            } else if friendsCache.friends.isEmpty {
                                 Text("No friends yet")
                                     .font(.system(size: 14))
                                     .foregroundColor(Color("TextSecondary"))
@@ -378,7 +386,7 @@ struct SearchPlayerSheet: View {
                                     .padding()
                             } else {
                                 VStack(spacing: 12) {
-                                    ForEach(friends, id: \.id) { player in
+                                    ForEach(friendsCache.friends, id: \.id) { player in
                                         Button(action: {
                                             onPlayerSelected(player)
                                             dismiss()
@@ -439,11 +447,17 @@ struct SearchPlayerSheet: View {
             .navigationBarHidden(true)
             .onAppear {
                 loadGuestPlayers()
-                loadFriends()
+                if !friendsCache.hasFriendsLoaded {
+                    print("🔵 Loading friends for first time")
+                    loadFriends()
+                } else {
+                    print("🟢 Friends already loaded, just updating stats")
+                    updateFriendStats()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
-                // Reload friends to get updated stats after a match
-                loadFriends()
+                // Update friend stats after a match (without recreating Player objects)
+                updateFriendStats()
             }
             .sheet(isPresented: $showAddGuestPlayer) {
                 AddGuestPlayerView { player in
@@ -470,14 +484,46 @@ struct SearchPlayerSheet: View {
                 let friendUsers = try await friendsService.loadFriends(userId: currentUser.id)
                 // Convert Users to Players with userId properly set
                 await MainActor.run {
-                    friends = friendUsers.map { $0.toPlayer() }
+                    friendsCache.friends = friendUsers.map { $0.toPlayer() }
                     isLoadingFriends = false
+                    friendsCache.hasFriendsLoaded = true // Mark as loaded
                 }
             } catch {
                 print("❌ Failed to load friends: \(error)")
                 await MainActor.run {
                     isLoadingFriends = false
                 }
+            }
+        }
+    }
+    
+    private func updateFriendStats() {
+        guard let currentUser = authService.currentUser else { return }
+        
+        Task {
+            do {
+                let friendUsers = try await friendsService.loadFriends(userId: currentUser.id)
+                // Update stats for existing Player objects instead of replacing them
+                await MainActor.run {
+                    for friendUser in friendUsers {
+                        if let index = friendsCache.friends.firstIndex(where: { $0.userId == friendUser.id }) {
+                            let existingPlayer = friendsCache.friends[index]
+                            // Create new Player with updated stats but same id
+                            friendsCache.friends[index] = Player(
+                                id: existingPlayer.id, // Keep same id to maintain selection state
+                                displayName: friendUser.displayName,
+                                nickname: friendUser.nickname,
+                                avatarURL: friendUser.avatarURL,
+                                isGuest: false,
+                                totalWins: friendUser.totalWins,
+                                totalLosses: friendUser.totalLosses,
+                                userId: friendUser.id
+                            )
+                        }
+                    }
+                }
+            } catch {
+                print("❌ Failed to update friend stats: \(error)")
             }
         }
     }
