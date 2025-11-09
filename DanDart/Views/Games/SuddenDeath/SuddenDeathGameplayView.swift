@@ -40,7 +40,7 @@ struct SuddenDeathGameplayView: View {
                     
                     
                     // Score to Beat
-                    ScoreToBeatView(score: viewModel.scoreToBeat)
+                    ScoreToBeatView(score: viewModel.scoreToBeat, showScoreAnimation: viewModel.showScoreAnimation, showSkullWiggle: viewModel.showSkullWiggle)
                     Spacer()
                     
                     // Current Player Card
@@ -48,6 +48,7 @@ struct SuddenDeathGameplayView: View {
                         .padding(.horizontal, 16)
                     
                     Spacer()
+                        .frame(height: 12)
                     // Current throw display (always visible)
                     CurrentThrowDisplay(
                         currentThrow: viewModel.currentThrow,
@@ -57,7 +58,7 @@ struct SuddenDeathGameplayView: View {
                         },
                         showScore: false
                     )
-                    Color.clear.frame(height: 12)
+                    /*Color.clear.frame(height: 12)*/
                     
                     
                     // Points needed text (like checkout suggestion) - HIDDEN for now
@@ -233,29 +234,29 @@ struct AvatarLineupItem: View {
                 // Outer green circle (32px)
                 Circle()
                     .fill(Color("AccentSecondary"))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
                 
                 // Inner black circle (28px)
                 Circle()
                     .fill(Color.black)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 32, height: 32)
                 
                 // Avatar (24px to fit inside black circle)
                 AsyncAvatarImage(
                     avatarURL: player.avatarURL,
-                    size: 24
+                    size: 28
                 )
                 .opacity(isEliminated ? 0.3 : 1.0)
             } else {
                 // Regular avatar (32px)
                 AsyncAvatarImage(
                     avatarURL: player.avatarURL,
-                    size: 32
+                    size: 36
                 )
                 .opacity(isEliminated ? 0.3 : 1.0)
             }
         }
-        .frame(width: 32, height: 32)
+        .frame(width: 36, height: 36)
     }
 }
 
@@ -275,7 +276,7 @@ struct SuddenDeathPlayerCard: View {
             // Avatar
             AsyncAvatarImage(
                 avatarURL: player.avatarURL,
-                size: 44
+                size: 48
             )
             
             // Player Info
@@ -289,8 +290,8 @@ struct SuddenDeathPlayerCard: View {
                 }
                 HStack(spacing: 8) {
                     Text(player.nickname)
-                        .font(.footnote)
-                        .fontWeight(.semibold)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundColor(Color("TextSecondary"))
                         .lineLimit(1)
                     
@@ -299,7 +300,7 @@ struct SuddenDeathPlayerCard: View {
                         ForEach(0..<startingLives, id: \.self) { index in
                             Image(systemName: "heart.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(index < lives ? .white : Color.white.opacity(0.5))
+                                .foregroundColor(index < lives ? .white : Color.white.opacity(0.25))
                         }
                     }
                 }
@@ -307,7 +308,7 @@ struct SuddenDeathPlayerCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             
             // Score Section
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 // Crown for player to beat
                 if isPlayerToBeat {
                     Image(systemName: "crown.fill")
@@ -316,40 +317,46 @@ struct SuddenDeathPlayerCard: View {
                 }
                 
                 Text("\(score)")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(.title, design: .monospaced))
+                    .fontWeight(.bold)
                     .foregroundColor(Color("TextPrimary"))
                     .frame(width: 60, alignment: .trailing)
                 
-                // Points needed indicator
-                HStack(spacing: 0) {
-                    if score > scoreToBeat {
-                        Image(systemName: "arrow.up")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(Color("AccentSecondary"))
-                    } else if score < scoreToBeat {
-                        Image(systemName: "arrow.down")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(Color("AccentPrimary"))
-                    } else if scoreToBeat > 0 {
-                        Image(systemName: "minus")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(Color("TextSecondary"))
-                    }
-                    
-                    if scoreToBeat > 0 {
+                // Points needed indicator - only show when there's a score to beat AND player has thrown
+                if scoreToBeat > 0 && score > 0 {
+                    HStack(spacing: 2) {
+                        if score > scoreToBeat {
+                            Image(systemName: "arrow.up")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(Color("AccentSecondary"))
+                        } else if score < scoreToBeat {
+                            Image(systemName: "arrow.down")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(Color("AccentPrimary"))
+                        } else {
+                            Image(systemName: "minus")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(Color("TextSecondary"))
+                        }
+                        
                         Text("\(abs(score - scoreToBeat))")
                             .font(.headline)
-                        .foregroundColor(score >= scoreToBeat ? Color("AccentSecondary") : Color("AccentPrimary"))                    }
+                            .foregroundColor(score >= scoreToBeat ? Color("AccentSecondary") : Color("AccentPrimary"))
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.leading, 4)
+                    .padding(.trailing, 6)
+                    .background(Color.backgroundPrimary)
+                    .cornerRadius(9)
                 }
             }
         }
-        .padding(.top, 8)
-        .padding(.bottom, 8)
-        .padding(.leading, 8)
+        .padding(.top, 16)
+        .padding(.bottom, 16)
+        .padding(.leading, 16)
         .padding(.trailing, 24)
         .background(
             Capsule()

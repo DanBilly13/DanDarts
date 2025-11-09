@@ -29,6 +29,10 @@ class SuddenDeathViewModel: ObservableObject {
     // Score to beat (from player to beat)
     @Published var scoreToBeat: Int = 0
     
+    // Animation state
+    @Published var showScoreAnimation: Bool = false // Triggers score to beat pop animation
+    @Published var showSkullWiggle: Bool = false // Triggers skull wiggle when player fails
+    
     // MARK: - Properties
     
     let startingLives: Int
@@ -151,6 +155,7 @@ class SuddenDeathViewModel: ObservableObject {
             scoreToBeat = turnScore
             playerToBeatIndex = 0
             soundManager.playScoreSound()
+            triggerScoreAnimation()
         } else {
             // Check if current player beat the score
             if turnScore > scoreToBeat {
@@ -158,11 +163,13 @@ class SuddenDeathViewModel: ObservableObject {
                 scoreToBeat = turnScore
                 playerToBeatIndex = currentPlayerIndex
                 soundManager.playScoreSound()
+                triggerScoreAnimation()
             } else {
                 // Lost a life
                 if let currentLives = playerLives[currentPlayer.id] {
                     playerLives[currentPlayer.id] = max(0, currentLives - 1)
                     soundManager.playMissSound()
+                    triggerSkullWiggle()
                     
                     // Check if player is eliminated
                     if playerLives[currentPlayer.id] == 0 {
@@ -301,11 +308,35 @@ class SuddenDeathViewModel: ObservableObject {
         selectedDartIndex = nil
         winner = nil
         isGameOver = false
+        showScoreAnimation = false
+        showSkullWiggle = false
         
         // Reset lives
         for player in players {
             playerLives[player.id] = startingLives
             currentTurnScores[player.id] = 0
+        }
+    }
+    
+    // MARK: - Animation
+    
+    private func triggerScoreAnimation() {
+        showScoreAnimation = true
+        
+        Task {
+            // Wait for animation to complete
+            try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
+            showScoreAnimation = false
+        }
+    }
+    
+    private func triggerSkullWiggle() {
+        showSkullWiggle = true
+        
+        Task {
+            // Wait for wiggle animation to complete
+            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4 seconds
+            showSkullWiggle = false
         }
     }
 }
