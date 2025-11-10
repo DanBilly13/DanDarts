@@ -122,12 +122,11 @@ struct MainTabView: View {
 
 struct GamesTabView: View {
     let games = Game.loadGames()
-    @State private var navigationPath = NavigationPath()
-    @StateObject private var navigationManager = NavigationManager.shared
+    @StateObject private var router = Router.shared
     @Binding var showProfile: Bool
     
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack(path: $router.path) {
             VStack(spacing: 0) {
                 // Top Bar
                 TopBar(showProfile: $showProfile)
@@ -137,7 +136,7 @@ struct GamesTabView: View {
                     LazyVStack(spacing: 16) {
                         ForEach(games) { game in
                             GameCard(game: game) {
-                                navigationPath.append(game)
+                                router.push(.gameSetup(game: game))
                             }
                         }
                     }
@@ -147,31 +146,12 @@ struct GamesTabView: View {
                 .background(Color("BackgroundPrimary"))
             }
             .background(Color("BackgroundPrimary"))
-            .navigationDestination(for: Game.self) { game in
-                GameSetupView(config: gameConfig(for: game))
+            .navigationDestination(for: Route.self) { route in
+                router.view(for: route)
                     .background(Color.black)
             }
-            .onChange(of: navigationManager.shouldDismissToGamesList) {
-                if navigationManager.shouldDismissToGamesList {
-                    navigationManager.resetDismissFlag()
-                    navigationPath.removeLast(navigationPath.count)
-                }
-            }
         }
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Returns the appropriate configuration for the given game
-    private func gameConfig(for game: Game) -> any GameSetupConfigurable {
-        switch game.title {
-        case "Halve-It":
-            return HalveItSetupConfig(game: game)
-        case "Knockout":
-            return KnockoutSetupConfig(game: game)
-        default: // 301, 501, or any other countdown game
-            return CountdownSetupConfig(game: game)
-        }
+        .environmentObject(router)
     }
 }
 

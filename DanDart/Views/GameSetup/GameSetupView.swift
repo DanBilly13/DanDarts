@@ -9,16 +9,27 @@
 import SwiftUI
 
 struct GameSetupView: View {
-    let config: any GameSetupConfigurable
+    let game: Game
     
     @State private var selectedPlayers: [Player] = []
     @State private var showSearchPlayer: Bool = false
-    @State private var showGameView: Bool = false
     @State private var selectedOption: Int = 0
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var navigationManager = NavigationManager.shared
+    @EnvironmentObject private var router: Router
     @StateObject private var friendsCache = FriendsCache()
     @EnvironmentObject private var authService: AuthService
+    
+    // Game-specific config
+    private var config: any GameSetupConfigurable {
+        switch game.title {
+        case "Halve-It":
+            return HalveItSetupConfig(game: game)
+        case "Knockout":
+            return KnockoutSetupConfig(game: game)
+        default: // 301, 501, or any other countdown game
+            return CountdownSetupConfig(game: game)
+        }
+    }
     
     private var canStartGame: Bool {
         selectedPlayers.count >= 2
@@ -145,7 +156,14 @@ struct GameSetupView: View {
                         // Start Game Button
                         VStack(spacing: 12) {
                             AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canStartGame) {
-                                showGameView = true
+                                let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
+                                router.push(.preGameHype(
+                                    game: params.game,
+                                    players: params.players,
+                                    matchFormat: params.matchFormat,
+                                    halveItDifficulty: params.halveItDifficulty,
+                                    knockoutLives: params.knockoutLives
+                                ))
                             } label: {
                                 Text("Start Game")
                             }
@@ -208,29 +226,6 @@ struct GameSetupView: View {
         }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
-        .navigationDestination(isPresented: $showGameView) {
-            // Always show black background to prevent white flash
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                if !navigationManager.shouldDismissToGamesList {
-                    let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
-                    PreGameHypeView(
-                        game: params.game,
-                        players: params.players,
-                        matchFormat: params.matchFormat,
-                        halveItDifficulty: params.halveItDifficulty,
-                        knockoutLives: params.knockoutLives
-                    )
-                }
-            }
-        }
-        .onChange(of: navigationManager.shouldDismissToGamesList) {
-            if navigationManager.shouldDismissToGamesList {
-                navigationManager.resetDismissFlag()
-                dismiss()
-            }
-        }
         .sheet(isPresented: $showSearchPlayer) {
             SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
                 addPlayer(player)

@@ -24,6 +24,7 @@ struct CountdownGameplayView: View {
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var router: Router
     
     // Initialize with game and players
     init(game: Game, players: [Player], matchFormat: Int = 1) {
@@ -158,9 +159,8 @@ struct CountdownGameplayView: View {
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {
-                // Set flag first, then dismiss
-                NavigationManager.shared.dismissToGamesList()
-                dismiss()
+                // Pop to root (games list)
+                router.popToRoot()
             }
         } message: {
             Text("Are you sure you want to leave the game? Your progress will be lost.")
@@ -223,8 +223,7 @@ struct CountdownGameplayView: View {
                     },
                     onBackToGames: {
                         // Navigate back to games list
-                        NavigationManager.shared.dismissToGamesList()
-                        dismiss()
+                        router.popToRoot()
                     },
                     matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
                     legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,

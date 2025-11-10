@@ -14,6 +14,7 @@ struct KnockoutGameplayView: View {
     
     @StateObject private var viewModel: KnockoutViewModel
     @EnvironmentObject private var authService: AuthService
+    @EnvironmentObject private var router: Router
     @Environment(\.dismiss) private var dismiss
     
     @State private var showInstructions = false
@@ -148,8 +149,7 @@ struct KnockoutGameplayView: View {
         .alert("Exit Game", isPresented: $showExitConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Leave Game", role: .destructive) {
-                NavigationManager.shared.dismissToGamesList()
-                dismiss()
+                router.popToRoot()
             }
         } message: {
             Text("Are you sure you want to leave the game? Your progress will be lost.")
@@ -180,8 +180,7 @@ struct KnockoutGameplayView: View {
                     dismiss()
                 },
                 onBackToGames: {
-                    NavigationManager.shared.dismissToGamesList()
-                    dismiss()
+                    router.popToRoot()
                 },
                 matchFormat: nil,
                 legsWon: nil,

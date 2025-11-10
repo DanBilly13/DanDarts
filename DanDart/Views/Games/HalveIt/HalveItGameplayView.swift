@@ -23,6 +23,7 @@ struct HalveItGameplayView: View {
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var router: Router
     
     // Initialize with game, players, and difficulty
     init(game: Game, players: [Player], difficulty: HalveItDifficulty) {
@@ -148,8 +149,7 @@ var body: some View {
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {
-                NavigationManager.shared.dismissToGamesList()
-                dismiss()
+                router.popToRoot()
             }
         } message: {
             Text("Are you sure you want to leave the game? Your progress will be lost.")
@@ -184,8 +184,7 @@ var body: some View {
                     dismiss()
                 },
                 onBackToGames: {
-                    NavigationManager.shared.dismissToGamesList()
-                    dismiss()
+                    router.popToRoot()
                 },
                 matchFormat: nil,
                 legsWon: nil,

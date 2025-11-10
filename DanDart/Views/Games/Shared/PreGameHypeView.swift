@@ -15,8 +15,16 @@ struct PreGameHypeView: View {
     let knockoutLives: Int?
     let autoTransition: Bool
     
-    // Navigation state
-    @State private var navigateToGameplay = false
+    // Navigation helper
+    private func navigateToGameplay() {
+        if let difficulty = halveItDifficulty {
+            router.push(.halveItGameplay(game: game, players: players, difficulty: difficulty))
+        } else if let lives = knockoutLives {
+            router.push(.knockoutGameplay(game: game, players: players, startingLives: lives))
+        } else {
+            router.push(.countdownGameplay(game: game, players: players, matchFormat: matchFormat))
+        }
+    }
     
     init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil, autoTransition: Bool = true) {
         self.game = game
@@ -28,7 +36,7 @@ struct PreGameHypeView: View {
     }
     
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var navigationManager = NavigationManager.shared
+    @EnvironmentObject private var router: Router
     
     // Animation states
     @State private var showPlayers = false
@@ -86,40 +94,12 @@ struct PreGameHypeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
             .onAppear {
-                // Check if we should dismiss immediately (from cancel game)
-                if navigationManager.shouldDismissToGamesList {
-                    navigationManager.resetDismissFlag()
-                    dismiss()
-                    return
-                }
-                
                 startAnimationSequence()
                 // Play boxing sound when view appears
                 SoundManager.shared.playBoxingSound()
             }
-            .onChange(of: navigationManager.shouldDismissToGamesList) {
-                if navigationManager.shouldDismissToGamesList {
-                    navigationManager.resetDismissFlag()
-                    dismiss()
-                }
-            }
         .onTapGesture {
-            navigateToGameplay = true
-        }
-        .navigationDestination(isPresented: $navigateToGameplay) {
-            if let difficulty = halveItDifficulty {
-                // Halve It game
-                HalveItGameplayView(game: game, players: players, difficulty: difficulty)
-                    .navigationBarBackButtonHidden(true)
-            } else if let lives = knockoutLives {
-                // Knockout game
-                KnockoutGameplayView(game: game, players: players, startingLives: lives)
-                    .navigationBarBackButtonHidden(true)
-            } else {
-                // 301/501 countdown games
-                CountdownGameplayView(game: game, players: players, matchFormat: matchFormat)
-                    .navigationBarBackButtonHidden(true)
-            }
+            navigateToGameplay()
         }
         .background(Color.black)
         .preferredColorScheme(.dark)
@@ -304,7 +284,7 @@ struct PreGameHypeView: View {
         // Auto-transition to gameplay after 3 seconds total (if enabled)
         if autoTransition {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                navigateToGameplay = true
+                navigateToGameplay()
             }
         }
     }
