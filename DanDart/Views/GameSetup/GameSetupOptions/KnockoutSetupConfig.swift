@@ -1,13 +1,13 @@
 //
-//  SuddenDeathSetupConfig.swift
+//  KnockoutSetupConfig.swift
 //  DanDart
 //
-//  Configuration for Sudden Death game setup
+//  Configuration for Knockout game setup
 //
 
 import SwiftUI
 
-struct SuddenDeathSetupConfig: GameSetupConfigurable {
+struct KnockoutSetupConfig: GameSetupConfigurable {
     let game: Game
     let playerLimit: Int = 10
     let optionLabel: String = "Lives"
@@ -31,7 +31,7 @@ struct SuddenDeathSetupConfig: GameSetupConfigurable {
             game: game,
             players: players,
             matchFormat: 1,
-            suddenDeathLives: selectedLives
+            knockoutLives: selectedLives
         )
     }
 }

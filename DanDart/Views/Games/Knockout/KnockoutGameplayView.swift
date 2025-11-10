@@ -1,5 +1,5 @@
 //
-//  SuddenDeathGameplayView.swift
+//  KnockoutGameplayView.swift
 //  DanDart
 //
 //  Created by DanDarts Team
@@ -7,12 +7,12 @@
 
 import SwiftUI
 
-struct SuddenDeathGameplayView: View {
+struct KnockoutGameplayView: View {
     let game: Game
     let players: [Player]
     let startingLives: Int
     
-    @StateObject private var viewModel: SuddenDeathViewModel
+    @StateObject private var viewModel: KnockoutViewModel
     @EnvironmentObject private var authService: AuthService
     @Environment(\.dismiss) private var dismiss
     
@@ -26,7 +26,7 @@ struct SuddenDeathGameplayView: View {
         self.game = game
         self.players = players
         self.startingLives = startingLives
-        _viewModel = StateObject(wrappedValue: SuddenDeathViewModel(players: players, startingLives: startingLives))
+        _viewModel = StateObject(wrappedValue: KnockoutViewModel(players: players, startingLives: startingLives))
     }
     
     var body: some View {
@@ -208,7 +208,7 @@ struct SuddenDeathGameplayView: View {
     // MARK: - Current Player Card
     
     private var currentPlayerCard: some View {
-        SuddenDeathPlayerCard(
+        KnockoutPlayerCard(
             player: viewModel.currentPlayer,
             lives: viewModel.playerLives[viewModel.currentPlayer.id] ?? 0,
             startingLives: viewModel.startingLives,
@@ -257,9 +257,9 @@ struct AvatarLineupItem: View {
     }
 }
 
-// MARK: - Sudden Death Player Card
+// MARK: - Knockout Player Card
 
-struct SuddenDeathPlayerCard: View {
+struct KnockoutPlayerCard: View {
     let player: Player
     let lives: Int
     let startingLives: Int
@@ -300,7 +300,7 @@ struct SuddenDeathPlayerCard: View {
                         ForEach(0..<startingLives, id: \.self) { index in
                             let isLosingLife = animatingLifeLoss && index == (lives - 1)
                             Image(systemName: "heart.fill")
-                                .font(.system(size: 10))
+                                .font(.system(size: 12))
                                 .foregroundColor(index < lives ? .white : Color.white.opacity(0.25))
                                 .scaleEffect(isLosingLife ? 3.0 : 1.0)
                                 .animation(.timingCurve(0.5, 1.4, 0.5, 1.0, duration: 0.15), value: isLosingLife)
@@ -378,12 +378,12 @@ struct SuddenDeathPlayerCard: View {
 
 #Preview("Gameplay") {
     NavigationStack {
-        SuddenDeathGameplayView(
+        KnockoutGameplayView(
             game: Game(
-                title: "Sudden Death",
-                subtitle: "Fast and Ruthless Fun",
+                title: "Knockout",
+                subtitle: "Beat the Previous Player or Lose a Life",
                 players: "2 or more",
-                instructions: "Each player throws three darts per round, and the player with the lowest total is eliminated."
+                instructions: "The first player throws three darts to set a score. The next player must beat that score, or they lose a life. The winner is the final player left with one or more lives remaining."
             ),
             players: [
                 Player.mockGuest1,

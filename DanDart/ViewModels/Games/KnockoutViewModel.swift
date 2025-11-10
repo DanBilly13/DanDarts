@@ -1,5 +1,5 @@
 //
-//  SuddenDeathViewModel.swift
+//  KnockoutViewModel.swift
 //  DanDart
 //
 //  Created by DanDarts Team
@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-class SuddenDeathViewModel: ObservableObject {
+class KnockoutViewModel: ObservableObject {
     // MARK: - Published Properties
     
     @Published var players: [Player]
@@ -83,11 +83,12 @@ class SuddenDeathViewModel: ObservableObject {
     // MARK: - Initialization
     
     init(players: [Player], startingLives: Int) {
-        self.players = players
+        // Randomize player order for fair play
+        self.players = players.shuffled()
         self.startingLives = startingLives
         
         // Initialize lives for all players
-        for player in players {
+        for player in self.players {
             playerLives[player.id] = startingLives
             currentTurnScores[player.id] = 0
         }

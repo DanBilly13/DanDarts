@@ -59,8 +59,8 @@ struct GameEndView: View {
                 // Winner Section
                 VStack(spacing: 24) {
                     // Trophy/Crown Icon
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 60, weight: .bold))
+                    Image(systemName: "crown")
+                        .font(.system(size: 60, weight: .regular))
                         .foregroundColor(Color("AccentPrimary"))
                         .shadow(color: Color("AccentPrimary").opacity(0.5), radius: 20, x: 0, y: 0)
                         .scaleEffect(showCelebration ? 1.0 : 0.5)
@@ -86,11 +86,13 @@ struct GameEndView: View {
                             .tracking(2)
                         
                         Text(winner.displayName)
-                            .font(.system(size: 36, weight: .black))
+                            .font(.system(.title2, design: .rounded))
+                            .fontWeight(.semibold)
                             .foregroundColor(Color("TextPrimary"))
                         
                         Text("@\(winner.nickname)")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(.headline, design: .rounded))
+                            .fontWeight(.semibold)
                             .foregroundColor(Color("TextSecondary"))
                     }
                     .scaleEffect(showCelebration ? 1.0 : 0.8)
@@ -107,11 +109,11 @@ struct GameEndView: View {
                     }
                     
                     // Celebration Message
-                    Text("🎯 Perfect Finish! 🎯")
+                   /* Text("🎯 Perfect Finish! 🎯")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(Color("AccentPrimary"))
                         .opacity(showCelebration ? 1.0 : 0.0)
-                        .animation(.easeIn(duration: 0.3).delay(0.6), value: showCelebration)
+                        .animation(.easeIn(duration: 0.3).delay(0.6), value: showCelebration)*/
                     
                     // Match Details Link
                     if matchId != nil {
@@ -120,7 +122,7 @@ struct GameEndView: View {
                         } label: {
                             Text("View Match Details")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color("AccentSecondary"))
+                                .foregroundColor(Color("TextPrimary"))
                                 .underline()
                         }
                         .opacity(showCelebration ? 1.0 : 0.0)
@@ -147,7 +149,7 @@ struct GameEndView: View {
                         Label("Back to Games", systemImage: "house.fill")
                     }
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 64)
                 .padding(.bottom, 40)
                 .opacity(showCelebration ? 1.0 : 0.0)
                 .animation(.easeIn(duration: 0.3).delay(0.8), value: showCelebration)
@@ -218,6 +220,7 @@ struct GameEndView: View {
         legsWon: nil,
         matchId: UUID()
     )
+    .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("Game End - Multi-Leg Match") {
@@ -235,4 +238,5 @@ struct GameEndView: View {
         legsWon: [player1.id: 2, player2.id: 1],
         matchId: UUID()
     )
+    .environmentObject(AuthService.mockAuthenticated)
 }

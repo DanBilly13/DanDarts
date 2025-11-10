@@ -19,9 +19,9 @@
   },
   {
     "title": "Knockout",
-    "subtitle": "Beat the Previous Player or Lose a Life",
+    "subtitle": "Beat the high score or lose a life — last player standing wins.",
     "players": "2 or more",
-    "instructions": "Determine the throwing order by throwing one dart each at the bullseye — closest goes first. Before the game begins, decide how many lives each player gets. The first player throws three darts to set a score. The next player must beat that score, or they lose a life. Continue in order, with each player trying to outscore the last. The winner is the final player left with one or more lives remaining."
+    "instructions": "Choose your players, set the number of lives, and hit Start — we’ll shuffle the throwing order.\n\nEach turn, players throw three darts and try to beat the current high score.\n\nThe first player’s throw sets the initial score to beat.\n\nEach time a player beats the high score, their score becomes the new high score to beat.\n\nPlayers who fail to beat the current high score lose a life.\n\nPlay continues in order until only one player remains — everyone else has been knocked out."
   },
   {
     "title": "Sudden Death",

@@ -24,7 +24,6 @@ struct MatchHistoryView: View {
         case fiveOhOne = "501"
         case halveIt = "Halve It"
         case knockout = "Knockout"
-        case suddenDeath = "Sudden Death"
         case cricket = "Cricket"
         case killer = "Killer"
         

@@ -29,17 +29,17 @@ struct ScoreToBeatView: View {
                     .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
                 
-                Image("skull")
+                Image("BoxingGloveLeft")
                     .resizable()
                     .renderingMode(.template)
                     .foregroundColor(.white)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 36, height: 26)
                     .rotationEffect(.degrees(wiggleAngle))
-                    .scaleEffect(showSkullWiggle ? 1.2 : 1.0)
+                    .scaleEffect(showSkullWiggle ? 1.8 : 1.0)
                     .onChange(of: showSkullWiggle) { _, newValue in
                         if newValue {
                             withAnimation(.easeInOut(duration: 0.08).repeatCount(6, autoreverses: true)) {
-                                wiggleAngle = 10
+                                wiggleAngle = 12
                             }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 wiggleAngle = 0 // reset to neutral

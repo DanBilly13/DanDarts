@@ -155,7 +155,8 @@ class CountdownViewModel: ObservableObject {
     
     init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
-        self.players = players
+        // Randomize player order for fair play
+        self.players = players.shuffled()
         self.matchStartTime = Date()
         self.matchFormat = matchFormat
         
@@ -172,7 +173,7 @@ class CountdownViewModel: ObservableObject {
         }
         
         // Initialize player scores
-        for player in players {
+        for player in self.players {
             playerScores[player.id] = startingScore
             legsWon[player.id] = 0
         }

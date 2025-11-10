@@ -61,14 +61,15 @@ class HalveItViewModel: ObservableObject {
     
     // MARK: - Initialization
     init(players: [Player], difficulty: HalveItDifficulty, gameId: UUID) {
-        self.players = players
+        // Randomize player order for fair play
+        self.players = players.shuffled()
         self.difficulty = difficulty
         self.targets = difficulty.generateTargets()
         self.gameId = gameId
         self.matchId = UUID()
         
         // Initialize all players with 0 score
-        for player in players {
+        for player in self.players {
             playerScores[player.id] = 0
         }
     }

@@ -12,17 +12,19 @@ struct PreGameHypeView: View {
     let players: [Player]
     let matchFormat: Int
     let halveItDifficulty: HalveItDifficulty?
-    let suddenDeathLives: Int?
+    let knockoutLives: Int?
+    let autoTransition: Bool
     
     // Navigation state
     @State private var navigateToGameplay = false
     
-    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, suddenDeathLives: Int? = nil) {
+    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil, autoTransition: Bool = true) {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
         self.halveItDifficulty = halveItDifficulty
-        self.suddenDeathLives = suddenDeathLives
+        self.knockoutLives = knockoutLives
+        self.autoTransition = autoTransition
     }
     
     @Environment(\.dismiss) private var dismiss
@@ -109,9 +111,9 @@ struct PreGameHypeView: View {
                 // Halve It game
                 HalveItGameplayView(game: game, players: players, difficulty: difficulty)
                     .navigationBarBackButtonHidden(true)
-            } else if let lives = suddenDeathLives {
-                // Sudden Death game
-                SuddenDeathGameplayView(game: game, players: players, startingLives: lives)
+            } else if let lives = knockoutLives {
+                // Knockout game
+                KnockoutGameplayView(game: game, players: players, startingLives: lives)
                     .navigationBarBackButtonHidden(true)
             } else {
                 // 301/501 countdown games
@@ -299,50 +301,84 @@ struct PreGameHypeView: View {
             }
         }
         
-        // Auto-transition to gameplay after 3 seconds total
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            navigateToGameplay = true
+        // Auto-transition to gameplay after 3 seconds total (if enabled)
+        if autoTransition {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                navigateToGameplay = true
+            }
         }
     }
 }
 
 // MARK: - Preview
 #Preview("Pre-Game Hype - 301") {
-    PreGameHypeView(
-        game: Game.preview301,
-        players: [Player.mockGuest1, Player.mockGuest2],
-        matchFormat: 1
-    )
+    NavigationStack {
+        PreGameHypeView(
+            game: Game.preview301,
+            players: [Player.mockGuest1, Player.mockGuest2],
+            matchFormat: 1,
+            autoTransition: false
+        )
+    }
+    .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("Pre-Game Hype - 501") {
-    PreGameHypeView(
-        game: Game.preview501,
-        players: [Player.mockConnected1, Player.mockConnected2],
-        matchFormat: 3
-    )
+    NavigationStack {
+        PreGameHypeView(
+            game: Game.preview501,
+            players: [Player.mockConnected1, Player.mockConnected2],
+            matchFormat: 3,
+            autoTransition: false
+        )
+    }
+    .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("Pre-Game Hype - Single Player") {
-    PreGameHypeView(
-        game: Game.previewHalveIt,
-        players: [Player.mockGuest1],
-        matchFormat: 1
-    )
+    NavigationStack {
+        PreGameHypeView(
+            game: Game.previewHalveIt,
+            players: [Player.mockGuest1],
+            matchFormat: 1,
+            autoTransition: false
+        )
+    }
+    .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("Pre-Game Hype - 3 Players") {
-    PreGameHypeView(
-        game: Game.preview301,
-        players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1],
-        matchFormat: 1
-    )
+    NavigationStack {
+        PreGameHypeView(
+            game: Game.preview301,
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1],
+            matchFormat: 1,
+            autoTransition: false
+        )
+    }
+    .environmentObject(AuthService.mockAuthenticated)
 }
 
 #Preview("Pre-Game Hype - 4 Players") {
-    PreGameHypeView(
-        game: Game.preview501,
-        players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
-        matchFormat: 3
-    )
+    NavigationStack {
+        PreGameHypeView(
+            game: Game.preview501,
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
+            matchFormat: 3,
+            autoTransition: false
+        )
+    }
+    .environmentObject(AuthService.mockAuthenticated)
+}
+
+#Preview("Pre-Game Hype - 6 Players") {
+    NavigationStack {
+        PreGameHypeView(
+            game: Game.preview501,
+            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2, Player.mockGuest1, Player.mockGuest2],
+            matchFormat: 3,
+            autoTransition: false
+        )
+    }
+    .environmentObject(AuthService.mockAuthenticated)
 }

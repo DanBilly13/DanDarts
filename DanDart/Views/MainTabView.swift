@@ -167,8 +167,8 @@ struct GamesTabView: View {
         switch game.title {
         case "Halve-It":
             return HalveItSetupConfig(game: game)
-        case "Sudden Death":
-            return SuddenDeathSetupConfig(game: game)
+        case "Knockout":
+            return KnockoutSetupConfig(game: game)
         default: // 301, 501, or any other countdown game
             return CountdownSetupConfig(game: game)
         }

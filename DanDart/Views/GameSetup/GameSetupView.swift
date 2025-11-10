@@ -220,7 +220,7 @@ struct GameSetupView: View {
                         players: params.players,
                         matchFormat: params.matchFormat,
                         halveItDifficulty: params.halveItDifficulty,
-                        suddenDeathLives: params.suddenDeathLives
+                        knockoutLives: params.knockoutLives
                     )
                 }
             }

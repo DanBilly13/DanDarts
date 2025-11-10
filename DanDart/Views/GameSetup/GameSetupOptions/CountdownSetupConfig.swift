@@ -18,8 +18,9 @@ struct CountdownSetupConfig: GameSetupConfigurable {
     
     func optionView(selection: Binding<Int>) -> AnyView {
         AnyView(
-            SegmentedControl(options: legsOptions, selection: selection) { legs in
-                "Best of \(legs)"
+            SegmentedControl(options: [0, 1, 2, 3], selection: selection) { index in
+                let legs = legsOptions[index]
+                return "Best of \(legs)"
             }
         )
     }

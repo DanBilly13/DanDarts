@@ -1,4 +1,4 @@
-# 🎯 Sudden Death Game Implementation - Complete
+# 🎯 Knockout Game Implementation - Complete
 
 **Date:** November 5, 2025  
 **Status:** ✅ COMPLETE - Ready for Testing
@@ -7,7 +7,7 @@
 
 ## 📋 Game Overview
 
-**Sudden Death** is a fast-paced elimination game where players compete to avoid having the lowest score each round.
+**Knockout** is a fast-paced elimination game where players must beat the previous player's score or lose a life.
 
 ### Game Rules
 - **Players:** 2-10 players (no hard limit, realistically max 10)
@@ -25,7 +25,7 @@
 ## 🎨 UI Design Specifications
 
 ### Game Header
-- Title: "Sudden death" (28pt bold)
+- Title: "Knockout" (28pt bold)
 - Positioned at top of screen
 
 ### Avatar Lineup
@@ -81,11 +81,11 @@
 9. **Player** - Player data model
 
 ### 🎯 Key Components
-1. **SuddenDeathViewModel** - Game logic, lives tracking, elimination
-2. **GameSetupView** (with SuddenDeathSetupConfig) - Lives selector, player selection
-3. **SuddenDeathGameplayView** - Main game screen
+1. **KnockoutViewModel** - Game logic, lives tracking, elimination
+2. **GameSetupView** (with KnockoutSetupConfig) - Lives selector, player selection
+3. **KnockoutGameplayView** - Main game screen
 4. **PreGameHypeView** (shared) - Pre-game animation, routes to gameplay
-5. **Avatar lineup components** - AvatarLineupItem, SuddenDeathPlayerCard
+5. **Avatar lineup components** - AvatarLineupItem, KnockoutPlayerCard
 
 ### 📊 Reuse Score
 **9 reused / 14 total = 64%** ✅ **Exceeds 60% target!**
@@ -95,7 +95,7 @@
 ## 📁 Files Created
 
 ### ViewModels
-- `/ViewModels/Games/SuddenDeathViewModel.swift` (220 lines)
+- `/ViewModels/Games/KnockoutViewModel.swift` (220 lines)
   - Lives tracking: `playerLives: [UUID: Int]`
   - Score tracking: `currentTurnScores: [UUID: Int]`
   - Elimination logic: `eliminatedPlayers: Set<UUID>`
@@ -103,14 +103,14 @@
   - Automatic player advancement (skips eliminated)
 
 ### Views
-- `/Views/Games/SuddenDeath/SuddenDeathSetupView.swift` (320 lines)
+- `/Views/GameSetup/GameSetupOptions/KnockoutSetupConfig.swift` (40 lines)
   - Lives selector (1/3/5)
   - Player selection (guests + friends)
   - Quick add friends section
   - Max 10 players
   - Navigation to hype screen
 
-- `/Views/Games/SuddenDeath/SuddenDeathGameplayView.swift` (280 lines)
+- `/Views/Games/Knockout/KnockoutGameplayView.swift` (280 lines)
   - Avatar lineup with states
   - Player to Beat card (red border, crown)
   - Current Player card (green border, turn total)
@@ -120,7 +120,7 @@
   - Menu (instructions, restart, exit)
 
 ### Documentation
-- `/documents/SUDDEN_DEATH_IMPLEMENTATION.md` (this file)
+- `/documents/KNOCKOUT_IMPLEMENTATION.md` (this file)
 
 ---
 
@@ -142,13 +142,13 @@
 ## 🎮 Game Flow
 
 ### Setup Flow
-1. User selects "Sudden Death" from games list
-2. SuddenDeathSetupView appears
+1. User selects "Knockout" from games list
+2. GameSetupView appears with KnockoutSetupConfig
 3. Select lives (1, 3, or 5)
 4. Add 2-10 players (guests or friends)
 5. Tap "Start Game"
 6. Navigate to PreGameHypeView (3-2-1 countdown)
-7. Navigate to SuddenDeathGameplayView
+7. Navigate to KnockoutGameplayView
 
 ### Gameplay Flow
 1. **Round 1, Player 1:**
