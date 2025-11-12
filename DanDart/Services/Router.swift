@@ -117,7 +117,9 @@ class Router: ObservableObject {
     
     /// Pop to root (clear entire stack)
     func popToRoot() {
-        path = NavigationPath()
+        withAnimation {
+            path = NavigationPath()
+        }
     }
     
     /// Reset navigation to a specific destination

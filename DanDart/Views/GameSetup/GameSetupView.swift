@@ -42,24 +42,40 @@ struct GameSetupView: View {
                 VStack(spacing: 0) {
                     // Hero Header with Cover Image
                     ZStack(alignment: .bottomLeading) {
-                        // Cover Image
-                        if let coverImage = UIImage(named: "game-cover/\(config.game.title)") {
-                            Image(uiImage: coverImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
+                        // Cover Image - try loading from Assets
+                        Group {
+                            // Try multiple naming conventions
+                            if let _ = UIImage(named: "game-cover/\(config.game.title)") {
+                                Image("game-cover/\(config.game.title)")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 280)
+                                    .clipped()
+                            } else if let _ = UIImage(named: config.game.title) {
+                                Image(config.game.title)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 280)
+                                    .clipped()
+                            } else if let _ = UIImage(named: config.game.title.lowercased()) {
+                                // Try lowercase version
+                                Image(config.game.title.lowercased())
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 280)
+                                    .clipped()
+                            } else {
+                                // Fallback gradient if no image
+                                LinearGradient(
+                                    colors: [
+                                        Color("AccentPrimary").opacity(0.6),
+                                        Color("AccentPrimary").opacity(0.3)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                                 .frame(height: 280)
-                                .clipped()
-                        } else {
-                            // Fallback gradient if no image
-                            LinearGradient(
-                                colors: [
-                                    Color("AccentPrimary").opacity(0.6),
-                                    Color("AccentPrimary").opacity(0.3)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .frame(height: 280)
+                            }
                         }
                         
                         // Gradient overlay for text readability
@@ -125,14 +141,12 @@ struct GameSetupView: View {
                                             .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                                             .listRowBackground(Color.clear)
                                             .listRowSeparator(.hidden)
-                                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                                Button {
-                                                    removePlayer(player)
-                                                } label: {
-                                                    Image(systemName: "trash")
-                                                        .foregroundColor(.red)
-                                                }
-                                                .tint(.clear)
+                                            .customSwipeAction(
+                                                title: "Remove",
+                                                systemImage: "xmark.circle",
+                                                role: .destructive
+                                            ) {
+                                                removePlayer(player)
                                             }
                                     }
                                 }

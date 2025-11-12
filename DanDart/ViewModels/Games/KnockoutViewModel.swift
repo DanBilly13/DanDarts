@@ -274,8 +274,8 @@ class KnockoutViewModel: ObservableObject {
         // Create match result
         let matchResult = MatchResult(
             id: matchId,
-            gameType: "Sudden Death",
-            gameName: "Sudden Death",
+            gameType: "Knockout",
+            gameName: "Knockout",
             players: matchPlayers,
             winnerId: winner.id,
             timestamp: matchStartTime,

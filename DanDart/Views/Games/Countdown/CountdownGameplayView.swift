@@ -113,7 +113,7 @@ struct CountdownGameplayView: View {
                             action: { gameViewModel.saveScore() }
                         ) {
                             if gameViewModel.isWinningThrow {
-                                Label("Game Over", systemImage: "trophy.fill")
+                                Label("Save Score", systemImage: "trophy.fill")
                             } else if gameViewModel.isBust {
                                 Text("Bust")
                             } else {

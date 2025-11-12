@@ -69,7 +69,7 @@ struct ThrowBreakdownCard: View {
     @ViewBuilder
     private func playerDarts(_ data: PlayerTurnData) -> some View {
         HStack(spacing: 0) {
-            ForEach(data.darts, id: \.self) { dart in
+            ForEach(Array(data.darts.enumerated()), id: \.offset) { index, dart in
                 Text(dart)
                     .font(.system(size: 14, design: .rounded))
                     .fontWeight(.bold)

@@ -19,22 +19,18 @@ struct SearchPlayerSheet: View {
     @State private var guestPlayers: [Player] = []
     
     var body: some View {
-        NavigationView {
+        StandardSheetView(
+            title: "Add Player",
+            dismissButtonTitle: "Back",
+            onDismiss: { dismiss() }
+        ) {
             VStack(spacing: 0) {
-                // Custom Navigation Bar
+                // Subtitle + Add Guest button
                 HStack {
-                    // Back button
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Back")
-                                .font(.system(size: 16, weight: .medium))
-                        }
-                        .foregroundColor(Color("AccentPrimary"))
-                    }
+                    Text("Choose yourself, a friend, or add a new guest")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color("TextSecondary"))
+                        .multilineTextAlignment(.leading)
                     
                     Spacer()
                     
@@ -51,26 +47,10 @@ struct SearchPlayerSheet: View {
                     }
                     .frame(width: 100)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color("BackgroundPrimary"))
+                .padding(.bottom, 24)
                 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 8) {
-                            Text("Add Player")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(Color("TextPrimary"))
-                            
-                            Text("Choose yourself, a friend, or add a new guest")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.top, 8)
-                        
-                        // Current User Section
+                VStack(spacing: 24) {
+                    // Current User Section
                         if let currentUser = authService.currentUser {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
@@ -160,7 +140,8 @@ struct SearchPlayerSheet: View {
                                     Spacer()
                                 }
                                 
-                                VStack(spacing: 12) {
+                                // Use List for swipe actions
+                                List {
                                     ForEach(guestPlayers, id: \.id) { player in
                                         Button(action: {
                                             onPlayerSelected(player)
@@ -173,48 +154,43 @@ struct SearchPlayerSheet: View {
                                         }
                                         .buttonStyle(PlainButtonStyle())
                                         .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
-                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                            Button(role: .destructive) {
-                                                deleteGuestPlayer(player)
-                                            } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
+                                        .listRowBackground(Color.clear)
+                                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                                        .deleteSwipeAction {
+                                            deleteGuestPlayer(player)
                                         }
                                     }
                                 }
+                                .listStyle(.plain)
+                                .scrollDisabled(true)
+                                .frame(height: CGFloat(guestPlayers.count) * 92) // 80pt card + 12pt spacing
                             }
                         }
-                        
-                        Spacer(minLength: 40)
-                    }
-                    .padding()
                 }
             }
-            .background(Color("BackgroundPrimary"))
-            .navigationBarHidden(true)
-            .onAppear {
-                loadGuestPlayers()
-                if !friendsCache.hasFriendsLoaded {
-                    print("🔵 Loading friends for first time")
-                    loadFriends()
-                } else {
-                    print("🟢 Friends already loaded, just updating stats")
-                    updateFriendStats()
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
-                // Update friend stats after a match (without recreating Player objects)
+        }
+        .onAppear {
+            loadGuestPlayers()
+            if !friendsCache.hasFriendsLoaded {
+                print("🔵 Loading friends for first time")
+                loadFriends()
+            } else {
+                print("🟢 Friends already loaded, just updating stats")
                 updateFriendStats()
             }
-            .sheet(isPresented: $showAddGuestPlayer) {
-                AddGuestPlayerView { player in
-                    onPlayerSelected(player)
-                    // Reload guest players to show the newly added one
-                    loadGuestPlayers()
-                    // AddGuestPlayerView dismisses itself, so we also dismiss the SearchPlayerSheet
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        dismiss()
-                    }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
+            // Update friend stats after a match (without recreating Player objects)
+            updateFriendStats()
+        }
+        .sheet(isPresented: $showAddGuestPlayer) {
+            AddGuestPlayerView { player in
+                onPlayerSelected(player)
+                // Reload guest players to show the newly added one
+                loadGuestPlayers()
+                // AddGuestPlayerView dismisses itself, so we also dismiss the SearchPlayerSheet
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    dismiss()
                 }
             }
         }

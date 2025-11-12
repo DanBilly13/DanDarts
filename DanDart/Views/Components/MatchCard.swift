@@ -118,18 +118,22 @@ struct MatchCard: View {
     
     // MARK: - Computed Properties
     
-    /// Check if this is a ranking-based game (Sudden Death, Halve-It)
+    /// Check if this is a ranking-based game (Knockout, Sudden Death, Halve-It)
     private var isRankingBasedGame: Bool {
         let gameType = match.gameType.lowercased()
-        return gameType == "sudden death" || gameType == "sudden_death" ||
+        return gameType == "knockout" ||
+               gameType == "sudden death" || gameType == "sudden_death" ||
                gameType == "halve it" || gameType == "halve_it"
     }
     
-    /// Players ranked by final score (highest to lowest for Halve-It, lowest to highest for Sudden Death)
+    /// Players ranked by final score (highest to lowest for Halve-It/Knockout, lowest to highest for Sudden Death)
     private var rankedPlayers: [MatchPlayer] {
         let gameType = match.gameType.lowercased()
         
-        if gameType == "sudden death" || gameType == "sudden_death" {
+        if gameType == "knockout" {
+            // For Knockout: higher lives = better placement
+            return match.players.sorted { $0.finalScore > $1.finalScore }
+        } else if gameType == "sudden death" || gameType == "sudden_death" {
             // For Sudden Death: higher lives = better placement
             return match.players.sorted { $0.finalScore > $1.finalScore }
         } else if gameType == "halve it" || gameType == "halve_it" {
