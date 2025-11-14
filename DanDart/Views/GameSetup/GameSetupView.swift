@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct GameSetupView: View {
     let game: Game
@@ -42,24 +43,10 @@ struct GameSetupView: View {
                 VStack(spacing: 0) {
                     // Hero Header with Cover Image
                     ZStack(alignment: .bottomLeading) {
-                        // Cover Image - try loading from Assets
+                        // Cover Image - use canonical coverImageName with gradient fallback
                         Group {
-                            // Try multiple naming conventions
-                            if let _ = UIImage(named: "game-cover/\(config.game.title)") {
-                                Image("game-cover/\(config.game.title)")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 280)
-                                    .clipped()
-                            } else if let _ = UIImage(named: config.game.title) {
-                                Image(config.game.title)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 280)
-                                    .clipped()
-                            } else if let _ = UIImage(named: config.game.title.lowercased()) {
-                                // Try lowercase version
-                                Image(config.game.title.lowercased())
+                            if UIImage(named: config.game.coverImageName) != nil {
+                                Image(config.game.coverImageName)
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(height: 280)
@@ -82,7 +69,7 @@ struct GameSetupView: View {
                         LinearGradient(
                             colors: [
                                 Color.black.opacity(0.0),
-                                Color.black.opacity(0.7)
+                                Color.black.opacity(0.3)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -217,12 +204,12 @@ struct GameSetupView: View {
             // Transparent Navigation Bar Overlay
             VStack {
                 HStack {
-                    // Back Button
+                    // Close Button
                     Button(action: {
-                        dismiss()
+                        router.pop()
                     }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .semibold))
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
                             .padding(12)
                             .background(Color.black.opacity(0.3))

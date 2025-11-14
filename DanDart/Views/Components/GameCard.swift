@@ -6,38 +6,67 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct GameCard: View {
     let game: Game
     let onPlayTapped: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Game Info Section
-            VStack(alignment: .leading, spacing: 8) {
-                // Game Title - Simple text to avoid crashes
-                Text(game.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+        VStack(spacing: 0) {
+            // Artwork Header
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if UIImage(named: game.coverImageName) != nil {
+                        Image(game.coverImageName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 140)
+                            .clipped()
+                    } else {
+                        LinearGradient(
+                            colors: [
+                                Color("AccentPrimary").opacity(0.6),
+                                Color("AccentPrimary").opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .frame(height: 140)
+                    }
+                }
                 
-                // Subtitle - Simple text
-                Text(game.subtitle)
-                    .font(.body)
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(2)
-                
-                // Players info
-                Text("Players: \(game.players)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                // Title overlay for a bit of App Store feel
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(game.title)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 2)
+                    
+                    Text(game.subtitle)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(2)
+                        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
+            .frame(maxWidth: .infinity)
             
-            Spacer()
-            
-            // Simple Play Button
-            HStack {
+            // Info + Play section
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Players: \(game.players)")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+                    
+                    Text("Tap to set up game")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                
                 Spacer()
                 
                 AppButton(role: .primary, controlSize: .small, compact: true) {
@@ -47,12 +76,20 @@ struct GameCard: View {
                         .bold()
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color("InputBackground"))
         }
-        .padding(20)
         .frame(maxWidth: .infinity)
-        .frame(height: 200)
-        .background(Color("InputBackground"))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onPlayTapped()
+        }
     }
 }
 

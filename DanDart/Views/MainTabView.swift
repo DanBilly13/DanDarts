@@ -124,6 +124,7 @@ struct GamesTabView: View {
     let games = Game.loadGames()
     @StateObject private var router = Router.shared
     @Binding var showProfile: Bool
+    @Namespace private var gameHeroNamespace
     
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -138,6 +139,7 @@ struct GamesTabView: View {
                             GameCard(game: game) {
                                 router.push(.gameSetup(game: game))
                             }
+                            .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
                         }
                     }
                     .padding()
@@ -147,11 +149,42 @@ struct GamesTabView: View {
             }
             .background(Color("BackgroundPrimary"))
             .navigationDestination(for: Route.self) { route in
-                router.view(for: route)
-                    .background(Color.black)
+                switch route.destination {
+                case .gameSetup(let game):
+                    let view = GameSetupView(game: game)
+                    if #available(iOS 18.0, *) {
+                        view
+                            .navigationTransition(
+                                .zoom(sourceID: game.id, in: gameHeroNamespace)
+                            )
+                            .background(Color.black)
+                    } else {
+                        view
+                            .background(Color.black)
+                    }
+                default:
+                    router.view(for: route)
+                        .background(Color.black)
+                }
             }
         }
         .environmentObject(router)
+    }
+}
+
+// MARK: - Hero Animation Modifier (iOS 18+)
+
+private struct GameHeroSourceModifier: ViewModifier {
+    let game: Game
+    let namespace: Namespace.ID
+    
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .matchedTransitionSource(id: game.id, in: namespace)
+        } else {
+            content
+        }
     }
 }
 

@@ -37,6 +37,18 @@ struct Game: Identifiable, Codable, Hashable {
     var name: String { title }
     var tagline: String { subtitle }
     
+    /// Canonical cover image asset name for this game.
+    /// Uses the convention: "<slug>", where slug is the lowercased
+    /// title with spaces replaced by hyphens. The `game-cover` group
+    /// in the asset catalog is organizational only and not part of
+    /// the runtime image name.
+    var coverImageName: String {
+        let slug = title
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+        return slug
+    }
+    
     // Custom coding keys to exclude id from JSON decoding
     private enum CodingKeys: String, CodingKey {
         case title, subtitle, players, instructions
