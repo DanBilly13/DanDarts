@@ -27,6 +27,8 @@ struct GameSetupView: View {
             return HalveItSetupConfig(game: game)
         case "Knockout":
             return KnockoutSetupConfig(game: game)
+        case "Sudden Death":
+            return SuddenDeathSetupConfig(game: game)
         default: // 301, 501, or any other countdown game
             return CountdownSetupConfig(game: game)
         }

@@ -18,6 +18,7 @@ enum Destination: Hashable {
     case countdownGameplay(game: Game, players: [Player], matchFormat: Int)
     case halveItGameplay(game: Game, players: [Player], difficulty: HalveItDifficulty)
     case knockoutGameplay(game: Game, players: [Player], startingLives: Int)
+    case suddenDeathGameplay(game: Game, players: [Player], startingLives: Int)
     
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?)
@@ -34,6 +35,8 @@ enum Destination: Hashable {
         case (.halveItGameplay(let g1, let p1, let d1), .halveItGameplay(let g2, let p2, let d2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && d1 == d2
         case (.knockoutGameplay(let g1, let p1, let l1), .knockoutGameplay(let g2, let p2, let l2)):
+            return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
+        case (.suddenDeathGameplay(let g1, let p1, let l1), .suddenDeathGameplay(let g2, let p2, let l2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
@@ -64,6 +67,11 @@ enum Destination: Hashable {
             hasher.combine(difficulty)
         case .knockoutGameplay(let game, let players, let startingLives):
             hasher.combine("knockoutGameplay")
+            hasher.combine(game.id)
+            hasher.combine(players.map(\.id))
+            hasher.combine(startingLives)
+        case .suddenDeathGameplay(let game, let players, let startingLives):
+            hasher.combine("suddenDeathGameplay")
             hasher.combine(game.id)
             hasher.combine(players.map(\.id))
             hasher.combine(startingLives)
@@ -154,6 +162,9 @@ class Router: ObservableObject {
             
         case .knockoutGameplay(let game, let players, let startingLives):
             KnockoutGameplayView(game: game, players: players, startingLives: startingLives)
+            
+        case .suddenDeathGameplay(let game, let players, let startingLives):
+            SuddenDeathGameplayView(game: game, players: players, startingLives: startingLives)
             
         case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
             GameEndView(

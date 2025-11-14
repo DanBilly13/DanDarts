@@ -20,7 +20,11 @@ struct PreGameHypeView: View {
         if let difficulty = halveItDifficulty {
             router.push(.halveItGameplay(game: game, players: players, difficulty: difficulty))
         } else if let lives = knockoutLives {
-            router.push(.knockoutGameplay(game: game, players: players, startingLives: lives))
+            if game.title == "Knockout" {
+                router.push(.knockoutGameplay(game: game, players: players, startingLives: lives))
+            } else if game.title == "Sudden Death" {
+                router.push(.suddenDeathGameplay(game: game, players: players, startingLives: lives))
+            }
         } else {
             router.push(.countdownGameplay(game: game, players: players, matchFormat: matchFormat))
         }
