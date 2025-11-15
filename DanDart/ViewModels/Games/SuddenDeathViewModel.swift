@@ -3,6 +3,11 @@ import SwiftUI
 
 @MainActor
 class SuddenDeathViewModel: ObservableObject {
+    enum RoundPhase {
+        case playing
+        case endOfRoundPause
+    }
+    
     // MARK: - Published Properties
     
     @Published var players: [Player]
@@ -23,11 +28,13 @@ class SuddenDeathViewModel: ObservableObject {
     
     // Round tracking
     @Published var roundNumber: Int = 1
+    @Published var phase: RoundPhase = .playing
     // Animation state
     @Published var animatingLifeLoss: UUID? = nil
     @Published var animatingPlayerTransition: Bool = false
     /// The player whose round score just updated (for score pop animation in UI)
     @Published var scoreAnimationPlayerId: UUID? = nil
+    @Published var showSkullWiggle: Bool = false
     
     // MARK: - Properties
     
@@ -136,6 +143,9 @@ class SuddenDeathViewModel: ObservableObject {
     }
     
     func completeTurn() {
+        // Ignore save actions if we're in the end-of-round pause state
+        guard phase == .playing else { return }
+        
         // Only commit if we have at least one dart
         let total = currentThrowTotal
         roundScores[currentPlayer.id] = total
@@ -196,6 +206,10 @@ class SuddenDeathViewModel: ObservableObject {
     private func endRound() {
         guard !roundScores.isEmpty else { return }
         
+        // Enter end-of-round pause phase so the UI can show animations and
+        // ignore further input until the next round starts or the game ends.
+        phase = .endOfRoundPause
+        
         // Determine lowest score among active players
         let activeIds = activePlayers.map { $0.id }
         let activeRoundScores = roundScores.filter { activeIds.contains($0.key) }
@@ -212,14 +226,31 @@ class SuddenDeathViewModel: ObservableObject {
             }
         }
         
+        // Trigger skull wiggle for players in danger during the pause at the
+        // end of the round (or before game end in the final round).
+        print("[SuddenDeath] 💀 Skull spinning – end-of-round pause active")
+        showSkullWiggle = true
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            await MainActor.run {
+                self?.showSkullWiggle = false
+            }
+        }
+        
         // Check for winner
         let remaining = activePlayers
         if remaining.count <= 1 {
             if let champ = remaining.first {
                 winner = champ
-                isGameOver = true
-                soundManager.playGameWin()
-                saveMatchResult()
+                Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    await MainActor.run {
+                        guard let self else { return }
+                        self.isGameOver = true
+                        self.soundManager.playGameWin()
+                        self.saveMatchResult()
+                    }
+                }
             }
             return
         }
@@ -241,6 +272,9 @@ class SuddenDeathViewModel: ObservableObject {
                 if let firstActiveIndex = self.players.firstIndex(where: { (self.playerLives[$0.id] ?? 0) > 0 }) {
                     self.currentPlayerIndex = firstActiveIndex
                 }
+
+                // Resume normal play after the end-of-round pause
+                self.phase = .playing
             }
         }
     }
@@ -257,6 +291,7 @@ class SuddenDeathViewModel: ObservableObject {
         roundNumber = 1
         winner = nil
         isGameOver = false
+        phase = .playing
         
         if let firstActiveIndex = players.firstIndex(where: { (playerLives[$0.id] ?? 0) > 0 }) {
             currentPlayerIndex = firstActiveIndex

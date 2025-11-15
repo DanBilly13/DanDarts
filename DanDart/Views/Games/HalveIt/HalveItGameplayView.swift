@@ -73,7 +73,7 @@ var body: some View {
                 )
                 .padding(.top, 8)
                 
-                Spacer(minLength: 0)
+                Spacer()
             }
             
             // Flexible gap between halves (grows on large phones)

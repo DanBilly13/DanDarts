@@ -27,34 +27,36 @@ struct SuddenDeathGameplayView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Top section: player cards row
-                VStack(spacing: 12) {
+                // TOP HALF — player cards + current throw
+                VStack {
                     playerCardsRow
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                         .padding(.bottom, 8)
+                    
+                    Spacer(minLength: 0)
+                    
+                    CurrentThrowDisplay(
+                        currentThrow: viewModel.currentThrow,
+                        selectedDartIndex: viewModel.selectedDartIndex,
+                        onDartTapped: { index in
+                            viewModel.selectDart(at: index)
+                        },
+                        showScore: true
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 0)
+                    
+                    Spacer(minLength: 0)
                 }
                 .safeAreaInset(edge: .top) {
-                    Color.clear.frame(height: 8)
+                    Color.clear.frame(height: 16)
                 }
                 
+                // Flexible space between top and bottom halves
                 Spacer(minLength: 0)
                 
-                // Current throw display
-                CurrentThrowDisplay(
-                    currentThrow: viewModel.currentThrow,
-                    selectedDartIndex: viewModel.selectedDartIndex,
-                    onDartTapped: { index in
-                        viewModel.selectDart(at: index)
-                    },
-                    showScore: true
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                
-                Spacer()
-                
-                // Bottom section: scoring grid + Save Score button
+                // BOTTOM HALF — scoring grid + Save Score button
                 VStack(spacing: 0) {
                     ScoringButtonGrid(
                         onScoreSelected: { baseValue, scoreType in
@@ -156,14 +158,18 @@ struct SuddenDeathGameplayView: View {
     // MARK: - Player Cards Row
     
     private var playerCardsRow: some View {
-        // During an active round (roundScores non-empty) show all players so we
-        // can still see who lost at the end of the round. Once scores are
-        // cleared for the next round, only show active players.
+        // Only show players who still have lives remaining. During the active
+        // round we continue to show just the active players so that once a
+        // player is eliminated (lives drop to 0) they do not reappear in later
+        // rounds after scores are saved.
         let playersToShow: [Player]
         if viewModel.roundScores.isEmpty {
+            // Start of a round: show all active players.
             playersToShow = viewModel.activePlayers
         } else {
-            playersToShow = viewModel.players
+            // Mid-round: still restrict to players with lives remaining,
+            // preventing previously eliminated players from reappearing.
+            playersToShow = viewModel.players.filter { (viewModel.displayPlayerLives[$0.id] ?? 0) > 0 }
         }
         let spacing: CGFloat = playersToShow.count <= 3 ? 32 : -8
         
@@ -177,12 +183,14 @@ struct SuddenDeathGameplayView: View {
                     isEliminated: viewModel.eliminatedPlayers.contains(player.id),
                     isInDanger: viewModel.playersInDanger.contains(player.id),
                     isCurrentPlayer: player.id == viewModel.currentPlayer.id,
-                    showScoreAnimation: viewModel.scoreAnimationPlayerId == player.id
+                    showScoreAnimation: viewModel.scoreAnimationPlayerId == player.id,
+                    showSkullWiggle: viewModel.showSkullWiggle
                 )
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .frame(height: 120)
+        .frame(height: 126)
+        
     }
 }
 
@@ -197,6 +205,9 @@ struct SuddenDeathPlayerCard: View {
     let isInDanger: Bool
     let isCurrentPlayer: Bool
     let showScoreAnimation: Bool
+    let showSkullWiggle: Bool
+    
+    @State private var wiggleAngle: Double = 0
     
     private var firstName: String {
         player.displayName.split(separator: " ").first.map(String.init) ?? player.displayName
@@ -209,11 +220,14 @@ struct SuddenDeathPlayerCard: View {
                 if isInDanger {
                     Image("skull")
                         .resizable()
-                        .scaledToFit()
-                        .frame(height: 18)
+                        .renderingMode(.template)
+                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                        .rotationEffect(.degrees(wiggleAngle))
+                        .scaleEffect(showSkullWiggle ? 1.8 : 1.0)
                 }
             }
-            .frame(height: 20)
+            .frame(height: 32)
             
             // Avatar (with double ring for current player)
             ZStack {
@@ -275,6 +289,29 @@ struct SuddenDeathPlayerCard: View {
             }
         }
         .padding(.vertical, 4)
+        .onAppear {
+            print("[SuddenDeathCard] appear for \(player.displayName) | isInDanger: \(isInDanger) | showSkullWiggle: \(showSkullWiggle)")
+        }
+        .onChange(of: isInDanger) { _, newValue in
+            print("[SuddenDeathCard] isInDanger changed for \(player.displayName): \(newValue)")
+        }
+        .onChange(of: showSkullWiggle) { _, newValue in
+            print("[SuddenDeathCard] showSkullWiggle changed for \(player.displayName): \(newValue) | isInDanger: \(isInDanger)")
+
+            // Only animate when the flag turns on AND this player is in danger
+            guard newValue, isInDanger else { return }
+
+            // Reset to neutral
+            wiggleAngle = 0
+
+            withAnimation(.easeInOut(duration: 0.08).repeatCount(6, autoreverses: true)) {
+                wiggleAngle = 12
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                wiggleAngle = 0 // reset to neutral
+            }
+        }
     }
 }
 
