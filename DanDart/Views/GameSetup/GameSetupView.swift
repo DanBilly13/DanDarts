@@ -39,7 +39,7 @@ struct GameSetupView: View {
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             // Main content with ScrollView
             ScrollView {
                 VStack(spacing: 0) {
@@ -96,7 +96,8 @@ struct GameSetupView: View {
                             VStack(spacing: 16) {
                                 HStack {
                                     Text(config.optionLabel)
-                                        .font(.system(size: 20, weight: .semibold))
+                                        .font(.system(.headline, design: .rounded))
+                                        .fontWeight(.semibold)
                                         .foregroundColor(Color("TextPrimary"))
                                     
                                     Spacer()
@@ -111,7 +112,8 @@ struct GameSetupView: View {
                         VStack(spacing: 16) {
                             HStack {
                                 Text("Players")
-                                    .font(.system(size: 20, weight: .semibold))
+                                    .font(.system(.headline, design: .rounded))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(Color("TextPrimary"))
                                 
                                 Spacer()
@@ -123,9 +125,20 @@ struct GameSetupView: View {
                             
                             // Sequential Player Addition
                             VStack(spacing: 12) {
+                                // Add next player button (if under limit)
+                                if selectedPlayers.count < config.playerLimit {
+                                    AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
+                                        showSearchPlayer = true
+                                    } label: {
+                                        Label("Add Player \(selectedPlayers.count + 1)", systemImage: "plus")
+                                            .font(.system(size: 16))
+                                    }
+                                }
+                                
                                 // Show selected players in a List for swipe actions
                                 List {
-                                    ForEach(Array(selectedPlayers.enumerated()), id: \.element.id) { index, player in
+                                    ForEach(selectedPlayers.indices, id: \.self) { index in
+                                        let player = selectedPlayers[index]
                                         PlayerCard(player: player, playerNumber: index + 1)
                                             .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                                             .listRowBackground(Color.clear)
@@ -143,39 +156,6 @@ struct GameSetupView: View {
                                 .scrollDisabled(true)
                                 .frame(height: CGFloat(selectedPlayers.count * 92)) // 80pt card + 12pt spacing
                                 .background(Color.clear)
-                                
-                                // Add next player button (if under limit)
-                                if selectedPlayers.count < config.playerLimit {
-                                    AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
-                                        showSearchPlayer = true
-                                    } label: {
-                                        Label("Add Player \(selectedPlayers.count + 1)", systemImage: "plus")
-                                            .font(.system(size: 16))
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Start Game Button
-                        VStack(spacing: 12) {
-                            AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canStartGame) {
-                                let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
-                                router.push(.preGameHype(
-                                    game: params.game,
-                                    players: params.players,
-                                    matchFormat: params.matchFormat,
-                                    halveItDifficulty: params.halveItDifficulty,
-                                    knockoutLives: params.knockoutLives
-                                ))
-                            } label: {
-                                Text("Start Game")
-                            }
-                            .frame(maxWidth: .infinity)
-
-                            if !canStartGame && selectedPlayers.count == 1 {
-                                Text("Add at least one more player")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
                             }
                         }
                         
@@ -200,10 +180,10 @@ struct GameSetupView: View {
                     .padding(.bottom, 16)
                 }
             }
-            .background(Color("BackgroundPrimary"))
+            .background(Color.clear)
             .edgesIgnoringSafeArea(.top)
             
-            // Transparent Navigation Bar Overlay
+            // Transparent Navigation Bar Overlay (top)
             VStack {
                 HStack {
                     // Close Button
@@ -227,16 +207,42 @@ struct GameSetupView: View {
                 Spacer()
             }
         }
+        .background(Color("BackgroundPrimary").ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            if canStartGame {
+                VStack(spacing: 12) {
+                    AppButton(role: .primary, controlSize: .extraLarge) {
+                        // start game
+                    } label: {
+                        Text("Start Game")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 64)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.4),
+                            Color.black.opacity(0.0)
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+            }
+        }
         .navigationBarHidden(true)
-        .toolbar(.hidden, for: .tabBar)
-        .sheet(isPresented: $showSearchPlayer) {
-            SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
-                addPlayer(player)
-            }, friendsCache: friendsCache)
-        }
-        .onAppear {
-            selectedOption = config.defaultSelection
-        }
+            .toolbar(.hidden, for: .tabBar)
+            .sheet(isPresented: $showSearchPlayer) {
+                SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
+                    addPlayer(player)
+                }, friendsCache: friendsCache)
+            }
+            .onAppear {
+                selectedOption = config.defaultSelection
+            }
     }
     
     // MARK: - Helper Methods

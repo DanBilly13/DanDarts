@@ -55,7 +55,8 @@ struct SearchPlayerSheet: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Text("You")
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.system(.caption, design: .rounded))
+                                        .fontWeight(.semibold)
                                         .foregroundColor(Color("TextPrimary"))
                                     Spacer()
                                 }
@@ -96,7 +97,8 @@ struct SearchPlayerSheet: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Your Friends")
-                                    .font(.system(size: 18, weight: .semibold))
+                                    .font(.system(.caption, design: .rounded))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(Color("TextPrimary"))
                                 Spacer()
                             }
@@ -135,7 +137,8 @@ struct SearchPlayerSheet: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Text("Guest Players")
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.system(.caption, design: .rounded))
+                                        .fontWeight(.semibold)
                                         .foregroundColor(Color("TextPrimary"))
                                     Spacer()
                                 }
