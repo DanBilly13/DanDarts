@@ -212,7 +212,14 @@ struct GameSetupView: View {
             if canStartGame {
                 VStack(spacing: 12) {
                     AppButton(role: .primary, controlSize: .extraLarge) {
-                        // start game
+                        let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
+                        router.push(.preGameHype(
+                            game: params.game,
+                            players: params.players,
+                            matchFormat: params.matchFormat,
+                            halveItDifficulty: params.halveItDifficulty,
+                            knockoutLives: params.knockoutLives
+                        ))
                     } label: {
                         Text("Start Game")
                     }

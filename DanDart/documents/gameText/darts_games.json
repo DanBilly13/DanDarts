@@ -2,43 +2,43 @@
   {
     "title": "301",
     "subtitle": "A Classic Countdown Game",
-    "players": "2 or more",
+    "players": "2-6",
     "instructions": "Each player starts with a score of 301. Players take turns throwing three darts per round and subtract the total from their score.\n\nThe goal is to reach exactly zero, finishing on a double. If a score goes below zero or ends on one, the turn is a bust and the score reverts to its previous total.\n\nThe first player to reach exactly zero wins."
   },
   {
     "title": "501",
     "subtitle": "The Professional Standard",
-    "players": "2 or more",
+    "players": "2-6",
     "instructions": "Players start with 501 points and take turns throwing three darts. Each turn’s total is subtracted from the player’s score.\n\nThe objective is to reach exactly zero, with the final dart landing on a double. If a player scores below zero or one, they bust and return to their previous score.\n\nThe first player to finish on zero wins.\n\nThis is the format used in most professional darts tournaments."
   },
   {
     "title": "Halve-It",
     "subtitle": "Accuracy Under Pressure",
-    "players": "2 or more",
+    "players": "2-6",
     "instructions": "Halve It is a darts game of accuracy and pressure played over six rounds. You have three chances to hit each target — every hit adds to your score, but miss all three in a round and your total is halved.\n\nEveryone starts on zero points. Each round has a different target, and players take turns throwing. Player 1 throws three darts at the target, then Player 2 throws, and so on.\n\nFor example, if the target is single 20 and you hit it twice, you score 40 points.\n\nIf you miss the target with all three darts, your score is halved — but it can’t drop below zero.\n\nChoose your difficulty — Easy, Medium, Hard, or Pro — and the app will automatically set the six targets for you.\n\nEasy: mostly singles.\nMedium: a mix of singles and doubles.\nHard: more doubles and trebles.\nPro: all doubles and trebles.\n\nAfter all six rounds, the player with the highest score wins."
   },
   {
     "title": "Knockout",
-    "subtitle": "Beat the high score or lose a life — last player standing wins.",
-    "players": "2 or more",
+    "subtitle": "Beat the high score or lose a life",
+    "players": "2-6",
     "instructions": "Choose your players, set the number of lives, and hit Start — we’ll shuffle the throwing order.\n\nEach turn, players throw three darts and try to beat the current high score.\n\nThe first player’s throw sets the initial score to beat.\n\nEach time a player beats the high score, their score becomes the new high score to beat.\n\nPlayers who fail to beat the current high score lose a life.\n\nPlay continues in order until only one player remains — everyone else has been knocked out."
   },
   {
     "title": "Sudden Death",
     "subtitle": "Fast and Ruthless Fun",
-    "players": "2 or more",
+    "players": "2-6",
     "instructions": "A quick and exciting game, perfect for groups. Each player throws three darts per round, and the player with the lowest total is eliminated. Play continues round by round until only one player remains. The last player standing wins."
   },
   {
     "title": "English Cricket",
     "subtitle": "Bat and Bowl with Darts",
-    "players": "2 or more",
+    "players": "2-6",
     "instructions": "English Cricket features a batter and a bowler, similar to traditional cricket. The game can be played one-on-one or with teams. The batting team aims to score as many points as possible by hitting the scoring numbers (15–20 and bullseye). The bowling team aims for the bullseye — an outer bullseye is worth one wicket, a bullseye two wickets. Once the bowling team reaches ten wickets, that marks the end of the batting team’s innings. Then teams switch roles. The team with the highest score after both have batted wins."
   },
   {
     "title": "Killer",
     "subtitle": "Target Others, Protect Yourself",
-    "players": "2 or more",
+    "players": "2-6",
     "instructions": "To start, each player throws one dart to determine their number (1–20). No two players can share the same number. If you land on an already-chosen number, keep throwing until you get a free one. Decide how many lives each player starts with. Players must first hit their own number’s double to become a Killer. Once a Killer, hitting another player’s number’s double removes one of their lives. You can lose your own lives by accidentally hitting your number while attacking others. To regain lives, hit your own number again. The last player with one or more lives wins."
   }
 ]

@@ -21,7 +21,7 @@ struct GameCard: View {
                         Image(game.coverImageName)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(height: 140)
+                            .frame(height: 188)
                             .clipped()
                     } else {
                         LinearGradient(
@@ -32,22 +32,17 @@ struct GameCard: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
-                        .frame(height: 140)
+                        .frame(height: 188)
                     }
                 }
                 
                 // Title overlay for a bit of App Store feel
                 VStack(alignment: .leading, spacing: 4) {
                     Text(game.title)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(.largeTitle, design: .rounded))
+                        .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 2)
-                    
-                    Text(game.subtitle)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(2)
-                        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
@@ -56,28 +51,40 @@ struct GameCard: View {
             
             // Info + Play section
             HStack(alignment: .center) {
+                
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Players: \(game.players)")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(1)
+                    Text(game.subtitle)
+                        .font(.system(.footnote, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color("TextPrimary").opacity(0.85))
+                        .lineLimit(2)
+                        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
                     
-                    Text("Tap to set up game")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.5))
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .font(.body)
+                            .foregroundColor(Color("TextPrimary"))
+                        Text(game.players)
+                            .font(.system(.footnote, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+                    }
+                    
                 }
                 
                 Spacer()
                 
-                AppButton(role: .primary, controlSize: .small, compact: true) {
+                AppButton(role: .primary, controlSize: .regular, compact: true) {
                     onPlayTapped()
                 } label: {
                     Text("Play")
                         .bold()
                 }
+                .frame(width: 100)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 16)
             .background(Color("InputBackground"))
         }
         .frame(maxWidth: .infinity)
