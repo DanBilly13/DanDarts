@@ -13,7 +13,7 @@ struct GameCard: View {
     let onPlayTapped: () -> Void
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .center, spacing: 0) {
             // Artwork Header
             ZStack(alignment: .bottomLeading) {
                 Group {
@@ -52,21 +52,21 @@ struct GameCard: View {
             // Info + Play section
             HStack(alignment: .center) {
                 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(game.subtitle)
-                        .font(.system(.footnote, design: .rounded))
-                        .fontWeight(.semibold)
+                        .font(.subheadline)
+                        .fontWeight(.bold)
                         .foregroundColor(Color("TextPrimary").opacity(0.85))
                         .lineLimit(2)
                         .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
                     
                     HStack {
                         Image(systemName: "person.2.fill")
-                            .font(.body)
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundColor(Color("TextPrimary"))
                         Text(game.players)
-                            .font(.system(.footnote, design: .rounded))
-                            .fontWeight(.semibold)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                             .foregroundColor(.white.opacity(0.7))
                             .lineLimit(1)
                     }
@@ -81,7 +81,7 @@ struct GameCard: View {
                     Text("Play")
                         .bold()
                 }
-                .frame(width: 100)
+                .frame(width: 88)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)

@@ -57,7 +57,7 @@ struct MatchCard: View {
                         .font(.caption)
                         .foregroundColor(Color("TextSecondary"))
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, 6)
              
                 
                 // Players with scores
@@ -82,13 +82,13 @@ struct MatchCard: View {
     }
     
     private var playersRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             ForEach(rankedPlayers) { player in
-                HStack(spacing: 8) {
+                HStack(alignment: .center) {
                     // Player name
                     Text(player.displayName)
                         .font(.system(.callout, design: .rounded))
-                        .fontWeight(.semibold)
+                        .fontWeight(.regular)
                         /*.font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))*/
                         .foregroundColor(Color("TextPrimary"))
                     
@@ -103,13 +103,12 @@ struct MatchCard: View {
                             // Show trophy for winner, score for others (301/501)
                             if player.id == match.winnerId {
                                 Image(systemName: "crown")
-                                    .font(.system(.callout, design: .rounded))
-                                    .fontWeight(.semibold)
+                                    .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(Color("AccentTertiary"))
                             } else {
                                 Text("\(player.finalScore)")
                                     .font(.system(.callout, design: .rounded))
-                                    .fontWeight(.semibold)
+                                    .fontWeight(.regular)
                                     .foregroundColor(Color("TextSecondary"))
                             }
                         }
@@ -132,7 +131,7 @@ struct MatchCard: View {
     private func placementView(for place: Int) -> some View {
         if place == 1 {
             // Trophy for 1st place (consistent with 301/501)
-            Image(systemName: "trophy.fill")
+            Image(systemName: "crown")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(Color("AccentTertiary"))
         } else {

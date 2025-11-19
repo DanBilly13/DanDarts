@@ -21,6 +21,7 @@ struct CountdownGameplayView: View {
     @State private var showExitAlert: Bool = false
     @State private var navigateToGameEnd: Bool = false
     @State private var showLegWinCelebration: Bool = false
+    @State private var showDoubleTripleTip: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
@@ -39,497 +40,535 @@ struct CountdownGameplayView: View {
             Color("BackgroundPrimary")
                 .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // TOP — cards / throw / checkout
-                VStack(spacing: 0) {
-                    // Stacked player cards (current player in front)
-                    StackedPlayerCards(
-                        players: gameViewModel.players,
-                        currentPlayerIndex: gameViewModel.currentPlayerIndex,
-                        playerScores: gameViewModel.playerScores,
-                        currentThrow: gameViewModel.currentThrow,
-                        legsWon: gameViewModel.legsWon,
-                        matchFormat: gameViewModel.matchFormat,
-                        showScoreAnimation: gameViewModel.showScoreAnimation
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 56)
-                    
-                    // Current throw display (always visible)
-                    CurrentThrowDisplay(
-                        currentThrow: gameViewModel.currentThrow,
-                        selectedDartIndex: gameViewModel.selectedDartIndex,
-                        onDartTapped: { index in
-                            gameViewModel.selectDart(at: index)
+            // Core gameplay layout, optionally wrapped with a positioned tip overlay
+            PositionedTip(
+                xPercent: 0.5,
+                yPercent: 0.8
+            ) {
+                if showDoubleTripleTip {
+                    TipBubble(
+                        systemImageName: "cursorarrow.click",
+                        title: "Doubles & Trebles",
+                        message: "Long-press any number button to choose single, double, or treble before you lift your finger.",
+                        onDismiss: {
+                            showDoubleTripleTip = false
+                            UserDefaults.standard.set(true, forKey: "hasSeenDoubleTripleTip")
                         }
                     )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
-                    // Checkout suggestion slot
-                    VStack {
-                        if let checkout = gameViewModel.suggestedCheckout {
-                            CheckoutSuggestionView(checkout: checkout)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 0)
-                        }
-                    }
-                    .frame(height: 40, alignment: .center)
-                    .padding(.bottom, 8)
-                    
-                    Spacer(minLength: 0)
+                    .padding(.horizontal, 24)
                 }
-                
-                // Flexible gap between halves (grows on large phones)
-                Spacer(minLength: 0)
-                
-                // BOTTOM — scoring grid + save
+            } background: {
                 VStack(spacing: 0) {
-                    // Scoring button grid (center)
-                    ScoringButtonGrid(
-                        onScoreSelected: { baseValue, scoreType in
-                            gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
-                        },
-                        showBustButton: gameViewModel.canBust
-                    )
-                    .padding(.horizontal, 16)
-                    
-                    // Small breathing room between grid and button (replaces Spacer)
-                    Color.clear.frame(height: 24)
-                    
-                    // Save Score button container (fixed height to prevent layout shift)
-                    ZStack {
-                        // Invisible placeholder to maintain layout space
-                        AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
-                            Text("Save Score")
-                        }
-                        .opacity(0)
-                        .disabled(true)
+                    // TOP — cards / throw / checkout
+                    VStack(spacing: 0) {
+                        // Stacked player cards (current player in front)
+                        StackedPlayerCards(
+                            players: gameViewModel.players,
+                            currentPlayerIndex: gameViewModel.currentPlayerIndex,
+                            playerScores: gameViewModel.playerScores,
+                            currentThrow: gameViewModel.currentThrow,
+                            legsWon: gameViewModel.legsWon,
+                            matchFormat: gameViewModel.matchFormat,
+                            showScoreAnimation: gameViewModel.showScoreAnimation
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 56)
                         
-                        // Actual button that pops in/out
-                        AppButton(
-                            role: gameViewModel.isWinningThrow ? .secondary : .primary,
-                            controlSize: .extraLarge,
-                            action: { gameViewModel.saveScore() }
-                        ) {
-                            if gameViewModel.isWinningThrow {
-                                Label("Save Score", systemImage: "trophy.fill")
-                            } else if gameViewModel.isBust {
-                                Text("Bust")
-                            } else {
-                                Label("Save Score", systemImage: "checkmark.circle.fill")
+                        // Current throw display (always visible)
+                        CurrentThrowDisplay(
+                            currentThrow: gameViewModel.currentThrow,
+                            selectedDartIndex: gameViewModel.selectedDartIndex,
+                            onDartTapped: { index in
+                                gameViewModel.selectDart(at: index)
                             }
-                        }
-                        .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
-                        .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
-                        // Reusable pop animation (applies to all button states)
-                        .popAnimation(
-                            active: gameViewModel.isTurnComplete,
-                            duration: gameViewModel.isWinningThrow ? 0.32 : 0.28,
-                            bounce: gameViewModel.isWinningThrow ? 0.28 : 0.22
                         )
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 34)
-                }
-            }
-        }
-        .navigationTitle(gameViewModel.matchFormat > 1 ? "Leg \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)" : game.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                GameplayMenuButton(
-                    onInstructions: { showInstructions = true },
-                    onRestart: { showRestartAlert = true },
-                    onExit: { showExitAlert = true }
-                )
-            }
-        }
-        .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
-        .navigationBarBackButtonHidden(true)
-        .interactiveDismissDisabled()
-        .ignoresSafeArea(.container, edges: .bottom)
-        .onAppear {
-            // Inject authService into the ViewModel
-            gameViewModel.setAuthService(authService)
-        }
-        .alert("Exit Game", isPresented: $showExitAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Leave Game", role: .destructive) {
-                // Pop to root (games list)
-                router.popToRoot()
-            }
-        } message: {
-            Text("Are you sure you want to leave the game? Your progress will be lost.")
-        }
-        .alert("Restart Game", isPresented: $showRestartAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Restart", role: .destructive) {
-                gameViewModel.restartGame()
-            }
-        } message: {
-            Text("Are you sure you want to restart the game? All progress will be lost.")
-        }
-        .sheet(isPresented: $showInstructions) {
-            GameInstructionsView(game: game)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .onChange(of: gameViewModel.legWinner) { oldValue, newValue in
-            if newValue != nil && !gameViewModel.isMatchWon {
-                // Leg won but match continues - show celebration
-                showLegWinCelebration = true
-            }
-        }
-        .onChange(of: gameViewModel.winner) { oldValue, newValue in
-            if newValue != nil {
-                // Match winner detected - navigate to game end screen after brief delay
-                // This ensures all state updates are complete
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    navigateToGameEnd = true
-                }
-            }
-        }
-        .alert("Leg Won!", isPresented: $showLegWinCelebration) {
-            Button("Next Leg") {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                    gameViewModel.resetLeg()
-                }
-            }
-        } message: {
-            if let legWinner = gameViewModel.legWinner {
-                let winnerLegs = gameViewModel.legsWon[legWinner.id] ?? 0
-                Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
-            }
-        }
-        .navigationDestination(isPresented: $navigateToGameEnd) {
-            if let winner = gameViewModel.winner {
-                GameEndView(
-                    game: game,
-                    winner: winner,
-                    players: players,
-                    onPlayAgain: {
-                        // Reset game with same players
-                        gameViewModel.restartGame()
-                        navigateToGameEnd = false
-                    },
-                    onChangePlayers: {
-                        // Navigate back to game setup
-                        navigateToGameEnd = false
-                        dismiss()
-                    },
-                    onBackToGames: {
-                        // Navigate back to games list
-                        router.popToRoot()
-                    },
-                    matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
-                    legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                    matchId: gameViewModel.matchId
-                )
-            }
-        }
-    }
-    
-    // MARK: - Game Logic
-    // All game logic now handled by GameViewModel
-}
-
-
-
-// MARK: - Stacked Player Cards
-
-struct StackedPlayerCards: View {
-    let players: [Player]
-    let currentPlayerIndex: Int
-    let playerScores: [UUID: Int]
-    let currentThrow: [ScoredThrow]
-    let legsWon: [UUID: Int]
-    let matchFormat: Int
-    let showScoreAnimation: Bool
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // Stacked player cards with current player in front
-            ZStack {
-                ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
-                    PlayerScoreCard(
-                        player: player,
-                        score: playerScores[player.id] ?? 301,
-                        isCurrentPlayer: index == currentPlayerIndex,
-                        currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
-                        legsWon: legsWon[player.id] ?? 0,
-                        matchFormat: matchFormat,
-                        playerIndex: index,
-                        showScoreAnimation: showScoreAnimation && index == currentPlayerIndex
-                    )
-                    .overlay(
-                        // Matched-shape dimming overlay for depth effect
-                        Capsule()
-                            .fill(Color.black.opacity(overlayOpacityForPlayer(index: index, currentIndex: currentPlayerIndex)))
-                            .allowsHitTesting(false)
-                    )
-                    .offset(
-                        x: 0,
-                        y: offsetForPlayer(index: index, currentIndex: currentPlayerIndex, totalPlayers: players.count)
-                    )
-                    .scaleEffect(scaleForPlayer(index: index, currentIndex: currentPlayerIndex, totalPlayers: players.count))
-                    .zIndex(zIndexForPlayer(index: index, currentIndex: currentPlayerIndex, totalPlayers: players.count))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPlayerIndex)
-                }
-            }
-            .frame(height: calculateStackHeight(playerCount: players.count))
-        }
-    }
-    
-    // MARK: - Helper Functions
-    
-    private func offsetForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> CGFloat {
-        if index == currentIndex {
-            return 0  // Current player at front (bottom of stack)
-        }
-        
-        // Calculate position in stack (excluding current player)
-        let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
-        
-        // Adjusted offsets for new layout below navigation bar
-        switch stackPosition {
-        case 1: return -50  // Card 1: Show most of the card including full score
-        case 2: return -72      // Card 2: Show at least half including score
-        case 3: return -88  // Card 3: Show quarter but ensure score is visible
-        default: return -CGFloat(stackPosition) * 10  // Additional cards
-        }
-    }
-    
-    private func scaleForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> CGFloat {
-        if index == currentIndex {
-            return 1.0  // Current player: 100% scale
-        }
-        
-        // Calculate position in stack (excluding current player)
-        let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
-        
-        // Exponential scaling for dramatic visual hierarchy
-        // Each card scales by a power of the base scale factor
-        let baseScale: CGFloat = 0.92  // 8% reduction for first card
-        let exponentialScale = pow(baseScale, CGFloat(stackPosition))
-        return max(exponentialScale, 0.75)  // Minimum 75% scale
-    }
-    
-    private func overlayOpacityForPlayer(index: Int, currentIndex: Int) -> Double {
-        if index == currentIndex {
-            return 0.0  // Current player: no overlay (fully visible)
-        }
-        
-        // Calculate position in stack (excluding current player)
-        let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: players.count)
-        
-        // Progressive overlay opacity for depth effect
-        switch stackPosition {
-        case 1: return 0.5   // Player 2: 30% dark overlay
-        case 2: return 0.6   // Player 3: 50% dark overlay
-        case 3: return 0.7  // Player 4: 65% dark overlay
-        default: return min(0.8, 0.3 + (CGFloat(stackPosition - 1) * 0.15))  // Additional players
-        }
-    }
-    
-    private func zIndexForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> Double {
-        if index == currentIndex {
-            return 100  // Current player always on top
-        }
-        
-        // Stack the rest in reverse order (higher stack position = lower z-index)
-        let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
-        return Double(totalPlayers - stackPosition)
-    }
-    
-    private func stackPositionForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> Int {
-        // Calculate the position in the stack for non-current players
-        // Use circular/modulo logic to maintain consistent order
-        // Next player (clockwise) gets position 1, then 2, 3, etc.
-        
-        let relativePosition = (index - currentIndex + totalPlayers) % totalPlayers
-        
-        // relativePosition 0 is the current player (should never reach here due to early return)
-        // relativePosition 1 is the next player (position 1 in stack)
-        // relativePosition 2 is two players ahead (position 2 in stack), etc.
-        
-        return relativePosition
-    }
-    
-    private func calculateStackHeight(playerCount: Int) -> CGFloat {
-        // Base card height + smaller offsets for visible portions
-        let baseCardHeight: CGFloat = 84
-        
-        if playerCount <= 1 {
-            return baseCardHeight
-        }
-        
-        // Add space for visible portions of stacked cards
-        // Each card adds approximately 12pt of visible space
-        let additionalHeight = CGFloat(playerCount - 1) * 12
-        
-        return baseCardHeight + additionalHeight
-    }
-}
-
-// MARK: - Player Game Card
-
-struct PlayerScoreCard: View {
-    let player: Player
-    let score: Int
-    let isCurrentPlayer: Bool
-    let currentThrow: [ScoredThrow]
-    let legsWon: Int
-    let matchFormat: Int
-    let playerIndex: Int
-    let showScoreAnimation: Bool
-    
-    // Get border color based on player index
-    var borderColor: Color {
-        switch playerIndex {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
-        }
-    }
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            // Player info
-            HStack(spacing: 12) {
-                // Player identity (avatar + name + nickname)
-                PlayerIdentity(
-                    player: player,
-                    avatarSize: 48,
-                    spacing: 0
-                )
-                
-                Spacer()
-                
-                // Score and legs indicator
-                VStack(spacing: 4) {
-                    // Score with arcade-style pop animation
-                    // Fixed-width container to prevent layout shift
-                    Text("\(score)")
-                        .font(.system(.title, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(Color("TextPrimary"))
-                        .frame(width: 70) // Fixed width to fit "888"
-                        .multilineTextAlignment(.center)
-                        .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
-                        .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
-                        .onChange(of: showScoreAnimation) { oldValue, newValue in
-                            if newValue {
-                                // Haptic feedback when score pops
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        
+                        // Checkout suggestion slot
+                        VStack {
+                            if let checkout = gameViewModel.suggestedCheckout {
+                                CheckoutSuggestionView(checkout: checkout)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 0)
                             }
                         }
+                        .frame(height: 40, alignment: .center)
+                        .padding(.bottom, 8)
+                        
+                        Spacer(minLength: 0)
+                    }
                     
-                    // Legs indicator (dots) - show all legs with filled/unfilled states
-                    if matchFormat > 1 {
-                        LegIndicators(
-                            legsWon: legsWon,
-                            totalLegs: matchFormat,
-                            color: borderColor,
-                            dotSize: 8,
-                            spacing: 4
+                    // Flexible gap between halves (grows on large phones)
+                    Spacer(minLength: 0)
+                    
+                    // BOTTOM — scoring grid + save
+                    VStack(spacing: 0) {
+                        // Scoring button grid (center)
+                        ScoringButtonGrid(
+                            onScoreSelected: { baseValue, scoreType in
+                                gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
+                            },
+                            showBustButton: gameViewModel.canBust
                         )
+                        .padding(.horizontal, 16)
+                        
+                        // Small breathing room between grid and button (replaces Spacer)
+                        Color.clear.frame(height: 24)
+                        
+                        // Save Score button container (fixed height to prevent layout shift)
+                        ZStack {
+                            // Invisible placeholder to maintain layout space
+                            AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
+                                Text("Save Score")
+                            }
+                            .opacity(0)
+                            .disabled(true)
+                            
+                            // Actual button that pops in/out
+                            AppButton(
+                                role: gameViewModel.isWinningThrow ? .secondary : .primary,
+                                controlSize: .extraLarge,
+                                action: { gameViewModel.saveScore() }
+                            ) {
+                                if gameViewModel.isWinningThrow {
+                                    Label("Save Score", systemImage: "trophy.fill")
+                                } else if gameViewModel.isBust {
+                                    Text("Bust")
+                                } else {
+                                    Label("Save Score", systemImage: "checkmark.circle.fill")
+                                }
+                            }
+                            .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
+                            .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
+                            // Reusable pop animation (applies to all button states)
+                            .popAnimation(
+                                active: gameViewModel.isTurnComplete,
+                                duration: gameViewModel.isWinningThrow ? 0.32 : 0.28,
+                                bounce: gameViewModel.isWinningThrow ? 0.28 : 0.22
+                            )
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 34)
                     }
                 }
+            }
+            .navigationTitle(gameViewModel.matchFormat > 1 ? "Leg \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)" : game.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    GameplayMenuButton(
+                        onInstructions: { showInstructions = true },
+                        onRestart: { showRestartAlert = true },
+                        onExit: { showExitAlert = true }
+                    )
+                }
+            }
+            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationBarBackButtonHidden(true)
+            .interactiveDismissDisabled()
+            .ignoresSafeArea(.container, edges: .bottom)
+            .onAppear {
+                // Inject authService into the ViewModel
+                gameViewModel.setAuthService(authService)
+                
+                // Show long-press tip only once for 301 games
+                let isCountdown301 = game.title.contains("301")
+                let hasSeenTip = UserDefaults.standard.bool(forKey: "hasSeenDoubleTripleTip")
+                
+                #if DEBUG
+                let shouldShowTip = isCountdown301
+                #else
+                let shouldShowTip = isCountdown301 && !hasSeenTip
+                #endif
+                
+                if shouldShowTip {
+                    // Slight delay so it appears after navigation transition
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        withAnimation {
+                            showDoubleTripleTip = true
+                        }
+                    }
+                }
+            }
+            .alert("Exit Game", isPresented: $showExitAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Leave Game", role: .destructive) {
+                    // Pop to root (games list)
+                    router.popToRoot()
+                }
+            } message: {
+                Text("Are you sure you want to leave the game? Your progress will be lost.")
+            }
+            .alert("Restart Game", isPresented: $showRestartAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Restart", role: .destructive) {
+                    gameViewModel.restartGame()
+                }
+            } message: {
+                Text("Are you sure you want to restart the game? All progress will be lost.")
+            }
+            .sheet(isPresented: $showInstructions) {
+                GameInstructionsView(game: game)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .onChange(of: gameViewModel.legWinner) { oldValue, newValue in
+                if newValue != nil && !gameViewModel.isMatchWon {
+                    // Leg won but match continues - show celebration
+                    showLegWinCelebration = true
+                }
+            }
+            .onChange(of: gameViewModel.winner) { oldValue, newValue in
+                if newValue != nil {
+                    // Match winner detected - navigate to game end screen after brief delay
+                    // This ensures all state updates are complete
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigateToGameEnd = true
+                    }
+                }
+            }
+            .alert("Leg Won!", isPresented: $showLegWinCelebration) {
+                Button("Next Leg") {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        gameViewModel.resetLeg()
+                    }
+                }
+            } message: {
+                if let legWinner = gameViewModel.legWinner {
+                    let winnerLegs = gameViewModel.legsWon[legWinner.id] ?? 0
+                    Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
+                }
+            }
+            .navigationDestination(isPresented: $navigateToGameEnd) {
+                if let winner = gameViewModel.winner {
+                    GameEndView(
+                        game: game,
+                        winner: winner,
+                        players: players,
+                        onPlayAgain: {
+                            // Reset game with same players
+                            gameViewModel.restartGame()
+                            navigateToGameEnd = false
+                        },
+                        onChangePlayers: {
+                            // Navigate back to game setup
+                            navigateToGameEnd = false
+                            dismiss()
+                        },
+                        onBackToGames: {
+                            // Navigate back to games list
+                            router.popToRoot()
+                        },
+                        matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
+                        legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
+                        matchId: gameViewModel.matchId
+                    )
+                }
+            }
+        }
+        
+        // MARK: - Game Logic
+        // All game logic now handled by GameViewModel
+    }
+    
+    
+    
+    // MARK: - Stacked Player Cards
+    
+    struct StackedPlayerCards: View {
+        let players: [Player]
+        let currentPlayerIndex: Int
+        let playerScores: [UUID: Int]
+        let currentThrow: [ScoredThrow]
+        let legsWon: [UUID: Int]
+        let matchFormat: Int
+        let showScoreAnimation: Bool
+        
+        var body: some View {
+            VStack(spacing: 16) {
+                // Stacked player cards with current player in front
+                ZStack {
+                    ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
+                        PlayerScoreCard(
+                            player: player,
+                            score: playerScores[player.id] ?? 301,
+                            isCurrentPlayer: index == currentPlayerIndex,
+                            currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
+                            legsWon: legsWon[player.id] ?? 0,
+                            matchFormat: matchFormat,
+                            playerIndex: index,
+                            showScoreAnimation: showScoreAnimation && index == currentPlayerIndex
+                        )
+                        .overlay(
+                            // Matched-shape dimming overlay for depth effect
+                            Capsule()
+                                .fill(Color.black.opacity(overlayOpacityForPlayer(index: index, currentIndex: currentPlayerIndex)))
+                                .allowsHitTesting(false)
+                        )
+                        .offset(
+                            x: 0,
+                            y: offsetForPlayer(index: index, currentIndex: currentPlayerIndex, totalPlayers: players.count)
+                        )
+                        .scaleEffect(scaleForPlayer(index: index, currentIndex: currentPlayerIndex, totalPlayers: players.count))
+                        .zIndex(zIndexForPlayer(index: index, currentIndex: currentPlayerIndex, totalPlayers: players.count))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPlayerIndex)
+                    }
+                }
+                .frame(height: calculateStackHeight(playerCount: players.count))
+            }
+        }
+        
+        // MARK: - Helper Functions
+        
+        private func offsetForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> CGFloat {
+            if index == currentIndex {
+                return 0  // Current player at front (bottom of stack)
             }
             
+            // Calculate position in stack (excluding current player)
+            let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
+            
+            // Adjusted offsets for new layout below navigation bar
+            switch stackPosition {
+            case 1: return -50  // Card 1: Show most of the card including full score
+            case 2: return -72      // Card 2: Show at least half including score
+            case 3: return -88  // Card 3: Show quarter but ensure score is visible
+            default: return -CGFloat(stackPosition) * 10  // Additional cards
+            }
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 24)
-        .padding(.vertical, 16)
-        .background(
-            Capsule()
-                .fill(Color("InputBackground"))
-        )
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(borderColor, lineWidth: 2)
-        )
+        
+        private func scaleForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> CGFloat {
+            if index == currentIndex {
+                return 1.0  // Current player: 100% scale
+            }
+            
+            // Calculate position in stack (excluding current player)
+            let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
+            
+            // Exponential scaling for dramatic visual hierarchy
+            // Each card scales by a power of the base scale factor
+            let baseScale: CGFloat = 0.92  // 8% reduction for first card
+            let exponentialScale = pow(baseScale, CGFloat(stackPosition))
+            return max(exponentialScale, 0.75)  // Minimum 75% scale
+        }
+        
+        private func overlayOpacityForPlayer(index: Int, currentIndex: Int) -> Double {
+            if index == currentIndex {
+                return 0.0  // Current player: no overlay (fully visible)
+            }
+            
+            // Calculate position in stack (excluding current player)
+            let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: players.count)
+            
+            // Progressive overlay opacity for depth effect
+            switch stackPosition {
+            case 1: return 0.5   // Player 2: 30% dark overlay
+            case 2: return 0.6   // Player 3: 50% dark overlay
+            case 3: return 0.7  // Player 4: 65% dark overlay
+            default: return min(0.8, 0.3 + (CGFloat(stackPosition - 1) * 0.15))  // Additional players
+            }
+        }
+        
+        private func zIndexForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> Double {
+            if index == currentIndex {
+                return 100  // Current player always on top
+            }
+            
+            // Stack the rest in reverse order (higher stack position = lower z-index)
+            let stackPosition = stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers)
+            return Double(totalPlayers - stackPosition)
+        }
+        
+        private func stackPositionForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> Int {
+            // Calculate the position in the stack for non-current players
+            // Use circular/modulo logic to maintain consistent order
+            // Next player (clockwise) gets position 1, then 2, 3, etc.
+            
+            let relativePosition = (index - currentIndex + totalPlayers) % totalPlayers
+            
+            // relativePosition 0 is the current player (should never reach here due to early return)
+            // relativePosition 1 is the next player (position 1 in stack)
+            // relativePosition 2 is two players ahead (position 2 in stack), etc.
+            
+            return relativePosition
+        }
+        
+        private func calculateStackHeight(playerCount: Int) -> CGFloat {
+            // Base card height + smaller offsets for visible portions
+            let baseCardHeight: CGFloat = 84
+            
+            if playerCount <= 1 {
+                return baseCardHeight
+            }
+            
+            // Add space for visible portions of stacked cards
+            // Each card adds approximately 12pt of visible space
+            let additionalHeight = CGFloat(playerCount - 1) * 12
+            
+            return baseCardHeight + additionalHeight
+        }
     }
-}
-
-// MARK: - Checkout Suggestion View
-
-struct CheckoutSuggestionView: View {
-    let checkout: String
     
-    var body: some View {
-        Text("Checkout: \(checkout)")
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundColor(Color("AccentTertiary"))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-        .transition(.asymmetric(
-            insertion: .scale(scale: 0.9).combined(with: .opacity),
-            removal: .scale(scale: 0.9).combined(with: .opacity)
-        ))
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: checkout)
+    // MARK: - Player Game Card
+    
+    struct PlayerScoreCard: View {
+        let player: Player
+        let score: Int
+        let isCurrentPlayer: Bool
+        let currentThrow: [ScoredThrow]
+        let legsWon: Int
+        let matchFormat: Int
+        let playerIndex: Int
+        let showScoreAnimation: Bool
+        
+        // Get border color based on player index
+        var borderColor: Color {
+            switch playerIndex {
+            case 0: return Color("AccentPrimary")
+            case 1: return Color("AccentSecondary")
+            case 2: return Color("AccentTertiary")
+            case 3: return Color("AccentQuaternary")
+            default: return Color("AccentPrimary")
+            }
+        }
+        
+        var body: some View {
+            VStack(spacing: 12) {
+                // Player info
+                HStack(spacing: 12) {
+                    // Player identity (avatar + name + nickname)
+                    PlayerIdentity(
+                        player: player,
+                        avatarSize: 48,
+                        spacing: 0
+                    )
+                    
+                    Spacer()
+                    
+                    // Score and legs indicator
+                    VStack(spacing: 4) {
+                        // Score with arcade-style pop animation
+                        // Fixed-width container to prevent layout shift
+                        Text("\(score)")
+                            .font(.system(.title, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(Color("TextPrimary"))
+                            .frame(width: 70) // Fixed width to fit "888"
+                            .multilineTextAlignment(.center)
+                            .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
+                            .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
+                            .onChange(of: showScoreAnimation) { oldValue, newValue in
+                                if newValue {
+                                    // Haptic feedback when score pops
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                }
+                            }
+                        
+                        // Legs indicator (dots) - show all legs with filled/unfilled states
+                        if matchFormat > 1 {
+                            LegIndicators(
+                                legsWon: legsWon,
+                                totalLegs: matchFormat,
+                                color: borderColor,
+                                dotSize: 8,
+                                spacing: 4
+                            )
+                        }
+                    }
+                }
+                
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 24)
+            .padding(.vertical, 16)
+            .background(
+                Capsule()
+                    .fill(Color("InputBackground"))
+            )
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(borderColor, lineWidth: 2)
+            )
+        }
     }
-}
-
-
-// MARK: - Preview
-#Preview("Countdown - 301") {
-    NavigationStack {
-        CountdownGameplayView(
-            game: Game.preview301,
-            players: [Player.mockGuest1, Player.mockGuest2]
-        )
-        .environmentObject(AuthService())
+    
+    // MARK: - Checkout Suggestion View
+    
+    struct CheckoutSuggestionView: View {
+        let checkout: String
+        
+        var body: some View {
+            Text("Checkout: \(checkout)")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(Color("AccentTertiary"))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .opacity)
+                ))
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: checkout)
+        }
     }
-}
-
-#Preview("Best of 3") {
-    NavigationStack {
-        CountdownGameplayView(
-            game: Game.preview301,
-            players: [Player.mockGuest1, Player.mockGuest2],
-            matchFormat: 3
-        )
-        .environmentObject(AuthService())
+    
+    
+    // MARK: - Preview
+    #Preview("Countdown - 301") {
+        NavigationStack {
+            CountdownGameplayView(
+                game: Game.preview301,
+                players: [Player.mockGuest1, Player.mockGuest2]
+            )
+            .environmentObject(AuthService())
+        }
     }
-}
-
-#Preview("Best of 5") {
-    NavigationStack {
-        CountdownGameplayView(
-            game: Game.preview501,
-            players: [Player.mockGuest1, Player.mockGuest2],
-            matchFormat: 5
-        )
-        .environmentObject(AuthService())
+    
+    #Preview("Best of 3") {
+        NavigationStack {
+            CountdownGameplayView(
+                game: Game.preview301,
+                players: [Player.mockGuest1, Player.mockGuest2],
+                matchFormat: 3
+            )
+            .environmentObject(AuthService())
+        }
     }
-}
-
-#Preview("Best of 7 - 4 Players") {
-    NavigationStack {
-        CountdownGameplayView(
-            game: Game.preview301,
-            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
-            matchFormat: 7
-        )
-        .environmentObject(AuthService())
+    
+    #Preview("Best of 5") {
+        NavigationStack {
+            CountdownGameplayView(
+                game: Game.preview501,
+                players: [Player.mockGuest1, Player.mockGuest2],
+                matchFormat: 5
+            )
+            .environmentObject(AuthService())
+        }
     }
-}
-
-#Preview("3 Players") {
-    NavigationStack {
-        CountdownGameplayView(
-            game: Game.preview301,
-            players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
-        )
-        .environmentObject(AuthService())
+    
+    #Preview("Best of 7 - 4 Players") {
+        NavigationStack {
+            CountdownGameplayView(
+                game: Game.preview301,
+                players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1, Player.mockConnected2],
+                matchFormat: 7
+            )
+            .environmentObject(AuthService())
+        }
+    }
+    
+    #Preview("3 Players") {
+        NavigationStack {
+            CountdownGameplayView(
+                game: Game.preview301,
+                players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
+            )
+            .environmentObject(AuthService())
+        }
     }
 }

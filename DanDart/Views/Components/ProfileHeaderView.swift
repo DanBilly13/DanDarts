@@ -38,7 +38,7 @@ struct ProfileHeaderView: View {
             }
             
             // Stats Cards
-            HStack(spacing: 12) {
+            HStack(alignment: .lastTextBaseline, spacing: 12) {
                 // Games Played
                 StatCard(
                     title: "Games",

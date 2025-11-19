@@ -1,44 +1,44 @@
 [
-  {
-    "title": "301",
-    "subtitle": "A Classic Countdown Game",
-    "players": "2-6",
-    "instructions": "Each player starts with a score of 301. Players take turns throwing three darts per round and subtract the total from their score.\n\nThe goal is to reach exactly zero, finishing on a double. If a score goes below zero or ends on one, the turn is a bust and the score reverts to its previous total.\n\nThe first player to reach exactly zero wins."
-  },
-  {
-    "title": "501",
-    "subtitle": "The Professional Standard",
-    "players": "2-6",
-    "instructions": "Players start with 501 points and take turns throwing three darts. Each turn’s total is subtracted from the player’s score.\n\nThe objective is to reach exactly zero, with the final dart landing on a double. If a player scores below zero or one, they bust and return to their previous score.\n\nThe first player to finish on zero wins.\n\nThis is the format used in most professional darts tournaments."
-  },
-  {
-    "title": "Halve-It",
-    "subtitle": "Accuracy Under Pressure",
-    "players": "2-6",
-    "instructions": "Halve It is a darts game of accuracy and pressure played over six rounds. You have three chances to hit each target — every hit adds to your score, but miss all three in a round and your total is halved.\n\nEveryone starts on zero points. Each round has a different target, and players take turns throwing. Player 1 throws three darts at the target, then Player 2 throws, and so on.\n\nFor example, if the target is single 20 and you hit it twice, you score 40 points.\n\nIf you miss the target with all three darts, your score is halved — but it can’t drop below zero.\n\nChoose your difficulty — Easy, Medium, Hard, or Pro — and the app will automatically set the six targets for you.\n\nEasy: mostly singles.\nMedium: a mix of singles and doubles.\nHard: more doubles and trebles.\nPro: all doubles and trebles.\n\nAfter all six rounds, the player with the highest score wins."
-  },
-  {
-    "title": "Knockout",
-    "subtitle": "Beat the high score or lose a life",
-    "players": "2-6",
-    "instructions": "Choose your players, set the number of lives, and hit Start — we’ll shuffle the throwing order.\n\nEach turn, players throw three darts and try to beat the current high score.\n\nThe first player’s throw sets the initial score to beat.\n\nEach time a player beats the high score, their score becomes the new high score to beat.\n\nPlayers who fail to beat the current high score lose a life.\n\nPlay continues in order until only one player remains — everyone else has been knocked out."
-  },
-  {
-    "title": "Sudden Death",
-    "subtitle": "Fast and Ruthless Fun",
-    "players": "2-6",
-    "instructions": "A quick and exciting game, perfect for groups. Each player throws three darts per round, and the player with the lowest total is eliminated. Play continues round by round until only one player remains. The last player standing wins."
-  },
-  {
-    "title": "English Cricket",
-    "subtitle": "Bat and Bowl with Darts",
-    "players": "2-6",
-    "instructions": "English Cricket features a batter and a bowler, similar to traditional cricket. The game can be played one-on-one or with teams. The batting team aims to score as many points as possible by hitting the scoring numbers (15–20 and bullseye). The bowling team aims for the bullseye — an outer bullseye is worth one wicket, a bullseye two wickets. Once the bowling team reaches ten wickets, that marks the end of the batting team’s innings. Then teams switch roles. The team with the highest score after both have batted wins."
-  },
+    {
+      "title": "301",
+      "subtitle": "The classic - double-out",
+      "players": "2-6",
+      "instructions": "You start with a score of 301. On your turn (called a visit), throw three darts and subtract the total from your score.\n\nYour goal is to reach exactly zero, finishing on a double.\n\nIf your score drops below zero, or you're left on 1, the turn is a bust and your score returns to what it was before you threw.\n\nThe first player to check out on zero wins.\n\nA perfect game?\nThe fewest visits you can finish 301 in is two — incredibly rare:\n- Visit 1: 180 (T20 T20 T20)\n- Visit 2: 121 checkout (T20, 11, D20)"
+    },
+    {
+      "title": "501",
+      "subtitle": "The professional standard",
+      "players": "2-6",
+      "instructions": "You start with a score of 501. On your turn (called a visit), throw three darts and subtract the total from your score.\n\nYour goal is to reach exactly zero, finishing on a double.\n\nIf your score drops below zero, or you're left on 1, the turn is a bust and your score returns to what it was before you threw.\n\nThe first player to check out on zero wins.\n\nThe perfect leg:\nThe fewest visits you can finish 501 in is three — the famous nine-dart finish:\n- Visit 1: 180\n- Visit 2: 180\n- Visit 3: 141 checkout (T20, T19, D12)"
+    },
+    {
+      "title": "Halve-It",
+      "subtitle": "No one escapes the chop",
+      "players": "2-6",
+      "instructions": "Halve-It is a six-round challenge of accuracy. You start on zero, and each round sets a single target to aim for.\n\nOn your turn (a visit), you throw three darts at that target. Every hit scores its value. Miss with all three, and your score is cut in half — the Chop.\n\nA score can never drop below zero.\n\nExample:\nIf you're on 10 points and the target is 5, hitting 5 with all three darts scores 15, taking you to 25.\nIf you miss the target with all three, your score is halved from 10 to 5.\n\nChoose your difficulty and the app will set the six targets for you:\n- Easy: mostly singles\n- Medium: singles and doubles\n- Hard: more doubles and trebles\n- Pro: all doubles and trebles\n\nAfter all six rounds, the highest score wins."
+    },
+    {
+      "title": "Knockout",
+      "subtitle": "Let's get ready to rumble",
+      "players": "2-6",
+      "instructions": "Choose your players, set the number of lives, and hit Start — the app shuffles the throwing order.\n\nOn your turn (a visit), you throw three darts and try to beat the current high score.\n\nThe first player's visit sets the initial score to beat.\n\nEach time a player beats the high score, their total becomes the new high score to beat.\n\nPlayers who fail to beat the current high score lose a life.\n\nPlay continues in order until only one player remains standing and everyone else has been knocked out."
+    },
+    {
+      "title": "Sudden Death",
+      "subtitle": "One slip and you’re history",
+      "players": "2-6",
+      "instructions": "Sudden Death is fast, simple, and unforgiving. Each round, every player throws three darts, and the player with the lowest total is eliminated.\n\nAll scores reset at the start of each new round — everyone begins even, but only for a moment.\n\nRound after round, one player falls, until only one remains.\n\nThe last player standing wins."
+    },
+    {
+      "title": "English Cricket",
+      "subtitle": "Take Wickets. Chase Runs.",
+      "players": "2-6",
+      "instructions": "English Cricket is played with a batter and a bowler, just like the real game. You can play one-on-one or in teams.\n\nAs the batting side, your goal is to score as many runs as you can by hitting the scoring numbers: 15, 16, 17, 18, 19, 20, and the bullseye.\n\nAs the bowling side, you're aiming for the bull to take wickets:\n- Outer bull = 1 wicket\n- Inner bullseye = 2 wickets\n\nOnce the bowling side reaches 10 wickets, the batting innings ends, and the roles swap.\n\nAfter both sides have batted, the team with the highest total wins."
+    },
   {
     "title": "Killer",
-    "subtitle": "Target Others, Protect Yourself",
+    "subtitle": "It's Kill or Be Killed",
     "players": "2-6",
-    "instructions": "To start, each player throws one dart to determine their number (1–20). No two players can share the same number. If you land on an already-chosen number, keep throwing until you get a free one. Decide how many lives each player starts with. Players must first hit their own number’s double to become a Killer. Once a Killer, hitting another player’s number’s double removes one of their lives. You can lose your own lives by accidentally hitting your number while attacking others. To regain lives, hit your own number again. The last player with one or more lives wins."
+    "instructions": "You start the game with a randomly assigned number between 1 and 20. No two players share the same number.\n\nYour goal is simple: become a Killer, take lives from others, and be the last player standing.\n\nTo become a Killer, you must hit the double of your own number.\n\nOnce you're a Killer, hit the double of another player's number and they lose a life.\n\nBe careful — hitting your own number (single, double, or treble) can cost you a life. You can regain lives by hitting your own number again.\n\nPlay continues as players pick each other off.\nThe last player with one or more lives wins."
   }
 ]
