@@ -17,7 +17,7 @@ struct TargetProgressView: View {
             ForEach(Array(targets.enumerated()), id: \.offset) { index, target in
                 // Target text
                 Text(target.displayText)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(Color("AccentTertiary"))
                     .opacity(index == currentRound ? 1.0 : 0.5)
                 

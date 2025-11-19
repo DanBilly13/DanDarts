@@ -379,7 +379,11 @@ class CountdownViewModel: ObservableObject {
         )
         
         currentThrow.removeAll()
+        selectedDartIndex = nil
         switchPlayer()
+        
+        // After a bust, recalculate checkout for the new current player
+        updateCheckoutSuggestion()
     }
     
     /// Switch to the next player

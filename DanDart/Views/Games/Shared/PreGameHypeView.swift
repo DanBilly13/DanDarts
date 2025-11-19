@@ -186,23 +186,26 @@ struct PreGameHypeView: View {
     
     // 5-6 Players: 2x3 grid
     private var multiPlayerGrid: some View {
-        VStack(spacing: 40) {
-            HStack(spacing: 40) {
+        VStack(spacing: 32) {
+            HStack(spacing: 0) {
                 ForEach(Array(players.prefix(2).enumerated()), id: \.element.id) { index, player in
                     playerCard(player, index: index)
+                        .frame(maxWidth: .infinity)
                 }
             }
             
-            HStack(spacing: 40) {
+            HStack(spacing: 0) {
                 ForEach(Array(players.dropFirst(2).prefix(2).enumerated()), id: \.element.id) { index, player in
                     playerCard(player, index: index + 2)
+                        .frame(maxWidth: .infinity)
                 }
             }
             
             if players.count > 4 {
-                HStack(spacing: 40) {
+                HStack(spacing: 0) {
                     ForEach(Array(players.dropFirst(4).enumerated()), id: \.element.id) { index, player in
                         playerCard(player, index: index + 4)
+                            .frame(maxWidth: .infinity)
                     }
                 }
             }
@@ -211,12 +214,16 @@ struct PreGameHypeView: View {
     
     // MARK: - Player Card Component
     
+    private var avatarSize: CGFloat {
+        players.count <= 4 ? 96 : 68
+    }
+    
     private func playerCard(_ player: Player, index: Int) -> some View {
         return VStack(spacing: 0) {
             // Avatar (96pt as per design) - no border
             PlayerAvatarView(
                 avatarURL: player.avatarURL,
-                size: 96,
+                size: avatarSize,
                 borderColor: .clear
             )
             .scaleEffect(showPlayers ? 1.0 : 0.8)
@@ -224,7 +231,7 @@ struct PreGameHypeView: View {
             
             // 16px spacing after avatar
             Spacer()
-                .frame(height: 16)
+                .frame(height: 8)
             
             // Name and nickname grouped together (no spacing)
             VStack(spacing: 0) {
@@ -244,7 +251,7 @@ struct PreGameHypeView: View {
             
             // 8px spacing before stats
             Spacer()
-                .frame(height: 8)
+                .frame(height: 2)
             
             // Stats (.footnote) - W in AccentSecondary, L in AccentPrimary
             HStack(spacing: 0) {
@@ -252,7 +259,7 @@ struct PreGameHypeView: View {
                         .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundColor(Color("AccentSecondary"))
-                Text("W\(player.totalLosses)")
+                Text("L\(player.totalLosses)")
                         .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundColor(Color("AccentPrimary"))

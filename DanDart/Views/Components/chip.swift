@@ -9,8 +9,8 @@ import SwiftUI
 
 struct Chip: View {
     let title: String
-    var foregroundColor: Color = Color("AccentPrimary")
-    var backgroundColor: Color = Color("AccentPrimary").opacity(0.15)
+    var foregroundColor: Color = Color("BackgroundPrimary")
+    var backgroundColor: Color = Color("AccentPrimary")
     
     var body: some View {
         Text(title)

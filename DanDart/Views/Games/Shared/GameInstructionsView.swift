@@ -17,45 +17,61 @@ struct GameInstructionsView: View {
             dismissButtonTitle: "Done",
             onDismiss: { dismiss() }
         ) {
-            VStack(alignment: .leading, spacing: 24) {
-                // Game Subtitle
-                if !game.subtitle.isEmpty {
-                    Text(game.subtitle)
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .foregroundColor(Color("TextSecondary"))
-                }
-                
-                // Players
-                HStack(spacing: 8) {
-                    Image(systemName: "person.2.fill")
-                        .font(.body)
-                        .foregroundColor(Color("AccentSecondary"))
-                    
-                    Text(game.players)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(Color("TextPrimary"))
-                }
-                
-                // Divider
-                Divider()
-                    .background(Color("TextSecondary").opacity(0.3))
-                
-                // Instructions from JSON
-                VStack(alignment: .leading, spacing: 12) {
+            GameInstructionsContent(game: game)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct GameInstructionsContent: View {
+    let game: Game
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Game Subtitle
+            
+            if !game.subtitle.isEmpty {
+                Text(game.subtitle)
+                    .font(.title3)
+                    .fontWeight(.medium)
+                    .foregroundColor(Color("TextSecondary"))
+            }
+            
+            // Players
+            
+            
+            // Divider
+            Divider()
+                .background(Color("TextSecondary").opacity(0.3))
+            
+            // Instructions from JSON
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
                     Text("How to Play")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(Color("AccentPrimary"))
                     
-                    Text(game.instructions)
-                        .font(.body)
-                        .foregroundColor(Color("TextPrimary"))
-                        .lineSpacing(6)
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.2.fill")
+                            .font(.body)
+                            .foregroundColor(Color("AccentSecondary"))
+                        
+                        Text(game.players)
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color("TextPrimary"))
+                    }
                 }
+                
+                
+                Text(game.instructions)
+                    .font(.body)
+                    .foregroundColor(Color("TextPrimary"))
+                    .lineSpacing(6)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

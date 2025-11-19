@@ -160,18 +160,10 @@ struct GameSetupView: View {
                         }
                         
                         // Game Instructions
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("How to Play")
-                                .font(.headline)
-                                .foregroundStyle(Color("TextPrimary"))
-                            
-                            Text(config.game.instructions)
-                                .font(.body)
-                                .foregroundStyle(Color("TextSecondary"))
-                        }
-                        .padding(16)
-                        .background(Color("InputBackground"))
-                        .cornerRadius(12)
+                        GameInstructionsContent(game: config.game)
+                            .padding(16)
+                            .background(Color("InputBackground"))
+                            .cornerRadius(12)
                         
                         Spacer(minLength: 40)
                     }

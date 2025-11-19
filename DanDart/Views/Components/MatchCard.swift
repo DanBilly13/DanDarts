@@ -6,42 +6,74 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct MatchCard: View {
     let match: MatchResult
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Left side: Placeholder for future game graphic
-            VStack {
-                Spacer()
+        HStack(spacing: 16) {
+            // Left side: game cover artwork (or gradient fallback)
+            ZStack {
+                Group {
+                    if let imageName = resolvedCoverImageName {
+                        Image(imageName)
+                            .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .scaleEffect(1.2)
+                                .clipped()
+                    } else {
+                        LinearGradient(
+                            colors: [
+                                Color("AccentPrimary").opacity(0.6),
+                                Color("AccentPrimary").opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                }
             }
-            .frame(width: 84)
+            .background(Color("InputBackground").opacity(0.1))
+            .frame(width: 52)
+            .frame(maxHeight: .infinity, alignment: .center)
+            .cornerRadius(0)
+            
+            .clipped()
+            /*.overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color("AccentTertiary").opacity(0.5), lineWidth: 1)
+            )*/
+            
+            
             
             // Match Info
-            VStack(alignment: .leading, spacing: 8) {
-                // Game name chip
-                gameNameChip
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    // Game name chip
+                    gameNameChip
+                    // Date
+                    Text(relativeDate)
+                        .font(.caption)
+                        .foregroundColor(Color("TextSecondary"))
+                }
+                .padding(.bottom, 4)
+             
                 
                 // Players with scores
                 playersRow
-                
-                // Date
-                Text(relativeDate)
-                    .font(.caption)
-                    .foregroundColor(Color("TextSecondary"))
             }
-            .padding(16)
+            .padding(.vertical,16)
+            .padding(.trailing,12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        
         .background(Color("InputBackground"))
-        .overlay(alignment: .leading) {
-            Color("AccentPrimary")
-                .opacity(0.15)
-                .frame(width: 84)
-        }
         .cornerRadius(12)
+        
+        
     }
+       
     
     // MARK: - Sub Views
 
@@ -55,7 +87,9 @@ struct MatchCard: View {
                 HStack(spacing: 8) {
                     // Player name
                     Text(player.displayName)
-                        .font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))
+                        .font(.system(.callout, design: .rounded))
+                        .fontWeight(.semibold)
+                        /*.font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))*/
                         .foregroundColor(Color("TextPrimary"))
                     
                     Spacer()
@@ -68,17 +102,19 @@ struct MatchCard: View {
                         } else {
                             // Show trophy for winner, score for others (301/501)
                             if player.id == match.winnerId {
-                                Image(systemName: "trophy.fill")
-                                    .font(.system(size: 16, weight: .semibold))
+                                Image(systemName: "crown")
+                                    .font(.system(.callout, design: .rounded))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(Color("AccentTertiary"))
                             } else {
                                 Text("\(player.finalScore)")
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(.system(.callout, design: .rounded))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(Color("TextSecondary"))
                             }
                         }
                     }
-                    .frame(width: 60)
+                    .frame(width: 36)
                 }
             }
         }
@@ -161,6 +197,25 @@ struct MatchCard: View {
             return "Just now"
         }
     }
+
+    /// Resolve a cover image name for this match's game using common naming patterns
+    private var resolvedCoverImageName: String? {
+        let titleKey = match.gameName
+        let candidates: [String] = [
+            "game-cover/\(titleKey)",
+            titleKey,
+            titleKey.lowercased(),
+            titleKey.lowercased().replacingOccurrences(of: " ", with: "-")
+        ]
+        
+        for candidate in candidates {
+            if UIImage(named: candidate) != nil {
+                return candidate
+            }
+        }
+        
+        return nil
+    }
 }
 
 // MARK: - Preview
@@ -190,7 +245,7 @@ struct MatchCard: View {
                     nickname: "alicej",
                     avatarURL: "avatar3",
                     isGuest: false,
-                    finalScore: 127,
+                    finalScore: 888,
                     startingScore: 501,
                     totalDartsThrown: 24,
                     turns: []

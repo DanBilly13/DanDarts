@@ -21,8 +21,8 @@ struct GameplayMenuButton: View {
             Button("Restart Game") { 
                 onRestart() 
             }
-            Button("Cancel Game", role: .destructive) { 
-                onExit() 
+            Button("Quit Game", role: .destructive) {
+                onExit()
             }
         } label: {
             Image(systemName: "ellipsis.circle.fill")

@@ -467,7 +467,7 @@ struct CheckoutSuggestionView: View {
     
     var body: some View {
         Text("Checkout: \(checkout)")
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 15, weight: .semibold))
             .foregroundColor(Color("AccentTertiary"))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
