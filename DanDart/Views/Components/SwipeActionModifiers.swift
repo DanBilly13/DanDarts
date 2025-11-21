@@ -101,7 +101,7 @@ struct SwipeActionConfig: Identifiable {
         SwipeActionConfig(
             title: "Edit",
             systemImage: "pencil",
-            tint: .blue,
+            tint: AppColor.interactivePrimaryBackground,
             action: action
         )
     }
@@ -193,3 +193,18 @@ struct MultipleSwipeActionsModifier: ViewModifier {
      }
  
  */
+
+#Preview("Swipe Action Demo") {
+    List {
+        Text("Swipe Me")
+            .multipleSwipeActions {
+                SwipeActionConfig.edit {
+                    print("Edit tapped")
+                }
+                SwipeActionConfig.delete {
+                    print("Delete tapped")
+                }
+            }
+    }
+    .background(AppColor.backgroundPrimary)
+}

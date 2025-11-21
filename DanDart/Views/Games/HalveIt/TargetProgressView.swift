@@ -18,14 +18,14 @@ struct TargetProgressView: View {
                 // Target text
                 Text(target.displayText)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color("AccentTertiary"))
+                    .foregroundColor(AppColor.interactiveTertiaryBackground)
                     .opacity(index == currentRound ? 1.0 : 0.5)
                 
                 // Arrow separator (except after last target)
                 if index < targets.count - 1 {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .foregroundColor(AppColor.interactiveTertiaryBackground)
                         .opacity(0.5)
                 }
             }
@@ -58,5 +58,5 @@ struct TargetProgressView: View {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

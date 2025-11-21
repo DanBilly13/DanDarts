@@ -30,11 +30,11 @@ struct ProfileSetupView: View {
                     VStack(spacing: 16) {
                         Text("Choose Your Avatar")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Text("Upload your own photo or pick an avatar")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                             .multilineTextAlignment(.center)
                     }
                     .padding(.top, 20)
@@ -58,33 +58,21 @@ struct ProfileSetupView: View {
                     
                     // Complete Setup Button
                     VStack(spacing: 16) {
-                        Button(action: {
-                            Task {
-                                await handleCompleteSetup()
-                            }
-                        }) {
+                        AppButton(role: .primary,
+                                  controlSize: .regular,
+                                  isDisabled: isCompleting,
+                                  action: {
+                                      Task { await handleCompleteSetup() }
+                                  }) {
                             HStack {
                                 if isCompleting {
                                     ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
                                         .scaleEffect(0.8)
                                 }
                                 Text(isCompleting ? "Completing Setup..." : "Complete Setup")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(.white)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color("AccentPrimary"), Color("AccentPrimary").opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(25)
                         }
-                        .disabled(isCompleting)
                         .opacity(!isCompleting ? 1.0 : 0.6)
                         
                         // Skip Button
@@ -94,7 +82,7 @@ struct ProfileSetupView: View {
                             }
                         }
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .disabled(isCompleting)
                     }
                     .padding(.horizontal, 32)
@@ -102,7 +90,7 @@ struct ProfileSetupView: View {
                     Spacer(minLength: 20)
                 }
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationTitle("Profile Setup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -110,7 +98,7 @@ struct ProfileSetupView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                     .disabled(isCompleting)
                 }
             }

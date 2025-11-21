@@ -31,7 +31,7 @@ struct AvatarOptionView: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color("InputBackground"))
+                .fill(AppColor.inputBackground)
                 .frame(width: size, height: size)
             
             Group {
@@ -45,14 +45,14 @@ struct AvatarOptionView: View {
                 case .symbol:
                     Image(systemName: option.id)
                         .font(.system(size: size * 0.4, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
             }
         }
         .overlay(
             Circle()
                 .stroke(
-                    isSelected ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.2),
+                    isSelected ? AppColor.interactivePrimaryBackground : AppColor.textSecondary.opacity(0.2),
                     lineWidth: isSelected ? 3 : 1
                 )
         )

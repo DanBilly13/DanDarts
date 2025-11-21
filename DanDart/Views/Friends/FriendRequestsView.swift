@@ -30,18 +30,18 @@ struct FriendRequestsView: View {
                         HStack {
                             Spacer()
                             ProgressView()
-                                .tint(Color("AccentPrimary"))
+                                .tint(AppColor.interactivePrimaryBackground)
                             Spacer()
                         }
                     } else if receivedRequests.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "tray")
                                 .font(.system(size: 48, weight: .light))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                             
                             Text("No pending requests")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 32)
@@ -59,7 +59,7 @@ struct FriendRequestsView: View {
                 } header: {
                     Text("Received Requests")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .textCase(nil)
                 }
                 .listRowBackground(Color.clear)
@@ -71,18 +71,18 @@ struct FriendRequestsView: View {
                         HStack {
                             Spacer()
                             ProgressView()
-                                .tint(Color("AccentPrimary"))
+                                .tint(AppColor.interactivePrimaryBackground)
                             Spacer()
                         }
                     } else if sentRequests.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "paperplane")
                                 .font(.system(size: 48, weight: .light))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                             
                             Text("No pending requests")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 32)
@@ -115,7 +115,7 @@ struct FriendRequestsView: View {
                 } header: {
                     Text("Sent Requests")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .textCase(nil)
                 }
                 .listRowBackground(Color.clear)
@@ -123,13 +123,13 @@ struct FriendRequestsView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Friend Requests")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -142,7 +142,7 @@ struct FriendRequestsView: View {
                             Text("Back")
                                 .font(.system(size: 16, weight: .medium))
                         }
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }
@@ -160,13 +160,13 @@ struct FriendRequestsView: View {
                             
                             Text(message)
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextPrimary"))
+                                .foregroundColor(AppColor.textPrimary)
                             
                             Spacer()
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color("InputBackground"))
+                        .background(AppColor.inputBackground)
                         .cornerRadius(12)
                         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                         .padding(.horizontal, 16)
@@ -385,10 +385,10 @@ struct ReceivedRequestCard: View {
                 // Time label
                 Text(request.timeAgo)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color("BackgroundPrimary").opacity(0.8))
+                    .background(AppColor.backgroundPrimary.opacity(0.8))
                     .cornerRadius(8)
                     .padding(8)
             }
@@ -401,7 +401,7 @@ struct ReceivedRequestCard: View {
                 } label: {
                     if isProcessing {
                         ProgressView()
-                            .tint(Color("AccentPrimary"))
+                            .tint(AppColor.interactivePrimaryBackground)
                     } else {
                         Label("Deny", systemImage: "xmark")
                     }
@@ -413,7 +413,7 @@ struct ReceivedRequestCard: View {
                 } label: {
                     if isProcessing {
                         ProgressView()
-                            .tint(.white)
+                            .tint(AppColor.textOnPrimary)
                     } else {
                         Label("Accept", systemImage: "checkmark")
                     }
@@ -448,24 +448,24 @@ struct SentRequestCard: View {
                     HStack(spacing: 0) {
                         Text("\(request.user.totalWins)W")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color("AccentSecondary"))
+                            .foregroundColor(AppColor.player1)
                         
                         Text("\(request.user.totalLosses)L")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.player2)
                     }
                     
                     Text("\(Int((Double(request.user.totalWins) / Double(request.user.totalWins + request.user.totalLosses)) * 100))%")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 } else {
                     Text("No games")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                     
                     Text("yet")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
             }
         }
@@ -473,11 +473,11 @@ struct SentRequestCard: View {
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color("TextSecondary").opacity(0.3), lineWidth: 1)
+                .stroke(AppColor.textSecondary.opacity(0.3), lineWidth: 1)
         )
         .opacity(isProcessing ? 0.5 : 1.0)
     }
@@ -550,7 +550,7 @@ struct FriendRequestsViewWithMockData: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Received Requests")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                             .padding(.horizontal, 16)
                         
                         VStack(spacing: 12) {
@@ -570,7 +570,7 @@ struct FriendRequestsViewWithMockData: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Sent Requests")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                             .padding(.horizontal, 16)
                         
                         VStack(spacing: 12) {
@@ -587,13 +587,13 @@ struct FriendRequestsViewWithMockData: View {
                 .padding(.top, 16)
                 .padding(.bottom, 16)
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Friend Requests")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                 }
             }
         }

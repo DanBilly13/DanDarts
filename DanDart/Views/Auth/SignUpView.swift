@@ -47,15 +47,15 @@ struct SignUpView: View {
                         // App Logo
                         Image(systemName: "target")
                             .font(.system(size: 60, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.brandPrimary)
                         
                         Text("Create Account")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Text("Join the DanDarts community")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     .padding(.top, 20)
                     
@@ -72,7 +72,7 @@ struct SignUpView: View {
                         HStack(spacing: 8) {
                             if authService.isLoading {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
                                     .scaleEffect(0.8)
                             } else {
                                 Image(systemName: "globe")
@@ -89,16 +89,16 @@ struct SignUpView: View {
                     HStack {
                         Rectangle()
                             .frame(height: 1)
-                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                            .foregroundColor(AppColor.textSecondary.opacity(0.3))
                         
                         Text("OR")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                             .padding(.horizontal, 16)
                         
                         Rectangle()
                             .frame(height: 1)
-                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                            .foregroundColor(AppColor.textSecondary.opacity(0.3))
                     }
                     .padding(.horizontal, 32)
                     
@@ -147,7 +147,7 @@ struct SignUpView: View {
                             }}) {
                                 Text("Hide email sign-up")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(AppColor.interactivePrimaryBackground)
                             }
                             .buttonStyle(.plain)
                             .padding(.top, 4)
@@ -158,11 +158,11 @@ struct SignUpView: View {
                         HStack {
                             Text("Already have an account?")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                             
                             Text("Sign In")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color("AccentPrimary"))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
                         }
                     }
                     .padding(.bottom, 32)
@@ -170,14 +170,14 @@ struct SignUpView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
             }
         }

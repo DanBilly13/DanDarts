@@ -25,11 +25,11 @@ struct SignInView: View {
                         // App Logo
                         Image(systemName: "target")
                             .font(.system(size: 60, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.brandPrimary)
                         
                         Text("Welcome Back")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                        /* Text("Sign in to your account")
                             .font(.system(size: 16, weight: .medium))
@@ -52,7 +52,7 @@ struct SignInView: View {
                         HStack(spacing: 8) {
                             if isLoading {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
                                     .scaleEffect(0.8)
                             } else {
                                 Image(systemName: "globe")
@@ -67,16 +67,16 @@ struct SignInView: View {
                     HStack {
                         Rectangle()
                             .frame(height: 1)
-                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                            .foregroundColor(AppColor.textSecondary.opacity(0.3))
                         
                         Text("or email")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                             .padding(.horizontal, 16)
                         
                         Rectangle()
                             .frame(height: 1)
-                            .foregroundColor(Color("TextSecondary").opacity(0.3))
+                            .foregroundColor(AppColor.textSecondary.opacity(0.3))
                     }
                     .padding(.horizontal, 32)
                     .padding(.top, 24)
@@ -129,7 +129,7 @@ struct SignInView: View {
                                 // TODO: Implement forgot password
                             }
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                         }
                         
                         // Sign In with Email Button (Primary Outline)
@@ -147,7 +147,7 @@ struct SignInView: View {
                             HStack(spacing: 8) {
                                 if isLoading {
                                     ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: Color("AccentPrimary")))
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AppColor.interactivePrimaryBackground))
                                         .scaleEffect(0.8)
                                 }
                                 Text(isLoading ? "Signing In..." : "Sign in with Email")
@@ -166,11 +166,11 @@ struct SignInView: View {
                             HStack {
                                 Text("Don't have an account?")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(AppColor.textSecondary)
                                 
                                 Text("Sign Up")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Color("AccentPrimary"))
+                                    .foregroundColor(AppColor.interactivePrimaryBackground)
                             }
                         }
                         
@@ -180,14 +180,14 @@ struct SignInView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
             }
         }

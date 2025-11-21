@@ -44,7 +44,7 @@ struct FriendsListView: View {
                     } header: {
                         Text("Friend Requests")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                             .textCase(nil)
                     }
                     .listRowBackground(Color.clear)
@@ -81,7 +81,7 @@ struct FriendsListView: View {
                     } header: {
                         Text("Requests Sent")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                             .textCase(nil)
                     }
                     .listRowBackground(Color.clear)
@@ -117,7 +117,7 @@ struct FriendsListView: View {
                     } header: {
                         Text("Friends")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                             .textCase(nil)
                     }
                 } else if !isLoadingFriends && !isLoadingRequests {
@@ -126,16 +126,16 @@ struct FriendsListView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "person.2.slash")
                                 .font(.system(size: 48, weight: .light))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                             
                             VStack(spacing: 8) {
                                 Text("No friends yet")
                                     .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(Color("TextPrimary"))
+                                    .foregroundColor(AppColor.textPrimary)
                                 
                                 Text("Search for friends to add them")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(AppColor.textSecondary)
                                     .multilineTextAlignment(.center)
                             }
                             
@@ -161,7 +161,7 @@ struct FriendsListView: View {
                         HStack {
                             Spacer()
                             ProgressView()
-                                .tint(Color("AccentPrimary"))
+                                .tint(AppColor.interactivePrimaryBackground)
                             Spacer()
                         }
                         .padding(.vertical, 32)
@@ -173,7 +173,7 @@ struct FriendsListView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationTitle("Friends")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -183,15 +183,15 @@ struct FriendsListView: View {
                     }) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }
-            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .background(Color("BackgroundPrimary")).ignoresSafeArea()
+        .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .onAppear {
             loadFriends()
             loadRequests()
@@ -507,11 +507,11 @@ struct FriendsListViewWithMockData: View {
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                     
                     TextField("Search friends", text: $searchText)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                     
@@ -521,13 +521,13 @@ struct FriendsListViewWithMockData: View {
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         }
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color("InputBackground"))
+                .background(AppColor.inputBackground)
                 .cornerRadius(12)
                 .padding(.top, 12)
                 .padding(.bottom, 16)
@@ -536,7 +536,7 @@ struct FriendsListViewWithMockData: View {
                 List {
                     ForEach(filteredFriends) { friend in
                         PlayerCard(player: friend)
-                            .listRowBackground(Color("BackgroundPrimary"))
+                            .listRowBackground(AppColor.backgroundPrimary)
                             .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button {
@@ -552,10 +552,10 @@ struct FriendsListViewWithMockData: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .background(Color("BackgroundPrimary"))
+                .background(AppColor.backgroundPrimary)
             }
             .padding(.horizontal, 16)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationTitle("Friends")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -565,15 +565,15 @@ struct FriendsListViewWithMockData: View {
                     }) {
                         Image(systemName: "person.badge.plus")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }
-            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .background(Color("BackgroundPrimary")).ignoresSafeArea()
+        .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .alert("Remove Friend?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Remove", role: .destructive) {

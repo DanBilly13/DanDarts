@@ -34,7 +34,7 @@ struct GameInstructionsContent: View {
                 Text(game.subtitle)
                     .font(.title3)
                     .fontWeight(.medium)
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
             
             // Players
@@ -42,7 +42,7 @@ struct GameInstructionsContent: View {
             
             // Divider
             Divider()
-                .background(Color("TextSecondary").opacity(0.3))
+                .background(AppColor.textSecondary.opacity(0.3))
             
             // Instructions from JSON
             VStack(alignment: .leading, spacing: 12) {
@@ -50,26 +50,26 @@ struct GameInstructionsContent: View {
                     Text("How to Play")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                     
                     Spacer()
                     
                     HStack(spacing: 8) {
                         Image(systemName: "person.2.fill")
                             .font(.body)
-                            .foregroundColor(Color("AccentSecondary"))
+                            .foregroundColor(AppColor.interactiveSecondaryBackground)
                         
                         Text(game.players)
                             .font(.body)
                             .fontWeight(.medium)
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                     }
                 }
                 
                 
                 Text(game.instructions)
                     .font(.body)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .lineSpacing(6)
             }
         }

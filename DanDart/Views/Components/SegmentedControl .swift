@@ -31,12 +31,12 @@ struct SegmentedControl<Value: Hashable>: View {
                 }) {
                     Text(titleForOption(option))
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(selection == option ? .white : Color("TextSecondary"))
+                        .foregroundColor(selection == option ? AppColor.textOnPrimary : AppColor.textOnPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(
                             Capsule()
-                                .fill(selection == option ? Color("AccentPrimary") : Color("InputBackground"))
+                                .fill(selection == option ? AppColor.interactivePrimaryBackground : AppColor.inputBackground)
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -52,11 +52,10 @@ private struct SegmentedControlPreviewWrapper: View {
             "Best of \(value)"
         }
         .padding()
-        .background(Color("BackgroundPrimary"))
+        .background(AppColor.backgroundPrimary)
     }
 }
 
 #Preview {
     SegmentedControlPreviewWrapper()
 }
-

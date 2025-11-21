@@ -26,8 +26,8 @@ struct GameCard: View {
                     } else {
                         LinearGradient(
                             colors: [
-                                Color("AccentPrimary").opacity(0.6),
-                                Color("AccentPrimary").opacity(0.3)
+                                AppColor.brandPrimary.opacity(0.6),
+                                AppColor.brandPrimary.opacity(0.3)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -56,18 +56,18 @@ struct GameCard: View {
                     Text(game.subtitle)
                         .font(.subheadline)
                         .fontWeight(.bold)
-                        .foregroundColor(Color("TextPrimary").opacity(0.85))
+                        .foregroundColor(AppColor.textPrimary)
                         .lineLimit(2)
-                        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
+                       
                     
                     HStack {
                         Image(systemName: "person.2.fill")
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textSecondary)
                         Text(game.players)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(AppColor.textSecondary)
                             .lineLimit(1)
                     }
                     
@@ -85,7 +85,7 @@ struct GameCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -138,7 +138,7 @@ struct GameCardContainer: View {
         }
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Game Card - All Games") {
@@ -152,7 +152,7 @@ struct GameCardContainer: View {
         }
         .padding()
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Game Card - 90% Width") {
@@ -166,7 +166,7 @@ struct GameCardContainer: View {
         }
         .padding(.vertical)
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Game Card - Dark Mode") {

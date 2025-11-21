@@ -29,7 +29,7 @@ struct PlayerIdentity: View {
         avatarSize: CGFloat = 48,
         nameFont: Font = .system(.title3, design: .rounded).weight(.semibold),
         nicknameFont: Font = .subheadline.weight(.medium),
-        nicknameColor: Color = Color("TextSecondary"),
+        nicknameColor: Color = AppColor.textSecondary,
         spacing: CGFloat = 4,
         alignment: HorizontalAlignment = .leading,
         borderColor: Color? = nil
@@ -61,7 +61,7 @@ struct PlayerIdentity: View {
                 // Display name
                 Text(displayName)
                     .font(nameFont)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .lineLimit(1)
                 
                 // Nickname (if provided)
@@ -85,7 +85,7 @@ extension PlayerIdentity {
         avatarSize: CGFloat = 48,
         nameFont: Font = .system(.headline, design: .rounded).weight(.semibold),
         nicknameFont: Font = .footnote.weight(.medium),
-        nicknameColor: Color = Color("TextSecondary"),
+        nicknameColor: Color = AppColor.textSecondary,
         spacing: CGFloat = 4,
         alignment: HorizontalAlignment = .leading,
         borderColor: Color? = nil
@@ -111,7 +111,7 @@ extension PlayerIdentity {
         avatarSize: CGFloat = 48,
         nameFont: Font = .system(.headline, design: .rounded).weight(.semibold),
         nicknameFont: Font = .footnote.weight(.medium),
-        nicknameColor: Color = Color("TextSecondary"),
+        nicknameColor: Color = AppColor.textSecondary,
         spacing: CGFloat = 4,
         alignment: HorizontalAlignment = .leading,
         borderColor: Color? = nil
@@ -148,7 +148,7 @@ extension PlayerIdentity {
             displayName: "Alice Johnson",
             nickname: "alice",
             isGuest: false,
-            borderColor: Color("AccentSecondary")
+            borderColor: AppColor.player2
         )
         
         PlayerIdentity(
@@ -159,7 +159,7 @@ extension PlayerIdentity {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Different Sizes") {
@@ -190,7 +190,7 @@ extension PlayerIdentity {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("With Border Colors") {
@@ -199,25 +199,25 @@ extension PlayerIdentity {
             avatarURL: "avatar1",
             displayName: "Player 1",
             nickname: "player1",
-            borderColor: Color("AccentPrimary")
+            borderColor: AppColor.player1
         )
         
         PlayerIdentity(
             avatarURL: "avatar2",
             displayName: "Player 2",
             nickname: "player2",
-            borderColor: Color("AccentSecondary")
+            borderColor: AppColor.player2
         )
         
         PlayerIdentity(
             avatarURL: "avatar3",
             displayName: "Player 3",
             nickname: "player3",
-            borderColor: Color("AccentTertiary")
+            borderColor: AppColor.brandPrimary
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Center Aligned") {
@@ -230,5 +230,5 @@ extension PlayerIdentity {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

@@ -11,20 +11,20 @@ struct TipBubble: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: systemImageName)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.brandPrimary)
                     .padding(8)
-                    .background(Color("AccentPrimary").opacity(0.15))
+                    .background(AppColor.brandPrimary.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(.headline, design: .rounded))
                         .fontWeight(.semibold)
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
 
                     Text(message)
                         .font(.system(.subheadline, design: .rounded))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -33,9 +33,9 @@ struct TipBubble: View {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .padding(6)
-                        .background(Color("InputBackground"))
+                        .background(AppColor.inputBackground)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -44,7 +44,7 @@ struct TipBubble: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color("SurfacePrimary"))
+                .fill(AppColor.surfacePrimary)
                 .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 8)
         )
     }
@@ -93,7 +93,7 @@ struct PositionedTip<TipContent: View, Background: View>: View {
 
 #Preview("Default Tip") {
     ZStack {
-        Color("BackgroundPrimary").ignoresSafeArea()
+        AppColor.backgroundPrimary.ignoresSafeArea()
 
         VStack(spacing: 24) {
             Spacer()
@@ -110,11 +110,11 @@ struct PositionedTip<TipContent: View, Background: View>: View {
 
             // Simulated scoring grid background for context
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color("InputBackground"))
+                .fill(AppColor.inputBackground)
                 .frame(height: 260)
                 .overlay(
                     Text("Scoring grid preview")
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 40)

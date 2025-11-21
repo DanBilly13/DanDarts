@@ -94,7 +94,7 @@ struct StandardSheetView<Content: View>: View {
                     Button(action: onCancel) {
                         Text(cancelButtonTitle)
                             .font(.system(size: 17, weight: .regular))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
                 
@@ -102,19 +102,19 @@ struct StandardSheetView<Content: View>: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             
             // Title - Large and Bold
             HStack {
                 Text(title)
                     .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 16)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             
             // Content area
             if useScrollView {
@@ -140,27 +140,19 @@ struct StandardSheetView<Content: View>: View {
                     Divider()
                         .background(Color.white.opacity(0.1))
                     
-                    Button(action: action) {
+                    AppButton(role: .primary,
+                              controlSize: .regular,
+                              isDisabled: !primaryActionEnabled,
+                              action: action) {
                         Text(actionTitle)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                primaryActionEnabled
-                                    ? Color("AccentPrimary")
-                                    : Color.gray.opacity(0.3)
-                            )
-                            .cornerRadius(12)
                     }
-                    .disabled(!primaryActionEnabled)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
-                    .background(Color("BackgroundPrimary"))
+                    .background(AppColor.backgroundPrimary)
                 }
             }
         }
-        .background(Color("BackgroundPrimary"))
+        .background(AppColor.backgroundPrimary)
     }
 }
 
@@ -200,7 +192,7 @@ struct StandardSheetView<Content: View>: View {
                 
                 TextField("", text: .constant("Daniel Billingham"))
                     .padding(12)
-                    .background(Color("InputBackground"))
+                    .background(AppColor.inputBackground)
                     .cornerRadius(10)
             }
             
@@ -213,7 +205,7 @@ struct StandardSheetView<Content: View>: View {
                 
                 TextField("", text: .constant("@danbillman"))
                     .padding(12)
-                    .background(Color("InputBackground"))
+                    .background(AppColor.inputBackground)
                     .cornerRadius(10)
             }
             
@@ -226,7 +218,7 @@ struct StandardSheetView<Content: View>: View {
                 
                 TextField("", text: .constant("danbillingham@gmail.com"))
                     .padding(12)
-                    .background(Color("InputBackground"))
+                    .background(AppColor.inputBackground)
                     .cornerRadius(10)
             }
         }
@@ -241,7 +233,7 @@ struct StandardSheetView<Content: View>: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("301")
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(AppColor.brandPrimary)
             
             Text("A Classic Countdown Game")
                 .font(.system(size: 17))
@@ -256,7 +248,7 @@ struct StandardSheetView<Content: View>: View {
             
             Text("How to Play")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(AppColor.brandPrimary)
                 .padding(.top, 8)
             
             Text("Each player starts with a score of 301. Players take turns throwing three darts per round and subtract the total from their score.")
@@ -281,7 +273,7 @@ struct StandardSheetView<Content: View>: View {
                     .foregroundColor(.white)
             }
             .padding(12)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(10)
             
             // Empty state

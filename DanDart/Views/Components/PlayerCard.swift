@@ -25,7 +25,7 @@ struct PlayerCard: View {
                 Text("\(number)")
                     .font(.system(.headline, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(width: 16)
                     
             }
@@ -45,7 +45,7 @@ struct PlayerCard: View {
                     // Show "Guest" for guest players
                     Text("Guest")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 } else {
                     // Show stats for connected players
                     if player.totalWins > 0 || player.totalLosses > 0 {
@@ -53,24 +53,24 @@ struct PlayerCard: View {
                         HStack(spacing: 0) {
                             Text("\(player.totalWins)W")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Color("AccentSecondary"))
+                                .foregroundColor(AppColor.textPrimary)
                             
                             Text("\(player.totalLosses)L")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Color("AccentPrimary"))
+                                .foregroundColor(AppColor.textSecondary)
                         }
                         
                         Text(player.winRatePercentage)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     } else {
                         Text("No games")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                         
                         Text("yet")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
             }
@@ -87,11 +87,11 @@ struct PlayerCard: View {
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color("TextSecondary").opacity(0.3), lineWidth: 1)
+                .stroke(AppColor.textSecondary.opacity(0.3), lineWidth: 1)
         )
         .opacity(showCheckmark ? 0.5 : 1.0)
     }
@@ -110,7 +110,7 @@ struct PlayerCardCompact: View {
                 avatarSize: 32,
                 nameFont: .system(size: 14, weight: .semibold),
                 nicknameFont: .system(size: 12, weight: .medium),
-                nicknameColor: Color("AccentSecondary"),
+                nicknameColor: AppColor.textSecondary,
                 spacing: 2
             )
             
@@ -120,13 +120,13 @@ struct PlayerCardCompact: View {
             if player.totalGames > 0 {
                 Text(player.winRatePercentage)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(height: 48)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
@@ -139,7 +139,7 @@ struct PlayerCardCompact: View {
         PlayerCard(player: Player.mockGuest3)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Player Card - Connected") {
@@ -149,7 +149,7 @@ struct PlayerCardCompact: View {
         PlayerCard(player: Player.mockConnected3)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Player Card - With Player Numbers") {
@@ -158,7 +158,7 @@ struct PlayerCardCompact: View {
         PlayerCard(player: Player.mockGuest1, playerNumber: 2)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Player Card - Compact") {
@@ -169,7 +169,7 @@ struct PlayerCardCompact: View {
         PlayerCardCompact(player: Player.mockGuest3)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Player Card - Dark Mode") {
@@ -179,6 +179,6 @@ struct PlayerCardCompact: View {
         PlayerCardCompact(player: Player.mockConnected2)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
     .preferredColorScheme(.dark)
 }

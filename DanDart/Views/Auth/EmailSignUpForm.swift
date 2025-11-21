@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct EmailSignUpForm: View {
@@ -35,29 +34,29 @@ struct EmailSignUpForm: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Nickname")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                 
                 HStack(spacing: 0) {
                     Text("@")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .padding(.leading, 16)
                         .padding(.trailing, 4)
                     
                     TextField("username", text: $nickname)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .textContentType(.nickname)
                         .autocapitalization(.none)
                         .autocorrectionDisabled()
                         .padding(.trailing, 16)
                         .padding(.vertical, 14)
                 }
-                .background(Color("InputBackground"))
+                .background(AppColor.inputBackground)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                        .stroke(AppColor.textSecondary.opacity(0.2), lineWidth: 1)
                 )
             }
             
@@ -99,15 +98,15 @@ struct EmailSignUpForm: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Password must contain:")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                 
                 HStack(spacing: 8) {
                     Image(systemName: isPasswordValid ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 12))
-                        .foregroundColor(isPasswordValid ? .green : Color("TextSecondary").opacity(0.6))
+                        .foregroundColor(isPasswordValid ? .green : AppColor.textSecondary.opacity(0.6))
                     Text("At least 8 characters")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(isPasswordValid ? .green : Color("TextSecondary"))
+                        .foregroundColor(isPasswordValid ? .green : AppColor.textSecondary)
                     Spacer()
                 }
             }
@@ -126,7 +125,7 @@ struct EmailSignUpForm: View {
                 HStack {
                     if isLoading {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
                             .scaleEffect(0.8)
                     }
                     Text(isLoading ? "Creating Account..." : "Create Account")

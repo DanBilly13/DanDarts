@@ -32,7 +32,7 @@ struct KnockoutGameplayView: View {
     
     var body: some View {
         ZStack {
-            Color("BackgroundPrimary")
+            AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -127,7 +127,7 @@ struct KnockoutGameplayView: View {
                 }
             }
         }
-        .background(Color.black)
+        .background(AppColor.backgroundPrimary)
         .navigationTitle(game.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -139,7 +139,7 @@ struct KnockoutGameplayView: View {
                 )
             }
         }
-        .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+        .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -214,7 +214,7 @@ struct KnockoutGameplayView: View {
             score: viewModel.currentTurnTotal,
             scoreToBeat: viewModel.scoreToBeat,
             isPlayerToBeat: false,
-            borderColor: Color("AccentSecondary"),
+            borderColor: AppColor.player1,
             animatingLifeLoss: viewModel.animatingLifeLoss == viewModel.currentPlayer.id,
             animatingTransition: viewModel.animatingPlayerTransition
         )
@@ -234,7 +234,7 @@ struct AvatarLineupItem: View {
         ZStack {
             // Outer green circle - only visible when current player
             Circle()
-                .fill(Color("AccentSecondary"))
+                .fill(AppColor.player1)
                 .frame(width: 36, height: 36)
                 .opacity(isCurrentPlayer ? 1.0 : 0.0)
             
@@ -284,14 +284,14 @@ struct KnockoutPlayerCard: View {
                     Text(player.displayName)
                         .font(.headline)
                         .fontWeight(.bold)
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .lineLimit(1)
                 }
                 HStack(spacing: 8) {
                     Text(player.nickname)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .lineLimit(1)
                     
                     // Lives (hearts) - show all hearts, lost ones filled with background
@@ -322,7 +322,7 @@ struct KnockoutPlayerCard: View {
                 Text("\(score)")
                     .font(.system(.title, design: .monospaced))
                     .fontWeight(.bold)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(width: 60, alignment: .trailing)
                 
                 // Points needed indicator - only show when there's a score to beat AND player has thrown
@@ -332,27 +332,27 @@ struct KnockoutPlayerCard: View {
                             Image(systemName: "arrow.up")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(Color("AccentSecondary"))
+                                .foregroundColor(AppColor.player1)
                         } else if score < scoreToBeat {
                             Image(systemName: "arrow.down")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(Color("AccentPrimary"))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
                         } else {
                             Image(systemName: "minus")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         }
                         
                         Text("\(abs(score - scoreToBeat))")
                             .font(.headline)
-                            .foregroundColor(score >= scoreToBeat ? Color("AccentSecondary") : Color("AccentPrimary"))
+                            .foregroundColor(score >= scoreToBeat ? AppColor.player1 : AppColor.interactivePrimaryBackground)
                     }
                     .padding(.vertical, 4)
                     .padding(.leading, 4)
                     .padding(.trailing, 6)
-                    .background(Color.backgroundPrimary)
+                    .background(AppColor.backgroundPrimary)
                     .cornerRadius(9)
                 }
             }
@@ -364,7 +364,7 @@ struct KnockoutPlayerCard: View {
         .padding(.trailing, 24)
         .background(
             Capsule()
-                .fill(Color("InputBackground"))
+                .fill(AppColor.inputBackground)
         )
         .overlay(
             Capsule()
@@ -392,5 +392,6 @@ struct KnockoutPlayerCard: View {
             startingLives: 3
         )
         .environmentObject(AuthService.mockAuthenticated)
+        .background(AppColor.backgroundPrimary)
     }
 }

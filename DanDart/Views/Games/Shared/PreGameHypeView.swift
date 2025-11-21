@@ -59,11 +59,11 @@ struct PreGameHypeView: View {
                     VStack(spacing: 8) {
                         Text(game.title)
                             .font(.system(size: 28, weight: .bold, design: .default))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Text("MATCH STARTING")
                             .font(.system(size: 14, weight: .semibold, design: .default))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                             .tracking(2)
                     }
                     .padding(.top, 60)
@@ -80,14 +80,14 @@ struct PreGameHypeView: View {
                     VStack(spacing: 16) {
                         Text("GET READY!")
                             .font(.system(size: 32, weight: .black, design: .default))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                             .tracking(2)
                             .scaleEffect(showGetReady ? 1.0 : 0.8)
                             .opacity(showGetReady ? 1.0 : 0.0)
                         
                         Text("Tap to skip")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                             .opacity(showGetReady ? 0.7 : 0.0)
                     }
                     .padding(.bottom, 60)
@@ -141,7 +141,7 @@ struct PreGameHypeView: View {
             VStack(spacing: 8) {
                 Text("VS")
                     .font(.system(size: 28, weight: .black))
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                     .scaleEffect(showVS ? 1.0 : 0.5)
                     .opacity(showVS ? 1.0 : 0.0)
             }
@@ -239,13 +239,13 @@ struct PreGameHypeView: View {
                 Text(player.displayName)
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .opacity(showPlayers ? 1.0 : 0.0)
                 
                 // Nickname (.footnote) - no spacing from name
                 Text("@\(player.nickname)")
                     .font(.footnote)
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                     .opacity(showPlayers ? 1.0 : 0.0)
             }
             
@@ -258,11 +258,11 @@ struct PreGameHypeView: View {
                 Text("W\(player.totalWins)")
                         .font(.footnote)
                     .fontWeight(.semibold)
-                    .foregroundColor(Color("AccentSecondary"))
+                    .foregroundColor(AppColor.interactiveSecondaryBackground)
                 Text("L\(player.totalLosses)")
                         .font(.footnote)
                     .fontWeight(.semibold)
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
             }
             .opacity(showPlayers ? 1.0 : 0.0)
         }

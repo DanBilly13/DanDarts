@@ -44,7 +44,7 @@ struct GameEndView: View {
             // Dark gradient background
             LinearGradient(
                 colors: [
-                    Color("BackgroundPrimary"),
+                    AppColor.backgroundPrimary,
                     Color.black,
                     Color.black
                 ],
@@ -61,8 +61,8 @@ struct GameEndView: View {
                     // Trophy/Crown Icon
                     Image(systemName: "crown")
                         .font(.system(size: 60, weight: .regular))
-                        .foregroundColor(Color("AccentPrimary"))
-                        .shadow(color: Color("AccentPrimary").opacity(0.5), radius: 20, x: 0, y: 0)
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                        .shadow(color: AppColor.interactivePrimaryBackground.opacity(0.5), radius: 20, x: 0, y: 0)
                         .scaleEffect(showCelebration ? 1.0 : 0.5)
                         .opacity(showCelebration ? 1.0 : 0.0)
                         .animation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.2), value: showCelebration)
@@ -71,9 +71,9 @@ struct GameEndView: View {
                     PlayerAvatarView(
                         avatarURL: winner.avatarURL,
                         size: 120,
-                        borderColor: Color("AccentPrimary")
+                        borderColor: AppColor.interactivePrimaryBackground
                     )
-                    .shadow(color: Color("AccentPrimary").opacity(0.4), radius: 30, x: 0, y: 10)
+                    .shadow(color: AppColor.interactivePrimaryBackground.opacity(0.4), radius: 30, x: 0, y: 10)
                     .scaleEffect(showCelebration ? 1.0 : 0.8)
                     .opacity(showCelebration ? 1.0 : 0.0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.3), value: showCelebration)
@@ -82,18 +82,18 @@ struct GameEndView: View {
                     VStack(spacing: 8) {
                         Text("WINNER!")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                             .tracking(2)
                         
                         Text(winner.displayName)
                             .font(.system(.title2, design: .rounded))
                             .fontWeight(.semibold)
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Text("@\(winner.nickname)")
                             .font(.system(.headline, design: .rounded))
                             .fontWeight(.semibold)
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     .scaleEffect(showCelebration ? 1.0 : 0.8)
                     .opacity(showCelebration ? 1.0 : 0.0)
@@ -103,7 +103,7 @@ struct GameEndView: View {
                     if let resultText = matchResultText {
                         Text("Wins \(resultText)")
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                             .opacity(showCelebration ? 1.0 : 0.0)
                             .animation(.easeIn(duration: 0.3).delay(0.5), value: showCelebration)
                     }
@@ -122,7 +122,7 @@ struct GameEndView: View {
                         } label: {
                             Text("View Match Details")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color("TextPrimary"))
+                                .foregroundColor(AppColor.textPrimary)
                                 .underline()
                         }
                         .opacity(showCelebration ? 1.0 : 0.0)
@@ -167,20 +167,20 @@ struct GameEndView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 48))
-                        .foregroundColor(Color("AccentSecondary"))
+                        .foregroundColor(AppColor.interactiveSecondaryBackground)
                     
                     Text("Match details not available")
                         .font(.headline)
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                     
                     Text("The match is being saved...")
                         .font(.subheadline)
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                     
                     Button("Close") {
                         showMatchDetails = false
                     }
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
                 .padding(40)
             }

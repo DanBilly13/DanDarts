@@ -37,7 +37,7 @@ struct CountdownGameplayView: View {
     
     var body: some View {
         ZStack {
-            Color("BackgroundPrimary")
+            AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
             // Core gameplay layout, optionally wrapped with a positioned tip overlay
@@ -164,7 +164,7 @@ struct CountdownGameplayView: View {
                     )
                 }
             }
-            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
@@ -428,11 +428,11 @@ struct CountdownGameplayView: View {
         // Get border color based on player index
         var borderColor: Color {
             switch playerIndex {
-            case 0: return Color("AccentPrimary")
-            case 1: return Color("AccentSecondary")
-            case 2: return Color("AccentTertiary")
-            case 3: return Color("AccentQuaternary")
-            default: return Color("AccentPrimary")
+            case 0: return AppColor.player1
+            case 1: return AppColor.player2
+            case 2: return AppColor.player3
+            case 3: return AppColor.player4
+            default: return AppColor.player1
             }
         }
         
@@ -456,7 +456,7 @@ struct CountdownGameplayView: View {
                         Text("\(score)")
                             .font(.system(.title, design: .monospaced))
                             .fontWeight(.bold)
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                             .frame(width: 70) // Fixed width to fit "888"
                             .multilineTextAlignment(.center)
                             .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
@@ -488,7 +488,7 @@ struct CountdownGameplayView: View {
             .padding(.vertical, 16)
             .background(
                 Capsule()
-                    .fill(Color("InputBackground"))
+                    .fill(AppColor.inputBackground)
             )
             .clipShape(Capsule())
             .overlay(
@@ -506,7 +506,7 @@ struct CountdownGameplayView: View {
         var body: some View {
             Text("Checkout: \(checkout)")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(Color("AccentTertiary"))
+                .foregroundColor(AppColor.brandPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .transition(.asymmetric(
@@ -526,6 +526,7 @@ struct CountdownGameplayView: View {
                 players: [Player.mockGuest1, Player.mockGuest2]
             )
             .environmentObject(AuthService())
+            .background(AppColor.backgroundPrimary)
         }
     }
     
@@ -537,6 +538,7 @@ struct CountdownGameplayView: View {
                 matchFormat: 3
             )
             .environmentObject(AuthService())
+            .background(AppColor.backgroundPrimary)
         }
     }
     
@@ -548,6 +550,7 @@ struct CountdownGameplayView: View {
                 matchFormat: 5
             )
             .environmentObject(AuthService())
+            .background(AppColor.backgroundPrimary)
         }
     }
     
@@ -559,6 +562,7 @@ struct CountdownGameplayView: View {
                 matchFormat: 7
             )
             .environmentObject(AuthService())
+            .background(AppColor.backgroundPrimary)
         }
     }
     
@@ -569,6 +573,7 @@ struct CountdownGameplayView: View {
                 players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
             )
             .environmentObject(AuthService())
+            .background(AppColor.backgroundPrimary)
         }
     }
 }

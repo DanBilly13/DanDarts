@@ -44,4 +44,7 @@ enum AppColor {
     static let player4 = Color("Player4Color")
     static let player5 = Color("Player5Color")
     static let player6 = Color("Player6Color")
+    
+    // MARK: - Brand
+    static let brandPrimary = Color("BrandPrimary")
 }

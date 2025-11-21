@@ -25,8 +25,8 @@ struct MatchCard: View {
                     } else {
                         LinearGradient(
                             colors: [
-                                Color("AccentPrimary").opacity(0.6),
-                                Color("AccentPrimary").opacity(0.3)
+                                AppColor.brandPrimary.opacity(0.6),
+                                AppColor.brandPrimary.opacity(0.3)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -34,7 +34,7 @@ struct MatchCard: View {
                     }
                 }
             }
-            .background(Color("InputBackground").opacity(0.1))
+            .background(AppColor.inputBackground.opacity(0.1))
             .frame(width: 52)
             .frame(maxHeight: .infinity, alignment: .center)
             .cornerRadius(0)
@@ -55,7 +55,7 @@ struct MatchCard: View {
                     // Date
                     Text(relativeDate)
                         .font(.caption)
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
                 .padding(.bottom, 6)
              
@@ -68,7 +68,7 @@ struct MatchCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
         
         
@@ -90,7 +90,7 @@ struct MatchCard: View {
                         .font(.system(.callout, design: .rounded))
                         .fontWeight(.regular)
                         /*.font(.subheadline.weight(player.id == match.winnerId ? .bold : .medium))*/
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                     
                     Spacer()
                     
@@ -104,12 +104,12 @@ struct MatchCard: View {
                             if player.id == match.winnerId {
                                 Image(systemName: "crown")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Color("AccentTertiary"))
+                                    .foregroundColor(AppColor.interactivePrimaryBackground)
                             } else {
                                 Text("\(player.finalScore)")
                                     .font(.system(.callout, design: .rounded))
                                     .fontWeight(.regular)
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(AppColor.textSecondary)
                             }
                         }
                     }
@@ -133,12 +133,12 @@ struct MatchCard: View {
             // Trophy for 1st place (consistent with 301/501)
             Image(systemName: "crown")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color("AccentTertiary"))
+                .foregroundColor(AppColor.interactivePrimaryBackground)
         } else {
             // Text-only for 2nd, 3rd, etc.
             Text("\(place)\(placementSuffix(place))")
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
         }
     }
     
@@ -256,5 +256,5 @@ struct MatchCard: View {
         ))
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

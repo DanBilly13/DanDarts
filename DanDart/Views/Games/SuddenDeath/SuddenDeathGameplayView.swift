@@ -23,7 +23,7 @@ struct SuddenDeathGameplayView: View {
     
     var body: some View {
         ZStack {
-            Color("BackgroundPrimary")
+            AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -94,7 +94,7 @@ struct SuddenDeathGameplayView: View {
                 }
             }
         }
-        .background(Color.black)
+        .background(AppColor.backgroundPrimary)
         .navigationTitle("\(game.title) - R\(viewModel.roundNumber)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -106,7 +106,7 @@ struct SuddenDeathGameplayView: View {
                 )
             }
         }
-        .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+        .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -221,7 +221,7 @@ struct SuddenDeathPlayerCard: View {
                     Image("skull")
                         .resizable()
                         .renderingMode(.template)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppColor.textPrimary)
                         .frame(width: 20, height: 20)
                         .rotationEffect(.degrees(wiggleAngle))
                         .scaleEffect(showSkullWiggle ? 1.8 : 1.0)
@@ -234,7 +234,7 @@ struct SuddenDeathPlayerCard: View {
                 if isCurrentPlayer {
                     // Outer accent ring
                     Circle()
-                        .stroke(Color("AccentSecondary"), lineWidth: 2)
+                        .stroke(AppColor.interactiveSecondaryBackground, lineWidth: 2)
                         .frame(width: 64, height: 64)
                     // Inner black ring
                     Circle()
@@ -257,7 +257,7 @@ struct SuddenDeathPlayerCard: View {
             Text(firstName)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: 56)
@@ -266,7 +266,7 @@ struct SuddenDeathPlayerCard: View {
             Text(roundScore.map { "\($0)" } ?? "-")
                 .font(.system(.title3, design: .monospaced))
                 .fontWeight(.bold)
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
                 .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
                 .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
                 .onChange(of: showScoreAnimation) { _, newValue in
@@ -284,7 +284,7 @@ struct SuddenDeathPlayerCard: View {
                         .foregroundColor(.red)
                     Text("\(lives)")
                         .font(.footnote)
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
             }
         }

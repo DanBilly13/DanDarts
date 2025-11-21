@@ -9,8 +9,8 @@ import SwiftUI
 
 struct Chip: View {
     let title: String
-    var foregroundColor: Color = Color("BackgroundPrimary")
-    var backgroundColor: Color = Color("AccentPrimary")
+    var foregroundColor: Color = AppColor.textOnPrimary
+    var backgroundColor: Color = AppColor.interactivePrimaryBackground
     
     var body: some View {
         Text(title)

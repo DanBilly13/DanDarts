@@ -32,14 +32,14 @@ struct FriendProfileView: View {
                     HStack {
                         Text("Head-to-Head")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Spacer()
                         
                         if !headToHeadMatches.isEmpty {
                             Text("\(headToHeadMatches.count) matches")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         }
                     }
                     
@@ -48,20 +48,20 @@ struct FriendProfileView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "chart.bar.xaxis")
                                 .font(.system(size: 48, weight: .light))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                             
                             Text("No matches yet")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextPrimary"))
+                                .foregroundColor(AppColor.textPrimary)
                             
                             Text("Challenge \(friend.displayName) to start your rivalry!")
                                 .font(.system(size: 14, weight: .regular))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 32)
-                        .background(Color("InputBackground"))
+                        .background(AppColor.inputBackground)
                         .cornerRadius(12)
                     } else {
                         // Match History List
@@ -70,7 +70,7 @@ struct FriendProfileView: View {
                                 // TODO: MatchCard component (Task 62)
                                 Text("Match: \(match.gameName)")
                                     .padding()
-                                    .background(Color("InputBackground"))
+                                    .background(AppColor.inputBackground)
                                     .cornerRadius(12)
                             }
                         }
@@ -83,14 +83,14 @@ struct FriendProfileView: View {
                 }) {
                     Text("Remove Friend")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
                 .padding(.top, 32)
                 .padding(.bottom, 40)
             }
             .padding(.horizontal, 16)
         }
-        .background(Color("BackgroundPrimary"))
+        .background(AppColor.backgroundPrimary)
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .alert("Remove Friend?", isPresented: $showRemoveConfirmation) {

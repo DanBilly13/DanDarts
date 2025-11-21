@@ -27,7 +27,7 @@ struct GameplayMenuButton: View {
         } label: {
             Image(systemName: "ellipsis.circle.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(Color("InteractiveSecondaryBackground"))
         }
     }
 }

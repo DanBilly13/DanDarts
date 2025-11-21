@@ -11,16 +11,16 @@ struct StatCard: View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 24, weight: .medium))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(AppColor.brandPrimary)
             VStack {
                 Text(value)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 
                 Text(title)
                     .font(.system(.caption, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
         }
         // Forward the baseline of the card to the title text
@@ -31,4 +31,14 @@ struct StatCard: View {
         .padding(.vertical, 16)
         .cornerRadius(12)
     }
+}
+
+#Preview("Stat Card Examples") {
+    HStack(spacing: 12) {
+        StatCard(title: "Games", value: "24", icon: "target")
+        StatCard(title: "Win %", value: "62%", icon: "medal.fill")
+        StatCard(title: "Avg Score", value: "58", icon: "chart.bar.fill")
+    }
+    .padding()
+    .background(AppColor.backgroundPrimary)
 }

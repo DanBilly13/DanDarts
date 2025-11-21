@@ -45,37 +45,37 @@ struct LegIndicators: View {
 
 #Preview("Single Leg Won") {
     VStack(spacing: 20) {
-        LegIndicators(legsWon: 1, totalLegs: 3)
-        LegIndicators(legsWon: 1, totalLegs: 3, color: Color("AccentSecondary"))
+        LegIndicators(legsWon: 1, totalLegs: 3, color: AppColor.player1)
+        LegIndicators(legsWon: 1, totalLegs: 3, color: AppColor.player2)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Two Legs Won") {
     VStack(spacing: 20) {
-        LegIndicators(legsWon: 2, totalLegs: 3)
-        LegIndicators(legsWon: 2, totalLegs: 4, color: Color("AccentTertiary"))
+        LegIndicators(legsWon: 2, totalLegs: 3, color: AppColor.player1)
+        LegIndicators(legsWon: 2, totalLegs: 4, color: AppColor.player2)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("All Legs Won") {
     VStack(spacing: 20) {
-        LegIndicators(legsWon: 3, totalLegs: 3)
-        LegIndicators(legsWon: 4, totalLegs: 4, color: Color("AccentQuaternary"))
+        LegIndicators(legsWon: 3, totalLegs: 3, color: AppColor.player1)
+        LegIndicators(legsWon: 4, totalLegs: 4, color: AppColor.player2)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Different Sizes") {
     VStack(spacing: 20) {
-        LegIndicators(legsWon: 2, totalLegs: 3, dotSize: 6, spacing: 3)
-        LegIndicators(legsWon: 2, totalLegs: 3, dotSize: 8, spacing: 4)
-        LegIndicators(legsWon: 2, totalLegs: 3, dotSize: 10, spacing: 5)
+        LegIndicators(legsWon: 2, totalLegs: 3, color: AppColor.player1, dotSize: 6, spacing: 3)
+        LegIndicators(legsWon: 2, totalLegs: 3, color: AppColor.player1, dotSize: 8, spacing: 4)
+        LegIndicators(legsWon: 2, totalLegs: 3, color: AppColor.player1, dotSize: 10, spacing: 5)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

@@ -25,7 +25,7 @@ struct AsyncAvatarImage: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color("InputBackground"))
+                .fill(AppColor.inputBackground)
                 .frame(width: size, height: size)
             
             if let avatarURL = avatarURL {
@@ -47,7 +47,7 @@ struct AsyncAvatarImage: View {
                             // Failed to load - show placeholder
                             Image(systemName: placeholderIcon)
                                 .font(.system(size: size * 0.5, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         @unknown default:
                             EmptyView()
                         }
@@ -69,7 +69,7 @@ struct AsyncAvatarImage: View {
                         // Failed to load file - show placeholder
                         Image(systemName: placeholderIcon)
                             .font(.system(size: size * 0.5, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                             .onAppear {
                                 print("⚠️ Failed to load avatar from file: \(avatarURL)")
                                 print("   File exists: \(FileManager.default.fileExists(atPath: avatarURL))")
@@ -87,7 +87,7 @@ struct AsyncAvatarImage: View {
                 // No avatar - show placeholder
                 Image(systemName: placeholderIcon)
                     .font(.system(size: size * 0.5, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
         }
     }
@@ -101,7 +101,7 @@ struct AsyncAvatarImage: View {
         AsyncAvatarImage(avatarURL: "avatar3", size: 80)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Remote URL Avatar") {
@@ -116,7 +116,7 @@ struct AsyncAvatarImage: View {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("No Avatar") {
@@ -126,5 +126,5 @@ struct AsyncAvatarImage: View {
         AsyncAvatarImage(avatarURL: nil, size: 80)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

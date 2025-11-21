@@ -51,7 +51,7 @@ struct MainTabView: View {
                 }
                 .tag(2)
         }
-        .accentColor(Color("AccentPrimary"))
+        .accentColor(AppColor.interactivePrimaryBackground)
         .sheet(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
@@ -99,18 +99,18 @@ struct MainTabView: View {
         // Configure tab bar for dark mode
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
-        tabBarAppearance.backgroundColor = UIColor(Color("BackgroundPrimary"))
+        tabBarAppearance.backgroundColor = UIColor(AppColor.backgroundPrimary)
         
         // Normal state
-        tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor(Color("TextSecondary"))
+        tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor(AppColor.textSecondary)
         tabBarAppearance.stackedLayoutAppearance.normal.titleTextAttributes = [
-            .foregroundColor: UIColor(Color("TextSecondary"))
+            .foregroundColor: UIColor(AppColor.textSecondary)
         ]
         
         // Selected state
-        tabBarAppearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color("AccentPrimary"))
+        tabBarAppearance.stackedLayoutAppearance.selected.iconColor = UIColor(AppColor.interactivePrimaryBackground)
         tabBarAppearance.stackedLayoutAppearance.selected.titleTextAttributes = [
-            .foregroundColor: UIColor(Color("AccentPrimary"))
+            .foregroundColor: UIColor(AppColor.interactivePrimaryBackground)
         ]
         
         UITabBar.appearance().standardAppearance = tabBarAppearance
@@ -145,9 +145,9 @@ struct GamesTabView: View {
                     .padding()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color("BackgroundPrimary"))
+                .background(AppColor.backgroundPrimary)
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationDestination(for: Route.self) { route in
                 switch route.destination {
                 case .gameSetup(let game):

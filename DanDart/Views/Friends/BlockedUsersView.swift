@@ -21,7 +21,7 @@ struct BlockedUsersView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color("BackgroundPrimary")
+                AppColor.backgroundPrimary
                     .ignoresSafeArea()
                 
                 if isLoading && blockedUsers.isEmpty {
@@ -29,27 +29,27 @@ struct BlockedUsersView: View {
                     VStack(spacing: 16) {
                         ProgressView()
                             .scaleEffect(1.2)
-                            .tint(Color("AccentPrimary"))
+                            .tint(AppColor.interactivePrimaryBackground)
                         
                         Text("Loading...")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 } else if blockedUsers.isEmpty {
                     // Empty State
                     VStack(spacing: 16) {
                         Image(systemName: "hand.raised.slash")
                             .font(.system(size: 64, weight: .light))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                         
                         VStack(spacing: 8) {
                             Text("No blocked users")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(Color("TextPrimary"))
+                                .foregroundColor(AppColor.textPrimary)
                             
                             Text("Users you block will appear here")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
                     }
@@ -77,7 +77,7 @@ struct BlockedUsersView: View {
                 ToolbarItem(placement: .principal) {
                     Text("Blocked Users")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -90,7 +90,7 @@ struct BlockedUsersView: View {
                             Text("Back")
                                 .font(.system(size: 16, weight: .medium))
                         }
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }
@@ -175,24 +175,24 @@ struct BlockedUserCard: View {
                 ZStack {
                     if isUnblocking {
                         ProgressView()
-                            .tint(Color("TextSecondary"))
+                            .tint(AppColor.textSecondary)
                     } else {
                         Image(systemName: "hand.raised.slash.fill")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(Color("TextSecondary").opacity(0.15))
+                        .fill(AppColor.textSecondary.opacity(0.15))
                 )
             }
             .disabled(isUnblocking)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
     }
 }
@@ -245,7 +245,7 @@ struct BlockedUsersViewWithMockData: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color("BackgroundPrimary")
+                AppColor.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -268,7 +268,7 @@ struct BlockedUsersViewWithMockData: View {
                 ToolbarItem(placement: .principal) {
                     Text("Blocked Users")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -279,7 +279,7 @@ struct BlockedUsersViewWithMockData: View {
                             Text("Back")
                                 .font(.system(size: 16, weight: .medium))
                         }
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }
@@ -294,17 +294,17 @@ struct BlockedUsersViewLoadingPreview: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color("BackgroundPrimary")
+                AppColor.backgroundPrimary
                     .ignoresSafeArea()
                 
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.2)
-                        .tint(Color("AccentPrimary"))
+                        .tint(AppColor.interactivePrimaryBackground)
                     
                     Text("Loading...")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -312,7 +312,7 @@ struct BlockedUsersViewLoadingPreview: View {
                 ToolbarItem(placement: .principal) {
                     Text("Blocked Users")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                 }
             }
         }

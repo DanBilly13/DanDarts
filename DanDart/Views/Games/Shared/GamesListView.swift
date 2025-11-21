@@ -104,7 +104,7 @@ struct GamesListViewLegacy: View {
             HStack(spacing: 8) {
                 ForEach(0..<games.count, id: \.self) { index in
                     Circle()
-                        .fill(index == currentIndex ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
+                        .fill(index == currentIndex ? AppColor.interactivePrimaryBackground : AppColor.textSecondary.opacity(0.3))
                         .frame(width: 8, height: 8)
                         .animation(.easeInOut(duration: 0.3), value: currentIndex)
                 }
@@ -149,27 +149,27 @@ struct GamesListViewVertical: View {
     GamesListView { game in
         print("Selected game: \(game.title)")
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Games List - Legacy") {
     GamesListViewLegacy { game in
         print("Selected game: \(game.title)")
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Games List - Vertical") {
     GamesListViewVertical { game in
         print("Selected game: \(game.title)")
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Games List - Dark Mode") {
     GamesListView { game in
         print("Selected game: \(game.title)")
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
     .preferredColorScheme(.dark)
 }

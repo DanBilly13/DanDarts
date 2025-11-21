@@ -20,7 +20,7 @@ struct LockedTextField: View {
             // Label
             Text(label)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             // Locked Field (Tappable)
             Button(action: {
@@ -29,21 +29,21 @@ struct LockedTextField: View {
                 HStack(spacing: 12) {
                     Text(value)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                     
                     Spacer()
                     
                     Image(systemName: "lock.fill")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color("TextSecondary").opacity(0.6))
+                        .foregroundColor(AppColor.textSecondary.opacity(0.6))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color("InputBackground").opacity(0.5))
+                .background(AppColor.inputBackground.opacity(0.5))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color("TextSecondary").opacity(0.1), lineWidth: 1)
+                        .stroke(AppColor.textSecondary.opacity(0.1), lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())
@@ -57,7 +57,7 @@ struct LockedTextField: View {
             if let subtitle = subtitle {
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color("TextSecondary").opacity(0.7))
+                    .foregroundColor(AppColor.textSecondary.opacity(0.7))
                     .padding(.leading, 2)
             }
         }
@@ -85,5 +85,5 @@ struct LockedTextField: View {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

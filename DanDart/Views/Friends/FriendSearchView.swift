@@ -48,11 +48,11 @@ struct FriendSearchView: View {
                 HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                 
                 TextField("Search by name or @handle", text: $searchQuery)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .onChange(of: searchQuery) { oldValue, newValue in
@@ -66,77 +66,77 @@ struct FriendSearchView: View {
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(12)
             .padding(.bottom, 16)
             
             // Content Area
             if isSearching {
-                    // Loading State
-                    VStack(spacing: 16) {
-                        Spacer()
-                        
-                        ProgressView()
-                            .scaleEffect(1.2)
-                            .tint(Color("AccentPrimary"))
-                        
-                        Text("Searching...")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
-                        
-                        Spacer()
-                    }
+                // Loading State
+                VStack(spacing: 16) {
+                    Spacer()
+                    
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(AppColor.interactivePrimaryBackground)
+                    
+                    Text("Searching...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    Spacer()
+                }
             } else if searchQuery.isEmpty {
-                    // Empty State - No Search Yet
-                    VStack(spacing: 16) {
-                        Spacer()
+                // Empty State - No Search Yet
+                VStack(spacing: 16) {
+                    Spacer()
+                    
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    VStack(spacing: 8) {
+                        Text("Find Friends")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(AppColor.textPrimary)
                         
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 64, weight: .light))
-                            .foregroundColor(Color("TextSecondary"))
-                        
-                        VStack(spacing: 8) {
-                            Text("Find Friends")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(Color("TextPrimary"))
-                            
-                            Text("Search by name or @handle to add friends")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                                .multilineTextAlignment(.center)
-                        }
-                        
-                        Spacer()
+                        Text("Search by name or @handle to add friends")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textSecondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .padding(.horizontal, 32)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 32)
             } else if searchResults.isEmpty {
-                    // No Results State
-                    VStack(spacing: 16) {
-                        Spacer()
+                // No Results State
+                VStack(spacing: 16) {
+                    Spacer()
+                    
+                    Image(systemName: "person.fill.questionmark")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    VStack(spacing: 8) {
+                        Text("No results found")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(AppColor.textPrimary)
                         
-                        Image(systemName: "person.fill.questionmark")
-                            .font(.system(size: 64, weight: .light))
-                            .foregroundColor(Color("TextSecondary"))
-                        
-                        VStack(spacing: 8) {
-                            Text("No results found")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(Color("TextPrimary"))
-                            
-                            Text("Try a different name or @handle")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color("TextSecondary"))
-                        }
-                        
-                        Spacer()
+                        Text("Try a different name or @handle")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textSecondary)
                     }
-                    .padding(.horizontal, 32)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 32)
             } else {
                     // Search Results List - Mixed (Friends + New People)
                     ScrollView {
@@ -146,7 +146,7 @@ struct FriendSearchView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Text("Friends")
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(Color("TextSecondary"))
+                                        .foregroundColor(AppColor.textSecondary)
                                     
                                     ForEach(friendResults) { user in
                                         FriendSearchResultCard(
@@ -167,7 +167,7 @@ struct FriendSearchView: View {
                                     if !friendResults.isEmpty {
                                         Text("Add Friends")
                                             .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color("TextSecondary"))
+                                            .foregroundColor(AppColor.textSecondary)
                                     }
                                     
                                     ForEach(nonFriendResults) { user in
@@ -342,11 +342,11 @@ struct FriendSearchResultCard: View {
                         .foregroundColor(.green)
                     Text("Friends")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Color("TextSecondary").opacity(0.1))
+                .background(AppColor.textSecondary.opacity(0.1))
                 .cornerRadius(20)
             } else {
                 // Invite Icon Button
@@ -355,7 +355,7 @@ struct FriendSearchResultCard: View {
                         if isLoading {
                             ProgressView()
                                 .scaleEffect(0.9)
-                                .tint(Color("AccentPrimary"))
+                                .tint(AppColor.interactivePrimaryBackground)
                         } else if showSuccess {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 20, weight: .bold))
@@ -363,11 +363,11 @@ struct FriendSearchResultCard: View {
                         } else if requestSent {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                         } else {
                             Image(systemName: "person.badge.plus")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(Color("AccentPrimary"))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
                         }
                     }
                     .frame(width: 44, height: 44)
@@ -375,8 +375,8 @@ struct FriendSearchResultCard: View {
                         Circle()
                             .fill(
                                 requestSent 
-                                ? Color("TextSecondary").opacity(0.15)
-                                : Color("AccentPrimary").opacity(0.15)
+                                ? AppColor.textSecondary.opacity(0.15)
+                                : AppColor.interactivePrimaryBackground.opacity(0.15)
                             )
                     )
                 }
@@ -384,7 +384,7 @@ struct FriendSearchResultCard: View {
             }
         }
         .padding(16)  // 16px padding all around
-        .background(Color("SurfacePrimary"))
+        .background(AppColor.surfacePrimary)
         .cornerRadius(12)
     }
 }
@@ -469,11 +469,11 @@ private struct FriendSearchResultsPreview: View {
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                     
                     TextField("Search by name or @handle", text: $searchQuery)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .autocorrectionDisabled()
                     
                     Button(action: {
@@ -481,12 +481,12 @@ private struct FriendSearchResultsPreview: View {
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color("InputBackground"))
+                .background(AppColor.inputBackground)
                 .cornerRadius(12)
                 .padding(.bottom, 16)
                 
@@ -496,7 +496,7 @@ private struct FriendSearchResultsPreview: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Results")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color("TextSecondary"))
+                                .foregroundColor(AppColor.textSecondary)
                             
                             ForEach(searchResults) { user in
                                 FriendSearchResultCard(

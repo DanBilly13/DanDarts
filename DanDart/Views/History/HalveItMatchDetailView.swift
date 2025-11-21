@@ -184,7 +184,15 @@ struct HalveItMatchDetailView: View {
             
             ForEach(0..<maxRounds, id: \.self) { roundIndex in
                 // Get target display from first player's turn (all players have same target per round)
-                let targetDisplay = match.players.first?.turns[safe: roundIndex]?.targetDisplay ?? "?"
+                let targetDisplay: String = {
+                    guard
+                        let firstPlayer = match.players.first,
+                        roundIndex < firstPlayer.turns.count
+                    else {
+                        return "?"
+                    }
+                    return firstPlayer.turns[roundIndex].targetDisplay ?? "?"
+                }()
                 
                 let playerData = match.players.enumerated().map { playerIndex, player in
                     let turn = roundIndex < player.turns.count ? player.turns[roundIndex] : nil

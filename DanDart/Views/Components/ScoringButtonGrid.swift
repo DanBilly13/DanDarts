@@ -178,9 +178,9 @@ struct ScoringButton: View {
                 } else if baseValue == 0 || baseValue == -1 {
                     // Miss and Bust buttons - same two-circle design as numbers
                     ZStack {
-                        // Outer circle - AccentQuinary (white) with dynamic opacity
+                        // Outer circle - AppColor.interactiveTertiaryBackground with dynamic opacity
                         Circle()
-                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.5))
+                            .fill(AppColor.interactiveTertiaryBackground.opacity(isHighlighted ? 1.0 : 0.5))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - InputBackground, fades out when pressed
@@ -197,10 +197,10 @@ struct ScoringButton: View {
                     // Standard buttons (1-20)
                     // Two-circle design: outer fills in, inner fades out, text changes color
                     ZStack {
-                        // Outer circle - AccentQuinary (white) with dynamic opacity
+                        // Outer circle - AppColor.interactiveTertiaryBackground with dynamic opacity
                         // Default: 15% opacity for subtle ring, Pressed: 100% for solid button
                         Circle()
-                            .fill(Color("AccentQuinary").opacity(isHighlighted ? 1.0 : 0.9))
+                            .fill(AppColor.interactiveTertiaryBackground.opacity(isHighlighted ? 1.0 : 0.9))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - InputBackground, fades out when pressed
@@ -350,4 +350,12 @@ struct ScoringButton: View {
             }
         )
     }
+}
+
+#Preview("Scoring Grid") {
+    ScoringButtonGrid(onScoreSelected: { value, type in
+        print("Selected score: \(value), type: \(type)")
+    }, showBustButton: true)
+    .padding()
+    .background(AppColor.backgroundPrimary)
 }

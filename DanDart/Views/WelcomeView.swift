@@ -24,12 +24,12 @@ struct WelcomeView: View {
                     // App Logo Icon
                     Image(systemName: "target")
                         .font(.system(size: 72, weight: .medium))
-                        .foregroundColor(AppColor.interactivePrimaryForeground)
+                        .foregroundColor(AppColor.brandPrimary)
                     
                     // App Logo Text (Hidden tap for MainTab preview)
                     Text("DanDarts")
                         .font(.system(size: 42, weight: .bold, design: .default))
-                        .foregroundColor(AppColor.textPrimary)
+                        .foregroundColor(AppColor.brandPrimary)
                         .onTapGesture(count: 3) {
                             // Triple tap to show MainTabView preview
                             showMainTabPreview = true

@@ -41,7 +41,7 @@ struct AvatarSelectionView: View {
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                             ZStack {
                                 Circle()
-                                    .fill(Color("InputBackground"))
+                                    .fill(AppColor.inputBackground)
                                     .frame(width: itemSize, height: itemSize)
                             
                                 if let selectedImage = selectedAvatarImage {
@@ -53,7 +53,7 @@ struct AvatarSelectionView: View {
                                 } else {
                                     Image(systemName: "camera.fill")
                                         .font(.system(size: 20, weight: .medium))
-                                        .foregroundColor(Color("AccentPrimary"))
+                                        .foregroundColor(AppColor.interactivePrimaryBackground)
                                 }
                             }
                         }
@@ -90,7 +90,7 @@ struct AvatarSelectionView: View {
             
             // Fixed Selection Circle Overlay (On Top)
             Circle()
-                .stroke(Color("AccentPrimary"), lineWidth: 3)
+                .stroke(AppColor.interactivePrimaryBackground, lineWidth: 3)
                 .frame(width: 80, height: 80)
                 .allowsHitTesting(false) // Let touches pass through to avatars below
         }
@@ -120,7 +120,7 @@ struct AvatarSelectionView: View {
                 )
                 .padding()
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
         }
     }
     

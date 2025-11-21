@@ -35,7 +35,7 @@ struct HalveItGameplayView: View {
     
     var body: some View {
         ZStack {
-            Color("BackgroundPrimary")
+            AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -135,7 +135,7 @@ struct HalveItGameplayView: View {
                 )
             }
         }
-        .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+        .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -207,5 +207,6 @@ struct HalveItGameplayView: View {
             difficulty: .medium
         )
         .environmentObject(AuthService())
+        .background(AppColor.backgroundPrimary)
     }
 }

@@ -29,7 +29,7 @@ struct SearchPlayerSheet: View {
                 HStack {
                     Text("Choose yourself, a friend, or add a new guest")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .multilineTextAlignment(.leading)
                     
                     Spacer()
@@ -57,7 +57,7 @@ struct SearchPlayerSheet: View {
                                     Text("You")
                                         .font(.system(.caption, design: .rounded))
                                         .fontWeight(.semibold)
-                                        .foregroundColor(Color("TextPrimary"))
+                                        .foregroundColor(AppColor.textPrimary)
                                     Spacer()
                                 }
                                 
@@ -99,7 +99,7 @@ struct SearchPlayerSheet: View {
                                 Text("Your Friends")
                                     .font(.system(.caption, design: .rounded))
                                     .fontWeight(.semibold)
-                                    .foregroundColor(Color("TextPrimary"))
+                                    .foregroundColor(AppColor.textPrimary)
                                 Spacer()
                             }
                             
@@ -110,7 +110,7 @@ struct SearchPlayerSheet: View {
                             } else if friendsCache.friends.isEmpty {
                                 Text("No friends yet")
                                     .font(.system(size: 14))
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(AppColor.textSecondary)
                                     .frame(maxWidth: .infinity)
                                     .padding()
                             } else {
@@ -139,7 +139,7 @@ struct SearchPlayerSheet: View {
                                     Text("Guest Players")
                                         .font(.system(.caption, design: .rounded))
                                         .fontWeight(.semibold)
-                                        .foregroundColor(Color("TextPrimary"))
+                                        .foregroundColor(AppColor.textPrimary)
                                     Spacer()
                                 }
                                 
@@ -262,4 +262,13 @@ struct SearchPlayerSheet: View {
         GuestPlayerStorageManager.shared.deleteGuestPlayer(id: player.id)
         loadGuestPlayers()
     }
+}
+
+#Preview("Search Player Sheet") {
+    SearchPlayerSheet(
+        selectedPlayers: [],
+        onPlayerSelected: { _ in },
+        friendsCache: FriendsCache()
+    )
+    .environmentObject(AuthService())
 }

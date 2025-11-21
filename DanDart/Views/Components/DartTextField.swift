@@ -15,14 +15,14 @@ struct DartTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(.system(size: 16, weight: .medium))
-            .foregroundColor(Color("TextPrimary"))
+            .foregroundColor(AppColor.textPrimary)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                    .stroke(AppColor.textSecondary.opacity(0.2), lineWidth: 1)
             )
     }
 }
@@ -48,7 +48,7 @@ struct DartTextField: View {
             // Label
             Text(label)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             // Text Field
             TextField(placeholder, text: $text)
@@ -89,19 +89,19 @@ struct DartSecureField: View {
             // Label
             Text(label)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             // Secure Field with Toggle
             HStack(spacing: 0) {
                 if isSecure {
                     SecureField(placeholder, text: $text)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .textContentType(textContentType)
                 } else {
                     TextField(placeholder, text: $text)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .textContentType(textContentType)
                 }
                 
@@ -111,17 +111,17 @@ struct DartSecureField: View {
                 }) {
                     Image(systemName: isSecure ? "eye.slash.fill" : "eye.fill")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .frame(width: 44, height: 44)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                    .stroke(AppColor.textSecondary.opacity(0.2), lineWidth: 1)
             )
             
             // Error Message
@@ -167,5 +167,5 @@ struct DartSecureField: View {
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

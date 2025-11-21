@@ -15,7 +15,7 @@ struct TopBar: View {
         VStack(spacing: 0) {
             // Status bar spacer
             Rectangle()
-                .fill(Color("BackgroundPrimary"))
+                .fill(AppColor.backgroundPrimary)
                 .frame(height: 0)
                 .ignoresSafeArea(.container, edges: .top)
             
@@ -24,7 +24,7 @@ struct TopBar: View {
                 // DanDarts Title (Left)
                 Text("DanDarts")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 
                 Spacer()
                 
@@ -38,7 +38,7 @@ struct TopBar: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 8)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
         }
     }
 }
@@ -68,11 +68,11 @@ struct AvatarView: View {
         
         Text("Content Area")
             .font(.title2)
-            .foregroundColor(Color("TextSecondary"))
+            .foregroundColor(AppColor.textSecondary)
         
         Spacer()
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
     .environmentObject(AuthService())
 }
 
@@ -86,11 +86,11 @@ struct AvatarView: View {
         
         Text("Content Area")
             .font(.title2)
-            .foregroundColor(Color("TextSecondary"))
+            .foregroundColor(AppColor.textSecondary)
         
         Spacer()
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
     .environmentObject({
         let authService = AuthService()
         // Mock user with avatar
@@ -117,11 +117,11 @@ struct AvatarView: View {
         
         Text("Content Area")
             .font(.title2)
-            .foregroundColor(Color("TextSecondary"))
+            .foregroundColor(AppColor.textSecondary)
         
         Spacer()
     }
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
     .environmentObject(AuthService())
     .preferredColorScheme(.dark)
 }

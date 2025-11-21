@@ -57,8 +57,8 @@ struct GameSetupView: View {
                                 // Fallback gradient if no image
                                 LinearGradient(
                                     colors: [
-                                        Color("AccentPrimary").opacity(0.6),
-                                        Color("AccentPrimary").opacity(0.3)
+                                        AppColor.interactivePrimaryBackground.opacity(0.6),
+                                        AppColor.interactivePrimaryBackground.opacity(0.3)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -98,7 +98,7 @@ struct GameSetupView: View {
                                     Text(config.optionLabel)
                                         .font(.system(.headline, design: .rounded))
                                         .fontWeight(.semibold)
-                                        .foregroundColor(Color("TextPrimary"))
+                                        .foregroundColor(AppColor.textPrimary)
                                     
                                     Spacer()
                                 }
@@ -114,13 +114,13 @@ struct GameSetupView: View {
                                 Text("Players")
                                     .font(.system(.headline, design: .rounded))
                                     .fontWeight(.semibold)
-                                    .foregroundColor(Color("TextPrimary"))
+                                    .foregroundColor(AppColor.textPrimary)
                                 
                                 Spacer()
                                 
                                 Text("\(selectedPlayers.count) of \(config.playerLimit)")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color("TextSecondary"))
+                                    .foregroundColor(AppColor.textSecondary)
                             }
                             
                             // Sequential Player Addition
@@ -162,7 +162,7 @@ struct GameSetupView: View {
                         // Game Instructions
                         GameInstructionsContent(game: config.game)
                             .padding(16)
-                            .background(Color("InputBackground"))
+                            .background(AppColor.inputBackground)
                             .cornerRadius(12)
                         
                         Spacer(minLength: 40)
@@ -199,7 +199,7 @@ struct GameSetupView: View {
                 Spacer()
             }
         }
-        .background(Color("BackgroundPrimary").ignoresSafeArea())
+        .background(AppColor.backgroundPrimary.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             if canStartGame {
                 VStack(spacing: 12) {

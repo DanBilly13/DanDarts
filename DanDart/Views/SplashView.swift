@@ -19,30 +19,30 @@ struct SplashView: View {
             // App Logo Icon
             Image(systemName: "target")
                 .font(.system(size: 80, weight: .medium))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(AppColor.brandPrimary)
             
             // App Logo Text
             Text("DanDarts")
                 .font(.system(size: 48, weight: .bold, design: .default))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.brandPrimary)
             
             Spacer()
             
             // Loading Indicator
             VStack(spacing: 16) {
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: Color("AccentPrimary")))
+                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.interactivePrimaryForeground))
                     .scaleEffect(1.2)
                 
                 Text("Loading...")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
             
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color("BackgroundPrimary"))
+        .background(AppColor.backgroundPrimary)
         .ignoresSafeArea()
         .onAppear {
             Task {
@@ -54,9 +54,9 @@ struct SplashView: View {
                 // Navigate to main app (Games tab)
                 Text("Main App - Games Tab")
                     .font(.largeTitle)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color("BackgroundPrimary"))
+                    .background(AppColor.backgroundPrimary)
             } else {
                 // Navigate to welcome screen
                 WelcomeView()

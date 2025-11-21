@@ -24,16 +24,16 @@ struct ProfileHeaderView: View {
             VStack(spacing: 4) {
                 Text(player.displayName)
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 
                 if !player.isGuest {
                     Text("@\(player.nickname)")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.brandPrimary)
                 } else {
                     Text("Guest Player")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
             }
             
@@ -85,5 +85,5 @@ struct ProfileHeaderView: View {
         ProfileHeaderView(player: Player.mockGuest1)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

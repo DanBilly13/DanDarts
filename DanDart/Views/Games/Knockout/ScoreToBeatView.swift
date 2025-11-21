@@ -19,20 +19,20 @@ struct ScoreToBeatView: View {
         VStack(spacing: 4) {
             /*Text("Score to beat")
                 .font(.caption)
-                .foregroundColor(Color("TextSecondary"))*/
+                .foregroundColor(AppColor.textSecondary)*/
             
             HStack(spacing: 8) {
                 Text("\(score)")
                     .font(.system(.largeTitle, design: .monospaced))
                     .fontWeight(.bold)
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                     .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
                 
                 Image("BoxingGloveLeft")
                     .resizable()
                     .renderingMode(.template)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(width: 36, height: 26)
                     .rotationEffect(.degrees(wiggleAngle))
                     .scaleEffect(showSkullWiggle ? 1.8 : 1.0)
@@ -54,7 +54,7 @@ struct ScoreToBeatView: View {
 
 #Preview {
     ZStack {
-        Color.black
+        AppColor.backgroundPrimary
             .ignoresSafeArea()
         
         VStack(spacing: 40) {

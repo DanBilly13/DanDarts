@@ -31,16 +31,16 @@ struct CurrentThrowDisplay: View {
                 }) {
                     Text(hasDart ? currentThrow[index].displayText : "—")
                         .font(.system(size: 18, weight: .semibold, design: .monospaced))
-                        .foregroundColor(hasDart ? Color("TextPrimary") : Color("TextSecondary"))
+                        .foregroundColor(hasDart ? AppColor.textPrimary : AppColor.textSecondary)
                         .frame(width: 40, height: 40)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color("TextPrimary").opacity(hasDart ? 0.15 : 0.10))
+                                .fill(AppColor.textPrimary.opacity(hasDart ? 0.15 : 0.10))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(
-                                    isSelected ? Color("AccentPrimary") : Color.clear,
+                                    isSelected ? AppColor.interactivePrimaryBackground : Color.clear,
                                     lineWidth: isSelected ? 2 : 0
                                 )
                         )
@@ -56,15 +56,15 @@ struct CurrentThrowDisplay: View {
                 // Equals sign
                 Text("=")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                     .padding(.horizontal, 8)
                 
                 // Total score
                 Text("\(currentThrow.reduce(0) { $0 + $1.totalValue })")
                     .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(width: 50, height: 40)
-                    .background(Color("TextPrimary").opacity(0.15))
+                    .background(AppColor.textPrimary.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -81,7 +81,7 @@ struct CurrentThrowDisplay: View {
         onDartTapped: { _ in }
     )
     .padding(.vertical,0)
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Partial Throw") {
@@ -94,7 +94,7 @@ struct CurrentThrowDisplay: View {
         onDartTapped: { _ in }
     )
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Full Throw - Selected") {
@@ -108,5 +108,5 @@ struct CurrentThrowDisplay: View {
         onDartTapped: { _ in }
     )
     .padding(.vertical,0)
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
