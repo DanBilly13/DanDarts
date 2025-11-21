@@ -94,9 +94,12 @@ private struct AppButtonStyle: ButtonStyle {
     private func backgroundShape(pressed: Bool) -> some View {
         let base: Color = {
             switch role {
-            case .primary, .primaryOutline:   return Color("AccentPrimary")
-            case .secondary, .secondaryOutline: return Color("AccentSecondary")
-            case .tertiary, .tertiaryOutline:  return Color("AccentTertiary")
+            case .primary, .primaryOutline:
+                return AppColor.interactivePrimaryBackground
+            case .secondary, .secondaryOutline:
+                return AppColor.interactiveSecondaryBackground
+            case .tertiary, .tertiaryOutline:
+                return AppColor.interactiveTertiaryBackground
             }
         }()
 
@@ -112,7 +115,7 @@ private struct AppButtonStyle: ButtonStyle {
 
         case .primaryOutline, .secondaryOutline, .tertiaryOutline:
             // Use app background to clearly differentiate from disabled filled buttons
-            let bg = Color("BackgroundPrimary")
+            let bg = AppColor.backgroundPrimary
             Capsule().fill(bg)
         }
     }
@@ -120,28 +123,22 @@ private struct AppButtonStyle: ButtonStyle {
     @ViewBuilder
     private func strokeOverlay(pressed: Bool) -> some View {
         switch role {
-        case .tertiary:
-            Capsule()
-                .strokeBorder(
-                    Color("AccentPrimary").opacity(isEnabled ? (pressed ? 0.45 : 0.25) : 0.2),
-                    lineWidth: 1
-                )
         case .primaryOutline:
             Capsule()
                 .strokeBorder(
-                    Color("AccentPrimary").opacity(isEnabled ? 1 : 0.5),
+                    AppColor.interactivePrimaryBackground.opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         case .secondaryOutline:
             Capsule()
                 .strokeBorder(
-                    Color("AccentSecondary").opacity(isEnabled ? 1 : 0.5),
+                    AppColor.interactiveSecondaryForeground.opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         case .tertiaryOutline:
             Capsule()
                 .strokeBorder(
-                    Color("AccentPrimary").opacity(isEnabled ? 1 : 0.5),
+                    AppColor.interactivePrimaryBackground.opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         default:
@@ -240,7 +237,7 @@ struct AppButton_Previews: PreviewProvider {
             }
         }
         .padding()
-        .background(Color("BackgroundPrimary"))
+        .background(AppColor.backgroundPrimary)
         .previewLayout(.sizeThatFits)
     }
 }
@@ -260,10 +257,10 @@ private struct SplitTintLabelStyle: LabelStyle {
 }
 private extension View {
     func applyButtonForeground(role: AppButtonRole, isEnabled: Bool) -> some View {
-        let primaryBase = Color("AccentPrimary")
-        let secondaryBase = Color("AccentSecondary")
+        let primaryBase = AppColor.interactivePrimaryBackground
+        let secondaryBase = AppColor.interactiveSecondaryForeground
         // disabled filled button text opacity
-        let white = Color.white.opacity(isEnabled ? 1 : 0.2)
+        let white = AppColor.interactivePrimaryForeground.opacity(isEnabled ? 1 : 0.2)
         // disabled border text opacity
         let dim: (Color) -> Color = { color in color.opacity(isEnabled ? 1 : 0.2) }
 
@@ -275,8 +272,8 @@ private extension View {
             textColor = white
             iconTint = white
         case .secondary:
-            textColor = white
-            iconTint = white
+            textColor = secondaryBase
+            iconTint = secondaryBase
         case .tertiary: // pale/white button
             textColor = dim(primaryBase)
             iconTint = dim(primaryBase)

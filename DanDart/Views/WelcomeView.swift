@@ -24,12 +24,12 @@ struct WelcomeView: View {
                     // App Logo Icon
                     Image(systemName: "target")
                         .font(.system(size: 72, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryForeground)
                     
                     // App Logo Text (Hidden tap for MainTab preview)
                     Text("DanDarts")
                         .font(.system(size: 42, weight: .bold, design: .default))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .onTapGesture(count: 3) {
                             // Triple tap to show MainTabView preview
                             showMainTabPreview = true
@@ -38,7 +38,7 @@ struct WelcomeView: View {
                     // Tagline
                     Text("Focus on the fun, not the math")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                     
@@ -52,7 +52,7 @@ struct WelcomeView: View {
                     AppButton(role: .primary, controlSize: .large) {
                         showingSignIn = true
                     } label: {
-                        Text("Get Started")
+                        Text("Sign in")
                     }
                     .frame(maxWidth: .infinity)
                     
@@ -60,7 +60,7 @@ struct WelcomeView: View {
                     AppButton(role: .secondary, controlSize: .large) {
                         showingSignUp = true
                     } label: {
-                        Text("Sign Up")
+                        Text("Create a new account")
                     }
                     .frame(maxWidth: .infinity)
                     
@@ -70,7 +70,7 @@ struct WelcomeView: View {
                     }) {
                         Text("Continue as Guest")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.top, 8)
@@ -81,7 +81,7 @@ struct WelcomeView: View {
                     }) {
                         Text("Use Mock User (Testing)")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryForeground)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.top, 4)
@@ -92,7 +92,7 @@ struct WelcomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color("BackgroundPrimary"))
+        .background(AppColor.backgroundPrimary)
         .ignoresSafeArea()
         .sheet(isPresented: $showingSignIn) {
             SignInView()
@@ -109,11 +109,11 @@ struct WelcomeView: View {
                 Text("Games Tab")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 
                 Text("MainTabView will be implemented in Phase 5")
                     .font(.body)
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
@@ -124,11 +124,11 @@ struct WelcomeView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 32)
                 .padding(.vertical, 12)
-                .background(Color("AccentPrimary"))
+                .background(AppColor.interactivePrimaryBackground)
                 .cornerRadius(25)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
         }
         .fullScreenCover(isPresented: $showMainTabPreview) {
             // Clean MainTabView Preview - no extra UI elements
