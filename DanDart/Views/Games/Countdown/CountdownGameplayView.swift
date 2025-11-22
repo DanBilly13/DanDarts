@@ -22,6 +22,7 @@ struct CountdownGameplayView: View {
     @State private var navigateToGameEnd: Bool = false
     @State private var showLegWinCelebration: Bool = false
     @State private var showDoubleTripleTip: Bool = false
+    @State private var isScoreboardExpanded: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
@@ -58,98 +59,120 @@ struct CountdownGameplayView: View {
                     .padding(.horizontal, 24)
                 }
             } background: {
-                VStack(spacing: 0) {
-                    // TOP — cards / throw / checkout
+                ZStack {
                     VStack(spacing: 0) {
-                        // Stacked player cards (current player in front)
-                        StackedPlayerCards(
-                            players: gameViewModel.players,
-                            currentPlayerIndex: gameViewModel.currentPlayerIndex,
-                            playerScores: gameViewModel.playerScores,
-                            currentThrow: gameViewModel.currentThrow,
-                            legsWon: gameViewModel.legsWon,
-                            matchFormat: gameViewModel.matchFormat,
-                            showScoreAnimation: gameViewModel.showScoreAnimation
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 56)
-                        
-                        // Current throw display (always visible)
-                        CurrentThrowDisplay(
-                            currentThrow: gameViewModel.currentThrow,
-                            selectedDartIndex: gameViewModel.selectedDartIndex,
-                            onDartTapped: { index in
-                                gameViewModel.selectDart(at: index)
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        
-                        // Checkout suggestion slot
-                        VStack {
-                            if let checkout = gameViewModel.suggestedCheckout {
-                                CheckoutSuggestionView(checkout: checkout)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 0)
-                            }
-                        }
-                        .frame(height: 40, alignment: .center)
-                        .padding(.bottom, 8)
-                        
-                        Spacer(minLength: 0)
-                    }
-                    
-                    // Flexible gap between halves (grows on large phones)
-                    Spacer(minLength: 0)
-                    
-                    // BOTTOM — scoring grid + save
-                    VStack(spacing: 0) {
-                        // Scoring button grid (center)
-                        ScoringButtonGrid(
-                            onScoreSelected: { baseValue, scoreType in
-                                gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
-                            },
-                            showBustButton: gameViewModel.canBust
-                        )
-                        .padding(.horizontal, 16)
-                        
-                        // Small breathing room between grid and button (replaces Spacer)
-                        Color.clear.frame(height: 24)
-                        
-                        // Save Score button container (fixed height to prevent layout shift)
-                        ZStack {
-                            // Invisible placeholder to maintain layout space
-                            AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
-                                Text("Save Score")
-                            }
-                            .opacity(0)
-                            .disabled(true)
+                        // TOP — cards / throw / checkout
+                        VStack(spacing: 0) {
+                            // Stacked player cards (current player in front / expandable into column)
+                            StackedPlayerCards(
+                                players: gameViewModel.players,
+                                currentPlayerIndex: gameViewModel.currentPlayerIndex,
+                                playerScores: gameViewModel.playerScores,
+                                currentThrow: gameViewModel.currentThrow,
+                                legsWon: gameViewModel.legsWon,
+                                matchFormat: gameViewModel.matchFormat,
+                                showScoreAnimation: gameViewModel.showScoreAnimation,
+                                isExpanded: isScoreboardExpanded,
+                                onTap: {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        isScoreboardExpanded = true
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 56)
                             
-                            // Actual button that pops in/out
-                            AppButton(
-                                role: gameViewModel.isWinningThrow ? .secondary : .primary,
-                                controlSize: .extraLarge,
-                                action: { gameViewModel.saveScore() }
-                            ) {
-                                if gameViewModel.isWinningThrow {
-                                    Label("Save Score", systemImage: "trophy.fill")
-                                } else if gameViewModel.isBust {
-                                    Text("Bust")
-                                } else {
-                                    Label("Save Score", systemImage: "checkmark.circle.fill")
+                            // Current throw display (always visible)
+                            CurrentThrowDisplay(
+                                currentThrow: gameViewModel.currentThrow,
+                                selectedDartIndex: gameViewModel.selectedDartIndex,
+                                onDartTapped: { index in
+                                    gameViewModel.selectDart(at: index)
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                            
+                            // Checkout suggestion slot
+                            VStack {
+                                if let checkout = gameViewModel.suggestedCheckout {
+                                    CheckoutSuggestionView(checkout: checkout)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 0)
                                 }
                             }
-                            .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
-                            .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
-                            // Reusable pop animation (applies to all button states)
-                            .popAnimation(
-                                active: gameViewModel.isTurnComplete,
-                                duration: gameViewModel.isWinningThrow ? 0.32 : 0.28,
-                                bounce: gameViewModel.isWinningThrow ? 0.28 : 0.22
-                            )
+                            .frame(height: 40, alignment: .center)
+                            .padding(.bottom, 8)
+                            
+                            Spacer(minLength: 0)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 34)
+                        
+                        // Flexible gap between halves (grows on large phones)
+                        Spacer(minLength: 0)
+                        
+                        // BOTTOM — scoring grid + save
+                        VStack(spacing: 0) {
+                            // Scoring button grid (center)
+                            ScoringButtonGrid(
+                                onScoreSelected: { baseValue, scoreType in
+                                    gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
+                                },
+                                showBustButton: gameViewModel.canBust
+                            )
+                            .padding(.horizontal, 16)
+                            
+                            // Small breathing room between grid and button (replaces Spacer)
+                            Color.clear.frame(height: 24)
+                            
+                            // Save Score button container (fixed height to prevent layout shift)
+                            ZStack {
+                                // Invisible placeholder to maintain layout space
+                                AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
+                                    Text("Save Score")
+                                }
+                                .opacity(0)
+                                .disabled(true)
+                                
+                                // Actual button that pops in/out
+                                AppButton(
+                                    role: gameViewModel.isWinningThrow ? .secondary : .primary,
+                                    controlSize: .extraLarge,
+                                    action: { gameViewModel.saveScore() }
+                                ) {
+                                    if gameViewModel.isWinningThrow {
+                                        Label("Save Score", systemImage: "trophy.fill")
+                                    } else if gameViewModel.isBust {
+                                        Text("Bust")
+                                    } else {
+                                        Label("Save Score", systemImage: "checkmark.circle.fill")
+                                    }
+                                }
+                                .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
+                                .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
+                                // Reusable pop animation (applies to all button states)
+                                .popAnimation(
+                                    active: gameViewModel.isTurnComplete,
+                                    duration: gameViewModel.isWinningThrow ? 0.32 : 0.28,
+                                    bounce: gameViewModel.isWinningThrow ? 0.28 : 0.22
+                                )
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 34)
+                        }
+                    }
+
+                    // When expanded, swallow taps anywhere in the gameplay area
+                    // so the scoreboard behaves like a modal overlay. The
+                    // navigation bar (above this view) remains interactive.
+                    if isScoreboardExpanded {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .ignoresSafeArea(.container, edges: .bottom)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    isScoreboardExpanded = false
+                                }
+                            }
                     }
                 }
             }

@@ -8,6 +8,8 @@ struct StackedPlayerCards: View {
     let legsWon: [UUID: Int]
     let matchFormat: Int
     let showScoreAnimation: Bool
+    let isExpanded: Bool
+    let onTap: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -39,13 +41,33 @@ struct StackedPlayerCards: View {
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentPlayerIndex)
                 }
             }
-            .frame(height: calculateStackHeight(playerCount: players.count))
+            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: isExpanded)
+            .frame(height: calculateStackHeight(playerCount: players.count, isExpanded: isExpanded), alignment: .top)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap?()
+            }
         }
     }
 
     // MARK: - Helper Functions
 
     private func offsetForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> CGFloat {
+        // When expanded, spread cards into a vertical column anchored at the top.
+        // The current (front) player sits at the bottom of the column, with
+        // earlier players stacked above it in turn order.
+        if isExpanded {
+            let cardHeight: CGFloat = 84
+            let spacing: CGFloat = 12
+            let stackPosition = CGFloat(stackPositionForPlayer(index: index, currentIndex: currentIndex, totalPlayers: totalPlayers))
+
+            // Map stackPosition (0 = current player) into a vertical index where
+            // 0 is the *top* of the column and the current player is at the
+            // bottom (largest index).
+            let verticalIndex = CGFloat(totalPlayers - 1) - stackPosition
+            return verticalIndex * (cardHeight + spacing)
+        }
+
         if index == currentIndex {
             return 0  // Current player at front (bottom of stack)
         }
@@ -63,6 +85,11 @@ struct StackedPlayerCards: View {
     }
 
     private func scaleForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> CGFloat {
+        // When expanded, all cards sit at full scale
+        if isExpanded {
+            return 1.0
+        }
+
         if index == currentIndex {
             return 1.0  // Current player: 100% scale
         }
@@ -78,6 +105,11 @@ struct StackedPlayerCards: View {
     }
 
     private func overlayOpacityForPlayer(index: Int, currentIndex: Int) -> Double {
+        // When expanded, avoid dimming so all cards are equally legible
+        if isExpanded {
+            return 0.0
+        }
+
         if index == currentIndex {
             return 0.0  // Current player: no overlay (fully visible)
         }
@@ -95,6 +127,11 @@ struct StackedPlayerCards: View {
     }
 
     private func zIndexForPlayer(index: Int, currentIndex: Int, totalPlayers: Int) -> Double {
+        // In expanded mode, keep a simple top-to-bottom stacking order
+        if isExpanded {
+            return Double(totalPlayers - index)
+        }
+
         if index == currentIndex {
             return 100  // Current player always on top
         }
@@ -118,19 +155,22 @@ struct StackedPlayerCards: View {
         return relativePosition
     }
 
-    private func calculateStackHeight(playerCount: Int) -> CGFloat {
-        // Base card height + smaller offsets for visible portions
-        let baseCardHeight: CGFloat = 84
+    private func calculateStackHeight(playerCount: Int, isExpanded: Bool) -> CGFloat {
+        let cardHeight: CGFloat = 84
+        let spacing: CGFloat = 12
 
         if playerCount <= 1 {
-            return baseCardHeight
+            return cardHeight
         }
 
-        // Add space for visible portions of stacked cards
-        // Each card adds approximately 12pt of visible space
-        let additionalHeight = CGFloat(playerCount - 1) * 12
-
-        return baseCardHeight + additionalHeight
+        if isExpanded {
+            // Full column height: one full card per player plus spacing
+            return CGFloat(playerCount) * (cardHeight + spacing)
+        } else {
+            // Stacked height: single card plus small visible portions
+            let additionalHeight = CGFloat(playerCount - 1) * 12
+            return cardHeight + additionalHeight
+        }
     }
 }
 

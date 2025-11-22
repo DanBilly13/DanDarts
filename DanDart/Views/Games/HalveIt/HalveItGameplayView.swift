@@ -20,6 +20,7 @@ struct HalveItGameplayView: View {
     @State private var showRestartAlert: Bool = false
     @State private var showExitAlert: Bool = false
     @State private var navigateToGameEnd: Bool = false
+    @State private var isScoreboardExpanded: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
@@ -38,89 +39,111 @@ struct HalveItGameplayView: View {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // TOP — cards / throw / targets
+            ZStack {
                 VStack(spacing: 0) {
-                    // Player score cards (reusing 301 component)
-                    StackedPlayerCards(
-                        players: viewModel.players,
-                        currentPlayerIndex: viewModel.currentPlayerIndex,
-                        playerScores: viewModel.playerScores,
-                        currentThrow: viewModel.currentThrow,
-                        legsWon: [:],  // Not used in Halve It
-                        matchFormat: 1,  // Not used in Halve It
-                        showScoreAnimation: viewModel.showScoreAnimation
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 56)
-                    
-                    // Current throw display (with tap-to-edit and target validation)
-                    HalveItThrowDisplay(
-                        currentThrow: viewModel.currentThrow,
-                        selectedDartIndex: viewModel.selectedDartIndex,
-                        currentTarget: viewModel.currentTarget,
-                        onDartTapped: { index in
-                            viewModel.selectDart(at: index)
-                        }
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    
-                    // Target progression (moved below current throw)
-                    TargetProgressView(
-                        targets: viewModel.targets,
-                        currentRound: viewModel.currentRound
-                    )
-                    .padding(.top, 8)
-                    
-                    Spacer()
-                }
-                
-                // Flexible gap between halves (grows on large phones)
-                Spacer(minLength: 0)
-                
-                // BOTTOM — scoring grid + save
-                VStack(spacing: 0) {
-                    // Scoring button grid (no bust button for Halve-It)
-                    ScoringButtonGrid(
-                        onScoreSelected: { baseValue, scoreType in
-                            viewModel.recordThrow(baseValue: baseValue, scoreType: scoreType)
-                        },
-                        showBustButton: false
-                    )
-                    .padding(.horizontal, 16)
-                    
-                    // Small breathing room between grid and button
-                    Color.clear.frame(height: 24)
-                    
-                    // Save Score button container (fixed height to prevent layout shift)
-                    ZStack {
-                        // Invisible placeholder to maintain layout space
-                        AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
-                            Text("Save Score")
-                        }
-                        .opacity(0)
-                        .disabled(true)
-                        
-                        // Actual button that pops in/out
-                        AppButton(
-                            role: .primary,
-                            controlSize: .extraLarge,
-                            action: { viewModel.completeTurn() }
-                        ) {
-                            Label("Save Score", systemImage: "checkmark.circle.fill")
-                        }
-                        .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
-                        .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
-                        // Pop animation when turn is complete (3 darts entered)
-                        .popAnimation(
-                            active: viewModel.isTurnComplete,
-                            duration: 0.28,
-                            bounce: 0.22
+                    // TOP — cards / throw / targets
+                    VStack(spacing: 0) {
+                        // Player score cards (reusing 301 component, expandable into column)
+                        StackedPlayerCards(
+                            players: viewModel.players,
+                            currentPlayerIndex: viewModel.currentPlayerIndex,
+                            playerScores: viewModel.playerScores,
+                            currentThrow: viewModel.currentThrow,
+                            legsWon: [:],  // Not used in Halve It
+                            matchFormat: 1,  // Not used in Halve It
+                            showScoreAnimation: viewModel.showScoreAnimation,
+                            isExpanded: isScoreboardExpanded,
+                            onTap: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    isScoreboardExpanded = true
+                                }
+                            }
                         )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 56)
+
+                        // Current throw display (with tap-to-edit and target validation)
+                        HalveItThrowDisplay(
+                            currentThrow: viewModel.currentThrow,
+                            selectedDartIndex: viewModel.selectedDartIndex,
+                            currentTarget: viewModel.currentTarget,
+                            onDartTapped: { index in
+                                viewModel.selectDart(at: index)
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        
+                        // Target progression (moved below current throw)
+                        TargetProgressView(
+                            targets: viewModel.targets,
+                            currentRound: viewModel.currentRound
+                        )
+                        .padding(.top, 8)
+                        
+                        Spacer()
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 34)
+                    
+                    // Flexible gap between halves (grows on large phones)
+                    Spacer(minLength: 0)
+                    
+                    // BOTTOM — scoring grid + save
+                    VStack(spacing: 0) {
+                        // Scoring button grid (no bust button for Halve-It)
+                        ScoringButtonGrid(
+                            onScoreSelected: { baseValue, scoreType in
+                                viewModel.recordThrow(baseValue: baseValue, scoreType: scoreType)
+                            },
+                            showBustButton: false
+                        )
+                        .padding(.horizontal, 16)
+                        
+                        // Small breathing room between grid and button
+                        Color.clear.frame(height: 24)
+                        
+                        // Save Score button container (fixed height to prevent layout shift)
+                        ZStack {
+                            // Invisible placeholder to maintain layout space
+                            AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
+                                Text("Save Score")
+                            }
+                            .opacity(0)
+                            .disabled(true)
+                            
+                            // Actual button that pops in/out
+                            AppButton(
+                                role: .primary,
+                                controlSize: .extraLarge,
+                                action: { viewModel.completeTurn() }
+                            ) {
+                                Label("Save Score", systemImage: "checkmark.circle.fill")
+                            }
+                            .blur(radius: menuCoordinator.activeMenuId != nil ? 2 : 0)
+                            .opacity(menuCoordinator.activeMenuId != nil ? 0.4 : 1.0)
+                            // Pop animation when turn is complete (3 darts entered)
+                            .popAnimation(
+                                active: viewModel.isTurnComplete,
+                                duration: 0.28,
+                                bounce: 0.22
+                            )
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 34)
+                    }
+                }
+
+                // When expanded, swallow taps anywhere in the gameplay area
+                // so the scoreboard behaves like a modal overlay. The
+                // navigation bar (above this view) remains interactive.
+                if isScoreboardExpanded {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea(.container, edges: .bottom)
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                isScoreboardExpanded = false
+                            }
+                        }
                 }
             }
         }
