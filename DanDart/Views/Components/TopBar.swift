@@ -23,8 +23,22 @@ struct TopBar: View {
             HStack {
                 // DanDarts Title (Left)
                 Text("DanDarts")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
                     .foregroundColor(AppColor.textPrimary)
+
+#if DEBUG
+                // Temporary debug link to scroll offset test view
+                NavigationLink {
+                    ScrollOffsetTestView()
+                        .background(AppColor.backgroundPrimary.ignoresSafeArea())
+                } label: {
+                    Text("Scroll Test")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(AppColor.textSecondary)
+                        .padding(.leading, 8)
+                }
+#endif
                 
                 Spacer()
                 
