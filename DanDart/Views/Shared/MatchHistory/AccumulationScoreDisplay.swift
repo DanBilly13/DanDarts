@@ -21,37 +21,43 @@ struct AccumulationScoreDisplay: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            // Trophy icon or placement text
-            if isWinner {
-                // Trophy icon - 24px (smaller to make room for score)
-                Image(systemName: "trophy")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundColor(Color("AccentTertiary"))
-            } else {
-                // Placement text - Apple title3 style
-                Text(placementText)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(Color("TextSecondary"))
+            // Top row: crown or placement, in a fixed-height container so they align
+            Group {
+                if isWinner {
+                    // Trophy icon - 24px (smaller to make room for score)
+                    Image(systemName: "crown")
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundColor(Color("AccentTertiary"))
+                } else {
+                    // Placement text - Apple headline style
+                    Text(placementText)
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColor.textSecondary)
+                }
             }
+            .frame(height: 24, alignment: .bottom)
             
-            // Show leg indicators for multi-leg matches OR score for all players
-            if isMultiLegMatch {
-                // Leg indicators using reusable component
-                LegIndicators(
-                    legsWon: legsWon,
-                    totalLegs: totalLegs,
-                    color: borderColor,
-                    dotSize: 8,
-                    spacing: 4
-                )
-            } else {
-                // Single-leg game: show score for all players (winner and non-winners)
-                Text("\(finalScore)pts")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(Color("TextSecondary"))
+            // Bottom row: leg indicators or score, also in a fixed-height container
+            Group {
+                if isMultiLegMatch {
+                    // Leg indicators using reusable component
+                    LegIndicators(
+                        legsWon: legsWon,
+                        totalLegs: totalLegs,
+                        color: borderColor,
+                        dotSize: 8,
+                        spacing: 4
+                    )
+                } else {
+                    // Single-leg game: show score for all players (winner and non-winners)
+                    Text("\(finalScore)pts")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColor.textSecondary)
+                }
             }
+            .frame(height: 16, alignment: .center)
         }
         .frame(width: 60)
     }
@@ -64,5 +70,45 @@ struct AccumulationScoreDisplay: View {
         case 3: return "3rd"
         default: return "\(placement)th"
         }
+    }
+}
+
+#Preview("Accumulation Score Display") {
+    ZStack {
+        AppColor.backgroundPrimary
+            .ignoresSafeArea()
+        
+        HStack(spacing: 24) {
+            AccumulationScoreDisplay(
+                isWinner: true,
+                placement: 1,
+                finalScore: 120,
+                borderColor: AppColor.player1,
+                isMultiLegMatch: true,
+                legsWon: 3,
+                totalLegs: 5
+            )
+            
+            AccumulationScoreDisplay(
+                isWinner: false,
+                placement: 2,
+                finalScore: 95,
+                borderColor: AppColor.player2,
+                isMultiLegMatch: true,
+                legsWon: 2,
+                totalLegs: 5
+            )
+            
+            AccumulationScoreDisplay(
+                isWinner: false,
+                placement: 3,
+                finalScore: 80,
+                borderColor: AppColor.player3,
+                isMultiLegMatch: false,
+                legsWon: 0,
+                totalLegs: 1
+            )
+        }
+        .padding()
     }
 }

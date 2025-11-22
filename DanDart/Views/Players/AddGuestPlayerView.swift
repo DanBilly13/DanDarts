@@ -38,11 +38,11 @@ struct AddGuestPlayerView: View {
                 VStack(spacing: 8) {
                     Text("Add Guest Player")
                         .font(.system(size: 28, weight: .bold, design: .default))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                     
                     Text("Create a local player profile")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
                 .padding(.top, 24)
                 .padding(.horizontal, 24)
@@ -53,7 +53,7 @@ struct AddGuestPlayerView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Profile Picture")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         AvatarSelectionView(
                             selectedAvatar: $selectedAvatar,
@@ -92,7 +92,7 @@ struct AddGuestPlayerView: View {
                         
                         Text("Used for quick identification during games")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                             .padding(.leading, 2)
                     }
                 }
@@ -103,52 +103,32 @@ struct AddGuestPlayerView: View {
                 
                 // Action Buttons
                 VStack(spacing: 12) {
-                    // Save Button
-                    Button(action: savePlayer) {
-                        HStack {
+                    AppButton(
+                        role: .primary,
+                        isDisabled: !isSaveEnabled || isLoading,
+                        action: savePlayer
+                    ) {
+                        HStack(spacing: 8) {
                             if isLoading {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     .scaleEffect(0.8)
                             }
-                            
                             Text(isLoading ? "Creating..." : "Save Player")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.white)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(
-                            RoundedRectangle(cornerRadius: 25)
-                                .fill(isSaveEnabled ? Color("AccentPrimary") : Color("TextSecondary").opacity(0.3))
-                        )
                     }
-                    .disabled(!isSaveEnabled || isLoading)
-                    
-                    // Cancel Button
-                    Button(action: {
-                        dismiss()
-                    }) {
+
+                    AppButton(
+                        role: .tertiary,
+                        isDisabled: isLoading,
+                        action: { dismiss() }
+                    ) {
                         Text("Cancel")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(Color("TextSecondary"))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: 25)
-                                    .fill(Color("InputBackground"))
-                                   /* .overlay(
-                                        RoundedRectangle(cornerRadius: 25)
-                                            .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
-                                    )*/
-                            )
                     }
-                    .disabled(isLoading)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 34)
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationBarBackButtonHidden(true)
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
@@ -187,8 +167,8 @@ struct AddGuestPlayerView: View {
     }
     
     private var isSaveEnabled: Bool {
-        return displayNameError.isEmpty && 
-               nicknameError.isEmpty && 
+        return displayNameError.isEmpty &&
+               nicknameError.isEmpty &&
                !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }

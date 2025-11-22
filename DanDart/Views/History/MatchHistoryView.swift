@@ -62,7 +62,7 @@ struct MatchHistoryView: View {
                 
                 contentView
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -72,18 +72,18 @@ struct MatchHistoryView: View {
                         loadMatches()
                     }
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
             }
-            .toolbarBackground(Color("BackgroundPrimary"), for: .navigationBar)
+            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .background(Color("BackgroundPrimary")).ignoresSafeArea()
+        .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .onAppear {
             let appearance = UINavigationBarAppearance()
             appearance.configureWithTransparentBackground()
-            appearance.backgroundColor = UIColor(named: "BackgroundPrimary")
+            appearance.backgroundColor = UIColor(AppColor.backgroundPrimary)
             appearance.shadowColor = .clear
             appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
             appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
@@ -102,17 +102,17 @@ struct MatchHistoryView: View {
         HStack(spacing: 8) {
             ProgressView()
                 .scaleEffect(0.8)
-                .tint(Color("AccentPrimary"))
+                .tint(AppColor.interactivePrimaryBackground)
             
             Text(isRefreshing ? "Syncing with cloud..." : "Loading from cloud...")
                 .font(.caption.weight(.medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(8)
         .padding(.bottom, 8)
     }
@@ -125,7 +125,7 @@ struct MatchHistoryView: View {
             
             Text(message)
                 .font(.caption.weight(.medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             Spacer()
             
@@ -134,7 +134,7 @@ struct MatchHistoryView: View {
             }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
         }
         .padding(.horizontal, 12)
@@ -179,16 +179,16 @@ struct MatchHistoryView: View {
             
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 64, weight: .light))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             VStack(spacing: 8) {
                 Text("No matches yet")
                     .font(.title3.weight(.semibold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 
                 Text(emptyStateMessage)
                     .font(.body.weight(.medium))
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
                     .multilineTextAlignment(.center)
             }
             
@@ -323,12 +323,12 @@ struct FilterButton: View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(isSelected ? Color("BackgroundPrimary") : Color("TextPrimary"))
+                .foregroundColor(isSelected ? AppColor.backgroundPrimary : AppColor.textPrimary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(isSelected ? Color("AccentPrimary") : Color("InputBackground"))
+                        .fill(isSelected ? AppColor.interactivePrimaryBackground : AppColor.inputBackground)
                 )
         }
     }

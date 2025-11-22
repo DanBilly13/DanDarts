@@ -34,7 +34,7 @@ struct MatchDetailView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 24)
                 }
-                .background(Color("BackgroundPrimary"))
+                .background(AppColor.backgroundPrimary)
                 .navigationTitle(match.gameName)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar(.hidden, for: .tabBar)
@@ -68,7 +68,7 @@ struct MatchDetailView: View {
     private var dateHeader: some View {
         Text(match.formattedDate)
             .font(.subheadline.weight(.medium))
-            .foregroundColor(Color("TextSecondary"))
+            .foregroundColor(AppColor.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     
@@ -108,11 +108,13 @@ struct MatchDetailView: View {
     // Get player color based on index
     private func playerColor(for index: Int) -> Color {
         switch index {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
         }
     }
     
@@ -121,7 +123,7 @@ struct MatchDetailView: View {
             // Stats title
             Text("Stats")
                 .font(.title3.weight(.semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             // Color key legend (wraps to 2 rows if needed)
             FlexibleLayout(spacing: 12) {
@@ -133,7 +135,7 @@ struct MatchDetailView: View {
                         
                         Text(match.players[index].displayName)
                             .font(.caption.weight(.medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
             }
@@ -209,7 +211,7 @@ struct MatchDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Turn-by-Turn Breakdown")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             // Get max turns across all players
             let maxTurns = match.players.map { $0.turns.count }.max() ?? 0
@@ -257,11 +259,13 @@ struct CompactPlayerCard: View {
     // Get border color based on player index
     var borderColor: Color {
         switch playerIndex {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
         }
     }
     
@@ -270,7 +274,7 @@ struct CompactPlayerCard: View {
             // Avatar with crown
             ZStack {
                 Circle()
-                    .fill(Color("InputBackground"))
+                    .fill(AppColor.inputBackground)
                     .frame(width: 100, height: 100)
                 
                 if let avatarURL = player.avatarURL {
@@ -282,7 +286,7 @@ struct CompactPlayerCard: View {
                 } else {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 50, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
                 
                 // Winner crown
@@ -299,15 +303,14 @@ struct CompactPlayerCard: View {
                 Text(player.displayName)
                     .font(.system(.title3, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(isWinner ? Color("TextPrimary") : Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .multilineTextAlignment(.center)
                 
                 if !player.isGuest {
                     Text("@\(player.nickname)")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(Color("TextPrimary").opacity(0.8))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary.opacity(0.8))
                 }
             }
             
@@ -320,7 +323,7 @@ struct CompactPlayerCard: View {
                     
                     Text("WINNER")
                         .font(.subheadline.weight(.bold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .tracking(1)
                 }
                 .padding(.vertical, 8)
@@ -328,18 +331,18 @@ struct CompactPlayerCard: View {
                 VStack(spacing: 4) {
                     Text("\(player.finalScore)")
                         .font(.title.weight(.bold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                     
                     Text("Left on \(player.finalScore)")
                         .font(.subheadline.weight(.bold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                 }
                 .padding(.vertical, 8)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -371,11 +374,13 @@ struct MatchPlayerCard: View {
     // Get border color based on player index
     var borderColor: Color {
         switch playerIndex {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
         }
     }
     
@@ -394,7 +399,7 @@ struct MatchPlayerCard: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -442,18 +447,18 @@ struct InfoRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(AppColor.interactivePrimaryBackground)
                 .frame(width: 24)
             
             Text(title)
                 .font(.subheadline.weight(.medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             Spacer()
             
             Text(value)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
         }
     }
 }
@@ -482,7 +487,7 @@ struct StatCategorySection: View {
             // Category label
             Text(label)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
             
             // Individual stat bars for each player
             VStack(spacing: 6) {
@@ -514,11 +519,13 @@ struct PlayerStatBar: View {
     // Get player color based on index
     private var playerColor: Color {
         switch playerIndex {
-        case 0: return Color("AccentPrimary")
-        case 1: return Color("AccentSecondary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
         }
     }
     
@@ -535,7 +542,7 @@ struct PlayerStatBar: View {
                 ZStack(alignment: .leading) {
                     // Background bar (gray)
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color("InputBackground"))
+                        .fill(AppColor.inputBackground)
                         .frame(height: 12)
                     
                     // Filled bar (player's color)
@@ -549,7 +556,7 @@ struct PlayerStatBar: View {
             // Value (right aligned, rounded up)
             Text(isDecimal && decimalValue != nil ? "\(Int(ceil(decimalValue!)))" : "\(value)")
                 .font(.caption.weight(.bold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
                 .frame(width: 35, alignment: .trailing)
         }
     }
@@ -565,7 +572,7 @@ struct PlayerTurnBreakdown: View {
             // Player name header
             Text(player.displayName)
                 .font(.headline)
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             // Turns
             VStack(spacing: 8) {
@@ -576,7 +583,7 @@ struct PlayerTurnBreakdown: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
-        .background(Color("InputBackground"))
+        .background(AppColor.inputBackground)
         .cornerRadius(12)
     }
 }
@@ -591,7 +598,7 @@ struct TurnRow: View {
             // Turn number
             Text("Turn \(turn.turnNumber)")
                 .font(.caption.weight(.semibold))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
                 .frame(width: 60, alignment: .leading)
             
             // Darts
@@ -599,10 +606,10 @@ struct TurnRow: View {
                 ForEach(turn.darts, id: \.value) { dart in
                     Text(dart.displayText)
                         .font(.caption.weight(.medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)
-                        .background(Color("BackgroundPrimary"))
+                        .background(AppColor.backgroundPrimary)
                         .cornerRadius(4)
                 }
             }
@@ -612,12 +619,12 @@ struct TurnRow: View {
             // Turn total
             Text("\(turn.turnTotal)")
                 .font(.subheadline.weight(.bold))
-                .foregroundColor(turn.isBust ? Color.red : Color("AccentPrimary"))
+                .foregroundColor(turn.isBust ? Color.red : AppColor.interactivePrimaryBackground)
             
             // Score after
             Text("→ \(turn.scoreAfter)")
                 .font(.caption.weight(.medium))
-                .foregroundColor(Color("TextSecondary"))
+                .foregroundColor(AppColor.textSecondary)
         }
         .padding(.vertical, 4)
     }

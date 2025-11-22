@@ -20,7 +20,7 @@ struct RoundContainer<Content: View>: View {
         content
             .frame(maxWidth: .infinity)
             .padding(16)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(8)
     }
 }
@@ -31,10 +31,10 @@ struct RoundContainer<Content: View>: View {
             HStack {
                 Text("R1")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                 Spacer()
                 Text("Example Content")
-                    .foregroundColor(Color("TextSecondary"))
+                    .foregroundColor(AppColor.textSecondary)
             }
         }
         
@@ -48,5 +48,5 @@ struct RoundContainer<Content: View>: View {
         }
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

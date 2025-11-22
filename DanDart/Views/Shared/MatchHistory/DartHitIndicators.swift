@@ -37,10 +37,10 @@ struct DartHitIndicators: View {
             // Use sequence if provided (shows exact hit/miss order)
             return index < sequence.count && sequence[index] 
                 ? playerColor 
-                : Color("TextSecondary").opacity(0.3)
+                : AppColor.textSecondary.opacity(0.3)
         } else {
             // Fallback to old behavior (just count)
-            return index < hits ? playerColor : Color("TextSecondary").opacity(0.3)
+            return index < hits ? playerColor : AppColor.textSecondary.opacity(0.3)
         }
     }
 }
@@ -49,24 +49,24 @@ struct DartHitIndicators: View {
     VStack(spacing: 16) {
         HStack {
             Text("3 hits:")
-            DartHitIndicators(hits: 3, playerColor: .green)
+            DartHitIndicators(hits: 3, playerColor: AppColor.player1)
         }
         
         HStack {
             Text("2 hits:")
-            DartHitIndicators(hits: 2, playerColor: .red)
+            DartHitIndicators(hits: 2, playerColor: AppColor.player2)
         }
         
         HStack {
             Text("1 hit:")
-            DartHitIndicators(hits: 1, playerColor: .yellow)
+            DartHitIndicators(hits: 1, playerColor: AppColor.player3)
         }
         
         HStack {
             Text("0 hits:")
-            DartHitIndicators(hits: 0, playerColor: .blue)
+            DartHitIndicators(hits: 0, playerColor: AppColor.player4)
         }
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

@@ -25,7 +25,7 @@ struct ThrowBreakdownCard: View {
                 // Round number label (flexible width)
                 Text("R\(roundNumber)")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(width: 32, alignment: .leading)
 
                 
@@ -103,13 +103,13 @@ struct ThrowBreakdownCard: View {
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["D19", "5", "1"],
                     scoreRemaining: 257,
-                    color: Color("AccentSecondary"),
+                    color: AppColor.player1,
                     isBust: false
                 ),
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["20", "5", "T20"],
                     scoreRemaining: 216,
-                    color: Color("AccentPrimary"),
+                    color: AppColor.player2,
                     isBust: false
                 )
             ]
@@ -121,20 +121,20 @@ struct ThrowBreakdownCard: View {
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["T20", "T20", "T20"],
                     scoreRemaining: 77,
-                    color: Color("AccentSecondary"),
+                    color: AppColor.player1,
                     isBust: false
                 ),
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["20", "20", "20"],
                     scoreRemaining: 156,
-                    color: Color("AccentPrimary"),
+                    color: AppColor.player2,
                     isBust: false
                 )
             ]
         )
     }
     .padding()
-    .background(Color.yellow)
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("4 Players") {
@@ -145,30 +145,30 @@ struct ThrowBreakdownCard: View {
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["D19", "5", "1"],
                     scoreRemaining: 257,
-                    color: Color("AccentSecondary"),
+                    color: AppColor.player1,
                     isBust: false
                 ),
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["20", "5", "T20"],
                     scoreRemaining: 216,
-                    color: Color("AccentPrimary"),
+                    color: AppColor.player2,
                     isBust: false
                 ),
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["T20", "T19", "T18"],
                     scoreRemaining: 130,
-                    color: Color("AccentTertiary"),
+                    color: AppColor.player3,
                     isBust: false
                 ),
                 ThrowBreakdownCard.PlayerTurnData(
                     darts: ["5", "1", "20"],
                     scoreRemaining: 275,
-                    color: Color("AccentQuaternary"),
+                    color: AppColor.player4,
                     isBust: false
                 )
             ]
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

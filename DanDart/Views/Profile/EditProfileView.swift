@@ -71,7 +71,7 @@ struct EditProfileView: View {
                 VStack(spacing: 16) {
                     Text("Profile Picture")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
                     AvatarSelectionView(
@@ -104,7 +104,7 @@ struct EditProfileView: View {
                         if displayName.count > 45 || displayName.count < 2 && !displayName.isEmpty {
                             Text("\(displayName.count)/50 characters")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(displayName.count > 50 || displayName.count < 2 ? .red : Color("TextSecondary"))
+                                .foregroundColor(displayName.count > 50 || displayName.count < 2 ? .red : AppColor.textSecondary)
                                 .padding(.leading, 2)
                         }
                     }
@@ -127,7 +127,7 @@ struct EditProfileView: View {
                     if nickname.count > 15 || nickname.count < 2 && !nickname.isEmpty {
                         Text("\(nickname.count)/20 characters")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(nickname.count > 20 || nickname.count < 2 ? .red : Color("TextSecondary"))
+                            .foregroundColor(nickname.count > 20 || nickname.count < 2 ? .red : AppColor.textSecondary)
                             .padding(.leading, 2)
                     }
                 }
@@ -168,14 +168,14 @@ struct EditProfileView: View {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .semibold))
                         }
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
-                        .background(Color("InputBackground"))
+                        .background(AppColor.inputBackground)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color("TextSecondary").opacity(0.2), lineWidth: 1)
+                                .stroke(AppColor.textSecondary.opacity(0.2), lineWidth: 1)
                         )
                     }
                 }
@@ -192,11 +192,11 @@ struct EditProfileView: View {
                 if isSaving || isUploadingAvatar {
                     HStack(spacing: 8) {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color("AccentPrimary")))
+                            .progressViewStyle(CircularProgressViewStyle(tint: AppColor.interactivePrimaryBackground))
                             .scaleEffect(0.8)
                         Text(isUploadingAvatar ? "Uploading photo..." : "Saving changes...")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     .padding(.top, 8)
                 }

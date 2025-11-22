@@ -41,7 +41,7 @@ struct ProfileView: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -49,7 +49,7 @@ struct ProfileView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(Color("AccentPrimary"))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
             }
             .alert("Log Out", isPresented: $showLogoutConfirmation) {
@@ -94,7 +94,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Settings")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             VStack(spacing: 0) {
                 SettingsRow(
@@ -106,7 +106,7 @@ struct ProfileView: View {
                 }
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 // Sound Effects Toggle
@@ -117,7 +117,7 @@ struct ProfileView: View {
                 )
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 SettingsRow(
@@ -129,7 +129,7 @@ struct ProfileView: View {
                 }
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 SettingsRow(
@@ -141,7 +141,7 @@ struct ProfileView: View {
                 }
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 SettingsRow(
@@ -153,7 +153,7 @@ struct ProfileView: View {
                 }
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 SettingsRow(
@@ -165,7 +165,7 @@ struct ProfileView: View {
                 }
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 SettingsRow(
@@ -177,7 +177,7 @@ struct ProfileView: View {
                     showClearMatchesConfirmation = true
                 }
             }
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(12)
         }
     }
@@ -186,31 +186,31 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("About")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             VStack(spacing: 0) {
                 // App Version
                 HStack(spacing: 16) {
                     Image(systemName: "info.circle")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(Color("AccentPrimary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                         .frame(width: 28)
                     
                     Text("Version")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color("TextPrimary"))
+                        .foregroundColor(AppColor.textPrimary)
                     
                     Spacer()
                     
                     Text(appVersion)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 // Privacy Policy
@@ -222,18 +222,18 @@ struct ProfileView: View {
                     HStack(spacing: 16) {
                         Image(systemName: "hand.raised")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                             .frame(width: 28)
                         
                         Text("Privacy Policy")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Spacer()
                         
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -242,7 +242,7 @@ struct ProfileView: View {
                 .buttonStyle(PlainButtonStyle())
                 
                 Divider()
-                    .background(Color("TextSecondary").opacity(0.2))
+                    .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
                 // Terms of Service
@@ -254,18 +254,18 @@ struct ProfileView: View {
                     HStack(spacing: 16) {
                         Image(systemName: "doc.text")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(Color("AccentPrimary"))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                             .frame(width: 28)
                         
                         Text("Terms of Service")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color("TextPrimary"))
+                            .foregroundColor(AppColor.textPrimary)
                         
                         Spacer()
                         
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -273,7 +273,7 @@ struct ProfileView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(12)
         }
     }
@@ -298,7 +298,7 @@ struct ProfileView: View {
             .foregroundColor(Color.red)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color("InputBackground"))
+            .background(AppColor.inputBackground)
             .cornerRadius(12)
         }
     }
@@ -315,18 +315,18 @@ struct SettingsToggleRow: View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 20, weight: .medium))
-                .foregroundColor(Color("AccentPrimary"))
+                .foregroundColor(AppColor.interactivePrimaryBackground)
                 .frame(width: 28)
             
             Text(title)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             Spacer()
             
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(Color("AccentPrimary"))
+                .tint(AppColor.interactivePrimaryBackground)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -345,19 +345,19 @@ struct SettingsRow: View {
             HStack(spacing: 16) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(destructive ? .red : Color("AccentPrimary"))
+                    .foregroundColor(destructive ? .red : AppColor.interactivePrimaryBackground)
                     .frame(width: 28)
                 
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(destructive ? .red : Color("TextPrimary"))
+                    .foregroundColor(destructive ? .red : AppColor.textPrimary)
                 
                 Spacer()
                 
                 if showChevron {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color("TextSecondary"))
+                        .foregroundColor(AppColor.textSecondary)
                 }
             }
             .padding(.horizontal, 16)

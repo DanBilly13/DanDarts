@@ -35,7 +35,7 @@ struct HalveItRoundCard: View {
                 // Round label - vertically centered
                 Text("R\(roundNumber)-\(targetDisplay)")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color("TextPrimary"))
+                    .foregroundColor(AppColor.textPrimary)
                     .frame(minWidth: 60, alignment: .leading)
                     .lineLimit(1)
                 
@@ -95,8 +95,8 @@ struct HalveItRoundCard: View {
             roundNumber: 1,
             targetDisplay: "15",
             playerData: [
-                .init(hits: 2, score: 130, color: Color("AccentSecondary")),
-                .init(hits: 3, score: 145, color: Color("AccentPrimary"))
+                .init(hits: 2, score: 130, color: AppColor.player1),
+                .init(hits: 3, score: 145, color: AppColor.player2)
             ]
         )
         
@@ -104,13 +104,13 @@ struct HalveItRoundCard: View {
             roundNumber: 2,
             targetDisplay: "D20",
             playerData: [
-                .init(hits: 1, score: 70, color: Color("AccentSecondary")),
-                .init(hits: 0, score: 23, color: Color("AccentPrimary"))
+                .init(hits: 1, score: 70, color: AppColor.player1),
+                .init(hits: 0, score: 23, color: AppColor.player2)
             ]
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("3 Players") {
@@ -119,14 +119,14 @@ struct HalveItRoundCard: View {
             roundNumber: 1,
             targetDisplay: "15",
             playerData: [
-                .init(hits: 2, score: 30, color: Color("AccentSecondary")),
-                .init(hits: 3, score: 45, color: Color("AccentPrimary")),
-                .init(hits: 3, score: 45, color: Color("AccentTertiary"))
+                .init(hits: 2, score: 30, color: AppColor.player1),
+                .init(hits: 3, score: 45, color: AppColor.player2),
+                .init(hits: 3, score: 45, color: AppColor.player3)
             ]
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
 
 #Preview("4 Players") {
@@ -135,13 +135,13 @@ struct HalveItRoundCard: View {
             roundNumber: 1,
             targetDisplay: "15",
             playerData: [
-                .init(hits: 2, score: 30, color: Color("AccentSecondary")),
-                .init(hits: 3, score: 45, color: Color("AccentPrimary")),
-                .init(hits: 3, score: 45, color: Color("AccentTertiary")),
-                .init(hits: 1, score: 15, color: Color("AccentQuaternary"))
+                .init(hits: 2, score: 30, color: AppColor.player1),
+                .init(hits: 3, score: 45, color: AppColor.player2),
+                .init(hits: 3, score: 45, color: AppColor.player3),
+                .init(hits: 1, score: 15, color: AppColor.player4)
             ]
         )
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }

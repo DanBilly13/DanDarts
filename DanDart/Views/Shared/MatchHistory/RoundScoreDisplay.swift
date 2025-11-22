@@ -25,11 +25,11 @@ struct RoundScoreDisplay: View {
 
 #Preview("Round Score Display") {
     HStack(spacing: 16) {
-        RoundScoreDisplay(score: 30, playerColor: .green)
-        RoundScoreDisplay(score: 45, playerColor: .red)
-        RoundScoreDisplay(score: 120, playerColor: .yellow)
-        RoundScoreDisplay(score: 5, playerColor: .blue)
+        RoundScoreDisplay(score: 30, playerColor: AppColor.player1)
+        RoundScoreDisplay(score: 45, playerColor: AppColor.player2)
+        RoundScoreDisplay(score: 120, playerColor: AppColor.player3)
+        RoundScoreDisplay(score: 5, playerColor: AppColor.player4)
     }
     .padding()
-    .background(Color("BackgroundPrimary"))
+    .background(AppColor.backgroundPrimary)
 }
