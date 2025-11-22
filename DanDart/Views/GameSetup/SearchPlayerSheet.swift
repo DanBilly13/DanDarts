@@ -8,8 +8,7 @@
 import SwiftUI
 
 struct SearchPlayerSheet: View {
-    let selectedPlayers: [Player]
-    let onPlayerSelected: (Player) -> Void
+    @Binding var selectedPlayers: [Player]
     @ObservedObject var friendsCache: FriendsCache // Injected from parent
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
@@ -17,17 +16,83 @@ struct SearchPlayerSheet: View {
     @State private var isLoadingFriends = false
     @State private var showAddGuestPlayer = false
     @State private var guestPlayers: [Player] = []
+    @State private var selectionLimitMessage: String = ""
+    @State private var showSelectionLimitMessage: Bool = false
     
+    private var playerLimit: Int {
+        // Use a conservative max; GameSetupView enforces exact limit per game.
+        // We'll pass the concrete limit from the parent later if needed.
+        10
+    }
+
+    private var allPlayers: [Player] {
+        var result: [Player] = []
+
+        if let currentUser = authService.currentUser {
+            let you = currentUser.toPlayer()
+            result.append(you)
+        }
+
+        result.append(contentsOf: friendsCache.friends)
+        result.append(contentsOf: guestPlayers)
+
+        // Deduplicate by id and sort by displayName (except "you" stays first)
+        var unique: [UUID: Player] = [:]
+        for player in result {
+            unique[player.id] = player
+        }
+
+        var players = Array(unique.values)
+
+        // Keep current user at top if present
+        if let currentUser = authService.currentUser {
+            let youId = selectedPlayers.first(where: { $0.userId == currentUser.id })?.id ?? players.first(where: { $0.userId == currentUser.id })?.id
+            players.sort { lhs, rhs in
+                if lhs.userId == currentUser.id { return true }
+                if rhs.userId == currentUser.id { return false }
+                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            }
+        } else {
+            players.sort { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        }
+
+        return players
+    }
+
+    private func isSelected(_ player: Player) -> Bool {
+        selectedPlayers.contains(where: { $0.id == player.id || ($0.userId != nil && $0.userId == player.userId) })
+    }
+
+    private func toggleSelection(_ player: Player) {
+        if isSelected(player) {
+            selectedPlayers.removeAll { $0.id == player.id || ($0.userId != nil && $0.userId == player.userId) }
+        } else {
+            guard selectedPlayers.count < playerLimit else {
+                selectionLimitMessage = "You can only add up to \(playerLimit) players for this game"
+                withAnimation {
+                    showSelectionLimitMessage = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation {
+                        showSelectionLimitMessage = false
+                    }
+                }
+                return
+            }
+            selectedPlayers.append(player)
+        }
+    }
+
     var body: some View {
         StandardSheetView(
-            title: "Add Player",
+            title: "Add Players",
             dismissButtonTitle: "Back",
             onDismiss: { dismiss() }
         ) {
-            VStack(spacing: 0) {
-                // Subtitle + Add Guest button
+            VStack(spacing: 16) {
+                // Summary + Add Guest button
                 HStack {
-                    Text("Choose yourself, a friend, or add a new guest")
+                    Text("\(selectedPlayers.count) of \(playerLimit) players added")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(AppColor.textSecondary)
                         .multilineTextAlignment(.leading)
@@ -47,128 +112,48 @@ struct SearchPlayerSheet: View {
                     }
                     .frame(width: 100)
                 }
-                .padding(.bottom, 24)
-                
-                VStack(spacing: 24) {
-                    // Current User Section
-                        if let currentUser = authService.currentUser {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("You")
-                                        .font(.system(.caption, design: .rounded))
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(AppColor.textPrimary)
-                                    Spacer()
-                                }
-                                
-                                Button(action: {
-                                    // Convert User to Player
-                                    let currentUserAsPlayer = Player(
-                                        id: UUID(), // Generate new player ID
-                                        displayName: currentUser.displayName,
-                                        nickname: currentUser.nickname,
-                                        avatarURL: currentUser.avatarURL,
-                                        isGuest: false,
-                                        totalWins: currentUser.totalWins,
-                                        totalLosses: currentUser.totalLosses,
-                                        userId: currentUser.id // CRITICAL: Link to user account for stats
-                                    )
-                                    onPlayerSelected(currentUserAsPlayer)
-                                    dismiss()
-                                }) {
-                                    PlayerCard(
-                                        player: Player(
-                                            displayName: currentUser.displayName,
-                                            nickname: currentUser.nickname,
-                                            avatarURL: currentUser.avatarURL,
-                                            isGuest: false,
-                                            totalWins: currentUser.totalWins,
-                                            totalLosses: currentUser.totalLosses
-                                        ),
-                                        showCheckmark: selectedPlayers.contains(where: { $0.userId == currentUser.id })
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .disabled(selectedPlayers.contains(where: { $0.userId == currentUser.id }))
+                if showSelectionLimitMessage {
+                    Text(selectionLimitMessage)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                        .padding(.vertical, 4)
+                        .transition(.opacity)
+                }
+
+                VStack(spacing: 12) {
+                    if isLoadingFriends {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    } else if allPlayers.isEmpty {
+                        Text("No players available yet")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColor.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    } else {
+                        ForEach(allPlayers, id: \.id) { player in
+                            Button {
+                                toggleSelection(player)
+                            } label: {
+                                PlayerCard(
+                                    player: player,
+                                    showCheckmark: isSelected(player)
+                                )
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        
-                        // Friends section
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Your Friends")
-                                    .font(.system(.caption, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(AppColor.textPrimary)
-                                Spacer()
-                            }
-                            
-                            if isLoadingFriends {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            } else if friendsCache.friends.isEmpty {
-                                Text("No friends yet")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(AppColor.textSecondary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            } else {
-                                VStack(spacing: 12) {
-                                    ForEach(friendsCache.friends, id: \.id) { player in
-                                        Button(action: {
-                                            onPlayerSelected(player)
-                                            dismiss()
-                                        }) {
-                                            PlayerCard(
-                                                player: player,
-                                                showCheckmark: selectedPlayers.contains(where: { $0.userId == player.userId })
-                                            )
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .disabled(selectedPlayers.contains(where: { $0.userId == player.userId }))
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Guest Players section
-                        if !guestPlayers.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("Guest Players")
-                                        .font(.system(.caption, design: .rounded))
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(AppColor.textPrimary)
-                                    Spacer()
-                                }
-                                
-                                // Use List for swipe actions
-                                List {
-                                    ForEach(guestPlayers, id: \.id) { player in
-                                        Button(action: {
-                                            onPlayerSelected(player)
-                                            dismiss()
-                                        }) {
-                                            PlayerCard(
-                                                player: player,
-                                                showCheckmark: selectedPlayers.contains(where: { $0.id == player.id })
-                                            )
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .disabled(selectedPlayers.contains(where: { $0.id == player.id }))
-                                        .listRowBackground(Color.clear)
-                                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                                        .deleteSwipeAction {
-                                            deleteGuestPlayer(player)
-                                        }
-                                    }
-                                }
-                                .listStyle(.plain)
-                                .scrollDisabled(true)
-                                .frame(height: CGFloat(guestPlayers.count) * 92) // 80pt card + 12pt spacing
-                            }
-                        }
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            BottomActionContainer {
+                AppButton(role: .primary,
+                          controlSize: .extraLarge) {
+                    dismiss()
+                } label: {
+                    Text("Done")
                 }
             }
         }
@@ -188,7 +173,7 @@ struct SearchPlayerSheet: View {
         }
         .sheet(isPresented: $showAddGuestPlayer) {
             AddGuestPlayerView { player in
-                onPlayerSelected(player)
+                toggleSelection(player)
                 // Reload guest players to show the newly added one
                 loadGuestPlayers()
                 // AddGuestPlayerView dismisses itself, so we also dismiss the SearchPlayerSheet
@@ -266,8 +251,7 @@ struct SearchPlayerSheet: View {
 
 #Preview("Search Player Sheet") {
     SearchPlayerSheet(
-        selectedPlayers: [],
-        onPlayerSelected: { _ in },
+        selectedPlayers: .constant([]),
         friendsCache: FriendsCache()
     )
     .environmentObject(AuthService())

@@ -103,8 +103,8 @@ extension Game {
         Game(
             title: "301",
             subtitle: "A Classic Countdown Game",
-            players: "2 or more",
-            instructions: "Each player starts with a score of 301. Players take turns throwing three darts per round and subtract the total from their score. The goal is to reach exactly zero, finishing on a double."
+            players: "2-8",
+            instructions: "You start with a score of 301. On your turn (called a visit), throw three darts and subtract the total from your score.\n\nYour goal is to reach exactly zero, finishing on a double.\n\nIf your score drops below zero, or you're left on 1, the turn is a bust and your score returns to what it was before you threw.\n\nThe first player to check out on zero wins.\n\nA perfect game?\nThe fewest visits you can finish 301 in is two — incredibly rare:\n\n- Visit 1: 180 (T20 T20 T20)\n- Visit 2: 121 checkout (T20, 11, D20)"
         )
     }
     

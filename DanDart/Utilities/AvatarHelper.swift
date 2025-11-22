@@ -42,16 +42,40 @@ struct PlayerAvatarView: View {
     let size: CGFloat
     let placeholder: String
     let borderColor: Color?
+    let showBadge: Bool
+    let badgeIcon: String
+    let badgeColor: Color
+    let badgeSize: CGFloat
+    let badgeForegroundColor: Color
+    let badgeText: String?
     
-    init(avatarURL: String?, size: CGFloat = 48, placeholder: String = "person.circle.fill", borderColor: Color? = nil) {
+    init(
+        avatarURL: String?,
+        size: CGFloat = 48,
+        placeholder: String = "person.circle.fill",
+        borderColor: Color? = nil,
+        showBadge: Bool = false,
+        badgeIcon: String = "checkmark.circle.fill",
+        badgeColor: Color = AppColor.interactivePrimaryBackground,
+        badgeSize: CGFloat? = nil,
+        badgeForegroundColor: Color = .white,
+        badgeText: String? = nil
+    ) {
         self.avatarURL = avatarURL
         self.size = size
         self.placeholder = placeholder
         self.borderColor = borderColor
+        self.showBadge = showBadge
+        self.badgeIcon = badgeIcon
+        self.badgeColor = badgeColor
+        // Default badge size is 16pt, or a custom size if provided
+        self.badgeSize = badgeSize ?? 16
+        self.badgeForegroundColor = badgeForegroundColor
+        self.badgeText = badgeText
     }
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomTrailing) {
             Circle()
                 .fill(Color("InputBackground"))
                 .frame(width: size, height: size)
@@ -115,6 +139,23 @@ struct PlayerAvatarView: View {
                 Image(systemName: placeholder)
                     .font(.system(size: size * 0.5, weight: .medium))
                     .foregroundColor(Color("TextSecondary"))
+            }
+            if showBadge {
+                ZStack {
+                    Circle()
+                        .fill(badgeColor)
+                        .frame(width: badgeSize, height: badgeSize)
+                    if let badgeText = badgeText {
+                        Text(badgeText)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(badgeForegroundColor)
+                    } else {
+                        Image(systemName: badgeIcon)
+                            .font(.system(size: badgeSize * 0.6, weight: .bold))
+                            .foregroundColor(badgeForegroundColor)
+                    }
+                }
+                .offset(x: badgeSize * 0.25, y: badgeSize * 0.25)
             }
         }
         .overlay(

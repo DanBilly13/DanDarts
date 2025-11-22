@@ -20,6 +20,12 @@ struct PlayerIdentity: View {
     let spacing: CGFloat
     let alignment: HorizontalAlignment
     let borderColor: Color?
+    let showBadge: Bool
+    let badgeIcon: String
+    let badgeColor: Color
+    let badgeSize: CGFloat?
+    let badgeForegroundColor: Color
+    let badgeText: String?
     
     init(
         avatarURL: String?,
@@ -32,7 +38,13 @@ struct PlayerIdentity: View {
         nicknameColor: Color = AppColor.textSecondary,
         spacing: CGFloat = 4,
         alignment: HorizontalAlignment = .leading,
-        borderColor: Color? = nil
+        borderColor: Color? = nil,
+        showBadge: Bool = false,
+        badgeIcon: String = "checkmark.circle.fill",
+        badgeColor: Color = AppColor.interactivePrimaryBackground,
+        badgeSize: CGFloat? = nil,
+        badgeForegroundColor: Color = .white,
+        badgeText: String? = nil
     ) {
         self.avatarURL = avatarURL
         self.displayName = displayName
@@ -45,6 +57,12 @@ struct PlayerIdentity: View {
         self.spacing = spacing
         self.alignment = alignment
         self.borderColor = borderColor
+        self.showBadge = showBadge
+        self.badgeIcon = badgeIcon
+        self.badgeColor = badgeColor
+        self.badgeSize = badgeSize
+        self.badgeForegroundColor = badgeForegroundColor
+        self.badgeText = badgeText
     }
     
     var body: some View {
@@ -53,7 +71,13 @@ struct PlayerIdentity: View {
             PlayerAvatarView(
                 avatarURL: avatarURL,
                 size: avatarSize,
-                borderColor: borderColor
+                borderColor: borderColor,
+                showBadge: showBadge,
+                badgeIcon: badgeIcon,
+                badgeColor: badgeColor,
+                badgeSize: badgeSize,
+                badgeForegroundColor: badgeForegroundColor,
+                badgeText: badgeText
             )
             
             // Name and nickname
@@ -83,12 +107,18 @@ extension PlayerIdentity {
     init(
         player: Player,
         avatarSize: CGFloat = 48,
-        nameFont: Font = .system(.headline, design: .rounded).weight(.semibold),
+        nameFont: Font = .system(.callout, design: .rounded).weight(.semibold),
         nicknameFont: Font = .footnote.weight(.medium),
         nicknameColor: Color = AppColor.textSecondary,
         spacing: CGFloat = 4,
         alignment: HorizontalAlignment = .leading,
-        borderColor: Color? = nil
+        borderColor: Color? = nil,
+        showBadge: Bool = false,
+        badgeIcon: String = "checkmark.circle.fill",
+        badgeColor: Color = AppColor.interactivePrimaryBackground,
+        badgeSize: CGFloat? = nil,
+        badgeForegroundColor: Color = .white,
+        badgeText: String? = nil
     ) {
         self.init(
             avatarURL: player.avatarURL,
@@ -101,7 +131,13 @@ extension PlayerIdentity {
             nicknameColor: nicknameColor,
             spacing: spacing,
             alignment: alignment,
-            borderColor: borderColor
+            borderColor: borderColor,
+            showBadge: showBadge,
+            badgeIcon: badgeIcon,
+            badgeColor: badgeColor,
+            badgeSize: badgeSize,
+            badgeForegroundColor: badgeForegroundColor,
+            badgeText: badgeText
         )
     }
     

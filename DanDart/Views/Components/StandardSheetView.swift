@@ -124,7 +124,11 @@ struct StandardSheetView<Content: View>: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
-                    .padding(.bottom, primaryActionTitle != nil ? 100 : 20)
+                    // When there is a primary action button, keep only a small
+                    // bottom padding so content (e.g. long lists) can scroll
+                    // visually right up to the button container instead of
+                    // leaving a large empty gap above it.
+                    .padding(.bottom, primaryActionTitle != nil ? 32 : 20)
                 }
             } else {
                 VStack(spacing: 16) {

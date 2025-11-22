@@ -90,14 +90,14 @@ struct GameSetupView: View {
                     .frame(height: 280)
                     
                     // Content below header
-                    VStack(spacing: 24) {
+                    VStack(spacing: 32) {
                         // Game-specific Options Section (if applicable)
                         if config.showOptions {
                             VStack(spacing: 16) {
                                 HStack {
                                     Text(config.optionLabel)
                                         .font(.system(.headline, design: .rounded))
-                                        .fontWeight(.semibold)
+                                        .fontWeight(.medium)
                                         .foregroundColor(AppColor.textPrimary)
                                     
                                     Spacer()
@@ -110,60 +110,55 @@ struct GameSetupView: View {
                         
                         // Player Selection Section
                         VStack(spacing: 16) {
-                            HStack {
-                                Text("Players")
-                                    .font(.system(.headline, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(AppColor.textPrimary)
-                                
-                                Spacer()
-                                
-                                Text("\(selectedPlayers.count) of \(config.playerLimit)")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(AppColor.textSecondary)
+                            if !selectedPlayers.isEmpty {
+                                HStack(spacing:8) {
+                                    Text("Players")
+                                        .font(.system(.headline, design: .rounded))
+                                        .fontWeight(.medium)
+                                        .foregroundColor(AppColor.textPrimary)
+
+                                    /*Spacer()*/
+
+                                    Text("\(selectedPlayers.count) of \(config.playerLimit)")
+                                        .font(.system(.caption, design: .rounded))
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(AppColor.textSecondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            VStack(spacing: 12) {
+                                // Selected players list
+                                if !selectedPlayers.isEmpty {
+                                    List {
+                                        ForEach(selectedPlayers.indices, id: \.self) { index in
+                                            let player = selectedPlayers[index]
+                                            PlayerCard(player: player, playerNumber: index + 1)
+                                                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 16, trailing: 0))
+                                                .listRowBackground(Color.clear)
+                                                .listRowSeparator(.hidden)
+                                                .customSwipeAction(
+                                                    title: "Remove",
+                                                    systemImage: "xmark.circle",
+                                                    role: .destructive
+                                                ) {
+                                                    removePlayer(player)
+                                                }
+                                        }
+                                    }
+                                    .listStyle(.plain)
+                                    .scrollDisabled(true)
+                                    .frame(height: CGFloat(selectedPlayers.count * 96)) // 80pt card + 6pt spacing
+                                    .background(Color.clear)
+                                }
                             }
                             
-                            // Sequential Player Addition
-                            VStack(spacing: 12) {
-                                // Add next player button (if under limit)
-                                if selectedPlayers.count < config.playerLimit {
-                                    AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
-                                        showSearchPlayer = true
-                                    } label: {
-                                        Label("Add Player \(selectedPlayers.count + 1)", systemImage: "plus")
-                                            .font(.system(size: 16))
-                                    }
-                                }
-                                
-                                // Show selected players in a List for swipe actions
-                                List {
-                                    ForEach(selectedPlayers.indices, id: \.self) { index in
-                                        let player = selectedPlayers[index]
-                                        PlayerCard(player: player, playerNumber: index + 1)
-                                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                                            .listRowBackground(Color.clear)
-                                            .listRowSeparator(.hidden)
-                                            .customSwipeAction(
-                                                title: "Remove",
-                                                systemImage: "xmark.circle",
-                                                role: .destructive
-                                            ) {
-                                                removePlayer(player)
-                                            }
-                                    }
-                                }
-                                .listStyle(.plain)
-                                .scrollDisabled(true)
-                                .frame(height: CGFloat(selectedPlayers.count * 92)) // 80pt card + 12pt spacing
-                                .background(Color.clear)
-                            }
                         }
+                        
                         
                         // Game Instructions
                         GameInstructionsContent(game: config.game)
-                            .padding(16)
-                            .background(AppColor.inputBackground)
-                            .cornerRadius(12)
+                            
                         
                         Spacer(minLength: 40)
                     }
@@ -201,43 +196,44 @@ struct GameSetupView: View {
         }
         .background(AppColor.backgroundPrimary.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            if canStartGame {
-                VStack(spacing: 12) {
-                    AppButton(role: .primary, controlSize: .extraLarge) {
-                        let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
-                        router.push(.preGameHype(
-                            game: params.game,
-                            players: params.players,
-                            matchFormat: params.matchFormat,
-                            halveItDifficulty: params.halveItDifficulty,
-                            knockoutLives: params.knockoutLives
-                        ))
+            BottomActionContainer {
+                if selectedPlayers.count < 2 {
+                    // Only Add players button
+                    AppButton(role: .secondary, controlSize: .extraLarge) {
+                        showSearchPlayer = true
                     } label: {
-                        Text("Start Game")
+                        Label("Add players", systemImage: "plus")
                     }
                     .frame(maxWidth: .infinity)
+                } else {
+                    // Add players + Start game side by side
+                    HStack(spacing: 12) {
+                        AppButton(role: .secondary, controlSize: .extraLarge) {
+                            showSearchPlayer = true
+                        } label: {
+                            Label("Add players", systemImage: "plus")
+                        }
+
+                        AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canStartGame) {
+                            let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
+                            router.push(.preGameHype(
+                                game: params.game,
+                                players: params.players,
+                                matchFormat: params.matchFormat,
+                                halveItDifficulty: params.halveItDifficulty,
+                                knockoutLives: params.knockoutLives
+                            ))
+                        } label: {
+                            Text("Start game")
+                        }
+                    }
                 }
-                .padding(.horizontal, 64)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.4),
-                            Color.black.opacity(0.0)
-                        ],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
             }
         }
         .navigationBarHidden(true)
             .toolbar(.hidden, for: .tabBar)
             .sheet(isPresented: $showSearchPlayer) {
-                SearchPlayerSheet(selectedPlayers: selectedPlayers, onPlayerSelected: { player in
-                    addPlayer(player)
-                }, friendsCache: friendsCache)
+                SearchPlayerSheet(selectedPlayers: $selectedPlayers, friendsCache: friendsCache)
             }
             .onAppear {
                 selectedOption = config.defaultSelection

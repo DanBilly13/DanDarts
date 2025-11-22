@@ -21,20 +21,21 @@ struct PlayerCard: View {
     var body: some View {
         HStack(spacing: 16) {
             // Player number (if provided)
-            if let number = playerNumber {
-                Text("\(number)")
-                    .font(.system(.headline, design: .rounded))
-                    .fontWeight(.semibold)
-                    .foregroundColor(AppColor.textPrimary)
-                    .frame(width: 16)
-                    
+            if let _ = playerNumber {
+                // Number now shown as a badge on the avatar instead of a leading label
             }
-            
+
             // Player identity (avatar + name + nickname)
             PlayerIdentity(
                 player: player,
                 avatarSize: 48,
-                spacing: 4
+                spacing: 4,
+                showBadge: showCheckmark || playerNumber != nil,
+                badgeIcon: "checkmark", // used when showCheckmark is true and no number
+                badgeColor: playerNumber != nil ? Color.white : AppColor.interactivePrimaryBackground,
+                badgeSize: 16,
+                badgeForegroundColor: playerNumber != nil ? Color.black : Color.white,
+                badgeText: playerNumber != nil ? String(playerNumber!) : nil
             )
             
             Spacer()
@@ -76,24 +77,14 @@ struct PlayerCard: View {
             }
             .padding(.top, 5)
             
-            // Checkmark (if player is already selected)
-            if showCheckmark {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.green)
-            }
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 16)
+        .padding(.trailing, 32)
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppColor.inputBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppColor.textSecondary.opacity(0.3), lineWidth: 1)
-        )
-        .opacity(showCheckmark ? 0.5 : 1.0)
+        .clipShape(Capsule())
     }
 }
 

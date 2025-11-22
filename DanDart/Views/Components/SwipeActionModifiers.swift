@@ -38,9 +38,14 @@ extension View {
     ) -> some View {
         self.swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: role, action: action) {
-                Label(title, systemImage: systemImage)
+                Image(systemName: systemImage)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(tint ?? AppColor.interactivePrimaryBackground)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(height: 80)
             }
-            .tint(tint)
+            // Use a consistent background for swipe actions to match card styling
+            .tint(AppColor.backgroundPrimary)
         }
     }
     
@@ -135,9 +140,14 @@ struct MultipleSwipeActionsModifier: ViewModifier {
         content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
             ForEach(actions) { config in
                 Button(role: config.role, action: config.action) {
-                    Label(config.title, systemImage: config.systemImage)
+                    Image(systemName: config.systemImage)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(config.tint ?? AppColor.interactivePrimaryBackground)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(height: 80)
                 }
-                .tint(config.tint)
+                // Consistent background tint for all swipe actions
+                .tint(AppColor.backgroundPrimary)
             }
         }
     }
