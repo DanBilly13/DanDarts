@@ -42,7 +42,7 @@ struct HalveItGameplayView: View {
                 // TOP — cards / throw / targets
                 VStack(spacing: 0) {
                     // Player score cards (reusing 301 component)
-                    CountdownGameplayView.StackedPlayerCards(
+                    StackedPlayerCards(
                         players: viewModel.players,
                         currentPlayerIndex: viewModel.currentPlayerIndex,
                         playerScores: viewModel.playerScores,
