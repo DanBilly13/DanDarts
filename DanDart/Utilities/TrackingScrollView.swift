@@ -30,6 +30,9 @@ struct TrackingScrollView<Content: View>: UIViewRepresentable {
         let hosting = UIHostingController(rootView: content)
         hosting.view.translatesAutoresizingMaskIntoConstraints = false
         hosting.view.backgroundColor = .clear
+        
+        // Store hosting controller in coordinator so we can access it later
+        context.coordinator.hostingController = hosting
 
         scrollView.addSubview(hosting.view)
 
@@ -46,16 +49,16 @@ struct TrackingScrollView<Content: View>: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIScrollView, context: Context) {
-        // Update the hosted SwiftUI content when SwiftUI state changes
-        if let hosting = uiView.subviews.compactMap({ $0.next as? UIHostingController<Content> }).first {
-            hosting.rootView = content
-        }
+        // Update the hosting controller's rootView to reflect parent state changes
+        // This is necessary for @ObservedObject changes in the parent to propagate
+        context.coordinator.hostingController?.rootView = content
     }
 
     // MARK: - Coordinator
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
         var parent: TrackingScrollView
+        var hostingController: UIHostingController<Content>?
 
         init(_ parent: TrackingScrollView) {
             self.parent = parent

@@ -12,14 +12,13 @@ import UIKit
 struct GameSetupView: View {
     let game: Game
     
-    @State private var selectedPlayers: [Player] = []
     @State private var showSearchPlayer: Bool = false
-    @State private var selectedOption: Int = 0
     @State private var scrollOffset: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: Router
     @StateObject private var friendsCache = FriendsCache()
     @EnvironmentObject private var authService: AuthService
+    @StateObject private var setupState = GameSetupState()
     
     // Game-specific config
     private var config: any GameSetupConfigurable {
@@ -33,6 +32,10 @@ struct GameSetupView: View {
         default: // 301, 501, or any other countdown game
             return CountdownSetupConfig(game: game)
         }
+    }
+    
+    private var selectedPlayers: [Player] {
+        setupState.selectedPlayers
     }
     
     private var canStartGame: Bool {
@@ -116,7 +119,9 @@ struct GameSetupView: View {
                             }
                             
                             // Game-specific segmented control
-                            config.optionView(selection: $selectedOption)
+                            config.optionView(
+                                selection: $setupState.selectedOption
+                            )
                         }
                     }
                     
@@ -140,26 +145,17 @@ struct GameSetupView: View {
                         VStack(spacing: 12) {
                             // Selected players list
                             if !selectedPlayers.isEmpty {
-                                List {
-                                    ForEach(selectedPlayers.indices, id: \.self) { index in
-                                        let player = selectedPlayers[index]
-                                        PlayerCard(player: player, playerNumber: index + 1)
-                                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 16, trailing: 0))
-                                            .listRowBackground(Color.clear)
-                                            .listRowSeparator(.hidden)
-                                            .customSwipeAction(
-                                                title: "Remove",
-                                                systemImage: "xmark.circle",
-                                                role: .destructive
-                                            ) {
-                                                removePlayer(player)
-                                            }
-                                    }
+                                ForEach(selectedPlayers.indices, id: \.self) { index in
+                                    let player = selectedPlayers[index]
+                                    PlayerCard(player: player, playerNumber: index + 1)
+                                        .customSwipeAction(
+                                            title: "Remove",
+                                            systemImage: "xmark.circle",
+                                            role: .destructive
+                                        ) {
+                                            removePlayer(player)
+                                        }
                                 }
-                                .listStyle(.plain)
-                                .scrollDisabled(true)
-                                .frame(height: CGFloat(selectedPlayers.count * 96)) // 80pt card + 6pt spacing
-                                .background(Color.clear)
                             }
                         }
                     }
@@ -169,14 +165,12 @@ struct GameSetupView: View {
                     
                     Spacer(minLength: 40)
                 }
-                /*.background(Color.gray)*/
-
                 .padding(.horizontal, 16)
-                /*.padding(.top, heroHeight + 24)*/
                 .padding(.top, heroHeight - 58 + 32)
                 .padding(.bottom, 16)
             }
             .background(Color.clear)
+            .environmentObject(setupState)
             
             // Sticky top bar that matches gameplay style and collapses the title
             VStack {
@@ -186,9 +180,9 @@ struct GameSetupView: View {
                         router.pop()
                     }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))   // adjust size for a 28px circle
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white)
-                            .frame(width: 28, height: 28)                 // ← FIXED SIZE CIRCLE
+                            .frame(width: 28, height: 28)
                             .background(Color.black.opacity(0.3 * (1 - collapseProgress)))
                             .clipShape(Circle())
                             .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
@@ -217,27 +211,6 @@ struct GameSetupView: View {
                 Spacer()
             }
             
-            // TEMP: Debug overlay to verify scrollOffset and collapseProgress
-            VStack {
-                HStack {
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(String(format: "offset: %.1f", scrollOffset))
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.8))
-                        Text(String(format: "collapse: %.2f", collapseProgress))
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    .padding(8)
-                    .background(Color.black.opacity(0.4))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .padding(.top, 40)
-                    .padding(.trailing, 12)
-                }
-                Spacer()
-            }
-
             // Bottom action bar (Add players / Start game)
             VStack {
                 Spacer()
@@ -259,7 +232,7 @@ struct GameSetupView: View {
                             }
 
                             AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canStartGame) {
-                                let params = config.gameParameters(players: selectedPlayers, selection: selectedOption)
+                                let params = config.gameParameters(players: selectedPlayers, selection: setupState.selectedOption)
                                 router.push(.preGameHype(
                                     game: params.game,
                                     players: params.players,
@@ -275,25 +248,33 @@ struct GameSetupView: View {
                 }
             }
         }
+        .background(AppColor.backgroundPrimary.ignoresSafeArea())
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showSearchPlayer) {
-            SearchPlayerSheet(selectedPlayers: $selectedPlayers, friendsCache: friendsCache)
+            SearchPlayerSheet(
+                selectedPlayers: $setupState.selectedPlayers,
+                friendsCache: friendsCache
+            )
         }
         .onAppear {
-            selectedOption = config.defaultSelection
+            if setupState.selectedOption == 0 {
+                setupState.selectedOption = config.defaultSelection
+            }
         }
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func addPlayer(_ player: Player) {
-        if selectedPlayers.count < config.playerLimit && !selectedPlayers.contains(where: { $0.id == player.id }) {
-            selectedPlayers.append(player)
+        if setupState.selectedPlayers.count < config.playerLimit &&
+            !setupState.selectedPlayers.contains(where: { $0.id == player.id }) {
+            setupState.selectedPlayers.append(player)
         }
     }
-    
+
     private func removePlayer(_ player: Player) {
-        selectedPlayers.removeAll { $0.id == player.id }
+        setupState.selectedPlayers.removeAll { $0.id == player.id }
     }
 }
+

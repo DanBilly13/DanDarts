@@ -8,6 +8,12 @@
 import Foundation
 import SwiftUI
 
+// Shared state for game setup (players, options)
+final class GameSetupState: ObservableObject {
+    @Published var selectedPlayers: [Player] = []
+    @Published var selectedOption: Int = 0
+}
+
 // MARK: - Destination
 
 /// All possible navigation destinations in the app
