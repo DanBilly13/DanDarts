@@ -43,10 +43,23 @@ struct GameSetupView: View {
     }
     
     var body: some View {
-        // scrollOffset is vertical contentOffset.y from TrackingScrollView
+        // Layout constants
+        let heroHeight: CGFloat = 280
+        let topBarHeight: CGFloat = 58  // Includes safe area + bar content
+        let contentSpacing: CGFloat = 32  // Visual spacing between hero and content
+        
+        // Scroll animation values
         let collapseDistance: CGFloat = 220
         let collapseProgress = min(max(scrollOffset / collapseDistance, 0), 1)
-        let heroHeight: CGFloat = 280
+        
+        // Top bar fades in later (starts at 70% scroll, fully visible at 100%)
+        let topBarProgress = min(max((collapseProgress - 0.7) / 0.3, 0), 1)
+        
+        // Image scale: grows subtly as you scroll down (1.0 at top, 1.08 at bottom)
+        let imageScale = 1.0 + (collapseProgress * 0.08)
+        
+        // Hero title fades out faster (fully gone at 60% scroll)
+        let heroTitleOpacity = max(1.0 - (collapseProgress / 0.6), 0)
         
         ZStack(alignment: .top) {
             // Hero header behind, flush with top, fades as content scrolls
@@ -59,6 +72,7 @@ struct GameSetupView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(height: heroHeight)
+                                .scaleEffect(imageScale)
                                 .clipped()
                         } else {
                             // Fallback gradient if no image
@@ -92,6 +106,7 @@ struct GameSetupView: View {
                         .padding(.leading, 20)
                         .padding(.bottom, 24)
                         .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 2)
+                        .opacity(heroTitleOpacity)
                 }
                 .frame(height: heroHeight)
                 .frame(maxWidth: .infinity)
@@ -125,9 +140,9 @@ struct GameSetupView: View {
                         }
                     }
                     
-                    // Player Selection Section
-                    VStack(spacing: 16) {
-                        if !selectedPlayers.isEmpty {
+                    // Player Selection Section (only shown when players are selected)
+                    if !selectedPlayers.isEmpty {
+                        VStack(spacing: 16) {
                             HStack(spacing: 8) {
                                 Text("Players")
                                     .font(.system(.headline, design: .rounded))
@@ -140,11 +155,8 @@ struct GameSetupView: View {
                                     .foregroundColor(AppColor.textSecondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        }
 
-                        VStack(spacing: 12) {
-                            // Selected players list
-                            if !selectedPlayers.isEmpty {
+                            VStack(spacing: 12) {
                                 ForEach(selectedPlayers.indices, id: \.self) { index in
                                     let player = selectedPlayers[index]
                                     PlayerCard(player: player, playerNumber: index + 1)
@@ -166,7 +178,7 @@ struct GameSetupView: View {
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, heroHeight - 58 + 32)
+                .padding(.top, heroHeight - topBarHeight + contentSpacing)
                 .padding(.bottom, 16)
             }
             .background(Color.clear)
@@ -194,7 +206,7 @@ struct GameSetupView: View {
                     Text(config.game.title)
                         .font(.system(.headline, design: .rounded).weight(.semibold))
                         .foregroundColor(AppColor.textPrimary)
-                        .opacity(collapseProgress)
+                        .opacity(topBarProgress)
                     
                     Spacer()
                 }
@@ -204,7 +216,7 @@ struct GameSetupView: View {
                 .padding(.bottom, 8)
                 .background(
                     AppColor.backgroundPrimary
-                        .opacity(collapseProgress)
+                        .opacity(topBarProgress)
                         .ignoresSafeArea(edges: .top)
                 )
                 
