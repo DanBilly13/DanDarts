@@ -69,6 +69,7 @@ struct GameInstructionsContent: View {
                     .fontWeight(.semibold)
                     .foregroundColor(AppColor.textSecondary)
                     .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

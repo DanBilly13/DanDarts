@@ -52,6 +52,13 @@ struct TrackingScrollView<Content: View>: UIViewRepresentable {
         // Update the hosting controller's rootView to reflect parent state changes
         // This is necessary for @ObservedObject changes in the parent to propagate
         context.coordinator.hostingController?.rootView = content
+        
+        // Force the hosting view to recalculate its size when content changes
+        context.coordinator.hostingController?.view.invalidateIntrinsicContentSize()
+        
+        // Force the scroll view to update layout immediately
+        uiView.setNeedsLayout()
+        uiView.layoutIfNeeded()
     }
 
     // MARK: - Coordinator
