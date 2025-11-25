@@ -26,6 +26,9 @@ class SuddenDeathViewModel: ObservableObject {
     // Per-round scores: [Player.id: round total]
     @Published var roundScores: [UUID: Int] = [:]
     
+    // Turn history tracking: [Player.id: [turns]]
+    private var turnHistory: [UUID: [MatchTurn]] = [:]
+    
     // Round tracking
     @Published var roundNumber: Int = 1
     @Published var phase: RoundPhase = .playing
@@ -150,6 +153,9 @@ class SuddenDeathViewModel: ObservableObject {
         let total = currentThrowTotal
         roundScores[currentPlayer.id] = total
         
+        // Record turn in history
+        recordTurn(playerId: currentPlayer.id, score: total)
+        
         // Trigger score pop animation for this player's round score
         let justScoredPlayerId = currentPlayer.id
         scoreAnimationPlayerId = justScoredPlayerId
@@ -217,6 +223,9 @@ class SuddenDeathViewModel: ObservableObject {
         
         let minScore = activeRoundScores.values.min() ?? 0
         let losers = activeRoundScores.filter { $0.value == minScore }.map { $0.key }
+        
+        // Mark life loss in turn history
+        markLifeLossInHistory(playerIds: losers)
         
         // Apply life loss for all losers (game state only; UI will update at
         // the start of the next round via displayPlayerLives)
@@ -286,6 +295,7 @@ class SuddenDeathViewModel: ObservableObject {
             displayPlayerLives[player.id] = startingLives
         }
         roundScores.removeAll()
+        turnHistory.removeAll()
         currentThrow.removeAll()
         selectedDartIndex = nil
         roundNumber = 1
@@ -300,6 +310,54 @@ class SuddenDeathViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Turn History
+    
+    private func recordTurn(playerId: UUID, score: Int) {
+        // Get current accumulated score (sum of all previous turns)
+        let previousTurns = turnHistory[playerId] ?? []
+        let scoreBefore = previousTurns.last?.scoreAfter ?? 0
+        let scoreAfter = scoreBefore + score
+        
+        // Check if this player lost a life this round (will be determined at end of round)
+        // For now, set isBust to false; we'll update it when the round ends
+        let matchDarts = currentThrow.map { scoredThrow in
+            MatchDart(
+                baseValue: scoredThrow.baseValue,
+                multiplier: scoredThrow.scoreType.multiplier
+            )
+        }
+        
+        let turn = MatchTurn(
+            turnNumber: roundNumber,
+            darts: matchDarts,
+            scoreBefore: scoreBefore,
+            scoreAfter: scoreAfter,
+            isBust: false // Will be updated at end of round
+        )
+        
+        if turnHistory[playerId] == nil {
+            turnHistory[playerId] = []
+        }
+        turnHistory[playerId]?.append(turn)
+    }
+    
+    private func markLifeLossInHistory(playerIds: [UUID]) {
+        // Mark the most recent turn for these players as a bust (life lost)
+        for playerId in playerIds {
+            guard var turns = turnHistory[playerId], !turns.isEmpty else { continue }
+            let lastIndex = turns.count - 1
+            turns[lastIndex] = MatchTurn(
+                id: turns[lastIndex].id,
+                turnNumber: turns[lastIndex].turnNumber,
+                darts: turns[lastIndex].darts,
+                scoreBefore: turns[lastIndex].scoreBefore,
+                scoreAfter: turns[lastIndex].scoreAfter,
+                isBust: true
+            )
+            turnHistory[playerId] = turns
+        }
+    }
+    
     // MARK: - Match Storage
     
     private func saveMatchResult() {
@@ -308,16 +366,20 @@ class SuddenDeathViewModel: ObservableObject {
         let duration = Date().timeIntervalSince(matchStartTime)
         
         let matchPlayers = players.map { player in
-            MatchPlayer(
+            let turns = turnHistory[player.id] ?? []
+            let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
+            let finalScore = turns.last?.scoreAfter ?? 0
+            
+            return MatchPlayer(
                 id: player.id,
                 displayName: player.displayName,
                 nickname: player.nickname,
                 avatarURL: player.avatarURL,
                 isGuest: player.isGuest,
-                finalScore: playerLives[player.id] ?? 0,
-                startingScore: startingLives,
-                totalDartsThrown: 0,
-                turns: [],
+                finalScore: finalScore,
+                startingScore: 0,
+                totalDartsThrown: totalDarts,
+                turns: turns,
                 legsWon: 0
             )
         }

@@ -25,9 +25,9 @@ struct CountdownScoreDisplay: View {
             Group {
                 if isWinner {
                     // Trophy icon - 24px (no score shown for countdown winners)
-                    Image(systemName: "crown")
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundColor(Color("AccentTertiary"))
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                 } else {
                     // Placement text - Apple headline style
                     Text(placementText)
@@ -49,7 +49,13 @@ struct CountdownScoreDisplay: View {
                         dotSize: 8,
                         spacing: 4
                     )
-                } else if !isWinner {
+                } else if isWinner {
+                    // Single-leg game: show "WINNER" text for winner
+                    Text("WINNER")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                        .tracking(0.5)
+                } else {
                     // Single-leg game: show remaining points for non-winners
                     Text("(\(finalScore)pts)")
                         .font(.caption)

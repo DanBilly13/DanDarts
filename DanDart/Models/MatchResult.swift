@@ -313,4 +313,147 @@ extension MatchResult {
             duration: 180
         )
     }()
+    
+    static let mockSuddenDeath: MatchResult = {
+        let player1Id = UUID()
+        let player2Id = UUID()
+        let player3Id = UUID()
+        let player4Id = UUID()
+        
+        // Player 1 turns (Winner - 3 rounds)
+        let player1Turns = [
+            MatchTurn(
+                turnNumber: 1,
+                darts: [MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 20, multiplier: 1)],
+                scoreBefore: 0,
+                scoreAfter: 60,
+                isBust: false
+            ),
+            MatchTurn(
+                turnNumber: 2,
+                darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3)],
+                scoreBefore: 60,
+                scoreAfter: 240,
+                isBust: false
+            ),
+            MatchTurn(
+                turnNumber: 3,
+                darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3)],
+                scoreBefore: 240,
+                scoreAfter: 420,
+                isBust: false
+            )
+        ]
+        
+        // Player 2 turns (2nd place - eliminated round 3)
+        let player2Turns = [
+            MatchTurn(
+                turnNumber: 1,
+                darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 19, multiplier: 1), MatchDart(baseValue: 18, multiplier: 1)],
+                scoreBefore: 0,
+                scoreAfter: 97,
+                isBust: false
+            ),
+            MatchTurn(
+                turnNumber: 2,
+                darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 17, multiplier: 1)],
+                scoreBefore: 97,
+                scoreAfter: 174,
+                isBust: false
+            ),
+            MatchTurn(
+                turnNumber: 3,
+                darts: [MatchDart(baseValue: 15, multiplier: 1), MatchDart(baseValue: 10, multiplier: 1), MatchDart(baseValue: 5, multiplier: 1)],
+                scoreBefore: 174,
+                scoreAfter: 204,
+                isBust: true // Lost life and eliminated
+            )
+        ]
+        
+        // Player 3 turns (3rd place - eliminated round 2)
+        let player3Turns = [
+            MatchTurn(
+                turnNumber: 1,
+                darts: [MatchDart(baseValue: 19, multiplier: 3), MatchDart(baseValue: 18, multiplier: 1), MatchDart(baseValue: 17, multiplier: 1)],
+                scoreBefore: 0,
+                scoreAfter: 92,
+                isBust: false
+            ),
+            MatchTurn(
+                turnNumber: 2,
+                darts: [MatchDart(baseValue: 10, multiplier: 1), MatchDart(baseValue: 5, multiplier: 1), MatchDart(baseValue: 1, multiplier: 1)],
+                scoreBefore: 92,
+                scoreAfter: 108,
+                isBust: true // Lost life and eliminated
+            )
+        ]
+        
+        // Player 4 turns (4th place - eliminated round 1)
+        let player4Turns = [
+            MatchTurn(
+                turnNumber: 1,
+                darts: [MatchDart(baseValue: 5, multiplier: 1), MatchDart(baseValue: 1, multiplier: 1), MatchDart(baseValue: 1, multiplier: 1)],
+                scoreBefore: 0,
+                scoreAfter: 7,
+                isBust: true // Lost life and eliminated
+            )
+        ]
+        
+        return MatchResult(
+            gameType: "sudden_death",
+            gameName: "Sudden Death",
+            players: [
+                MatchPlayer(
+                    id: player1Id,
+                    displayName: "Daniel Billingham",
+                    nickname: "dantheman",
+                    avatarURL: "avatar1",
+                    isGuest: false,
+                    finalScore: 420,
+                    startingScore: 0,
+                    totalDartsThrown: 9,
+                    turns: player1Turns
+                ),
+                MatchPlayer(
+                    id: player2Id,
+                    displayName: "Christina Billingham",
+                    nickname: "legend",
+                    avatarURL: "avatar2",
+                    isGuest: false,
+                    finalScore: 204,
+                    startingScore: 0,
+                    totalDartsThrown: 9,
+                    turns: player2Turns
+                ),
+                MatchPlayer(
+                    id: player3Id,
+                    displayName: "Daniel Andersson",
+                    nickname: "killerdan",
+                    avatarURL: "avatar3",
+                    isGuest: false,
+                    finalScore: 108,
+                    startingScore: 0,
+                    totalDartsThrown: 6,
+                    turns: player3Turns
+                ),
+                MatchPlayer(
+                    id: player4Id,
+                    displayName: "Guest Player",
+                    nickname: "guest",
+                    avatarURL: "avatar5",
+                    isGuest: true,
+                    finalScore: 7,
+                    startingScore: 0,
+                    totalDartsThrown: 3,
+                    turns: player4Turns
+                )
+            ],
+            winnerId: player1Id,
+            timestamp: Date(),
+            duration: 240,
+            matchFormat: 1,
+            totalLegsPlayed: 1,
+            metadata: ["starting_lives": "1"]
+        )
+    }()
 }

@@ -47,4 +47,8 @@ enum AppColor {
     
     // MARK: - Brand
     static let brandPrimary = Color("BrandPrimary")
+    
+    // MARK: - Basics
+    static let justBlack = Color("JustBlack")
+    static let justWhite = Color("JustWhite")
 }

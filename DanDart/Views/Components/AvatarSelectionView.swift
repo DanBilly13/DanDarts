@@ -13,7 +13,7 @@ struct AvatarSelectionView: View {
     @Binding var selectedPhotoItem: PhotosPickerItem?
     @Binding var selectedAvatarImage: UIImage?
     
-    @State private var scrollPosition: String? = "camera"
+    @State private var scrollPosition: String?
     
     // MARK: - Avatar Options
     private let avatarOptions: [AvatarOption] = [
@@ -95,6 +95,14 @@ struct AvatarSelectionView: View {
                 .allowsHitTesting(false) // Let touches pass through to avatars below
         }
         .frame(height: 100)
+        .onAppear {
+            // Set initial scroll position based on current selection
+            if selectedAvatarImage != nil {
+                scrollPosition = "camera"
+            } else {
+                scrollPosition = selectedAvatar
+            }
+        }
         .onChange(of: selectedAvatarImage) { _, newImage in
             // When custom image is selected, scroll to camera position
             if newImage != nil {

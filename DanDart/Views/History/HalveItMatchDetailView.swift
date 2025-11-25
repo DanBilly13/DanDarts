@@ -30,7 +30,7 @@ struct HalveItMatchDetailView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 24)
             }
-            .background(Color("BackgroundPrimary"))
+            .background(AppColor.backgroundPrimary)
             .navigationTitle("\(match.gameName) - Level \(halveItLevel)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .tabBar)
@@ -63,7 +63,7 @@ struct HalveItMatchDetailView: View {
     private var dateHeader: some View {
         Text(match.formattedDate)
             .font(.subheadline.weight(.medium))
-            .foregroundColor(Color("TextSecondary"))
+            .foregroundColor(AppColor.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     
@@ -105,7 +105,7 @@ struct HalveItMatchDetailView: View {
             // Stats title
             Text("Stats")
                 .font(.title3.weight(.semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             // Color key legend
             FlexibleLayout(spacing: 12) {
@@ -117,7 +117,7 @@ struct HalveItMatchDetailView: View {
                         
                         Text(match.players[index].displayName)
                             .font(.caption.weight(.medium))
-                            .foregroundColor(Color("TextSecondary"))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
             }
@@ -177,7 +177,7 @@ struct HalveItMatchDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Round-by-Round Breakdown")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Color("TextPrimary"))
+                .foregroundColor(AppColor.textPrimary)
             
             // Show rounds (assuming 6 rounds for Halve-It)
             let maxRounds = match.players.map { $0.turns.count }.max() ?? 0
@@ -227,11 +227,13 @@ struct HalveItMatchDetailView: View {
     // Get player color based on index
     private func playerColor(for index: Int) -> Color {
         switch index {
-        case 0: return Color("AccentSecondary")
-        case 1: return Color("AccentPrimary")
-        case 2: return Color("AccentTertiary")
-        case 3: return Color("AccentQuaternary")
-        default: return Color("AccentPrimary")
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
         }
     }
 }

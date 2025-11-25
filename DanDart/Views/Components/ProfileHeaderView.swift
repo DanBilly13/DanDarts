@@ -8,11 +8,18 @@
 import SwiftUI
 import PhotosUI
 
-struct ProfileHeaderView: View {
+struct ProfileHeaderView<Content: View>: View {
     let player: Player
+    let customContent: Content?
     
-    init(player: Player) {
+    init(player: Player, @ViewBuilder customContent: () -> Content) {
         self.player = player
+        self.customContent = customContent()
+    }
+    
+    init(player: Player) where Content == EmptyView {
+        self.player = player
+        self.customContent = nil
     }
     
     var body: some View {
@@ -23,18 +30,25 @@ struct ProfileHeaderView: View {
             // Name and Handle
             VStack(spacing: 4) {
                 Text(player.displayName)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.regular)
                     .foregroundColor(AppColor.textPrimary)
                 
                 if !player.isGuest {
                     Text("@\(player.nickname)")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.semibold)
                         .foregroundColor(AppColor.brandPrimary)
                 } else {
                     Text("Guest Player")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(AppColor.textSecondary)
                 }
+            }
+            
+            // Custom content slot (e.g., Edit Profile button)
+            if let customContent = customContent {
+                customContent
             }
             
             // Stats Cards

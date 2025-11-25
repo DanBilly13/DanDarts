@@ -24,7 +24,20 @@ struct ProfileView: View {
                     if let currentUser = authService.currentUser {
                         ProfileHeaderView(
                             player: currentUser.toPlayer()
-                        )
+                        ) {
+                            // Edit Profile Button
+                            AppButton(
+                                role: .tertiaryOutline,
+                                controlSize: .regular,
+                                action: {
+                                    showEditProfile = true
+                                }
+                            ) {
+                                Text("Edit Profile")
+                            }
+                            .frame(width: 120)
+                            .padding(.top, 8)
+                        }
                         .padding(.top, 24)
                     }
                     
@@ -42,14 +55,13 @@ struct ProfileView: View {
                 .padding(.horizontal, 16)
             }
             .background(AppColor.backgroundPrimary)
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.large)
+           /* .navigationTitle("Profile")*/
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    CloseButton(size: 24) {
                         dismiss()
                     }
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
             }
             .alert("Log Out", isPresented: $showLogoutConfirmation) {
@@ -93,22 +105,11 @@ struct ProfileView: View {
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Settings")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(.footnote, design: .rounded))
+                .fontWeight(.regular)
                 .foregroundColor(AppColor.textPrimary)
             
             VStack(spacing: 0) {
-                SettingsRow(
-                    icon: "person.circle",
-                    title: "Edit Profile",
-                    showChevron: true
-                ) {
-                    showEditProfile = true
-                }
-                
-                Divider()
-                    .background(AppColor.textSecondary.opacity(0.2))
-                    .padding(.leading, 44)
-                
                 // Sound Effects Toggle
                 SettingsToggleRow(
                     icon: "speaker.wave.2",
@@ -185,7 +186,8 @@ struct ProfileView: View {
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("About")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(.footnote, design: .rounded))
+                .fontWeight(.regular)
                 .foregroundColor(AppColor.textPrimary)
             
             VStack(spacing: 0) {
@@ -372,5 +374,22 @@ struct SettingsRow: View {
 
 #Preview {
     ProfileView()
-        .environmentObject(AuthService())
+        .environmentObject({
+            let mockAuthService = AuthService()
+            mockAuthService.currentUser = User(
+                id: UUID(),
+                displayName: "Daniel Billingham",
+                nickname: "dantheman",
+                email: "daniel@example.com",
+                handle: "dantheman",
+                avatarURL: "avatar1",
+                authProvider: .email,
+                createdAt: Date(),
+                lastSeenAt: Date(),
+                totalWins: 63,
+                totalLosses: 24
+            )
+            mockAuthService.isAuthenticated = true
+            return mockAuthService
+        }())
 }

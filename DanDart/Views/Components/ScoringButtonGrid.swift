@@ -141,18 +141,18 @@ struct ScoringButton: View {
                         // Outer circle - AccentQuinary (white) with dynamic opacity
                         // Fades out when pressed to reveal solid blue button
                         Circle()
-                            .fill(Color("AccentPrimary").opacity(isHighlighted ? 1.0 : 0.8))
+                            .fill(AppColor.player1.opacity(isHighlighted ? 1.0 : 0.8))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - InputBackground, fades out when pressed
                         Circle()
-                            .fill(Color("InputBackground"))
+                            .fill(AppColor.player1)
                             .frame(width: 52, height: 52)
                             .opacity(isHighlighted ? 0.0 : 1.0)
                         
                         Text(title)
                             .font(.system(size: 17, weight: .semibold, design: .default))
-                            .foregroundColor(isHighlighted ? .black : .white)
+                            .foregroundColor(isHighlighted ? AppColor.justWhite : AppColor.justWhite)
                     }
                 } else if baseValue == 25 {
                     // Two-circle design: dark inner, green outer ring
@@ -161,19 +161,19 @@ struct ScoringButton: View {
                         // Outer circle - AccentSecondary (green) with dynamic opacity
                         // Default: 60% opacity, Pressed: 100% for solid green button
                         Circle()
-                            .fill(Color("AccentSecondary").opacity(isHighlighted ? 1.0 : 0.7))
+                            .fill(AppColor.player2.opacity(isHighlighted ? 1.0 : 0.7))
                             .frame(width: 64, height: 64)
                         
                         // Inner circle - InputBackground, fades out when pressed
                         Circle()
-                            .fill(Color("InputBackground"))
+                            .fill(AppColor.player2)
                             .frame(width: 52, height: 52)
                             .opacity(isHighlighted ? 0.0 : 1.0)
                         
                         Text(title)
                             .font(.system(size: 18, weight: .bold, design: .monospaced
                                          ))
-                            .foregroundColor(isHighlighted ? .black : .white)
+                            .foregroundColor(isHighlighted ? AppColor.justBlack : AppColor.justBlack)
                     }
                 } else if baseValue == 0 || baseValue == -1 {
                     // Miss and Bust buttons - same two-circle design as numbers
@@ -185,13 +185,13 @@ struct ScoringButton: View {
                         
                         // Inner circle - InputBackground, fades out when pressed
                         Circle()
-                            .fill(Color("InputBackground"))
+                            .fill(AppColor.inputBackground)
                             .frame(width: 52, height: 52)
-                            .opacity(isHighlighted ? 0.0 : 1.0)
+                            .opacity(isHighlighted ? 1.0 : 1.0)
                         
                         Text(title)
                             .font(.system(size: 17, weight: .semibold, design: .default))
-                            .foregroundColor(isHighlighted ? .black : .white)
+                            .foregroundColor(isHighlighted ? AppColor.justWhite : AppColor.justWhite)
                     }
                 } else {
                     // Standard buttons (1-20)
@@ -205,14 +205,14 @@ struct ScoringButton: View {
                         
                         // Inner circle - InputBackground, fades out when pressed
                         Circle()
-                            .fill(Color("InputBackground"))
+                            .fill(AppColor.inputBackground)
                             .frame(width: 58, height: 58)
                             .opacity(isHighlighted ? 0.0 : 0.0)
                         
                         Text(title)
                             .font(.system(size: 20, weight: .bold, design: .monospaced
                                          ))
-                            .foregroundColor(Color.black)
+                            .foregroundColor(AppColor.justBlack)
                     }
                 }
             }
@@ -298,7 +298,7 @@ struct ScoringButton: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(Color.red)
+                                .background(AppColor.interactivePrimaryBackground)
                         }
                         
                         // Double option (middle)
@@ -316,7 +316,7 @@ struct ScoringButton: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(Color.red)
+                                .background(AppColor.interactivePrimaryBackground)
                         }
                         
                         // Single option (bottom)
@@ -334,7 +334,7 @@ struct ScoringButton: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(Color.red)
+                                .background(AppColor.interactivePrimaryBackground)
                         }
                     }
                     .cornerRadius(12)

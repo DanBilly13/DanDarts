@@ -38,9 +38,12 @@ struct ThrowBreakdownCard: View {
                                 // First player darts
                                 playerDarts(playerData[rowIndex])
                                 
-                                // Second player darts (if exists)
+                                // Second player darts (if exists) or empty placeholder
                                 if rowIndex + 1 < playerData.count {
                                     playerDarts(playerData[rowIndex + 1])
+                                } else {
+                                    // Empty placeholder to maintain layout
+                                    emptyDartsPlaceholder()
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -53,9 +56,12 @@ struct ThrowBreakdownCard: View {
                                 // First player score
                                 playerScore(playerData[rowIndex])
                                 
-                                // Second player score (if exists)
+                                // Second player score (if exists) or empty placeholder
                                 if rowIndex + 1 < playerData.count {
                                     playerScore(playerData[rowIndex + 1])
+                                } else {
+                                    // Empty placeholder to maintain layout
+                                    emptyScorePlaceholder()
                                 }
                             }
                             .layoutPriority(0)
@@ -90,6 +96,31 @@ struct ThrowBreakdownCard: View {
             score: data.scoreRemaining,
             playerColor: data.isBust ? .red : data.color
         )
+    }
+    
+    // Empty placeholder for darts section to maintain layout
+    @ViewBuilder
+    private func emptyDartsPlaceholder() -> some View {
+        HStack(spacing: 0) {
+            ForEach(0..<3, id: \.self) { _ in
+                Text("")
+                    .font(.system(size: 14, design: .rounded))
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .layoutPriority(1)
+    }
+    
+    // Empty placeholder for score section to maintain layout
+    @ViewBuilder
+    private func emptyScorePlaceholder() -> some View {
+        Text("")
+            .font(.system(size: 14, design: .rounded))
+            .monospacedDigit()
+            .fontWeight(.bold)
+            .frame(minWidth: 36, alignment: .trailing)
     }
 }
 
@@ -166,6 +197,37 @@ struct ThrowBreakdownCard: View {
                     color: AppColor.player4,
                     isBust: false
                 )
+            ]
+        )
+    }
+    .padding()
+    .background(AppColor.backgroundPrimary)
+}
+
+#Preview("3 Players") {
+    VStack(spacing: 16) {
+        ThrowBreakdownCard(
+            roundNumber: 1,
+            playerData: [
+                ThrowBreakdownCard.PlayerTurnData(
+                    darts: ["50", "50", "1"],
+                    scoreRemaining: 257,
+                    color: AppColor.player1,
+                    isBust: false
+                ),
+                ThrowBreakdownCard.PlayerTurnData(
+                    darts: ["20", "5", "T20"],
+                    scoreRemaining: 216,
+                    color: AppColor.player2,
+                    isBust: false
+                ),
+                ThrowBreakdownCard.PlayerTurnData(
+                    darts: ["50", "50", "1"],
+                    scoreRemaining: 130,
+                    color: AppColor.player3,
+                    isBust: false
+                ),
+              
             ]
         )
     }

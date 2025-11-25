@@ -16,6 +16,8 @@ struct MatchDetailView: View {
         // Route to game-specific detail view
         if match.gameName == "Halve It" {
             HalveItMatchDetailView(match: match, isSheet: isSheet)
+        } else if match.gameName == "Sudden Death" {
+            SuddenDeathMatchDetailView(match: match, isSheet: isSheet)
         } else {
             // 301/501 matches use generic view
             if isSheet {
@@ -293,7 +295,7 @@ struct CompactPlayerCard: View {
                 if isWinner {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .foregroundColor(AppColor.player1)
                         .offset(y: -55)
                 }
             }
@@ -319,7 +321,7 @@ struct CompactPlayerCard: View {
                 VStack(spacing: 4) {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(Color("AccentTertiary"))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                     
                     Text("WINNER")
                         .font(.subheadline.weight(.bold))
@@ -402,7 +404,7 @@ struct MatchPlayerCard: View {
         .background(AppColor.inputBackground)
         .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            Capsule()
                 .stroke(borderColor, lineWidth: 2)
         )
     }
