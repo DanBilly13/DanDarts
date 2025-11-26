@@ -150,7 +150,7 @@ struct SuddenDeathGameplayView: View {
                 },
                 matchFormat: nil,
                 legsWon: nil,
-                matchId: nil
+                matchId: viewModel.matchId
             )
         }
     }

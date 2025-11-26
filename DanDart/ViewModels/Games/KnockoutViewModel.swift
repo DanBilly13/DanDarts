@@ -31,6 +31,7 @@ class KnockoutViewModel: ObservableObject {
     
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers score to beat pop animation
+    @Published var showPlayerScorePop: Bool = false // Triggers player card score pop animation
     @Published var showSkullWiggle: Bool = false // Triggers skull wiggle when player fails
     @Published var animatingLifeLoss: UUID? = nil // Player ID whose life is animating
     @Published var animatingPlayerTransition: Bool = false // Triggers player card fade transition
@@ -39,8 +40,11 @@ class KnockoutViewModel: ObservableObject {
     
     let startingLives: Int
     private let soundManager = SoundManager.shared
-    private let matchId = UUID()
+    let matchId = UUID()
     private let matchStartTime = Date()
+    
+    // Turn history tracking: [Player.id: [MatchTurn]]
+    private var turnHistory: [UUID: [MatchTurn]] = [:]
     
     // Services (optional for Supabase sync)
     var authService: AuthService?
@@ -91,6 +95,7 @@ class KnockoutViewModel: ObservableObject {
         for player in self.players {
             playerLives[player.id] = startingLives
             currentTurnScores[player.id] = 0
+            turnHistory[player.id] = []
         }
         
         // First player is automatically player to beat
@@ -153,6 +158,9 @@ class KnockoutViewModel: ObservableObject {
     func completeTurn() {
         let turnScore = currentTurnTotal
         
+        // Record turn in history
+        recordTurn(score: turnScore, lostLife: false)
+        
         // First player's first turn - they become player to beat
         if currentPlayerIndex == 0 && scoreToBeat == 0 {
             scoreToBeat = turnScore
@@ -167,11 +175,23 @@ class KnockoutViewModel: ObservableObject {
                 playerToBeatIndex = currentPlayerIndex
                 soundManager.playScoreSound()
                 triggerScoreAnimation()
+                
+                // Wait for score pop animation to complete before switching players
+                Task {
+                    try? await Task.sleep(nanoseconds: 250_000_000) // 0.25s for pop animation
+                    await MainActor.run {
+                        finishTurnTransition()
+                    }
+                }
+                return // Exit early, finishTurnTransition will be called after animation
             } else {
                 // Lost a life
                 if let currentLives = playerLives[currentPlayer.id] {
                     soundManager.playMissSound()
                     triggerSkullWiggle()
+                    
+                    // Mark life loss in turn history
+                    markLifeLossInHistory()
                     
                     // Trigger life loss animation
                     triggerLifeLossAnimation(for: currentPlayer.id)
@@ -196,7 +216,7 @@ class KnockoutViewModel: ObservableObject {
             }
         }
         
-        // If no life was lost, proceed immediately
+        // If no life was lost and didn't beat score, proceed immediately
         finishTurnTransition()
     }
     
@@ -246,6 +266,43 @@ class KnockoutViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Turn History Tracking
+    
+    /// Record a turn in the history
+    private func recordTurn(score: Int, lostLife: Bool) {
+        let darts = currentThrow.map { scoredThrow in
+            MatchDart(baseValue: scoredThrow.baseValue, multiplier: scoredThrow.scoreType.multiplier)
+        }
+        
+        let turn = MatchTurn(
+            turnNumber: (turnHistory[currentPlayer.id]?.count ?? 0) + 1,
+            darts: darts,
+            scoreBefore: 0, // Not applicable for Knockout
+            scoreAfter: score, // Store the turn score
+            isBust: lostLife
+        )
+        
+        turnHistory[currentPlayer.id, default: []].append(turn)
+    }
+    
+    /// Mark the last recorded turn as a life loss
+    private func markLifeLossInHistory() {
+        guard var turns = turnHistory[currentPlayer.id], !turns.isEmpty else { return }
+        
+        // Create a new turn with isBust set to true (MatchTurn properties are immutable)
+        let lastTurn = turns[turns.count - 1]
+        let updatedTurn = MatchTurn(
+            id: lastTurn.id,
+            turnNumber: lastTurn.turnNumber,
+            darts: lastTurn.darts,
+            scoreBefore: lastTurn.scoreBefore,
+            scoreAfter: lastTurn.scoreAfter,
+            isBust: true
+        )
+        turns[turns.count - 1] = updatedTurn
+        turnHistory[currentPlayer.id] = turns
+    }
+    
     // MARK: - Match Storage
     
     /// Save match result to local storage and Supabase
@@ -255,7 +312,7 @@ class KnockoutViewModel: ObservableObject {
         // Calculate match duration
         let duration = Date().timeIntervalSince(matchStartTime)
         
-        // Create match players with final lives remaining
+        // Create match players with final lives remaining and turn history
         let matchPlayers = players.map { player in
             MatchPlayer(
                 id: player.id,
@@ -265,8 +322,8 @@ class KnockoutViewModel: ObservableObject {
                 isGuest: player.isGuest,
                 finalScore: playerLives[player.id] ?? 0,
                 startingScore: startingLives,
-                totalDartsThrown: 0, // Sudden Death doesn't track individual darts
-                turns: [], // Sudden Death doesn't track turn-by-turn history
+                totalDartsThrown: 0, // Knockout doesn't track individual darts
+                turns: turnHistory[player.id] ?? [],
                 legsWon: 0
             )
         }
@@ -339,14 +396,16 @@ class KnockoutViewModel: ObservableObject {
         winner = nil
         isGameOver = false
         showScoreAnimation = false
+        showPlayerScorePop = false
         showSkullWiggle = false
         animatingLifeLoss = nil
         animatingPlayerTransition = false
         
-        // Reset lives
+        // Reset lives and turn history
         for player in players {
             playerLives[player.id] = startingLives
             currentTurnScores[player.id] = 0
+            turnHistory[player.id] = []
         }
     }
     
@@ -354,11 +413,13 @@ class KnockoutViewModel: ObservableObject {
     
     private func triggerScoreAnimation() {
         showScoreAnimation = true
+        showPlayerScorePop = true
         
         Task {
             // Wait for animation to complete
             try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
             showScoreAnimation = false
+            showPlayerScorePop = false
         }
     }
     

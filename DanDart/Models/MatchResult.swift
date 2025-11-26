@@ -456,4 +456,58 @@ extension MatchResult {
             metadata: ["starting_lives": "1"]
         )
     }()
+    
+    // MARK: - Mock Knockout Match
+    
+    static let mockKnockout: MatchResult = {
+        let player1Id = UUID()
+        let player2Id = UUID()
+        let player3Id = UUID()
+        let player4Id = UUID()
+        
+        // Player 1 (Winner - Green) - Lost 0 lives
+        let player1Turns = [
+            MatchTurn(turnNumber: 1, darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3)], scoreBefore: 0, scoreAfter: 180, isBust: false),
+            MatchTurn(turnNumber: 2, darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 2), MatchDart(baseValue: 20, multiplier: 1)], scoreBefore: 0, scoreAfter: 120, isBust: false),
+            MatchTurn(turnNumber: 3, darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 15, multiplier: 1)], scoreBefore: 0, scoreAfter: 135, isBust: false)
+        ]
+        
+        // Player 2 (2nd - Red) - Lost 1 life in round 1
+        let player2Turns = [
+            MatchTurn(turnNumber: 1, darts: [MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 20, multiplier: 1)], scoreBefore: 0, scoreAfter: 60, isBust: true), // Lost life
+            MatchTurn(turnNumber: 2, darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 20, multiplier: 1)], scoreBefore: 0, scoreAfter: 100, isBust: false),
+            MatchTurn(turnNumber: 3, darts: [MatchDart(baseValue: 20, multiplier: 3), MatchDart(baseValue: 20, multiplier: 2), MatchDart(baseValue: 5, multiplier: 1)], scoreBefore: 0, scoreAfter: 105, isBust: false)
+        ]
+        
+        // Player 3 (3rd - Orange) - Lost 2 lives (rounds 1 and 2), eliminated after round 2
+        let player3Turns = [
+            MatchTurn(turnNumber: 1, darts: [MatchDart(baseValue: 15, multiplier: 1), MatchDart(baseValue: 15, multiplier: 1), MatchDart(baseValue: 10, multiplier: 1)], scoreBefore: 0, scoreAfter: 40, isBust: true), // Lost life
+            MatchTurn(turnNumber: 2, darts: [MatchDart(baseValue: 20, multiplier: 1), MatchDart(baseValue: 15, multiplier: 1), MatchDart(baseValue: 10, multiplier: 1)], scoreBefore: 0, scoreAfter: 45, isBust: true) // Lost life, eliminated
+        ]
+        
+        // Player 4 (4th - Blue) - Lost 2 lives (rounds 1 and 2), eliminated after round 2
+        let player4Turns = [
+            MatchTurn(turnNumber: 1, darts: [MatchDart(baseValue: 10, multiplier: 1), MatchDart(baseValue: 10, multiplier: 1), MatchDart(baseValue: 10, multiplier: 1)], scoreBefore: 0, scoreAfter: 30, isBust: true), // Lost life
+            MatchTurn(turnNumber: 2, darts: [MatchDart(baseValue: 15, multiplier: 1), MatchDart(baseValue: 10, multiplier: 1), MatchDart(baseValue: 5, multiplier: 1)], scoreBefore: 0, scoreAfter: 30, isBust: true) // Lost life, eliminated
+        ]
+        
+        return MatchResult(
+            id: UUID(),
+            gameType: "Knockout",
+            gameName: "Knockout",
+            players: [
+                MatchPlayer(id: player1Id, displayName: "Alice", nickname: "@alice", avatarURL: nil, isGuest: true, finalScore: 2, startingScore: 2, totalDartsThrown: 0, turns: player1Turns, legsWon: 0),
+                MatchPlayer(id: player2Id, displayName: "Bob", nickname: "@bob", avatarURL: nil, isGuest: true, finalScore: 1, startingScore: 2, totalDartsThrown: 0, turns: player2Turns, legsWon: 0),
+                MatchPlayer(id: player3Id, displayName: "Charlie", nickname: "@charlie", avatarURL: nil, isGuest: true, finalScore: 0, startingScore: 2, totalDartsThrown: 0, turns: player3Turns, legsWon: 0),
+                MatchPlayer(id: player4Id, displayName: "Diana", nickname: "@diana", avatarURL: nil, isGuest: true, finalScore: 0, startingScore: 2, totalDartsThrown: 0, turns: player4Turns, legsWon: 0)
+            ],
+            winnerId: player1Id,
+            timestamp: Date(),
+            duration: 180,
+            matchFormat: 1,
+            totalLegsPlayed: 1,
+            metadata: ["starting_lives": "2"]
+        )
+    }()
 }
+

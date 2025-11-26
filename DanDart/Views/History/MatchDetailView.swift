@@ -18,6 +18,8 @@ struct MatchDetailView: View {
             HalveItMatchDetailView(match: match, isSheet: isSheet)
         } else if match.gameName == "Sudden Death" {
             SuddenDeathMatchDetailView(match: match, isSheet: isSheet)
+        } else if match.gameName == "Knockout" {
+            KnockoutMatchDetailView(match: match, isSheet: isSheet)
         } else {
             // 301/501 matches use generic view
             if isSheet {

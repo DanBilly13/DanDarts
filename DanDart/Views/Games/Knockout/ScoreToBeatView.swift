@@ -13,42 +13,62 @@ struct ScoreToBeatView: View {
     let showScoreAnimation: Bool
     let showSkullWiggle: Bool
     
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            // Boxing glove on the left
+            
+            
+            VStack(spacing: -2) {
+                Text("HIGH")
+                    .font(.system(.footnote, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppColor.justWhite)
+                
+                Text("SCORE")
+                    .font(.system(.footnote, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppColor.justWhite)
+            }
+            
+            Text("\(score)")
+                .font(.system(.largeTitle, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundColor(AppColor.justWhite)
+                .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
+                .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
+            
+            BoxingGloveAnimation(showAnimation: showSkullWiggle)
+                .padding(.leading, 2)
+        }
+        .padding(.vertical, 0)
+    }
+}
+
+// MARK: - Boxing Glove Animation Component (for reuse)
+
+struct BoxingGloveAnimation: View {
+    let showAnimation: Bool
+    
     @State private var wiggleAngle: Double = 0
     
     var body: some View {
-        VStack(spacing: 4) {
-            /*Text("Score to beat")
-                .font(.caption)
-                .foregroundColor(AppColor.textSecondary)*/
-            
-            HStack(spacing: 8) {
-                Text("\(score)")
-                    .font(.system(.largeTitle, design: .monospaced))
-                    .fontWeight(.bold)
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                    .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
-                
-                Image("BoxingGloveLeft")
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundColor(AppColor.textPrimary)
-                    .frame(width: 36, height: 26)
-                    .rotationEffect(.degrees(wiggleAngle))
-                    .scaleEffect(showSkullWiggle ? 1.8 : 1.0)
-                    .onChange(of: showSkullWiggle) { _, newValue in
-                        if newValue {
-                            withAnimation(.easeInOut(duration: 0.08).repeatCount(6, autoreverses: true)) {
-                                wiggleAngle = 12
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                wiggleAngle = 0 // reset to neutral
-                            }
-                        }
+        Image("BoxingGloveLeft")
+            .resizable()
+            .renderingMode(.template)
+            .foregroundColor(AppColor.player1)
+            .frame(width: 36, height: 26)
+            .rotationEffect(.degrees(wiggleAngle))
+            .scaleEffect(showAnimation ? 1.8 : 1.0)
+            .onChange(of: showAnimation) { _, newValue in
+                if newValue {
+                    withAnimation(.easeInOut(duration: 0.08).repeatCount(6, autoreverses: true)) {
+                        wiggleAngle = 12
                     }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        wiggleAngle = 0 // reset to neutral
+                    }
+                }
             }
-        }
-        .padding(.vertical, 0)
     }
 }
 

@@ -184,7 +184,7 @@ struct KnockoutGameplayView: View {
                 },
                 matchFormat: nil,
                 legsWon: nil,
-                matchId: nil
+                matchId: viewModel.matchId
             )
         }
     }
@@ -193,12 +193,15 @@ struct KnockoutGameplayView: View {
     // MARK: - Avatar Lineup
     
     private var avatarLineup: some View {
-        HStack(spacing: -2) {
+        let dynamicRingColor = viewModel.currentTurnTotal > viewModel.scoreToBeat ? AppColor.player2 : AppColor.player1
+        
+        return HStack(spacing: -2) {
             ForEach(viewModel.players) { player in
                 AvatarLineupItem(
                     player: player,
                     isCurrentPlayer: player.id == viewModel.currentPlayer.id,
-                    isEliminated: viewModel.eliminatedPlayers.contains(player.id)
+                    isEliminated: viewModel.eliminatedPlayers.contains(player.id),
+                    ringColor: dynamicRingColor
                 )
             }
         }
@@ -207,16 +210,19 @@ struct KnockoutGameplayView: View {
     // MARK: - Current Player Card
     
     private var currentPlayerCard: some View {
-        KnockoutPlayerCard(
+        let dynamicBorderColor = viewModel.currentTurnTotal > viewModel.scoreToBeat ? AppColor.player2 : AppColor.player1
+        
+        return KnockoutPlayerCard(
             player: viewModel.currentPlayer,
             lives: viewModel.playerLives[viewModel.currentPlayer.id] ?? 0,
             startingLives: viewModel.startingLives,
             score: viewModel.currentTurnTotal,
             scoreToBeat: viewModel.scoreToBeat,
             isPlayerToBeat: false,
-            borderColor: AppColor.player1,
+            borderColor: dynamicBorderColor,
             animatingLifeLoss: viewModel.animatingLifeLoss == viewModel.currentPlayer.id,
-            animatingTransition: viewModel.animatingPlayerTransition
+            animatingTransition: viewModel.animatingPlayerTransition,
+            showScorePop: viewModel.showPlayerScorePop
         )
         .animation(.easeInOut(duration: 0.4), value: viewModel.animatingPlayerTransition)
     }
@@ -229,12 +235,13 @@ struct AvatarLineupItem: View {
     let player: Player
     let isCurrentPlayer: Bool
     let isEliminated: Bool
+    let ringColor: Color
     
     var body: some View {
         ZStack {
-            // Outer green circle - only visible when current player
+            // Outer circle - only visible when current player, color based on score
             Circle()
-                .fill(AppColor.player1)
+                .fill(ringColor)
                 .frame(width: 36, height: 36)
                 .opacity(isCurrentPlayer ? 1.0 : 0.0)
             
@@ -268,6 +275,7 @@ struct KnockoutPlayerCard: View {
     let borderColor: Color
     let animatingLifeLoss: Bool
     let animatingTransition: Bool
+    let showScorePop: Bool
     
     var body: some View {
         HStack(spacing: 12) {
@@ -324,6 +332,8 @@ struct KnockoutPlayerCard: View {
                     .fontWeight(.bold)
                     .foregroundColor(AppColor.textPrimary)
                     .frame(width: 60, alignment: .trailing)
+                    .scaleEffect(showScorePop ? 1.35 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScorePop)
                 
                 // Points needed indicator - only show when there's a score to beat AND player has thrown
                 if scoreToBeat > 0 && score > 0 {
@@ -332,22 +342,22 @@ struct KnockoutPlayerCard: View {
                             Image(systemName: "arrow.up")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(AppColor.player1)
+                                .foregroundColor(AppColor.player2)
                         } else if score < scoreToBeat {
                             Image(systemName: "arrow.down")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .foregroundColor(AppColor.player1)
                         } else {
                             Image(systemName: "minus")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(AppColor.textSecondary)
+                                .foregroundColor(AppColor.player1)
                         }
                         
                         Text("\(abs(score - scoreToBeat))")
                             .font(.headline)
-                            .foregroundColor(score >= scoreToBeat ? AppColor.player1 : AppColor.interactivePrimaryBackground)
+                            .foregroundColor(score > scoreToBeat ? AppColor.player2 : AppColor.player1)
                     }
                     .padding(.vertical, 4)
                     .padding(.leading, 4)

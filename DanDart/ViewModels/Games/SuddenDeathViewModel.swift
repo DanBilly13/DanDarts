@@ -43,7 +43,7 @@ class SuddenDeathViewModel: ObservableObject {
     
     let startingLives: Int
     private let soundManager = SoundManager.shared
-    private let matchId = UUID()
+    let matchId = UUID()
     private let matchStartTime = Date()
     
     // Services (optional for Supabase sync)
