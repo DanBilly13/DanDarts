@@ -230,28 +230,11 @@ struct SuddenDeathPlayerCard: View {
             .frame(height: 32)
             
             // Avatar (with double ring for current player)
-            ZStack {
-                if isCurrentPlayer {
-                    // Outer accent ring
-                    Circle()
-                        .stroke(AppColor.interactiveSecondaryBackground, lineWidth: 2)
-                        .frame(width: 64, height: 64)
-                    // Inner black ring
-                    Circle()
-                        .stroke(Color.black, lineWidth: 2)
-                        .frame(width: 60, height: 60)
-                    // Avatar inside
-                    AsyncAvatarImage(
-                        avatarURL: player.avatarURL,
-                        size: 56
-                    )
-                } else {
-                    AsyncAvatarImage(
-                        avatarURL: player.avatarURL,
-                        size: 64
-                    )
-                }
-            }
+            PlayerAvatarWithRing(
+                avatarURL: player.avatarURL,
+                isCurrentPlayer: isCurrentPlayer,
+                size: 64
+            )
             
             // Name
             Text(firstName)
@@ -277,16 +260,7 @@ struct SuddenDeathPlayerCard: View {
                 }
             
             // Lives row (hide if startingLives == 1)
-            if startingLives > 1 {
-                HStack(spacing: 4) {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.red)
-                    Text("\(lives)")
-                        .font(.footnote)
-                        .foregroundColor(AppColor.textSecondary)
-                }
-            }
+            LivesDisplay(lives: lives, startingLives: startingLives)
         }
         .padding(.vertical, 4)
         .onAppear {

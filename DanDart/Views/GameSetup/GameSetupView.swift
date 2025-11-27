@@ -29,6 +29,8 @@ struct GameSetupView: View {
             return KnockoutSetupConfig(game: game)
         case "Sudden Death":
             return SuddenDeathSetupConfig(game: game)
+        case "Killer":
+            return KillerSetupConfig(game: game)
         default: // 301, 501, or any other countdown game
             return CountdownSetupConfig(game: game)
         }
@@ -250,7 +252,8 @@ struct GameSetupView: View {
                                     players: params.players,
                                     matchFormat: params.matchFormat,
                                     halveItDifficulty: params.halveItDifficulty,
-                                    knockoutLives: params.knockoutLives
+                                    knockoutLives: params.knockoutLives,
+                                    killerLives: params.killerLives
                                 ))
                             } label: {
                                 Text("Start game")

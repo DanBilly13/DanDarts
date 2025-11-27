@@ -13,6 +13,7 @@ struct PreGameHypeView: View {
     let matchFormat: Int
     let halveItDifficulty: HalveItDifficulty?
     let knockoutLives: Int?
+    let killerLives: Int?
     let autoTransition: Bool
     
     // Navigation helper
@@ -25,17 +26,20 @@ struct PreGameHypeView: View {
             } else if game.title == "Sudden Death" {
                 router.push(.suddenDeathGameplay(game: game, players: players, startingLives: lives))
             }
+        } else if let lives = killerLives {
+            router.push(.killerGameplay(game: game, players: players, startingLives: lives))
         } else {
             router.push(.countdownGameplay(game: game, players: players, matchFormat: matchFormat))
         }
     }
     
-    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil, autoTransition: Bool = true) {
+    init(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil, killerLives: Int? = nil, autoTransition: Bool = true) {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
         self.halveItDifficulty = halveItDifficulty
         self.knockoutLives = knockoutLives
+        self.killerLives = killerLives
         self.autoTransition = autoTransition
     }
     
@@ -61,10 +65,18 @@ struct PreGameHypeView: View {
                             .font(.system(size: 28, weight: .bold, design: .default))
                             .foregroundColor(AppColor.textPrimary)
                         
-                        Text("MATCH STARTING")
-                            .font(.system(size: 14, weight: .semibold, design: .default))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                            .tracking(2)
+                        // Show "Assigning random numbers..." for Killer game
+                        if game.title == "Killer" {
+                            Text("ASSIGNING RANDOM NUMBERS...")
+                                .font(.system(size: 14, weight: .semibold, design: .default))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .tracking(2)
+                        } else {
+                            Text("MATCH STARTING")
+                                .font(.system(size: 14, weight: .semibold, design: .default))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .tracking(2)
+                        }
                     }
                     .padding(.top, 60)
                     

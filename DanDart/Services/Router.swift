@@ -20,11 +20,12 @@ final class GameSetupState: ObservableObject {
 enum Destination: Hashable {
     // Games flow
     case gameSetup(game: Game)
-    case preGameHype(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil)
+    case preGameHype(game: Game, players: [Player], matchFormat: Int, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil, killerLives: Int? = nil)
     case countdownGameplay(game: Game, players: [Player], matchFormat: Int)
     case halveItGameplay(game: Game, players: [Player], difficulty: HalveItDifficulty)
     case knockoutGameplay(game: Game, players: [Player], startingLives: Int)
     case suddenDeathGameplay(game: Game, players: [Player], startingLives: Int)
+    case killerGameplay(game: Game, players: [Player], startingLives: Int)
     
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?)
@@ -34,7 +35,7 @@ enum Destination: Hashable {
         switch (lhs, rhs) {
         case (.gameSetup(let g1), .gameSetup(let g2)):
             return g1.id == g2.id
-        case (.preGameHype(let g1, let p1, let m1, _, _), .preGameHype(let g2, let p2, let m2, _, _)):
+        case (.preGameHype(let g1, let p1, let m1, _, _, _), .preGameHype(let g2, let p2, let m2, _, _, _)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && m1 == m2
         case (.countdownGameplay(let g1, let p1, let m1), .countdownGameplay(let g2, let p2, let m2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && m1 == m2
@@ -43,6 +44,8 @@ enum Destination: Hashable {
         case (.knockoutGameplay(let g1, let p1, let l1), .knockoutGameplay(let g2, let p2, let l2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.suddenDeathGameplay(let g1, let p1, let l1), .suddenDeathGameplay(let g2, let p2, let l2)):
+            return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
+        case (.killerGameplay(let g1, let p1, let l1), .killerGameplay(let g2, let p2, let l2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
@@ -56,7 +59,7 @@ enum Destination: Hashable {
         case .gameSetup(let game):
             hasher.combine("gameSetup")
             hasher.combine(game.id)
-        case .preGameHype(let game, let players, let matchFormat, _, _):
+        case .preGameHype(let game, let players, let matchFormat, _, _, _):
             hasher.combine("preGameHype")
             hasher.combine(game.id)
             hasher.combine(players.map(\.id))
@@ -78,6 +81,11 @@ enum Destination: Hashable {
             hasher.combine(startingLives)
         case .suddenDeathGameplay(let game, let players, let startingLives):
             hasher.combine("suddenDeathGameplay")
+            hasher.combine(game.id)
+            hasher.combine(players.map(\.id))
+            hasher.combine(startingLives)
+        case .killerGameplay(let game, let players, let startingLives):
+            hasher.combine("killerGameplay")
             hasher.combine(game.id)
             hasher.combine(players.map(\.id))
             hasher.combine(startingLives)
@@ -151,13 +159,14 @@ class Router: ObservableObject {
         case .gameSetup(let game):
             GameSetupView(game: game)
             
-        case .preGameHype(let game, let players, let matchFormat, let halveItDifficulty, let knockoutLives):
+        case .preGameHype(let game, let players, let matchFormat, let halveItDifficulty, let knockoutLives, let killerLives):
             PreGameHypeView(
                 game: game,
                 players: players,
                 matchFormat: matchFormat,
                 halveItDifficulty: halveItDifficulty,
-                knockoutLives: knockoutLives
+                knockoutLives: knockoutLives,
+                killerLives: killerLives
             )
             
         case .countdownGameplay(let game, let players, let matchFormat):
@@ -171,6 +180,9 @@ class Router: ObservableObject {
             
         case .suddenDeathGameplay(let game, let players, let startingLives):
             SuddenDeathGameplayView(game: game, players: players, startingLives: startingLives)
+            
+        case .killerGameplay(let game, let players, let startingLives):
+            KillerGameplayView(game: game, players: players, startingLives: startingLives)
             
         case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
             GameEndView(

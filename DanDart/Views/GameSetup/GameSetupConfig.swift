@@ -17,13 +17,15 @@ struct GameParameters {
     let matchFormat: Int
     let halveItDifficulty: HalveItDifficulty?
     let knockoutLives: Int?
+    let killerLives: Int?
     
-    init(game: Game, players: [Player], matchFormat: Int = 1, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil) {
+    init(game: Game, players: [Player], matchFormat: Int = 1, halveItDifficulty: HalveItDifficulty? = nil, knockoutLives: Int? = nil, killerLives: Int? = nil) {
         self.game = game
         self.players = players
         self.matchFormat = matchFormat
         self.halveItDifficulty = halveItDifficulty
         self.knockoutLives = knockoutLives
+        self.killerLives = killerLives
     }
 }
 
