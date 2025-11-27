@@ -36,20 +36,15 @@ struct FriendSearchView: View {
         }
     }
     
-    var body: some View {
-        StandardSheetView(
-            title: "Find Friends",
-            dismissButtonTitle: "Back",
-            useScrollView: false,  // We manage our own scrolling
-            onDismiss: { dismiss() }
-        ) {
-            VStack(spacing: 0) {
-                // Search Bar (fixed at top)
-                HStack(spacing: 12) {
+    // Shared content for both header styles
+    private var contentBody: some View {
+        VStack(spacing: 0) {
+            // Search Bar (fixed at top)
+            HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppColor.textSecondary)
-                
+
                 TextField("Search by name or @handle", text: $searchQuery)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppColor.textPrimary)
@@ -58,7 +53,7 @@ struct FriendSearchView: View {
                     .onChange(of: searchQuery) { oldValue, newValue in
                         performSearch(query: newValue)
                     }
-                
+
                 if !searchQuery.isEmpty {
                     Button(action: {
                         searchQuery = ""
@@ -75,43 +70,43 @@ struct FriendSearchView: View {
             .background(AppColor.inputBackground)
             .cornerRadius(12)
             .padding(.bottom, 16)
-            
+
             // Content Area
             if isSearching {
                 // Loading State
                 VStack(spacing: 16) {
                     Spacer()
-                    
+
                     ProgressView()
                         .scaleEffect(1.2)
                         .tint(AppColor.interactivePrimaryBackground)
-                    
+
                     Text("Searching...")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(AppColor.textSecondary)
-                    
+
                     Spacer()
                 }
             } else if searchQuery.isEmpty {
                 // Empty State - No Search Yet
                 VStack(spacing: 16) {
                     Spacer()
-                    
+
                     Image(systemName: "person.2.fill")
                         .font(.system(size: 64, weight: .light))
                         .foregroundColor(AppColor.textSecondary)
-                    
+
                     VStack(spacing: 8) {
                         Text("Find Friends")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(AppColor.textPrimary)
-                        
+
                         Text("Search by name or @handle to add friends")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppColor.textSecondary)
                             .multilineTextAlignment(.center)
                     }
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 32)
@@ -119,73 +114,109 @@ struct FriendSearchView: View {
                 // No Results State
                 VStack(spacing: 16) {
                     Spacer()
-                    
+
                     Image(systemName: "person.fill.questionmark")
                         .font(.system(size: 64, weight: .light))
                         .foregroundColor(AppColor.textSecondary)
-                    
+
                     VStack(spacing: 8) {
                         Text("No results found")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(AppColor.textPrimary)
-                        
+
                         Text("Try a different name or @handle")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppColor.textSecondary)
                     }
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 32)
             } else {
-                    // Search Results List - Mixed (Friends + New People)
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            // Existing Friends Section
-                            if !friendResults.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Friends")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(AppColor.textSecondary)
-                                    
-                                    ForEach(friendResults) { user in
-                                        FriendSearchResultCard(
-                                            user: user,
-                                            isFriend: true,
-                                            isLoading: false,
-                                            showSuccess: false,
-                                            requestSent: false,
-                                            onAction: {}
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            // New People Section
-                            if !nonFriendResults.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    if !friendResults.isEmpty {
-                                        Text("Add Friends")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(AppColor.textSecondary)
-                                    }
-                                    
-                                    ForEach(nonFriendResults) { user in
-                                        FriendSearchResultCard(
-                                            user: user,
-                                            isFriend: false,
-                                            isLoading: isAddingFriend && sentRequestUserId == user.id,
-                                            showSuccess: showSuccessMessage && sentRequestUserId == user.id,
-                                            requestSent: sentRequestUserId == user.id,
-                                            onAction: { sendFriendRequest(user) }
-                                        )
-                                    }
+                // Search Results List - Mixed (Friends + New People)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Existing Friends Section
+                        if !friendResults.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Friends")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(AppColor.textSecondary)
+
+                                ForEach(friendResults) { user in
+                                    FriendSearchResultCard(
+                                        user: user,
+                                        isFriend: true,
+                                        isLoading: false,
+                                        showSuccess: false,
+                                        requestSent: false,
+                                        onAction: {}
+                                    )
                                 }
                             }
                         }
-                        .padding(.bottom, 16)
+
+                        // New People Section
+                        if !nonFriendResults.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                if !friendResults.isEmpty {
+                                    Text("Add Friends")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(AppColor.textSecondary)
+                                }
+
+                                ForEach(nonFriendResults) { user in
+                                    FriendSearchResultCard(
+                                        user: user,
+                                        isFriend: false,
+                                        isLoading: isAddingFriend && sentRequestUserId == user.id,
+                                        showSuccess: showSuccessMessage && sentRequestUserId == user.id,
+                                        requestSent: sentRequestUserId == user.id,
+                                        onAction: { sendFriendRequest(user) }
+                                    )
+                                }
+                            }
+                        }
                     }
+                    .padding(.bottom, 16)
+                }
             }
+        }
+    }
+
+    var body: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                NavigationStack {
+                    contentBody
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .navigationTitle("Find Friends")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button(action: { dismiss() }) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .accessibilityLabel("Back")
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                            }
+                        }
+                        // Let Liquid Glass appear naturally in iOS 26 sheets
+                        .toolbarBackground(.automatic, for: .navigationBar)
+                        .toolbarBackground(.visible, for: .navigationBar)
+                }
+                .background(Color.clear)
+            } else {
+                StandardSheetView(
+                    title: "Find Friends",
+                    dismissButtonTitle: "Back",
+                    useScrollView: false,  // We manage our own scrolling
+                    onDismiss: { dismiss() }
+                ) {
+                    contentBody
+                }
             }
         }
         .alert("Error", isPresented: .constant(addFriendError != nil)) {
@@ -374,7 +405,7 @@ struct FriendSearchResultCard: View {
                     .background(
                         Circle()
                             .fill(
-                                requestSent 
+                                requestSent
                                 ? AppColor.textSecondary.opacity(0.15)
                                 : AppColor.interactivePrimaryBackground.opacity(0.15)
                             )

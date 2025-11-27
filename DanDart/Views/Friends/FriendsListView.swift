@@ -25,6 +25,19 @@ struct FriendsListView: View {
     @State private var isLoadingRequests: Bool = false
     @State private var loadError: String?
     @State private var processingRequestId: UUID? = nil
+
+    // iOS 26+ can show a navigation subtitle without affecting layout
+    private var navigationSubtitleText: String? {
+        if isLoadingFriends || isLoadingRequests {
+            return "Loading…"
+        }
+        var parts: [String] = []
+        if !receivedRequests.isEmpty {
+            parts.append("\(receivedRequests.count) request\(receivedRequests.count == 1 ? "" : "s")")
+        }
+        parts.append("\(friends.count) friend\(friends.count == 1 ? "" : "s")")
+        return parts.joined(separator: " • ")
+    }
     
     var body: some View {
         NavigationStack {
@@ -174,8 +187,6 @@ struct FriendsListView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(AppColor.backgroundPrimary)
-            .navigationTitle("Friends")
-            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
@@ -187,9 +198,7 @@ struct FriendsListView: View {
                     }
                 }
             }
-            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .modifier(FriendsNavBarModifier(title: "Friends", subtitle: navigationSubtitleText))
         }
         .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .onAppear {
@@ -197,12 +206,27 @@ struct FriendsListView: View {
             loadRequests()
         }
         .sheet(isPresented: $showSearch) {
-            FriendSearchView { player in
-                // Reload after adding friend
-                loadFriends()
-                loadRequests()
-                successMessage = "Friend request sent to \(player.displayName)!"
-                showSuccessAlert = true
+            if #available(iOS 26.0, *) {
+                FriendSearchView { player in
+                    // Reload after adding friend
+                    loadFriends()
+                    loadRequests()
+                    successMessage = "Friend request sent to \(player.displayName)!"
+                    showSuccessAlert = true
+                }
+                // Liquid Glass sheets render translucency for partial-height detents
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                // Prioritize taps/scrolling inside the sheet over resizing gestures
+                .presentationContentInteraction(.scrolls)
+            } else {
+                FriendSearchView { player in
+                    // Reload after adding friend
+                    loadFriends()
+                    loadRequests()
+                    successMessage = "Friend request sent to \(player.displayName)!"
+                    showSuccessAlert = true
+                }
             }
         }
         .alert("Success", isPresented: $showSuccessAlert) {
@@ -224,6 +248,36 @@ struct FriendsListView: View {
         }
     }
     
+    private struct FriendsNavBarModifier: ViewModifier {
+        let title: String
+        let subtitle: String?
+
+        @ViewBuilder
+        func body(content: Content) -> some View {
+            if #available(iOS 26.0, *) {
+                // Let Liquid Glass show naturally, but make sure title/subtitle are applied together
+                if let subtitle {
+                    content
+                        .navigationTitle(title)
+                        .navigationBarTitleDisplayMode(.large)
+                        .navigationSubtitle(subtitle)
+                } else {
+                    content
+                        .navigationTitle(title)
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            } else {
+                content
+                    .navigationTitle(title)
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
+                    .toolbarColorScheme(.dark, for: .navigationBar)
+            }
+        }
+    }
+    
+
     // MARK: - Helper Methods
     
     /// Load friends from Supabase
