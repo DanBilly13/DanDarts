@@ -185,40 +185,9 @@ struct FriendSearchView: View {
     }
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                NavigationStack {
-                    contentBody
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .navigationTitle("Find Friends")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button(action: { dismiss() }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 14, weight: .semibold))
-                                }
-                                .accessibilityLabel("Back")
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
-                            }
-                        }
-                        // Let Liquid Glass appear naturally in iOS 26 sheets
-                        .toolbarBackground(.automatic, for: .navigationBar)
-                        .toolbarBackground(.visible, for: .navigationBar)
-                }
-                .background(Color.clear)
-            } else {
-                StandardSheetView(
-                    title: "Find Friends",
-                    dismissButtonTitle: "Back",
-                    useScrollView: false,  // We manage our own scrolling
-                    onDismiss: { dismiss() }
-                ) {
-                    contentBody
-                }
-            }
-        }
+        contentBody
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
         .alert("Error", isPresented: .constant(addFriendError != nil)) {
             Button("OK") {
                 addFriendError = nil

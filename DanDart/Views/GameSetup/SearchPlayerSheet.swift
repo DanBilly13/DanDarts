@@ -84,34 +84,8 @@ struct SearchPlayerSheet: View {
     }
 
     var body: some View {
-        StandardSheetView(
-            title: "Add Players",
-            dismissButtonTitle: "Back",
-            onDismiss: { dismiss() }
-        ) {
+        ScrollView {
             VStack(spacing: 16) {
-                // Summary + Add Guest button
-                HStack {
-                    Text("\(selectedPlayers.count) of \(playerLimit) players added")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-                        .multilineTextAlignment(.leading)
-                    
-                    Spacer()
-                    
-                    // Add Guest button
-                    AppButton(role: .primary, controlSize: .small, compact: true) {
-                        showAddGuestPlayer = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("Guest")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                    }
-                    .frame(width: 100)
-                }
                 if showSelectionLimitMessage {
                     Text(selectionLimitMessage)
                         .font(.system(size: 13, weight: .medium))
@@ -146,7 +120,10 @@ struct SearchPlayerSheet: View {
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
         }
+        .background(AppColor.backgroundPrimary)
         .safeAreaInset(edge: .bottom) {
             BottomActionContainer {
                 AppButton(role: .primary,
@@ -170,6 +147,10 @@ struct SearchPlayerSheet: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
             // Update friend stats after a match (without recreating Player objects)
             updateFriendStats()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShowAddGuestPlayer"))) { _ in
+            // Show add guest player sheet when button tapped
+            showAddGuestPlayer = true
         }
         .sheet(isPresented: $showAddGuestPlayer) {
             AddGuestPlayerView { player in

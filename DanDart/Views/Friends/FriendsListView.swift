@@ -187,47 +187,40 @@ struct FriendsListView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(AppColor.backgroundPrimary)
+            .navigationTitle("Friends")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarRole(.editor)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    ToolbarTitle(title: "Friends")
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
+                    ToolbarSearchButton {
                         showSearch = true
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }
-            .modifier(FriendsNavBarModifier(title: "Friends", subtitle: navigationSubtitleText))
+            .customNavBar(title: "Friends", subtitle: navigationSubtitleText)
         }
         .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .onAppear {
             loadFriends()
             loadRequests()
         }
+        // MARK: Sheet
         .sheet(isPresented: $showSearch) {
-            if #available(iOS 26.0, *) {
-                FriendSearchView { player in
-                    // Reload after adding friend
-                    loadFriends()
-                    loadRequests()
-                    successMessage = "Friend request sent to \(player.displayName)!"
-                    showSuccessAlert = true
-                }
-                // Liquid Glass sheets render translucency for partial-height detents
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                // Prioritize taps/scrolling inside the sheet over resizing gestures
-                .presentationContentInteraction(.scrolls)
-            } else {
-                FriendSearchView { player in
-                    // Reload after adding friend
-                    loadFriends()
-                    loadRequests()
-                    successMessage = "Friend request sent to \(player.displayName)!"
-                    showSuccessAlert = true
-                }
+            FriendSearchView { player in
+                // Reload after adding friend
+                loadFriends()
+                loadRequests()
+                successMessage = "Friend request sent to \(player.displayName)!"
+                showSuccessAlert = true
             }
+            .modernSheet(
+                title: "Find Friends",
+                detents: [.medium, .large]
+            )
         }
         .alert("Success", isPresented: $showSuccessAlert) {
             Button("OK", role: .cancel) { }
@@ -244,35 +237,6 @@ struct FriendsListView: View {
         } message: {
             if let friend = friendToDelete {
                 Text("Are you sure you want to remove \(friend.displayName) from your friends?")
-            }
-        }
-    }
-    
-    private struct FriendsNavBarModifier: ViewModifier {
-        let title: String
-        let subtitle: String?
-
-        @ViewBuilder
-        func body(content: Content) -> some View {
-            if #available(iOS 26.0, *) {
-                // Let Liquid Glass show naturally, but make sure title/subtitle are applied together
-                if let subtitle {
-                    content
-                        .navigationTitle(title)
-                        .navigationBarTitleDisplayMode(.large)
-                        .navigationSubtitle(subtitle)
-                } else {
-                    content
-                        .navigationTitle(title)
-                        .navigationBarTitleDisplayMode(.large)
-                }
-            } else {
-                content
-                    .navigationTitle(title)
-                    .navigationBarTitleDisplayMode(.large)
-                    .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
-                    .toolbarColorScheme(.dark, for: .navigationBar)
             }
         }
     }

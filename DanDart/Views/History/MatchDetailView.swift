@@ -281,8 +281,9 @@ struct CompactPlayerCard: View {
                     .fill(AppColor.inputBackground)
                     .frame(width: 100, height: 100)
                 
-                if let avatarURL = player.avatarURL {
-                    Image(avatarURL)
+                if let avatarURL = player.avatarURL,
+                   let uiImage = UIImage(named: avatarURL) ?? (avatarURL.hasPrefix("/") ? UIImage(contentsOfFile: avatarURL) : nil) {
+                    Image(uiImage: uiImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 100, height: 100)

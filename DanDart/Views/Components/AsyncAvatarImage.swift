@@ -28,8 +28,8 @@ struct AsyncAvatarImage: View {
                 .fill(AppColor.inputBackground)
                 .frame(width: size, height: size)
             
-            if let avatarURL = avatarURL {
-                // Check if it's a URL, file path, or local asset
+            if let avatarURL = avatarURL, !avatarURL.isEmpty {
+                // Check if it's a URL or local asset
                 if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
                     // Remote URL - use AsyncImage
                     AsyncImage(url: URL(string: avatarURL)) { phase in
@@ -52,36 +52,20 @@ struct AsyncAvatarImage: View {
                             EmptyView()
                         }
                     }
-                } else if avatarURL.hasPrefix("/") || avatarURL.contains("/Documents/") {
-                    // File path - load from local storage
-                    let fileURL = URL(fileURLWithPath: avatarURL)
-                    if let imageData = try? Data(contentsOf: fileURL),
-                       let uiImage = UIImage(data: imageData) {
+                } else {
+                    // Local asset or file path - use UIImage to avoid URL parsing
+                    if let uiImage = UIImage(named: avatarURL) ?? (avatarURL.hasPrefix("/") ? UIImage(contentsOfFile: avatarURL) : nil) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: size, height: size)
                             .clipShape(Circle())
-                            .onAppear {
-                                print("✅ Loaded avatar from file: \(avatarURL)")
-                            }
                     } else {
-                        // Failed to load file - show placeholder
+                        // Asset/file not found - show placeholder
                         Image(systemName: placeholderIcon)
                             .font(.system(size: size * 0.5, weight: .medium))
                             .foregroundColor(AppColor.textSecondary)
-                            .onAppear {
-                                print("⚠️ Failed to load avatar from file: \(avatarURL)")
-                                print("   File exists: \(FileManager.default.fileExists(atPath: avatarURL))")
-                            }
                     }
-                } else {
-                    // Local asset - use Image
-                    Image(avatarURL)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: size, height: size)
-                        .clipShape(Circle())
                 }
             } else {
                 // No avatar - show placeholder

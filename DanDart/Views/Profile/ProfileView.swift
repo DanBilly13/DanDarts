@@ -55,15 +55,6 @@ struct ProfileView: View {
                 .padding(.horizontal, 16)
             }
             .background(AppColor.backgroundPrimary)
-           /* .navigationTitle("Profile")*/
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    CloseButton(size: 24) {
-                        dismiss()
-                    }
-                }
-            }
             .alert("Log Out", isPresented: $showLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Log Out", role: .destructive) {

@@ -271,6 +271,21 @@ struct GameSetupView: View {
                 selectedPlayers: $setupState.selectedPlayers,
                 friendsCache: friendsCache
             )
+            .modernSheet(
+                title: "Add Players",
+                subtitle: "\(setupState.selectedPlayers.count) of \(config.playerLimit) players",
+                detents: [.large]
+            ) {
+                Button(action: {
+                    // Trigger add guest player from SearchPlayerSheet
+                    NotificationCenter.default.post(name: NSNotification.Name("ShowAddGuestPlayer"), object: nil)
+                }) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                }
+                .accessibilityLabel("Add Guest")
+            }
         }
         .onAppear {
             if setupState.selectedOption == 0 {

@@ -19,7 +19,8 @@ struct MainTabView: View {
             GamesTabView(showProfile: $showProfile)
                 .tabItem {
                     Image(systemName: "target")
-                    Text("Games")
+                        .font(.system(size: 17, weight: .semibold))
+                    //Text("Games")
                 }
                 .tag(0)
             
@@ -29,7 +30,8 @@ struct MainTabView: View {
                     FriendsTabView(showProfile: $showProfile)
                         .tabItem {
                             Image(systemName: "person.2.fill")
-                            Text("Friends")
+                                .font(.system(size: 22, weight: .semibold))
+                            //Text("Friends")
                         }
                         .badge(pendingRequestCount)
                         .tag(1)
@@ -37,7 +39,8 @@ struct MainTabView: View {
                     FriendsTabView(showProfile: $showProfile)
                         .tabItem {
                             Image(systemName: "person.2.fill")
-                            Text("Friends")
+                                .font(.system(size: 22, weight: .semibold))
+                            //Text("Friends")
                         }
                         .tag(1)
                 }
@@ -46,8 +49,9 @@ struct MainTabView: View {
             // History Tab
             HistoryTabView(showProfile: $showProfile)
                 .tabItem {
-                    Image(systemName: "chart.bar.fill")
-                    Text("History")
+                    Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        .fontWeight(.bold)
+                    //Text("History")
                 }
                 .tag(2)
         }
@@ -55,6 +59,10 @@ struct MainTabView: View {
         .sheet(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
+                .modernSheet(
+                    title: "Profile",
+                    detents: [.large]
+                )
         }
         .onAppear {
             configureTabBarAppearance()
@@ -123,31 +131,41 @@ struct MainTabView: View {
 struct GamesTabView: View {
     let games = Game.loadGames()
     @StateObject private var router = Router.shared
+    @EnvironmentObject private var authService: AuthService
     @Binding var showProfile: Bool
     @Namespace private var gameHeroNamespace
     
     var body: some View {
         NavigationStack(path: $router.path) {
-            VStack(spacing: 0) {
-                // Top Bar
-                TopBar(showProfile: $showProfile)
-                
-                // Games List Content
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(games) { game in
-                            GameCard(game: game) {
-                                router.push(.gameSetup(game: game))
-                            }
-                            .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
+            // Games List Content
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(games) { game in
+                        GameCard(game: game) {
+                            router.push(.gameSetup(game: game))
                         }
+                        .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
                     }
-                    .padding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppColor.backgroundPrimary)
+                .padding()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.backgroundPrimary)
+            .navigationTitle("Games")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarRole(.editor)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    ToolbarTitle(title: "Games")
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarAvatarButton(avatarURL: authService.currentUser?.avatarURL) {
+                        showProfile = true
+                    }
+                }
+            }
+            .customNavBar(title: "Games")
             .navigationDestination(for: Route.self) { route in
                 switch route.destination {
                 case .gameSetup(let game):

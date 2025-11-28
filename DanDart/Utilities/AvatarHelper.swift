@@ -19,8 +19,9 @@ struct AvatarHelper {
     /// Creates an avatar view with consistent styling
     static func avatarView(for avatarURL: String?, size: CGFloat = 48, placeholder: String = "person.circle.fill") -> some View {
         Group {
-            if let avatarURL = avatarURL {
-                Image(avatarURL)
+            if let avatarURL = avatarURL,
+               let uiImage = UIImage(named: avatarURL) ?? (avatarURL.hasPrefix("/") ? UIImage(contentsOfFile: avatarURL) : nil) {
+                Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size, height: size)
@@ -125,15 +126,25 @@ struct PlayerAvatarView: View {
                             }
                     }
                 } else {
-                    // Local asset - use Image
-                    Image(avatarURL)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: size, height: size)
-                        .clipShape(Circle())
-                        .onAppear {
-                            print("🎨 Loading from asset: \(avatarURL)")
-                        }
+                    // Local asset - use UIImage to avoid URL parsing
+                    if let uiImage = UIImage(named: avatarURL) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size, height: size)
+                            .clipShape(Circle())
+                            .onAppear {
+                                print("🎨 Loading from asset: \(avatarURL)")
+                            }
+                    } else {
+                        // Asset not found - show placeholder
+                        Image(systemName: placeholder)
+                            .font(.system(size: size * 0.5, weight: .medium))
+                            .foregroundColor(Color("TextSecondary"))
+                            .onAppear {
+                                print("⚠️ Asset not found: \(avatarURL)")
+                            }
+                    }
                 }
             } else {
                 Image(systemName: placeholder)
