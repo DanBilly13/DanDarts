@@ -16,6 +16,9 @@ struct MatchHistoryView: View {
     @State private var isRefreshing: Bool = false
     @State private var isLoadingFromSupabase: Bool = false
     @State private var loadError: String?
+    @State private var searchText: String = ""
+    @State private var isSearching: Bool = false
+    @FocusState private var isSearchFieldFocused: Bool
     
     // Filter options
     enum GameFilter: String, CaseIterable {
@@ -33,65 +36,97 @@ struct MatchHistoryView: View {
         }
     }
     
-    // Filtered matches based on selected filter
+    // Filtered matches based on selected filter and search text
     var filteredMatches: [MatchResult] {
-        if selectedFilter == .all {
-            return matches
-        } else {
-            return matches.filter { $0.gameName == selectedFilter.rawValue }
+        var filtered = matches
+        
+        // Apply game type filter
+        if selectedFilter != .all {
+            filtered = filtered.filter { $0.gameName == selectedFilter.rawValue }
         }
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            filtered = filtered.filter { match in
+                // Search in game name
+                if match.gameName.localizedCaseInsensitiveContains(searchText) {
+                    return true
+                }
+                
+                // Search in player names
+                if match.players.contains(where: { $0.displayName.localizedCaseInsensitiveContains(searchText) }) {
+                    return true
+                }
+                
+                // Search in date (formatted)
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateStyle = .medium
+                let dateString = dateFormatter.string(from: match.timestamp)
+                if dateString.localizedCaseInsensitiveContains(searchText) {
+                    return true
+                }
+                
+                return false
+            }
+        }
+        
+        return filtered
     }
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack {
+                // Main content
                 VStack(spacing: 0) {
-                    // Sync status banner
-                    if isLoadingFromSupabase || isRefreshing {
-                        syncStatusBanner
+                    VStack(spacing: 0) {
+                        // Sync status banner
+                        if isLoadingFromSupabase || isRefreshing {
+                            syncStatusBanner
+                        }
+                        
+                        // Error banner
+                        if let error = loadError {
+                            errorBanner(message: error)
+                        }
+                        
+                        filterButtonsView
                     }
+                    .padding(.horizontal, 16)
                     
-                    // Error banner
-                    if let error = loadError {
-                        errorBanner(message: error)
-                    }
-                    
-                    filterButtonsView
+                    contentView
                 }
-                .padding(.horizontal, 16)
+                .background(AppColor.backgroundPrimary)
+                .navigationTitle("History")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarRole(.editor)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        ToolbarTitle(title: "History")
+                    }
+                    
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        ToolbarSearchButton {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isSearching = true
+                            }
+                        }
+                    }
+                }
+                .toolbar(isSearching ? .hidden : .visible, for: .navigationBar)
+                .customNavBar(title: "History")
+                .blur(radius: isSearching ? 3 : 0)
+                .opacity(isSearching ? 0 : 1.0)
+                .allowsHitTesting(!isSearching)
                 
-                contentView
-            }
-            .background(AppColor.backgroundPrimary)
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Test Data") {
-                        MatchStorageManager.shared.seedTestMatches()
-                        loadMatches()
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                // Search mode overlay
+                if isSearching {
+                    searchOverlay
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .onAppear {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithTransparentBackground()
-            appearance.backgroundColor = UIColor(AppColor.backgroundPrimary)
-            appearance.shadowColor = .clear
-            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-
-            UINavigationBar.appearance().standardAppearance = appearance
-            UINavigationBar.appearance().scrollEdgeAppearance = appearance
-            UINavigationBar.appearance().compactAppearance = appearance
-
             loadMatches()
         }
     }
@@ -223,6 +258,113 @@ struct MatchHistoryView: View {
     
     private func matchRowView(_ match: MatchResult) -> some View {
         MatchCard(match: match)
+    }
+    
+    // MARK: - Search Overlay
+    
+    private var searchOverlay: some View {
+        VStack(spacing: 0) {
+            // Search results area (takes remaining space)
+            if !searchText.isEmpty {
+                if filteredMatches.isEmpty {
+                    // No results
+                    VStack(spacing: 16) {
+                        Spacer()
+                        
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 48, weight: .light))
+                            .foregroundColor(AppColor.textSecondary)
+                        
+                        Text("No matches found")
+                            .font(.headline)
+                            .foregroundColor(AppColor.textPrimary)
+                        
+                        Text("Try a different search term")
+                            .font(.subheadline)
+                            .foregroundColor(AppColor.textSecondary)
+                        
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Results list
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(filteredMatches.prefix(5)) { match in
+                                Button(action: {
+                                    // Navigate to match detail
+                                }) {
+                                    matchRowView(match)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 16)
+                    }
+                }
+            } else {
+                // Empty state - fill space
+                Spacer()
+            }
+            
+            // Search bar with close button (pinned to bottom, above keyboard)
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    TextField("Search", text: $searchText)
+                        .font(.system(size: 17))
+                        .foregroundColor(AppColor.textPrimary)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .focused($isSearchFieldFocused)
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(AppColor.textSecondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(AppColor.inputBackground)
+                .cornerRadius(10)
+                
+                Button(action: {
+                    isSearchFieldFocused = false
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isSearching = false
+                        searchText = ""
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColor.textPrimary)
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(AppColor.backgroundPrimary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
+        .onAppear {
+            // Auto-focus search field
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isSearchFieldFocused = true
+            }
+        }
     }
     
     // MARK: - Helper Methods
