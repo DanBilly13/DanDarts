@@ -108,6 +108,7 @@ struct MainTabView: View {
         .accentColor(AppColor.interactivePrimaryBackground)
         
         // Hidden TextField for warming up text input system (outside TabView)
+        // CHANGE 1: opacity 0.01 instead of 0 (keeps it "real" to iOS)
         TextField("", text: $warmupText)
             .focused($warmupFocused)
             .frame(width: 1, height: 1)
@@ -126,12 +127,10 @@ struct MainTabView: View {
             configureTabBarAppearance()
             loadPendingRequestCount()
             
-            // Pre-warm iOS text input system
-            // This fixes the "first keyboard interaction fails" bug in iOS 18
-            // Wait longer to ensure UI is fully settled
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // Pre-warm iOS text input system on launch
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 warmupFocused = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     warmupFocused = false
                     print("✅ Text input system ready")
                 }
