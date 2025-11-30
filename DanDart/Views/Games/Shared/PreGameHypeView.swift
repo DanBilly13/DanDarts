@@ -314,6 +314,7 @@ struct PreGameHypeView: View {
 }
 
 // MARK: - Preview
+#if DEBUG
 #Preview("Pre-Game Hype - 301") {
     NavigationStack {
         PreGameHypeView(
@@ -385,3 +386,4 @@ struct PreGameHypeView: View {
     }
     .environmentObject(AuthService.mockAuthenticated)
 }
+#endif

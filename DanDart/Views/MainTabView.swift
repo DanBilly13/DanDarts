@@ -13,7 +13,12 @@ struct MainTabView: View {
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     
+    // Hidden TextField to pre-warm iOS text input system
+    @State private var warmupText: String = ""
+    @FocusState private var warmupFocused: Bool
+    
     var body: some View {
+        ZStack {
         TabView {
             // Games Tab
             GamesTabView(showProfile: $showProfile)
@@ -54,8 +59,61 @@ struct MainTabView: View {
                     //Text("History")
                 }
                 .tag(2)
+            
+            // Test Search Tab (temporary for debugging)
+            TestSearchView()
+                .tabItem {
+                    Image(systemName: "testtube.2")
+                        .fontWeight(.bold)
+                    //Text("Test")
+                }
+                .tag(3)
+            
+            // Native Search Test (Apple's .searchable)
+            TestSearchView2()
+                .tabItem {
+                    Image(systemName: "apple.logo")
+                        .fontWeight(.bold)
+                    //Text("Native")
+                }
+                .tag(4)
+            
+            // UIKit Search Test (UITextField)
+            TestSearchView3()
+                .tabItem {
+                    Image(systemName: "hammer.fill")
+                        .fontWeight(.bold)
+                    //Text("UIKit")
+                }
+                .tag(5)
+            
+            // Liquid Glass Search (Article approach)
+            TestSearchView4()
+                .tabItem {
+                    Image(systemName: "drop.fill")
+                        .fontWeight(.bold)
+                    //Text("Liquid")
+                }
+                .tag(6)
+            
+            // Simple Keyboard Test
+            TestSearchView5()
+                .tabItem {
+                    Image(systemName: "keyboard")
+                        .fontWeight(.bold)
+                    //Text("Simple")
+                }
+                .tag(7)
         }
         .accentColor(AppColor.interactivePrimaryBackground)
+        
+        // Hidden TextField for warming up text input system (outside TabView)
+        TextField("", text: $warmupText)
+            .focused($warmupFocused)
+            .frame(width: 1, height: 1)
+            .opacity(0.01)
+            .allowsHitTesting(false)
+        }
         .sheet(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
@@ -67,6 +125,17 @@ struct MainTabView: View {
         .onAppear {
             configureTabBarAppearance()
             loadPendingRequestCount()
+            
+            // Pre-warm iOS text input system
+            // This fixes the "first keyboard interaction fails" bug in iOS 18
+            // Wait longer to ensure UI is fully settled
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                warmupFocused = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    warmupFocused = false
+                    print("✅ Text input system ready")
+                }
+            }
             
             // Listen for friend request changes
             NotificationCenter.default.addObserver(

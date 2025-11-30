@@ -127,6 +127,7 @@ struct GameCardContainer: View {
 }
 
 // MARK: - Preview
+#if DEBUG
 #Preview("Game Card - 301") {
     VStack(spacing: 20) {
         GameCard(game: Game.preview301) {
@@ -140,7 +141,9 @@ struct GameCardContainer: View {
     .padding()
     .background(AppColor.backgroundPrimary)
 }
+#endif
 
+#if DEBUG
 #Preview("Game Card - All Games") {
     ScrollView {
         LazyVStack(spacing: 16) {
@@ -154,7 +157,9 @@ struct GameCardContainer: View {
     }
     .background(AppColor.backgroundPrimary)
 }
+#endif
 
+#if DEBUG
 #Preview("Game Card - 90% Width") {
     ScrollView {
         LazyVStack(spacing: 16) {
@@ -168,7 +173,9 @@ struct GameCardContainer: View {
     }
     .background(AppColor.backgroundPrimary)
 }
+#endif
 
+#if DEBUG
 #Preview("Game Card - Dark Mode") {
     VStack(spacing: 20) {
         GameCard(game: Game.previewHalveIt) {
@@ -183,3 +190,4 @@ struct GameCardContainer: View {
     .background(Color.black)
     .preferredColorScheme(.dark)
 }
+#endif

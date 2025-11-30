@@ -75,6 +75,8 @@ struct GameInstructionsContent: View {
     }
 }
 
+#if DEBUG
 #Preview {
     GameInstructionsView(game: Game.preview301)
 }
+#endif

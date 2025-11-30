@@ -208,6 +208,7 @@ struct GameEndView: View {
 }
 
 // MARK: - Preview
+#if DEBUG
 #Preview("Game End - 301") {
     GameEndView(
         game: Game.preview301,
@@ -240,3 +241,4 @@ struct GameEndView: View {
     )
     .environmentObject(AuthService.mockAuthenticated)
 }
+#endif

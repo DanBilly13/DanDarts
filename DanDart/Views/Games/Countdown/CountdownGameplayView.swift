@@ -321,6 +321,7 @@ struct CountdownGameplayView: View {
     
     
     // MARK: - Preview
+    #if DEBUG
     #Preview("Countdown - 301") {
         NavigationStack {
             CountdownGameplayView(
@@ -331,7 +332,9 @@ struct CountdownGameplayView: View {
             .background(AppColor.backgroundPrimary)
         }
     }
+    #endif
     
+    #if DEBUG
     #Preview("Best of 3") {
         NavigationStack {
             CountdownGameplayView(
@@ -378,4 +381,5 @@ struct CountdownGameplayView: View {
             .background(AppColor.backgroundPrimary)
         }
     }
+    #endif
 }
