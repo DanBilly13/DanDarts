@@ -112,21 +112,23 @@ struct MatchHistoryView: View {
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarRole(.editor)
+            .toolbar(isSearchPresented ? .hidden : .visible, for: .tabBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     ToolbarTitle(title: "History")
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    ToolbarSearchButton {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isSearchPresented = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            isSearchFieldFocused = true
+                    if !isSearchPresented {
+                        ToolbarSearchButton {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isSearchPresented = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                isSearchFieldFocused = true
+                            }
                         }
                     }
-                    .opacity(isSearchPresented ? 0 : 1)
                 }
             }
             .onChange(of: searchText) { _, _ in
@@ -353,17 +355,31 @@ struct MatchHistoryView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColor.inputBackground)
-                    .cornerRadius(10)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            )
+                    )
                     
-                    Button(action: {
-                        stopSearch()
-                    }) {
-                        Text("Cancel")
-                            .font(.system(size: 17))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    Button(action: { stopSearch() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                    )
+                            )
+                            .accessibilityLabel("Close search")
                     }
                 }
                 .padding(.horizontal, 16)
