@@ -59,51 +59,6 @@ struct MainTabView: View {
                     //Text("History")
                 }
                 .tag(2)
-            
-            // Test Search Tab (temporary for debugging)
-            TestSearchView()
-                .tabItem {
-                    Image(systemName: "testtube.2")
-                        .fontWeight(.bold)
-                    //Text("Test")
-                }
-                .tag(3)
-            
-            // Native Search Test (Apple's .searchable)
-            TestSearchView2()
-                .tabItem {
-                    Image(systemName: "apple.logo")
-                        .fontWeight(.bold)
-                    //Text("Native")
-                }
-                .tag(4)
-            
-            // UIKit Search Test (UITextField)
-            TestSearchView3()
-                .tabItem {
-                    Image(systemName: "hammer.fill")
-                        .fontWeight(.bold)
-                    //Text("UIKit")
-                }
-                .tag(5)
-            
-            // Liquid Glass Search (Article approach)
-            TestSearchView4()
-                .tabItem {
-                    Image(systemName: "drop.fill")
-                        .fontWeight(.bold)
-                    //Text("Liquid")
-                }
-                .tag(6)
-            
-            // Simple Keyboard Test
-            TestSearchView5()
-                .tabItem {
-                    Image(systemName: "keyboard")
-                        .fontWeight(.bold)
-                    //Text("Simple")
-                }
-                .tag(7)
         }
         .accentColor(AppColor.interactivePrimaryBackground)
         

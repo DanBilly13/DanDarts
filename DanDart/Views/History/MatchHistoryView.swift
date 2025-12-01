@@ -81,25 +81,20 @@ struct MatchHistoryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Main content
-                VStack(spacing: 0) {
+                // Main content with filters scrolling together
+                if !isSearchPresented {
                     VStack(spacing: 0) {
-                        // Error banner (only show on errors)
+                        // Error banner (pinned at top)
                         if let error = loadError {
                             errorBanner(message: error)
+                                .padding(.horizontal, 16)
                         }
                         
-                        // Only show filters when not searching
-                        if !isSearchPresented {
-                            filterButtonsView
-                        }
+                        contentView
                     }
-                    .padding(.horizontal, 16)
-                    
-                    contentView
+                    .opacity(isSearchPresented ? 0 : 1)
+                    .animation(.easeInOut(duration: 0.2), value: isSearchPresented)
                 }
-                .opacity(isSearchPresented ? 0 : 1)
-                .animation(.easeInOut(duration: 0.2), value: isSearchPresented)
                 
                 // Search overlay (Liquid Glass pattern)
                 if isSearchPresented {
@@ -206,7 +201,11 @@ struct MatchHistoryView: View {
     @ViewBuilder
     private var contentView: some View {
         if filteredMatches.isEmpty {
-            emptyStateView
+            VStack(spacing: 0) {
+                filterButtonsView
+                    .padding(.horizontal, 16)
+                emptyStateView
+            }
         } else {
             matchListView
         }
@@ -234,6 +233,7 @@ struct MatchHistoryView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .padding(.top, 100)
     }
     
     private var emptyStateMessage: String {
@@ -242,18 +242,26 @@ struct MatchHistoryView: View {
     
     private var matchListView: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(filteredMatches) { match in
-                    NavigationLink(value: match) {
-                        matchRowView(match)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+            VStack(spacing: 0) {
+                // Filters at top of scroll view
+                filterButtonsView
+                    .padding(.horizontal, 16)
+                
+                // Match list
+                LazyVStack(spacing: 12) {
+                    ForEach(filteredMatches) { match in
+                        NavigationLink(value: match) {
+                            matchRowView(match)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .padding(.top, 16)
         }
         .refreshable {
             await refreshMatches()
@@ -274,10 +282,25 @@ struct MatchHistoryView: View {
                     stopSearch()
                 }
             
-            VStack(spacing: 0) {
-                // Results area
-                if searchText.isEmpty {
-                    // Empty state
+            // Results area (full height, scrolls behind search bar)
+            if searchText.isEmpty {
+                // Empty state
+                VStack(spacing: 16) {
+                    Spacer()
+                    
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 48, weight: .light))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    Text("Start typing to search")
+                        .font(.headline)
+                        .foregroundColor(AppColor.textPrimary)
+                    
+                    Spacer()
+                }
+            } else {
+                if filteredMatches.isEmpty {
+                    // No results
                     VStack(spacing: 16) {
                         Spacer()
                         
@@ -285,52 +308,41 @@ struct MatchHistoryView: View {
                             .font(.system(size: 48, weight: .light))
                             .foregroundColor(AppColor.textSecondary)
                         
-                        Text("Start typing to search")
+                        Text("No matches found")
                             .font(.headline)
                             .foregroundColor(AppColor.textPrimary)
+                        
+                        Text("Try a different search term")
+                            .font(.subheadline)
+                            .foregroundColor(AppColor.textSecondary)
                         
                         Spacer()
                     }
                 } else {
-                    if filteredMatches.isEmpty {
-                        // No results
-                        VStack(spacing: 16) {
-                            Spacer()
-                            
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 48, weight: .light))
-                                .foregroundColor(AppColor.textSecondary)
-                            
-                            Text("No matches found")
-                                .font(.headline)
-                                .foregroundColor(AppColor.textPrimary)
-                            
-                            Text("Try a different search term")
-                                .font(.subheadline)
-                                .foregroundColor(AppColor.textSecondary)
-                            
-                            Spacer()
-                        }
-                    } else {
-                        // Results list
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(filteredMatches) { match in
-                                    NavigationLink(value: match) {
-                                        matchRowView(match)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .simultaneousGesture(TapGesture().onEnded {
-                                        stopSearch()
-                                    })
+                    // Results list
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(filteredMatches) { match in
+                                NavigationLink(value: match) {
+                                    matchRowView(match)
                                 }
+                                .buttonStyle(.plain)
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    stopSearch()
+                                })
                             }
-                            .padding(16)
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 120)
                     }
                 }
+            }
+            
+            // Search bar pinned to bottom (overlays results in outer ZStack)
+            VStack {
+                Spacer()
                 
-                // Search bar (pinned to bottom above keyboard)
                 HStack(spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
@@ -384,7 +396,6 @@ struct MatchHistoryView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(AppColor.backgroundPrimary)
             }
         }
     }
