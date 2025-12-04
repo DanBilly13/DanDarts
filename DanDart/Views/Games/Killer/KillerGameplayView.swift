@@ -107,19 +107,14 @@ struct KillerGameplayView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { showExitConfirmation = true }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                        Text("Exit")
-                            .font(.system(size: 17))
-                    }
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                }
+            ToolbarItem(placement: .principal) {
+                Text(game.title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(viewModel.anyPlayerIsKiller ? AppColor.interactivePrimaryBackground : AppColor.justWhite)
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
                 GameplayMenuButton(
                     onInstructions: { showInstructions = true },
                     onRestart: {
@@ -215,11 +210,36 @@ struct KillerGameplayView: View {
     private var playerCardsRow: some View {
         // Show all players with lives > 0
         let playersToShow = viewModel.activePlayers
-        let spacing: CGFloat = playersToShow.count <= 3 ? 32 : -8
+        
+        // Spacing based on player count
+        let spacing: CGFloat = {
+            switch playersToShow.count {
+            case 2: return 64
+            case 3: return 48
+            case 4: return 32
+            case 5: return -6
+            case 6: return -8
+            case 7: return -8
+            case 8: return -8
+            default: return 32
+            }
+        }()
+        
+        // Card width based on player count
+        let cardWidth: CGFloat = {
+            switch playersToShow.count {
+            case 2: return 100
+            case 3: return 80
+            case 4: return 70
+            case 5: return 64
+            case 6: return 64
+            default: return 64
+            }
+        }()
         
         return HStack(spacing: spacing) {
             ForEach(playersToShow) { player in
-                KillerPlayerCard(
+                KillerPlayerCard2(
                     player: player,
                     assignedNumber: viewModel.playerNumbers[player.id] ?? 0,
                     isKiller: viewModel.isKiller[player.id] ?? false,
@@ -227,7 +247,8 @@ struct KillerGameplayView: View {
                     startingLives: viewModel.startingLives,
                     isCurrentPlayer: player.id == viewModel.currentPlayer.id,
                     animatingKillerActivation: viewModel.animatingKillerActivation == player.id,
-                    animatingLifeLoss: viewModel.animatingLifeLoss == player.id
+                    animatingLifeLoss: viewModel.animatingLifeLoss == player.id,
+                    cardWidth: cardWidth
                 )
             }
         }
@@ -272,6 +293,30 @@ struct KillerGameplayView: View {
                 Player.mockGuest2,
                 Player(id: UUID(), displayName: "Alice", nickname: "Alice", avatarURL: nil),
                 Player(id: UUID(), displayName: "Bob", nickname: "Bob", avatarURL: nil)
+            ],
+            startingLives: 5
+        )
+        .environmentObject(AuthService.mockAuthenticated)
+        .environmentObject(Router.shared)
+    }
+}
+
+#Preview("Killer - 6 Players") {
+    NavigationStack {
+        KillerGameplayView(
+            game: Game(
+                title: "Killer",
+                subtitle: "It's Kill or Be Killed",
+                players: "2-6",
+                instructions: "You start the game with a randomly assigned number between 1 and 20..."
+            ),
+            players: [
+                Player.mockGuest1,
+                Player.mockGuest2,
+                Player.mockGuest1,
+                Player.mockGuest2,
+                Player.mockGuest1,
+                Player.mockGuest2,
             ],
             startingLives: 5
         )

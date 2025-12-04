@@ -230,7 +230,7 @@ struct GameSetupView: View {
                 Spacer()
                 BottomActionContainer {
                     if selectedPlayers.isEmpty {
-                        AppButton(role: .primary, controlSize: .extraLarge) {
+                        AppButton(role: .secondary, controlSize: .extraLarge) {
                             showSearchPlayer = true
                         } label: {
                             Label("Add players", systemImage: "plus")

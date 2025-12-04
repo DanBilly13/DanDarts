@@ -41,6 +41,7 @@ class KillerViewModel: ObservableObject {
     @Published var animatingLifeLoss: UUID? = nil
     @Published var animatingLifeGain: UUID? = nil
     @Published var animatingKillerActivation: UUID? = nil
+    @Published var eliminatedPlayers: Set<UUID> = []
     
     // MARK: - Computed Properties
     
@@ -49,11 +50,15 @@ class KillerViewModel: ObservableObject {
     }
     
     var activePlayers: [Player] {
-        players.filter { (playerLives[$0.id] ?? 0) > 0 }
+        players.filter { !eliminatedPlayers.contains($0.id) }
     }
     
     var canSave: Bool {
-        !currentThrow.isEmpty && phase == .playing
+        currentThrow.count == 3 && phase == .playing
+    }
+    
+    var anyPlayerIsKiller: Bool {
+        isKiller.values.contains(true)
     }
     
     // MARK: - Initialization
@@ -176,6 +181,16 @@ class KillerViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 300_000_000)
             await MainActor.run {
                 self.animatingLifeLoss = nil
+            }
+        }
+        
+        // If player is eliminated, add to eliminatedPlayers after fade animation
+        if currentLives - 1 == 0 {
+            Task {
+                try? await Task.sleep(nanoseconds: 500_000_000) // Match fade duration
+                await MainActor.run {
+                    self.eliminatedPlayers.insert(playerID)
+                }
             }
         }
     }

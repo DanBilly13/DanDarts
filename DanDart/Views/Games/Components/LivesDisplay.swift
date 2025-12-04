@@ -11,6 +11,7 @@ import SwiftUI
 struct LivesDisplay: View {
     let lives: Int
     let startingLives: Int
+    var animatingLifeLoss: Bool = false
     
     var body: some View {
         // Only show lives row if game has more than 1 life
@@ -19,6 +20,8 @@ struct LivesDisplay: View {
                 Image(systemName: "heart.fill")
                     .font(.system(size: 12))
                     .foregroundColor(.red)
+                    .scaleEffect(animatingLifeLoss ? 2.0 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.4), value: animatingLifeLoss)
                 Text("\(lives)")
                     .font(.footnote)
                     .foregroundColor(AppColor.textSecondary)

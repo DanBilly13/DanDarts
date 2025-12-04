@@ -25,7 +25,7 @@ struct GameplayMenuButton: View {
                 onExit()
             }
         } label: {
-            Image(systemName: "ellipsis.circle.fill")
+            Image(systemName: "ellipsis")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(Color("InteractiveSecondaryBackground"))
         }

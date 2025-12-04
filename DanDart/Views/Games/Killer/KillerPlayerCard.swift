@@ -30,11 +30,14 @@ struct KillerPlayerCard: View {
         VStack(spacing: 8) {
             // Killer chip in fixed-height container
             ZStack {
-                Chip(
-                    title: "KILLER",
+                Image(systemName: "light.beacon.max.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AppColor.interactiveTertiaryBackground)
+                /*Chip(
+                    title: "KLR",
                     foregroundColor: AppColor.textOnPrimary,
                     backgroundColor: .red
-                )
+                )*/
                 .opacity(isKiller ? 1.0 : 0.3)
                 .scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
@@ -47,32 +50,35 @@ struct KillerPlayerCard: View {
                 isCurrentPlayer: isCurrentPlayer,
                 size: 64
             )
-            
-            // Name
-            Text(firstName)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(AppColor.textPrimary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: 56)
-            
-            // Assigned number with dart icon
-            HStack(spacing: 4) {
-                Text("🎯")
-                    .font(.system(size: 12))
-                Text("D\(assignedNumber)")
-                    .font(.system(.caption, design: .monospaced))
-                    .fontWeight(.bold)
+            VStack(spacing: 2) {
+                // Name
+                Text(firstName)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                     .foregroundColor(AppColor.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 56)
+                
+                // Assigned number with dart icon
+                HStack(spacing: 0) {
+                    Image(systemName: "dot.scope")
+                        .font(.system(size: 14, weight:
+                                .bold))
+                        .foregroundStyle(AppColor.justWhite)
+                   // Text("D\(assignedNumber)")
+                    Text("\(assignedNumber)")
+                        .font(.system(.title3, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(AppColor.justWhite)
+                }
+                
+                // Lives display
+                LivesDisplay(lives: lives, startingLives: startingLives, animatingLifeLoss: animatingLifeLoss)
             }
-            
-            // Lives display
-            LivesDisplay(lives: lives, startingLives: startingLives)
-                .scaleEffect(animatingLifeLoss ? 1.5 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.4), value: animatingLifeLoss)
+           
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 0)
         .opacity(lives == 0 ? 0 : 1) // Fade out when eliminated
         .animation(.easeOut(duration: 0.5), value: lives)
     }
