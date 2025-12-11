@@ -107,7 +107,6 @@ struct MatchHistoryView: View {
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarRole(.editor)
-            .toolbar(isSearchPresented ? .hidden : .visible, for: .tabBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     ToolbarTitle(title: "History")

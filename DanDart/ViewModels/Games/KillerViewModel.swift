@@ -22,6 +22,7 @@ class KillerViewModel: ObservableObject {
     @Published var players: [Player]
     @Published var currentPlayerIndex: Int = 0
     @Published var currentThrow: [ScoredThrow] = []
+    private var currentThrowMetadata: [KillerDartMetadata] = [] // Parallel array for metadata
     @Published var selectedDartIndex: Int? = nil
     @Published var winner: Player? = nil
     @Published var isGameOver: Bool = false
@@ -41,6 +42,7 @@ class KillerViewModel: ObservableObject {
     @Published var animatingLifeLoss: UUID? = nil
     @Published var animatingLifeGain: UUID? = nil
     @Published var animatingKillerActivation: UUID? = nil
+    @Published var animatingGunSpin: UUID? = nil
     @Published var eliminatedPlayers: Set<UUID> = []
     
     // MARK: - Computed Properties
@@ -64,7 +66,7 @@ class KillerViewModel: ObservableObject {
     // MARK: - Initialization
     
     let startingLives: Int
-    private var turnHistory: [MatchTurn] = []
+    private var playerTurnHistory: [UUID: [MatchTurn]] = [:] // Per-player turn history
     let matchId: UUID
     
     init(players: [Player], startingLives: Int) {
@@ -99,6 +101,12 @@ class KillerViewModel: ObservableObject {
     func recordThrow(value: Int, multiplier: Int) {
         guard phase == .playing else { return }
         
+        // Prevent recording more than 3 darts
+        // Note: In Killer mode, we don't allow editing previous darts because
+        // game state changes (lives, killer status) are permanent and can't be undone.
+        // Players should use the menu Restart option if they made a mistake.
+        guard currentThrow.count < 3 else { return }
+        
         let scoreType: ScoreType = {
             switch multiplier {
             case 2: return .double
@@ -110,11 +118,12 @@ class KillerViewModel: ObservableObject {
         currentThrow.append(dart)
         selectedDartIndex = currentThrow.count - 1
         
-        // Process throw immediately for real-time UI updates
-        processThrow(dart)
+        // Process throw and get metadata
+        let metadata = processThrow(dart)
+        currentThrowMetadata.append(metadata)
     }
     
-    private func processThrow(_ dart: ScoredThrow) {
+    private func processThrow(_ dart: ScoredThrow) -> KillerDartMetadata {
         let playerID = currentPlayer.id
         let playerNumber = playerNumbers[playerID] ?? 0
         let thrownNumber = dart.baseValue
@@ -123,7 +132,8 @@ class KillerViewModel: ObservableObject {
         // Check if player hit their own double to become a Killer
         if thrownNumber == playerNumber && multiplier == 2 && !(isKiller[playerID] ?? false) {
             activateKiller(playerID: playerID)
-            return
+            checkForImmediateWin()
+            return KillerDartMetadata(outcome: .becameKiller, affectedPlayerIds: [])
         }
         
         // If player is a Killer
@@ -131,21 +141,95 @@ class KillerViewModel: ObservableObject {
             // Check if hit own number (any multiplier) - lose a life
             if thrownNumber == playerNumber {
                 loseLife(playerID: playerID)
-                return
+                checkForImmediateWin()
+                return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: [playerID])
             }
             
             // Check if hit opponent's number
             for opponent in players where opponent.id != playerID {
                 if let opponentNumber = playerNumbers[opponent.id], thrownNumber == opponentNumber {
+                    // Trigger gun spin animation for the attacker (current player)
+                    triggerGunSpin(playerID: playerID)
+                    
                     // Remove lives based on multiplier
                     let livesToRemove = multiplier
+                    var affectedIds: [UUID] = []
                     for _ in 0..<livesToRemove {
                         loseLife(playerID: opponent.id)
+                        affectedIds.append(opponent.id)
                     }
-                    return
+                    
+                    // Check if this eliminated the last opponent
+                    checkForImmediateWin()
+                    return KillerDartMetadata(outcome: .hitOpponent, affectedPlayerIds: affectedIds)
                 }
             }
         }
+        
+        // Miss - didn't hit any relevant number
+        return KillerDartMetadata(outcome: .miss, affectedPlayerIds: [])
+    }
+    
+    private func checkForImmediateWin() {
+        // Count players with lives > 0
+        let playersWithLives = players.filter { (displayPlayerLives[$0.id] ?? 0) > 0 }
+        
+        // If only one player left, they win immediately
+        if playersWithLives.count == 1 {
+            winner = playersWithLives.first
+            isGameOver = true
+            
+            // Sync lives immediately
+            playerLives = displayPlayerLives
+            
+            // Save match
+            saveMatch()
+        }
+    }
+    
+    private func saveMatch() {
+        guard let winner = winner else { return }
+        
+        // Create match players with their individual turns
+        let matchPlayers = players.map { player in
+            let turns = playerTurnHistory[player.id] ?? []
+            let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
+            
+            return MatchPlayer.from(
+                player: player,
+                finalScore: 0,
+                startingScore: 0,
+                totalDartsThrown: totalDarts,
+                turns: turns
+            )
+        }
+        
+        // Create metadata with player numbers and starting lives
+        var metadata: [String: String] = [
+            "starting_lives": "\(startingLives)"
+        ]
+        // Store player numbers as "player_{uuid}": "number"
+        for player in players {
+            if let number = playerNumbers[player.id] {
+                metadata["player_\(player.id.uuidString)"] = "\(number)"
+            }
+        }
+        
+        let matchResult = MatchResult(
+            id: matchId,
+            gameType: "Killer",
+            gameName: "Killer",
+            players: matchPlayers,
+            winnerId: winner.id,
+            timestamp: Date(),
+            duration: 0,
+            matchFormat: 1,
+            totalLegsPlayed: 1,
+            metadata: metadata
+        )
+        
+        MatchStorageManager.shared.saveMatch(matchResult)
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
     }
     
     private func activateKiller(playerID: UUID) {
@@ -161,6 +245,18 @@ class KillerViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 500_000_000)
             await MainActor.run {
                 self.animatingKillerActivation = nil
+            }
+        }
+    }
+    
+    private func triggerGunSpin(playerID: UUID) {
+        animatingGunSpin = playerID
+        
+        // Reset animation after 0.6 seconds (matching animation duration)
+        Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            await MainActor.run {
+                self.animatingGunSpin = nil
             }
         }
     }
@@ -197,6 +293,7 @@ class KillerViewModel: ObservableObject {
     
     func clearThrow() {
         currentThrow.removeAll()
+        currentThrowMetadata.removeAll()
         selectedDartIndex = nil
     }
     
@@ -216,28 +313,47 @@ class KillerViewModel: ObservableObject {
         // Sync actual lives with display lives
         playerLives = displayPlayerLives
         
-        // Record turn in history
-        let darts = currentThrow.map { dart in
-            MatchDart(
+        // Record turn in history with metadata
+        let darts = currentThrow.enumerated().map { index, dart in
+            let metadata = index < currentThrowMetadata.count ? currentThrowMetadata[index] : nil
+            return MatchDart(
                 baseValue: dart.baseValue,
-                multiplier: dart.scoreType.multiplier
+                multiplier: dart.scoreType.multiplier,
+                killerMetadata: metadata
             )
         }
+        // Get current player's turn number
+        let playerTurns = playerTurnHistory[currentPlayer.id] ?? []
         let turn = MatchTurn(
-            turnNumber: turnHistory.count + 1,
+            turnNumber: playerTurns.count + 1,
             darts: darts,
             scoreBefore: 0, // Killer doesn't track scores
             scoreAfter: 0,
             isBust: false
         )
-        turnHistory.append(turn)
+        
+        // Append to this player's turn history
+        if playerTurnHistory[currentPlayer.id] == nil {
+            playerTurnHistory[currentPlayer.id] = []
+        }
+        playerTurnHistory[currentPlayer.id]?.append(turn)
         
         // Check for eliminations
         checkForEliminations()
         
+        // Count players with lives > 0 (using displayPlayerLives for immediate check)
+        let playersWithLives = players.filter { (displayPlayerLives[$0.id] ?? 0) > 0 }
+        
         // Check for winner
-        if activePlayers.count == 1 {
-            winner = activePlayers.first
+        if playersWithLives.count == 1 {
+            winner = playersWithLives.first
+            isGameOver = true
+            return
+        }
+        
+        // Check if game is over (no players left - shouldn't happen but safety check)
+        if playersWithLives.count == 0 {
+            print("[Killer] Warning: No players left alive")
             isGameOver = true
             return
         }
@@ -257,13 +373,19 @@ class KillerViewModel: ObservableObject {
     }
     
     private func moveToNextPlayer() {
-        // Find next active player
+        // Find next active player (use displayPlayerLives for immediate response)
         var nextIndex = (currentPlayerIndex + 1) % players.count
         var attempts = 0
         
-        while (playerLives[players[nextIndex].id] ?? 0) == 0 && attempts < players.count {
+        while (displayPlayerLives[players[nextIndex].id] ?? 0) == 0 && attempts < players.count {
             nextIndex = (nextIndex + 1) % players.count
             attempts += 1
+        }
+        
+        // Safety check: if all players eliminated, don't update (game should end)
+        if attempts >= players.count {
+            print("[Killer] Warning: All players eliminated, cannot move to next player")
+            return
         }
         
         currentPlayerIndex = nextIndex
@@ -271,7 +393,7 @@ class KillerViewModel: ObservableObject {
     
     // MARK: - Match Storage
     
-    func getMatchData() -> (turns: [MatchTurn], matchId: UUID) {
-        return (turnHistory, matchId)
+    func getMatchData() -> (playerTurns: [UUID: [MatchTurn]], matchId: UUID) {
+        return (playerTurnHistory, matchId)
     }
 }

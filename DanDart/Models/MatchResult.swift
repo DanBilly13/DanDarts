@@ -255,6 +255,7 @@ struct MatchDart: Codable, Hashable {
     let baseValue: Int
     let multiplier: Int // 1=single, 2=double, 3=triple
     let value: Int // total value (baseValue * multiplier)
+    let killerMetadata: KillerDartMetadata? // Killer-specific data
     
     var displayText: String {
         if multiplier == 1 {
@@ -267,10 +268,25 @@ struct MatchDart: Codable, Hashable {
         return "\(value)"
     }
     
-    init(baseValue: Int, multiplier: Int) {
+    init(baseValue: Int, multiplier: Int, killerMetadata: KillerDartMetadata? = nil) {
         self.baseValue = baseValue
         self.multiplier = multiplier
         self.value = baseValue * multiplier
+        self.killerMetadata = killerMetadata
+    }
+}
+
+// MARK: - Killer Dart Metadata
+
+struct KillerDartMetadata: Codable, Hashable {
+    let outcome: KillerDartOutcome
+    let affectedPlayerIds: [UUID] // Empty for miss, contains victim ID(s) for hits
+    
+    enum KillerDartOutcome: String, Codable {
+        case becameKiller // Hit own double, became a killer
+        case hitOwnNumber // Killer hit their own number (lost life)
+        case hitOpponent // Killer hit opponent's number
+        case miss // Didn't hit any relevant number
     }
 }
 
@@ -507,6 +523,82 @@ extension MatchResult {
             matchFormat: 1,
             totalLegsPlayed: 1,
             metadata: ["starting_lives": "2"]
+        )
+    }()
+    
+    // MARK: - Mock Killer Match
+    
+    static let mockKiller: MatchResult = {
+        let player1Id = UUID()
+        let player2Id = UUID()
+        let player3Id = UUID()
+        
+        // Player 1 (Winner) - Number 4
+        let player1Turns = [
+            // Round 1: Hit D4 (became killer), hit opponent's 12, miss
+            MatchTurn(turnNumber: 1, darts: [
+                MatchDart(baseValue: 4, multiplier: 2, killerMetadata: KillerDartMetadata(outcome: .becameKiller, affectedPlayerIds: [])),
+                MatchDart(baseValue: 12, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .hitOpponent, affectedPlayerIds: [player2Id])),
+                MatchDart(baseValue: 20, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: []))
+            ], scoreBefore: 0, scoreAfter: 0, isBust: false),
+            // Round 2: Hit opponent's 12 with triple (3 lives), miss, miss
+            MatchTurn(turnNumber: 2, darts: [
+                MatchDart(baseValue: 12, multiplier: 3, killerMetadata: KillerDartMetadata(outcome: .hitOpponent, affectedPlayerIds: [player2Id, player2Id, player2Id])),
+                MatchDart(baseValue: 20, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: [])),
+                MatchDart(baseValue: 19, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: []))
+            ], scoreBefore: 0, scoreAfter: 0, isBust: false)
+        ]
+        
+        // Player 2 (2nd) - Number 12 - Lost all lives
+        let player2Turns = [
+            // Round 1: Hit D12 (became killer), miss, miss
+            MatchTurn(turnNumber: 1, darts: [
+                MatchDart(baseValue: 12, multiplier: 2, killerMetadata: KillerDartMetadata(outcome: .becameKiller, affectedPlayerIds: [])),
+                MatchDart(baseValue: 20, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: [])),
+                MatchDart(baseValue: 18, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: []))
+            ], scoreBefore: 0, scoreAfter: 0, isBust: false)
+            // Eliminated after round 1 (lost 4 lives total from player1's throws)
+        ]
+        
+        // Player 3 (3rd) - Number 7 - Never became killer
+        let player3Turns = [
+            // Round 1: All misses
+            MatchTurn(turnNumber: 1, darts: [
+                MatchDart(baseValue: 20, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: [])),
+                MatchDart(baseValue: 19, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: [])),
+                MatchDart(baseValue: 18, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: []))
+            ], scoreBefore: 0, scoreAfter: 0, isBust: false),
+            // Round 2: Hit D7 (became killer), hit own number (lost life), miss
+            MatchTurn(turnNumber: 2, darts: [
+                MatchDart(baseValue: 7, multiplier: 2, killerMetadata: KillerDartMetadata(outcome: .becameKiller, affectedPlayerIds: [])),
+                MatchDart(baseValue: 7, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: [player3Id])),
+                MatchDart(baseValue: 20, multiplier: 1, killerMetadata: KillerDartMetadata(outcome: .miss, affectedPlayerIds: []))
+            ], scoreBefore: 0, scoreAfter: 0, isBust: false)
+        ]
+        
+        // Create metadata
+        var metadata: [String: String] = [
+            "starting_lives": "3",
+            "player_\(player1Id.uuidString)": "4",
+            "player_\(player2Id.uuidString)": "12",
+            "player_\(player3Id.uuidString)": "7"
+        ]
+        
+        return MatchResult(
+            id: UUID(),
+            gameType: "Killer",
+            gameName: "Killer",
+            players: [
+                MatchPlayer(id: player1Id, displayName: "Dan Billingham", nickname: "@danbilly", avatarURL: "avatar1", isGuest: false, finalScore: 0, startingScore: 0, totalDartsThrown: 6, turns: player1Turns, legsWon: 0),
+                MatchPlayer(id: player2Id, displayName: "Alice", nickname: "@alice", avatarURL: "avatar2", isGuest: true, finalScore: 0, startingScore: 0, totalDartsThrown: 3, turns: player2Turns, legsWon: 0),
+                MatchPlayer(id: player3Id, displayName: "Bob", nickname: "@bob", avatarURL: "avatar3", isGuest: true, finalScore: 0, startingScore: 0, totalDartsThrown: 6, turns: player3Turns, legsWon: 0)
+            ],
+            winnerId: player1Id,
+            timestamp: Date(),
+            duration: 180,
+            matchFormat: 1,
+            totalLegsPlayed: 1,
+            metadata: metadata
         )
     }()
 }

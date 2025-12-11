@@ -40,7 +40,7 @@ struct PlayerIdentity: View {
         alignment: HorizontalAlignment = .leading,
         borderColor: Color? = nil,
         showBadge: Bool = false,
-        badgeIcon: String = "checkmark.circle.fill",
+        badgeIcon: String = "checkmark",
         badgeColor: Color = AppColor.interactivePrimaryBackground,
         badgeSize: CGFloat? = nil,
         badgeForegroundColor: Color = .white,
@@ -176,7 +176,11 @@ extension PlayerIdentity {
             avatarURL: "avatar1",
             displayName: "Dan Billingham",
             nickname: "danbilly",
-            isGuest: false
+            isGuest: false,
+            showBadge: true,
+            badgeSize: 20,
+            badgeForegroundColor: AppColor.justBlack
+            
         )
         
         PlayerIdentity(

@@ -104,8 +104,8 @@ struct HalveItMatchDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Stats title
             Text("Stats")
-                .font(.title3.weight(.semibold))
-                .foregroundColor(AppColor.textPrimary)
+                .font(.system(.headline, design: .rounded))
+                .fontWeight(.semibold)                .foregroundColor(AppColor.justWhite)
             
             // Color key legend
             FlexibleLayout(spacing: 12) {
@@ -176,8 +176,9 @@ struct HalveItMatchDetailView: View {
     private var roundBreakdownSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Round-by-Round Breakdown")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(AppColor.textPrimary)
+                .font(.system(.headline, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundColor(AppColor.justWhite)
             
             // Show rounds (assuming 6 rounds for Halve-It)
             let maxRounds = match.players.map { $0.turns.count }.max() ?? 0

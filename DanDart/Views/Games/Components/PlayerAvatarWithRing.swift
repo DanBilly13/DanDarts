@@ -11,11 +11,13 @@ import SwiftUI
 struct PlayerAvatarWithRing: View {
     let avatarURL: String?
     let isCurrentPlayer: Bool
+    let ringColor: Color
     let size: CGFloat
     
-    init(avatarURL: String?, isCurrentPlayer: Bool, size: CGFloat = 64) {
+    init(avatarURL: String?, isCurrentPlayer: Bool, ringColor: Color = AppColor.interactiveSecondaryBackground, size: CGFloat = 64) {
         self.avatarURL = avatarURL
         self.isCurrentPlayer = isCurrentPlayer
+        self.ringColor = ringColor
         self.size = size
     }
     
@@ -24,7 +26,7 @@ struct PlayerAvatarWithRing: View {
             if isCurrentPlayer {
                 // Outer accent ring
                 Circle()
-                    .stroke(AppColor.interactiveSecondaryBackground, lineWidth: 2)
+                    .stroke(ringColor, lineWidth: 3)
                     .frame(width: size, height: size)
                 
                 // Inner black ring

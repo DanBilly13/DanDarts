@@ -20,33 +20,68 @@ struct KillerPlayerCard2: View {
     let isCurrentPlayer: Bool
     let animatingKillerActivation: Bool
     let animatingLifeLoss: Bool
+    let animatingGunSpin: Bool
+    let playerIndex: Int
     let cardWidth: CGFloat
     
     private var firstName: String {
         player.displayName.split(separator: " ").first.map(String.init) ?? player.displayName
     }
     
+    // Get player color based on index
+    private var playerColor: Color {
+        switch playerIndex {
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 12) {
-            // Target number in rounded container
-            Text("#\(assignedNumber)")
-                .font(.system(.title3, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundColor(AppColor.textPrimary)
-                .frame(width: 44, height: 28)
-                .padding(.bottom, 1)
-                .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        
-                        .fill(isKiller ? AppColor.interactivePrimaryBackground : AppColor.inputBackground)
-                )
-                .scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
+            // Target number in rounded container with gun icon
+            HStack(spacing: 2) {
+                // Gun icon in fixed-size container to prevent rotation affecting layout
+                ZStack {
+                    Color.clear
+                        .frame(width: 17, height: 17)
+                    
+                    Image("Gun")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 17)
+                        .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
+                        //.foregroundColor(AppColor.justWhite)
+                        .opacity(isKiller ? 1.0 : 0.3)
+                        .rotationEffect(.degrees(animatingGunSpin ? 1125 : -25)) // 45° default, +1080° (3 spins) when animating
+                        .animation(.easeInOut(duration: 0.6), value: animatingGunSpin)
+                }
+                
+                Text("\(assignedNumber)")
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
+                    //.foregroundColor(AppColor.justBlack)
+            }
+            .frame(height: 28)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 1)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(isKiller ? playerColor : AppColor.inputBackground)
+            )
+            .scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
             
             // Avatar (with double ring for current player)
             PlayerAvatarWithRing(
                 avatarURL: player.avatarURL,
                 isCurrentPlayer: isCurrentPlayer,
+                ringColor: playerColor,
                 size: 64
             )
             
@@ -55,7 +90,7 @@ struct KillerPlayerCard2: View {
                 Text(firstName)
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(AppColor.textSecondary)
+                    .foregroundColor(playerColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: cardWidth)
@@ -95,6 +130,8 @@ struct KillerPlayerCard2: View {
             isCurrentPlayer: false,
             animatingKillerActivation: false,
             animatingLifeLoss: false,
+            animatingGunSpin: false,
+            playerIndex: 0,
             cardWidth: 64
         )
         
@@ -108,6 +145,8 @@ struct KillerPlayerCard2: View {
             isCurrentPlayer: true,
             animatingKillerActivation: false,
             animatingLifeLoss: false,
+            animatingGunSpin: false,
+            playerIndex: 1,
             cardWidth: 64
         )
         
@@ -121,6 +160,8 @@ struct KillerPlayerCard2: View {
             isCurrentPlayer: false,
             animatingKillerActivation: false,
             animatingLifeLoss: false,
+            animatingGunSpin: false,
+            playerIndex: 2,
             cardWidth: 64
         )
         
@@ -134,6 +175,8 @@ struct KillerPlayerCard2: View {
             isCurrentPlayer: false,
             animatingKillerActivation: false,
             animatingLifeLoss: false,
+            animatingGunSpin: false,
+            playerIndex: 3,
             cardWidth: 64
         )
     }

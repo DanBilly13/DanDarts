@@ -13,12 +13,7 @@ struct MainTabView: View {
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     
-    // Hidden TextField to pre-warm iOS text input system
-    @State private var warmupText: String = ""
-    @FocusState private var warmupFocused: Bool
-    
     var body: some View {
-        ZStack {
         TabView {
             // Games Tab
             GamesTabView(showProfile: $showProfile)
@@ -61,15 +56,6 @@ struct MainTabView: View {
                 .tag(2)
         }
         .accentColor(AppColor.interactivePrimaryBackground)
-        
-        // Hidden TextField for warming up text input system (outside TabView)
-        // CHANGE 1: opacity 0.01 instead of 0 (keeps it "real" to iOS)
-        TextField("", text: $warmupText)
-            .focused($warmupFocused)
-            .frame(width: 1, height: 1)
-            .opacity(0.01)
-            .allowsHitTesting(false)
-        }
         .sheet(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
@@ -81,15 +67,6 @@ struct MainTabView: View {
         .onAppear {
             configureTabBarAppearance()
             loadPendingRequestCount()
-            
-            // Pre-warm iOS text input system on launch
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                warmupFocused = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    warmupFocused = false
-                    print("✅ Text input system ready")
-                }
-            }
             
             // Listen for friend request changes
             NotificationCenter.default.addObserver(

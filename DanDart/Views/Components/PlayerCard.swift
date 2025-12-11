@@ -32,9 +32,9 @@ struct PlayerCard: View {
                 spacing: 4,
                 showBadge: showCheckmark || playerNumber != nil,
                 badgeIcon: "checkmark", // used when showCheckmark is true and no number
-                badgeColor: playerNumber != nil ? Color.white : AppColor.interactivePrimaryBackground,
-                badgeSize: 16,
-                badgeForegroundColor: playerNumber != nil ? Color.black : Color.white,
+                badgeColor: playerNumber != nil ? Color.white : AppColor.player2,
+                badgeSize: 24,
+                badgeForegroundColor: playerNumber != nil ? AppColor.justBlack : AppColor.justBlack,
                 badgeText: playerNumber != nil ? String(playerNumber!) : nil
             )
             

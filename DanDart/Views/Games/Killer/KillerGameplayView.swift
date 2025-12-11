@@ -146,62 +146,36 @@ struct KillerGameplayView: View {
             Text("Your progress will be lost.")
         }
         .onChange(of: viewModel.isGameOver) { _, isOver in
-            if isOver, let winner = viewModel.winner {
+            if isOver {
                 navigateToGameEnd = true
-                
-                // Save match data
-                let (turns, matchId) = viewModel.getMatchData()
-                
-                // Create match players
-                let matchPlayers = players.map { player in
-                    MatchPlayer.from(
-                        player: player,
-                        finalScore: 0,
-                        startingScore: 0,
-                        totalDartsThrown: turns.filter { turn in
-                            // Count darts for this player (Killer doesn't track per-player turns)
-                            true
-                        }.reduce(0) { $0 + $1.darts.count },
-                        turns: turns
-                    )
-                }
-                
-                let matchResult = MatchResult(
-                    gameType: "Killer",
-                    gameName: game.title,
-                    players: matchPlayers,
-                    winnerId: winner.id,
-                    duration: 0,
-                    matchFormat: 1,
-                    totalLegsPlayed: 1
-                )
-                
-                MatchStorageManager.shared.saveMatch(matchResult)
-                
-                // Navigate to game end after short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    router.push(.gameEnd(
-                        game: game,
-                        winner: winner,
-                        players: players,
-                        onPlayAgain: {
-                            router.pop(count: 2)
-                            router.push(.preGameHype(
-                                game: game,
-                                players: players,
-                                matchFormat: 1,
-                                killerLives: startingLives
-                            ))
-                        },
-                        onBackToGames: {
-                            router.popToRoot()
-                        },
-                        matchFormat: nil,
-                        legsWon: nil,
-                        matchId: matchId
-                    ))
-                }
             }
+        }
+        .navigationDestination(isPresented: $navigateToGameEnd) {
+            GameEndView(
+                game: game,
+                winner: viewModel.winner ?? players[0],
+                players: players,
+                onPlayAgain: {
+                    navigateToGameEnd = false
+                    router.pop()
+                    router.push(.preGameHype(
+                        game: game,
+                        players: players,
+                        matchFormat: 1,
+                        killerLives: startingLives
+                    ))
+                },
+                onChangePlayers: {
+                    navigateToGameEnd = false
+                    dismiss()
+                },
+                onBackToGames: {
+                    router.popToRoot()
+                },
+                matchFormat: nil,
+                legsWon: nil,
+                matchId: viewModel.matchId
+            )
         }
     }
     
@@ -214,11 +188,11 @@ struct KillerGameplayView: View {
         // Spacing based on player count
         let spacing: CGFloat = {
             switch playersToShow.count {
-            case 2: return 64
-            case 3: return 48
-            case 4: return 32
-            case 5: return -6
-            case 6: return -8
+            case 2: return 24
+            case 3: return 24
+            case 4: return 24
+            case 5: return 4
+            case 6: return -6
             case 7: return -8
             case 8: return -8
             default: return 32
@@ -230,7 +204,7 @@ struct KillerGameplayView: View {
             switch playersToShow.count {
             case 2: return 100
             case 3: return 80
-            case 4: return 70
+            case 4: return 72
             case 5: return 64
             case 6: return 64
             default: return 64
@@ -248,6 +222,8 @@ struct KillerGameplayView: View {
                     isCurrentPlayer: player.id == viewModel.currentPlayer.id,
                     animatingKillerActivation: viewModel.animatingKillerActivation == player.id,
                     animatingLifeLoss: viewModel.animatingLifeLoss == player.id,
+                    animatingGunSpin: viewModel.animatingGunSpin == player.id,
+                    playerIndex: viewModel.players.firstIndex(where: { $0.id == player.id }) ?? 0,
                     cardWidth: cardWidth
                 )
             }

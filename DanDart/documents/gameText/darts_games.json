@@ -39,6 +39,6 @@
     "title": "Killer",
     "subtitle": "It's Kill or Be Killed",
     "players": "2-6",
-    "instructions": "You start the game with a randomly assigned number between 1 and 20. No two players share the same number.\n\nYour goal is simple: become a Killer, take lives from others, and be the last player standing.\n\nTo become a Killer, you must hit the double of your own number.\n\nOnce you're a Killer, hit the double of another player's number and they lose a life.\n\nBe careful — hitting your own number (single, double, or treble) can cost you a life. You can regain lives by hitting your own number again.\n\nPlay continues as players pick each other off.\nThe last player with one or more lives wins."
+    "instructions": "Your goal is simple: Become a Killer, take lives from other players, and be the last person standing.\n\nYou begin the game with a unique number between 1 and 20. No two players share the same number.\n\nBecoming a Killer.\nTo become a Killer, you must hit the double of your own assigned number.\n\nKilling your opponents.\nOnce you're a Killer, you can start attacking other players' assigned numbers to take away their lives. Hitting a single of an opponent's number removes one life, a double removes two, and a treble removes three.\n\nBe careful.\nHitting your own number—single, double, or treble—costs you one life.\nThe last player with one or more lives wins."
   }
 ]

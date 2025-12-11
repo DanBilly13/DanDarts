@@ -230,12 +230,15 @@ struct GameSetupView: View {
                 Spacer()
                 BottomActionContainer {
                     if selectedPlayers.isEmpty {
-                        AppButton(role: .secondary, controlSize: .extraLarge) {
-                            showSearchPlayer = true
-                        } label: {
-                            Label("Add players", systemImage: "plus")
+                        GeometryReader { geo in
+                            AppButton(role: .secondary, controlSize: .extraLarge) {
+                                showSearchPlayer = true
+                            } label: {
+                                Label("Add players", systemImage: "plus")
+                            }
+                            .halfWidth(in: geo)
                         }
-                        .frame(maxWidth: .infinity)
+                        .frame(height: 80)
                     } else {
                         // Add players + Start game side by side
                         HStack(spacing: 12) {
@@ -308,3 +311,10 @@ struct GameSetupView: View {
     }
 }
 
+extension View {
+    /// Forces the view to be 50% of the parent container's width and centers it.
+    func halfWidth(in geo: GeometryProxy) -> some View {
+        self.frame(width: geo.size.width * 0.5)
+            .frame(maxWidth: .infinity)
+    }
+}
