@@ -25,13 +25,27 @@ struct MatchDetailView: View {
         } else {
             // 301/501 matches use generic view
             if isSheet {
-                // Sheet presentation - use StandardSheetView
-                StandardSheetView(
-                    title: match.gameName,
-                    dismissButtonTitle: "Done",
-                    onDismiss: { dismiss() }
-                ) {
-                    contentView
+                // Sheet presentation
+                NavigationStack {
+                    ScrollView {
+                        contentView
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 24)
+                    }
+                    .background(AppColor.backgroundPrimary)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarBackButtonHidden(true)
+                    .toolbarRole(.editor)
+                    .toolbar {
+                        TopBarSub(
+                            title: match.gameName,
+                            subtitle: match.formattedDate
+                        ) {
+                            TopBarCloseButton {
+                                dismiss()
+                            }
+                        }
+                    }
                 }
             } else {
                 // Navigation push - use standard ScrollView
@@ -41,9 +55,20 @@ struct MatchDetailView: View {
                         .padding(.vertical, 24)
                 }
                 .background(AppColor.backgroundPrimary)
-                .navigationTitle(match.gameName)
                 .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbarRole(.editor)
                 .toolbar(.hidden, for: .tabBar)
+                .toolbar {
+                    TopBarSub(
+                        title: match.gameName,
+                        subtitle: match.formattedDate
+                    ) {
+                        TopBarCloseButton {
+                            dismiss()
+                        }
+                    }
+                }
             }
         }
     }
@@ -51,9 +76,6 @@ struct MatchDetailView: View {
     // Shared content for both contexts
     private var contentView: some View {
         VStack(spacing: 24) {
-            // Date and Time
-            dateHeader
-            
             // Players and Scores
             playersSection
             
@@ -70,13 +92,6 @@ struct MatchDetailView: View {
     }
     
     // MARK: - Sub Views
-    
-    private var dateHeader: some View {
-        Text(match.formattedDate)
-            .font(.subheadline.weight(.medium))
-            .foregroundColor(AppColor.textSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
     
     private var playersSection: some View {
         VStack(spacing: 16) {

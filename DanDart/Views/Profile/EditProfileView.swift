@@ -54,19 +54,9 @@ struct EditProfileView: View {
     }
     
     var body: some View {
-        StandardSheetView(
-            title: "Edit Profile",
-            dismissButtonTitle: "Cancel",
-            primaryActionTitle: isSaving || isUploadingAvatar ? "Saving..." : "Save Changes",
-            primaryActionEnabled: isValid && !isSaving && !isUploadingAvatar,
-            onDismiss: { dismiss() },
-            onPrimaryAction: {
-                Task {
-                    await handleSave()
-                }
-            }
-        ) {
-            VStack(spacing: 24) {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
                 // Avatar Selection
                 VStack(spacing: 16) {
                     Text("Profile Picture")
@@ -200,6 +190,39 @@ struct EditProfileView: View {
                     }
                     .padding(.top, 8)
                 }
+                
+                // Save Button at Bottom
+                Button(action: {
+                    Task {
+                        await handleSave()
+                    }
+                }) {
+                    Text(isSaving || isUploadingAvatar ? "Saving..." : "Save Changes")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(isValid && !isSaving && !isUploadingAvatar ? AppColor.interactivePrimaryBackground : AppColor.textSecondary.opacity(0.5))
+                        .cornerRadius(12)
+                }
+                .disabled(!isValid || isSaving || isUploadingAvatar)
+                .padding(.top, 8)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
+        }
+        .background(AppColor.backgroundPrimary)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarRole(.editor)
+        .toolbar {
+            TopBarSub(
+                title: "Edit Profile",
+                subtitle: nil
+            ) {
+                TopBarCloseButton {
+                    dismiss()
+                }
             }
         }
         .onAppear {
@@ -216,6 +239,7 @@ struct EditProfileView: View {
             }
         } message: {
             Text("Your profile has been updated successfully")
+        }
         }
     }
     

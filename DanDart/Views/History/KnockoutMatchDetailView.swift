@@ -14,13 +14,27 @@ struct KnockoutMatchDetailView: View {
     
     var body: some View {
         if isSheet {
-            // Sheet presentation - use StandardSheetView
-            StandardSheetView(
-                title: match.gameName,
-                dismissButtonTitle: "Done",
-                onDismiss: { dismiss() }
-            ) {
-                contentView
+            // Sheet presentation
+            NavigationStack {
+                ScrollView {
+                    contentView
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 24)
+                }
+                .background(AppColor.backgroundPrimary)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbarRole(.editor)
+                .toolbar {
+                    TopBarSub(
+                        title: match.gameName,
+                        subtitle: match.formattedDate
+                    ) {
+                        TopBarCloseButton {
+                            dismiss()
+                        }
+                    }
+                }
             }
         } else {
             // Navigation push - use standard ScrollView
@@ -30,18 +44,26 @@ struct KnockoutMatchDetailView: View {
                     .padding(.vertical, 24)
             }
             .background(AppColor.backgroundPrimary)
-            .navigationTitle(match.gameName)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbarRole(.editor)
             .toolbar(.hidden, for: .tabBar)
+            .toolbar {
+                TopBarSub(
+                    title: match.gameName,
+                    subtitle: match.formattedDate
+                ) {
+                    TopBarCloseButton {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
     
     // Shared content for both contexts
     private var contentView: some View {
         VStack(spacing: 24) {
-            // Date and Time
-            dateHeader
-            
             // Players and Rankings (no scores shown)
             playersSection
             
@@ -58,13 +80,6 @@ struct KnockoutMatchDetailView: View {
     }
     
     // MARK: - Sub Views
-    
-    private var dateHeader: some View {
-        Text(match.formattedDate)
-            .font(.subheadline.weight(.medium))
-            .foregroundColor(AppColor.textSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
     
     private var playersSection: some View {
         VStack(spacing: 16) {

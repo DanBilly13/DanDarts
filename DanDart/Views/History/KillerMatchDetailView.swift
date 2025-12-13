@@ -15,12 +15,26 @@ struct KillerMatchDetailView: View {
     
     var body: some View {
         if isSheet {
-            StandardSheetView(
-                title: match.gameName,
-                dismissButtonTitle: "Done",
-                onDismiss: { dismiss() }
-            ) {
-                contentView
+            NavigationStack {
+                ScrollView {
+                    contentView
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 24)
+                }
+                .background(AppColor.backgroundPrimary)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbarRole(.editor)
+                .toolbar {
+                    TopBarSub(
+                        title: match.gameName,
+                        subtitle: formattedDate
+                    ) {
+                        TopBarCloseButton {
+                            dismiss()
+                        }
+                    }
+                }
             }
         } else {
             ScrollView {
@@ -29,17 +43,30 @@ struct KillerMatchDetailView: View {
                     .padding(.vertical, 24)
             }
             .background(AppColor.backgroundPrimary)
-            .navigationTitle(match.gameName)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbarRole(.editor)
             .toolbar(.hidden, for: .tabBar)
+            .toolbar {
+                TopBarSub(
+                    title: match.gameName,
+                    subtitle: formattedDate
+                ) {
+                    TopBarCloseButton {
+                        dismiss()
+                    }
+                }
+            }
         }
+    }
+    
+    // Formatted date for subtitle
+    private var formattedDate: String {
+        match.formattedDate
     }
     
     private var contentView: some View {
         VStack(spacing: 24) {
-            // Date header
-            dateHeader
-            
             // Player cards (winner first, then placement)
             playersSection
             
@@ -59,13 +86,6 @@ struct KillerMatchDetailView: View {
     }
     
     // MARK: - Sub Views
-    
-    private var dateHeader: some View {
-        Text(match.formattedDate)
-            .font(.subheadline.weight(.medium))
-            .foregroundColor(AppColor.textSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
     
     private var playersSection: some View {
         VStack(spacing: 16) {
