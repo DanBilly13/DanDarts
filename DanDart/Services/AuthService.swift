@@ -500,8 +500,8 @@ class AuthService: ObservableObject {
             try await supabaseService.client.storage
                 .from("avatars")
                 .upload(
-                    path: filePath,
-                    file: imageData,
+                    filePath,
+                    data: imageData,
                     options: .init(
                         contentType: "image/jpeg",
                         upsert: false

@@ -41,5 +41,7 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>DanDarts uses the camera so you can take a profile photo.</string>
 </dict>
 </plist>

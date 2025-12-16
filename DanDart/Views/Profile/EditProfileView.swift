@@ -19,6 +19,9 @@ struct EditProfileView: View {
     @State private var selectedAvatar: String = "avatar1"
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedAvatarImage: UIImage?
+    @State private var originalAvatarURL: String?
+    @State private var isAvatarDirty: Bool = false
+    @State private var isHydratingExistingAvatar: Bool = false
     
     // MARK: - UI State
     @State private var isSaving: Bool = false
@@ -64,7 +67,7 @@ struct EditProfileView: View {
                         .foregroundColor(AppColor.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    AvatarSelectionView(
+                    AvatarSelectionViewV2(
                         selectedAvatar: $selectedAvatar,
                         selectedPhotoItem: $selectedPhotoItem,
                         selectedAvatarImage: $selectedAvatarImage
@@ -211,22 +214,37 @@ struct EditProfileView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
         }
-        .background(AppColor.backgroundPrimary)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbarRole(.editor)
-        .toolbar {
-            TopBarSub(
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top) {
+            SheetTopBarSub(
                 title: "Edit Profile",
-                subtitle: nil
-            ) {
-                TopBarCloseButton {
+                subtitle: nil,
+                onClose: {
                     dismiss()
                 }
-            }
+            )
         }
+        .background(AppColor.backgroundPrimary)
         .onAppear {
             loadCurrentProfile()
+        }
+        .onChange(of: selectedAvatar) { _, newValue in
+            if !newValue.isEmpty {
+                isAvatarDirty = true
+            }
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            if newItem != nil {
+                isAvatarDirty = true
+            }
+        }
+        .onChange(of: selectedAvatarImage) { _, newImage in
+            if isHydratingExistingAvatar {
+                return
+            }
+            if newImage != nil && selectedPhotoItem == nil && selectedAvatar.isEmpty {
+                isAvatarDirty = true
+            }
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
@@ -240,106 +258,144 @@ struct EditProfileView: View {
         } message: {
             Text("Your profile has been updated successfully")
         }
-        }
     }
-    
-    // MARK: - Actions
-    
-    private func loadCurrentProfile() {
-        guard let currentUser = authService.currentUser else { return }
-        
-        displayName = currentUser.displayName
-        nickname = currentUser.nickname
-        email = currentUser.email ?? ""
-        
-        // Set avatar
-        if let avatarURL = currentUser.avatarURL {
-            if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
-                // It's a custom uploaded image - download it
-                Task {
-                    await loadCustomAvatar(from: avatarURL)
+}
+
+private struct SheetTopBarSub: View {
+    let title: String
+    let subtitle: String?
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppColor.textPrimary)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
                 }
-            } else {
-                // It's a predefined avatar
-                selectedAvatar = avatarURL
             }
+
+            Spacer()
+
+            TopBarCloseButton(action: onClose)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(AppColor.backgroundPrimary)
     }
+}
     
-    private func loadCustomAvatar(from urlString: String) async {
-        guard let url = URL(string: urlString) else { return }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let image = UIImage(data: data) {
+// MARK: - Actions
+    
+private func loadCurrentProfile() {
+    guard let currentUser = authService.currentUser else { return }
+    
+    displayName = currentUser.displayName
+    nickname = currentUser.nickname
+    email = currentUser.email ?? ""
+    
+    // Set avatar
+    originalAvatarURL = currentUser.avatarURL
+    isAvatarDirty = false
+
+    if let avatarURL = currentUser.avatarURL {
+        if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
+            selectedAvatar = ""
+            isHydratingExistingAvatar = true
+            Task {
+                await loadCustomAvatar(from: avatarURL)
                 await MainActor.run {
-                    selectedAvatarImage = image
+                    isHydratingExistingAvatar = false
                 }
             }
-        } catch {
-            print("Failed to load custom avatar: \(error.localizedDescription)")
+        } else {
+            selectedAvatar = avatarURL
+            selectedAvatarImage = nil
+            selectedPhotoItem = nil
         }
     }
+}
     
-    private func handlePhotoSelection(_ item: PhotosPickerItem?) async {
-        guard let item = item else { return }
-        
-        do {
-            guard let data = try await item.loadTransferable(type: Data.self),
-                  let uiImage = UIImage(data: data) else {
-                return
-            }
-            
-            selectedAvatarImage = uiImage
-        } catch {
-            print("Failed to load photo")
-            errorMessage = "Failed to load photo. Please try again."
-        }
-    }
+private func loadCustomAvatar(from urlString: String) async {
+    guard let url = URL(string: urlString) else { return }
     
-    private func handleSave() async {
-        guard let currentUser = authService.currentUser else { return }
-        
-        isSaving = true
-        errorMessage = ""
-        
-        do {
-            var avatarURL = selectedAvatar
-            
-            // Upload photo if one was selected
-            if let selectedImage = selectedAvatarImage {
-                isUploadingAvatar = true
-                
-                // Resize and compress image
-                let resizedImage = selectedImage.resized(toMaxDimension: 512)
-                guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
-                    throw NSError(domain: "ImageError", code: -1)
-                }
-                
-                // Upload to Supabase
-                avatarURL = try await authService.uploadAvatar(imageData: jpegData)
-                
-                isUploadingAvatar = false
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        if let image = UIImage(data: data) {
+            await MainActor.run {
+                selectedAvatarImage = image
             }
-            
-            // Update profile
-            try await authService.updateProfile(
-                displayName: displayName.trimmingCharacters(in: .whitespaces),
-                nickname: nickname.trimmingCharacters(in: .whitespaces),
-                email: isGoogleUser ? nil : email.trimmingCharacters(in: .whitespaces),
-                avatarURL: avatarURL
-            )
-            
-            showSuccessAlert = true
-            
-        } catch {
-            errorMessage = "Failed to update profile. Please try again."
-            isSaving = false
-            isUploadingAvatar = false
+        }
+    } catch {
+        print("Failed to load custom avatar: \(error.localizedDescription)")
+    }
+}
+    
+private func handlePhotoSelection(_ item: PhotosPickerItem?) async {
+    guard let item = item else { return }
+    
+    do {
+        guard let data = try await item.loadTransferable(type: Data.self),
+              let uiImage = UIImage(data: data) else {
+            return
         }
         
-        isSaving = false
+        selectedAvatarImage = uiImage.resized(toMaxDimension: 512)
+    } catch {
+        print("Failed to load photo")
+        errorMessage = "Failed to load photo. Please try again."
     }
+}
+    
+private func handleSave() async {
+    isSaving = true
+    errorMessage = ""
+    defer { isSaving = false }
+
+    do {
+        var avatarURL = selectedAvatar
+
+        if !isAvatarDirty {
+            avatarURL = originalAvatarURL ?? selectedAvatar
+        }
+
+        // Upload photo if one was selected
+        if isAvatarDirty, let selectedImage = selectedAvatarImage {
+            isUploadingAvatar = true
+            defer { isUploadingAvatar = false }
+
+            // Resize and compress image
+            let resizedImage = selectedImage.resized(toMaxDimension: 512)
+            guard let jpegData = resizedImage.jpegData(compressionQuality: 0.8) else {
+                throw NSError(domain: "ImageError", code: -1)
+            }
+
+            // Upload to Supabase
+            avatarURL = try await authService.uploadAvatar(imageData: jpegData)
+        }
+
+        // Update profile
+        try await authService.updateProfile(
+            displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+            nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines),
+            email: isGoogleUser ? nil : email.trimmingCharacters(in: .whitespacesAndNewlines),
+            avatarURL: avatarURL
+        )
+
+        originalAvatarURL = avatarURL
+        isAvatarDirty = false
+        showSuccessAlert = true
+    } catch {
+        errorMessage = "Failed to update profile. Please try again."
+    }
+}
+
 }
 
 // MARK: - Preview

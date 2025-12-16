@@ -40,7 +40,7 @@ struct ProfileSetupView: View {
                     .padding(.top, 20)
                     
                     // Avatar Selection Component
-                    AvatarSelectionView(
+                    AvatarSelectionViewV2(
                         selectedAvatar: $selectedAvatar,
                         selectedPhotoItem: $selectedPhotoItem,
                         selectedAvatarImage: $selectedAvatarImage
@@ -121,8 +121,8 @@ struct ProfileSetupView: View {
                   let uiImage = UIImage(data: data) else {
                 return
             }
-            
-            selectedAvatarImage = uiImage
+
+            selectedAvatarImage = uiImage.resized(toMaxDimension: 512)
         } catch {
             print("Failed to load photo")
             errorMessage = "Failed to load photo. Please try again."

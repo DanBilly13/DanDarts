@@ -55,7 +55,7 @@ struct AddGuestPlayerView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(AppColor.textPrimary)
                         
-                        AvatarSelectionView(
+                        AvatarSelectionViewV2(
                             selectedAvatar: $selectedAvatar,
                             selectedPhotoItem: $selectedPhotoItem,
                             selectedAvatarImage: $selectedAvatarImage
@@ -183,8 +183,8 @@ struct AddGuestPlayerView: View {
                   let uiImage = UIImage(data: data) else {
                 return
             }
-            
-            selectedAvatarImage = uiImage
+
+            selectedAvatarImage = uiImage.resized(toMaxDimension: 512)
         } catch {
             print("Failed to load photo: \(error.localizedDescription)")
         }

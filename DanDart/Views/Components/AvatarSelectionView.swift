@@ -8,12 +8,40 @@
 import SwiftUI
 import PhotosUI
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+typealias UIImage = NSImage
+#else
+struct UIImage { }
+#endif
+
+#if canImport(ImagePlayground)
+import ImagePlayground
+#endif
+
 struct AvatarSelectionView: View {
     @Binding var selectedAvatar: String
     @Binding var selectedPhotoItem: PhotosPickerItem?
     @Binding var selectedAvatarImage: UIImage?
     
     @State private var scrollPosition: String?
+    @State private var showAIGenerationSheet: Bool = false
+    @State private var showImagePlaygroundSheet: Bool = false
+    @State private var showAINotAvailableAlert: Bool = false
+    
+    private var isAppleIntelligenceAvailable: Bool {
+        if #available(iOS 18.1, *) {
+            #if canImport(ImagePlayground)
+            return ImagePlaygroundViewController.isAvailable
+            #else
+            return false
+            #endif
+        } else {
+            return false
+        }
+    }
     
     // MARK: - Avatar Options
     private let avatarOptions: [AvatarOption] = [
@@ -27,8 +55,8 @@ struct AvatarSelectionView: View {
         AvatarOption(id: "person.crop.circle.fill", type: .symbol),
         AvatarOption(id: "figure.wave.circle.fill", type: .symbol)
     ]
-    
-    var body: some View {
+
+    private var content: some View {
         ZStack(alignment: .center) {
             GeometryReader { proxy in
                 let itemSize: CGFloat = 64                // avatar diameter
@@ -61,6 +89,29 @@ struct AvatarSelectionView: View {
                         .scaleEffect(scrollPosition == "camera" ? 1.25 : 0.8)
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
                         .id("camera")
+
+                        Button(action: {
+                            scrollPosition = "ai"
+                            if isAppleIntelligenceAvailable {
+                                showImagePlaygroundSheet = true
+                            } else {
+                                showAIGenerationSheet = true
+                            }
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(AppColor.inputBackground)
+                                    .frame(width: itemSize, height: itemSize)
+                                
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(isAppleIntelligenceAvailable ? AppColor.interactivePrimaryBackground : AppColor.textSecondary.opacity(0.6))
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(scrollPosition == "ai" ? 1.25 : 0.8)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scrollPosition)
+                        .id("ai")
                     
                         // Predefined Avatar Options
                         ForEach(avatarOptions, id: \.id) { option in
@@ -109,6 +160,60 @@ struct AvatarSelectionView: View {
                 scrollPosition = "camera"
             }
         }
+        .sheet(isPresented: $showAIGenerationSheet) {
+            AIGeneratedAvatarSheetView(
+                selectedAvatar: $selectedAvatar,
+                selectedPhotoItem: $selectedPhotoItem,
+                selectedAvatarImage: $selectedAvatarImage
+            )
+        }
+        .alert("Not available on this device", isPresented: $showAINotAvailableAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Apple Intelligence avatar generation requires a supported device and iOS 18 or later.")
+        }
+    }
+
+    var body: some View {
+        #if canImport(ImagePlayground)
+        if #available(iOS 18.1, *) {
+            if ImagePlaygroundViewController.isAvailable {
+                content
+                    .imagePlaygroundSheet(
+                        isPresented: $showImagePlaygroundSheet,
+                        concepts: [],
+                        sourceImage: nil,
+                        onCompletion: { url in
+                            Task {
+                                guard let data = try? Data(contentsOf: url),
+                                      let image = UIImage(data: data) else {
+                                    await MainActor.run {
+                                        showImagePlaygroundSheet = false
+                                    }
+                                    return
+                                }
+
+                                await MainActor.run {
+                                    showImagePlaygroundSheet = false
+                                    selectedAvatarImage = image
+                                    selectedPhotoItem = nil
+                                    selectedAvatar = ""
+                                }
+                            }
+                        },
+                        onCancellation: {
+                            showImagePlaygroundSheet = false
+                        }
+                    )
+            } else {
+                content
+            }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 
