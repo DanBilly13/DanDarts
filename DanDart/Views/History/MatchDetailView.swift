@@ -422,7 +422,7 @@ struct MatchPlayerCard: View {
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
         .background(AppColor.inputBackground)
-        .cornerRadius(12)
+        .clipShape(.capsule)
         .overlay(
             Capsule()
                 .stroke(borderColor, lineWidth: 2)
