@@ -186,7 +186,7 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
                     turns: [MatchTurn],
                     legsWon: Int = 0) -> MatchPlayer {
         return MatchPlayer(
-            id: player.id,
+            id: player.userId ?? player.id, // Use userId for connected players, player.id for guests
             displayName: player.displayName,
             nickname: player.nickname,
             avatarURL: player.avatarURL,

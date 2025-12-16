@@ -98,13 +98,22 @@ class MatchService: ObservableObject {
         // Debug: Check AuthService state at the start
         print("🔍 saveMatch called. AuthService.shared.currentUser: \(AuthService.shared.currentUser?.displayName ?? "nil")")
         
+        // Verify we have an authenticated session
+        do {
+            let session = try await supabaseService.client.auth.session
+            print("✅ Authenticated session found: \(session.user.id)")
+        } catch {
+            print("❌ No authenticated session - RLS will block this request")
+            throw error
+        }
+        
         // 1. Insert match record
         let duration = Int(endedAt.timeIntervalSince(startedAt))
         
         // Create legacy players JSONB (simplified player data)
         let legacyPlayers = players.map { player in
             [
-                "id": player.id.uuidString,
+                "id": (player.userId ?? player.id).uuidString, // Use userId for connected players, player.id for guests
                 "displayName": player.displayName,
                 "nickname": player.nickname,
                 "isGuest": player.isGuest ? "true" : "false"
@@ -131,9 +140,30 @@ class MatchService: ObservableObject {
             players: playersString
         )
         
+        // Delete existing match if it exists (handles duplicate IDs)
+        try? await supabaseService.client
+            .from("matches")
+            .delete()
+            .eq("id", value: matchId.uuidString)
+            .execute()
+        
+        // Insert match record
         try await supabaseService.client
             .from("matches")
             .insert(matchRecord)
+            .execute()
+        
+        // Delete old child records if this is a re-save (handles duplicates)
+        try? await supabaseService.client
+            .from("match_players")
+            .delete()
+            .eq("match_id", value: matchId.uuidString)
+            .execute()
+        
+        try? await supabaseService.client
+            .from("match_throws")
+            .delete()
+            .eq("match_id", value: matchId.uuidString)
             .execute()
         
         // 2. Insert match_players records

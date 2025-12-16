@@ -43,6 +43,7 @@ class CountdownViewModel: ObservableObject {
     
     // Match saving
     @Published var matchId: UUID? = nil // ID for saved match
+    private var hasBeenSaved: Bool = false // Prevent double-saving
     
     // Game configuration
     let game: Game
@@ -596,6 +597,11 @@ class CountdownViewModel: ObservableObject {
     private func saveMatchResult() {
         guard let winner = winner else { return }
         guard let matchId = matchId else { return }
+        guard !hasBeenSaved else {
+            print("⚠️ Match already saved, skipping duplicate save")
+            return
+        }
+        hasBeenSaved = true
         
         let matchDuration = Date().timeIntervalSince(matchStartTime)
         

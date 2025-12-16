@@ -20,6 +20,10 @@ struct MatchHistoryView: View {
     @State private var isSearchPresented: Bool = false
     @FocusState private var isSearchFieldFocused: Bool
     
+    // TEMPORARY: Toggle to hide local matches for testing
+    @State private var showLocalMatches: Bool = true
+    @State private var supabaseMatchIds: Set<UUID> = [] // Track which matches came from Supabase
+    
     // Cached date formatter (expensive to create)
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -46,6 +50,22 @@ struct MatchHistoryView: View {
     // Update filtered matches based on current state
     private func updateFilteredMatches() {
         var filtered = matches
+        
+        // TEMPORARY: Filter out local matches if toggle is off
+        if !showLocalMatches {
+            // Hide matches that came from local storage (not from Supabase)
+            let beforeCount = filtered.count
+            filtered = filtered.filter { match in
+                // Keep only matches that came from Supabase
+                let isFromSupabase = supabaseMatchIds.contains(match.id)
+                if !isFromSupabase {
+                    print("  🔘 Hiding local match: \(match.id)")
+                }
+                return isFromSupabase
+            }
+            let afterCount = filtered.count
+            print("🔘 Toggle OFF: \(beforeCount) → \(afterCount) matches (hid \(beforeCount - afterCount) local-only matches)")
+        }
         
         // Apply game type filter (only when not searching)
         if !isSearchPresented && selectedFilter != .all {
@@ -79,72 +99,103 @@ struct MatchHistoryView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Main content with filters scrolling together
-                if !isSearchPresented {
-                    VStack(spacing: 0) {
-                        // Error banner (pinned at top)
-                        if let error = loadError {
-                            errorBanner(message: error)
-                                .padding(.horizontal, 16)
-                        }
-                        
-                        contentView
-                    }
-                    .opacity(isSearchPresented ? 0 : 1)
-                    .animation(.easeInOut(duration: 0.2), value: isSearchPresented)
-                }
-                
-                // Search overlay (Liquid Glass pattern)
-                if isSearchPresented {
-                    searchOverlay
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        navigationStackView
             .background(AppColor.backgroundPrimary)
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarRole(.editor)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    ToolbarTitle(title: "History")
+            .ignoresSafeArea()
+            .onAppear {
+                loadMatches()
+                updateFilteredMatches()
+            }
+    }
+    
+    private var navigationStackView: some View {
+        NavigationStack {
+            mainContentZStack
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppColor.backgroundPrimary)
+                .navigationTitle("History")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarRole(.editor)
+                .toolbar {
+                    toolbarContent
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if !isSearchPresented {
-                        ToolbarSearchButton {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isSearchPresented = true
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                isSearchFieldFocused = true
-                            }
-                        }
+                .onChange(of: searchText) { _, _ in
+                    updateFilteredMatches()
+                }
+                .onChange(of: selectedFilter) { _, _ in
+                    updateFilteredMatches()
+                }
+                .onChange(of: matches) { _, _ in
+                    updateFilteredMatches()
+                }
+                .onChange(of: isSearchPresented) { _, _ in
+                    updateFilteredMatches()
+                }
+                .onChange(of: showLocalMatches) { _, _ in
+                    updateFilteredMatches()
+                }
+                .navigationDestination(for: MatchResult.self) { match in
+                    MatchDetailView(match: match)
+                }
+        }
+    }
+    
+    private var mainContentZStack: some View {
+        ZStack {
+            // Main content with filters scrolling together
+            if !isSearchPresented {
+                VStack(spacing: 0) {
+                    // Error banner (pinned at top)
+                    if let error = loadError {
+                        errorBanner(message: error)
+                            .padding(.horizontal, 16)
                     }
+                    
+                    contentView
                 }
+                .opacity(isSearchPresented ? 0 : 1)
+                .animation(.easeInOut(duration: 0.2), value: isSearchPresented)
             }
-            .onChange(of: searchText) { _, _ in
-                updateFilteredMatches()
-            }
-            .onChange(of: selectedFilter) { _, _ in
-                updateFilteredMatches()
-            }
-            .onChange(of: matches) { _, _ in
-                updateFilteredMatches()
-            }
-            .onChange(of: isSearchPresented) { _, _ in
-                updateFilteredMatches()
-            }
-            .navigationDestination(for: MatchResult.self) { match in
-                MatchDetailView(match: match)
+            
+            // Search overlay (Liquid Glass pattern)
+            if isSearchPresented {
+                searchOverlay
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .background(AppColor.backgroundPrimary).ignoresSafeArea()
-        .onAppear {
-            loadMatches()
-            updateFilteredMatches()
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            ToolbarTitle(title: "History")
+        }
+        
+        ToolbarItem(placement: .navigationBarLeading) {
+            if !isSearchPresented {
+                // TEMPORARY: Toggle for hiding local matches during testing
+                Button(action: {
+                    showLocalMatches.toggle()
+                }) {
+                    Image(systemName: showLocalMatches ? "iphone" : "iphone.slash")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(showLocalMatches ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
+                }
+                .accessibilityLabel(showLocalMatches ? "Hide local matches" : "Show local matches")
+            }
+        }
+        
+        ToolbarItem(placement: .navigationBarTrailing) {
+            if !isSearchPresented {
+                ToolbarSearchButton {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isSearchPresented = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isSearchFieldFocused = true
+                    }
+                }
+            }
         }
     }
     
@@ -422,10 +473,16 @@ struct MatchHistoryView: View {
             return
         }
         
+        print("👤 Current user: \(authService.currentUser?.displayName ?? "Unknown") (ID: \(currentUserId))")
+        
         Task {
             do {
                 // Load matches from Supabase (silent)
                 let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
+                
+                // Track which matches came from Supabase
+                let supabaseIds = Set(supabaseMatches.map { $0.id })
+                print("📊 Supabase match IDs: \(supabaseIds)")
                 
                 // Merge with local matches and remove duplicates
                 let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
@@ -433,6 +490,8 @@ struct MatchHistoryView: View {
                 // Update UI with merged matches (silent)
                 await MainActor.run {
                     matches = allMatches.sorted { $0.timestamp > $1.timestamp }
+                    supabaseMatchIds = supabaseIds
+                    print("📊 Final state: \(matches.count) total matches, \(supabaseMatchIds.count) from Supabase")
                 }
                 
                 print("✅ Silently synced: \(supabaseMatches.count) from cloud, \(localMatches.count) local, \(matches.count) total")
@@ -478,12 +537,16 @@ struct MatchHistoryView: View {
             // Load from Supabase
             let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
             
+            // Track which matches came from Supabase
+            let supabaseIds = Set(supabaseMatches.map { $0.id })
+            
             // Load local matches
             let localMatches = MatchStorageManager.shared.loadMatches()
             
             // Merge and update
             let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
             matches = allMatches.sorted { $0.timestamp > $1.timestamp }
+            supabaseMatchIds = supabaseIds
             
             print("✅ Refreshed: \(matches.count) total matches")
             

@@ -109,7 +109,8 @@ class MatchesService: ObservableObject {
     /// - Returns: Array of match results
     func loadMatches(userId: UUID) async throws -> [MatchResult] {
         do {
-            // Query matches - RLS policy will filter to matches where user participated
+            // Query matches where user participated (check players JSONB array)
+            // Note: We filter client-side since JSONB array filtering is complex in Supabase
             let response = try await supabaseService.client
                 .from("matches")
                 .select("id, game_type, game_name, winner_id, timestamp, duration, players, match_format, total_legs_played, metadata")
@@ -122,8 +123,11 @@ class MatchesService: ObservableObject {
                 return []
             }
             
+            print("📊 Supabase query returned \(jsonArray.count) matches")
+            
             var matches: [MatchResult] = []
             
+            // Filter matches to only include those where the user participated
             for json in jsonArray {
                 // Extract fields manually
                 guard let idString = json["id"] as? String,
@@ -147,6 +151,7 @@ class MatchesService: ObservableObject {
                 
                 // Parse JSONB players array (basic info only - turns will be loaded separately)
                 let basicPlayers: [MatchPlayer]
+                var userParticipated = false
                 
                 if let playersString = json["players"] as? String {
                     // Case 1: players is a JSON string - convert to Data and decode
@@ -156,17 +161,36 @@ class MatchesService: ObservableObject {
                     }
                     let decoder = JSONDecoder()
                     basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                    // For connected users, player.id == user account ID
+                    // For guests, player.id is a random UUID and isGuest = true
+                    userParticipated = basicPlayers.contains { player in
+                        !player.isGuest && player.id == userId
+                    }
+                    print("🔍 Match \(idString): Players = \(basicPlayers.map { "\($0.displayName) (guest: \($0.isGuest), id: \($0.id))" }), User participated: \(userParticipated)")
                     
                 } else if let playersArray = json["players"] as? [[String: Any]] {
                     // Case 2: players is already parsed as an array - serialize and decode
                     let playersJsonData = try JSONSerialization.data(withJSONObject: playersArray)
                     let decoder = JSONDecoder()
                     basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                    // For connected users, player.id == user account ID
+                    // For guests, player.id is a random UUID and isGuest = true
+                    userParticipated = basicPlayers.contains { player in
+                        !player.isGuest && player.id == userId
+                    }
+                    print("🔍 Match \(idString): Players = \(basicPlayers.map { "\($0.displayName) (guest: \($0.isGuest), id: \($0.id))" }), User participated: \(userParticipated)")
                     
                 } else {
                     print("⚠️ Skipping match - players data is neither string nor array")
                     continue
                 }
+                
+                // Skip matches where user didn't participate
+                if !userParticipated {
+                    print("⏭️ Skipping match - user \(userId) did not participate")
+                    continue
+                }
+                print("✅ Including match - user \(userId) participated")
                 
                 // Get optional fields
                 let matchFormat = json["match_format"] as? Int ?? 1
