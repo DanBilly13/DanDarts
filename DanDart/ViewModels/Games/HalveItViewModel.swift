@@ -296,11 +296,22 @@ class HalveItViewModel: ObservableObject {
                 // Convert turn history to TurnHistory format
                 let supabaseTurns = turnHistory.enumerated().map { index, turn in
                     let player = players.first { $0.id == turn.playerId }!
+                    
+                    // For Halve-It: Convert darts to only save non-zero value if dart HIT the target
+                    // This allows hit indicators to work correctly when loading from Supabase
+                    let convertedDarts = turn.darts.map { dart in
+                        let hitTarget = turn.target.isHit(by: dart)
+                        return ScoredThrow(
+                            baseValue: hitTarget ? dart.baseValue : 0,
+                            scoreType: hitTarget ? dart.scoreType : .single
+                        )
+                    }
+                    
                     return TurnHistory(
                         player: player,
                         playerId: turn.playerId,
                         turnNumber: index + 1,
-                        darts: turn.darts,
+                        darts: convertedDarts,
                         scoreBefore: turn.scoreBefore,
                         scoreAfter: turn.scoreAfter,
                         isBust: false,
@@ -321,7 +332,13 @@ class HalveItViewModel: ObservableObject {
                     currentUserId: currentUserId
                 )
                 
-                print("✅ Match saved to Supabase: \(matchId)")
+                print("✅ Halve-It match saved to Supabase: \(matchId)")
+                
+                // Delete from local storage after successful sync
+                await MainActor.run {
+                    MatchStorageManager.shared.deleteMatch(withId: matchId)
+                    print("🗑️ Halve-It match removed from local storage after sync: \(matchId)")
+                }
                 
                 // Update AuthService with the fresh user data directly (no need to query again!)
                 if let updatedUser = updatedUser {

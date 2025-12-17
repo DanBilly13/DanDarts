@@ -10,6 +10,7 @@ import UIKit
 
 struct MatchCard: View {
     let match: MatchResult
+    var isSyncedToCloud: Bool = false
     
     var body: some View {
         HStack(spacing: 16) {
@@ -52,10 +53,18 @@ struct MatchCard: View {
                 HStack {
                     // Game name chip
                     gameNameChip
-                    // Date
-                    Text(relativeDate)
-                        .font(.caption)
-                        .foregroundColor(AppColor.textSecondary)
+                    // Date with cloud icon
+                    HStack(spacing: 4) {
+                        Text(relativeDate)
+                            .font(.caption)
+                            .foregroundColor(AppColor.textSecondary)
+                        
+                        if isSyncedToCloud {
+                            Image(systemName: "cloud.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppColor.interactivePrimaryBackground.opacity(0.6))
+                        }
+                    }
                 }
                 .padding(.bottom, 6)
              

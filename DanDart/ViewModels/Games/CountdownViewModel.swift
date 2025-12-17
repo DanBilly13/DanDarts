@@ -688,6 +688,12 @@ class CountdownViewModel: ObservableObject {
                 
                 print("✅ Match saved to Supabase: \(matchId)")
                 
+                // Delete from local storage after successful sync (member matches only)
+                await MainActor.run {
+                    MatchStorageManager.shared.deleteMatch(withId: matchId)
+                    print("🗑️ Member match removed from local storage after sync: \(matchId)")
+                }
+                
                 // Update AuthService with the fresh user data directly (no need to query again!)
                 if let updatedUser = updatedUser {
                     await MainActor.run {

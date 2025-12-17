@@ -69,24 +69,11 @@ class MatchStorageManager {
             return
         }
         
-        // 2. Try to sync to Supabase (only if it's a member match)
+        // Note: Sync is now handled by MatchService.saveMatch() in ViewModels
+        // This provides better control over turn data and prevents duplicate syncs
+        // Local storage is used as a backup for failed syncs
         if isMemberMatch(match) {
-            Task {
-                do {
-                    _ = try await matchesService.syncMatch(match)
-                    print("✅ Match synced to Supabase: \(match.id)")
-                    
-                    // Delete from local storage after successful sync
-                    await MainActor.run {
-                        deleteMatch(withId: match.id)
-                        print("🗑️ Member match removed from local storage: \(match.id)")
-                    }
-                } catch {
-                    print("⚠️ Match sync failed, keeping in local storage: \(match.id)")
-                    // Add to failed syncs queue
-                    addToFailedSyncs(match)
-                }
-            }
+            print("ℹ️ Member match saved locally - sync handled by ViewModel")
         } else {
             print("ℹ️ Guest match - keeping in local storage only: \(match.id)")
         }

@@ -402,6 +402,33 @@ class SuddenDeathViewModel: ObservableObject {
         
         let currentUserId = authService?.currentUser?.id
         
+        // Convert turn history dictionary to flat array for Supabase
+        var flatTurnHistory: [TurnHistory] = []
+        for player in players {
+            if let playerTurns = turnHistory[player.id] {
+                for (index, turn) in playerTurns.enumerated() {
+                    // Convert MatchDart to ScoredThrow for TurnHistory
+                    let scoredThrows = turn.darts.map { dart in
+                        ScoredThrow(
+                            baseValue: dart.baseValue,
+                            scoreType: dart.multiplier == 1 ? .single : (dart.multiplier == 2 ? .double : .triple)
+                        )
+                    }
+                    
+                    flatTurnHistory.append(TurnHistory(
+                        player: player,
+                        playerId: player.id,
+                        turnNumber: index,
+                        darts: scoredThrows,
+                        scoreBefore: turn.scoreBefore,
+                        scoreAfter: turn.scoreAfter,
+                        isBust: turn.isBust,
+                        gameMetadata: nil
+                    ))
+                }
+            }
+        }
+        
         Task {
             do {
                 let matchService = MatchService()
@@ -413,16 +440,26 @@ class SuddenDeathViewModel: ObservableObject {
                     winnerId: winnerId,
                     startedAt: matchStartTime,
                     endedAt: Date(),
-                    turnHistory: [],
+                    turnHistory: flatTurnHistory,
                     matchFormat: 1,
                     legsWon: [:],
                     currentUserId: currentUserId
                 )
                 
+                print("✅ Sudden Death match saved to Supabase: \(matchId)")
+                
+                // Delete from local storage after successful sync
+                await MainActor.run {
+                    MatchStorageManager.shared.deleteMatch(withId: matchId)
+                    print("🗑️ Sudden Death match removed from local storage after sync: \(matchId)")
+                }
+                
                 if let updatedUser = updatedUser {
                     await MainActor.run {
                         self.authService?.currentUser = updatedUser
+                        self.authService?.objectWillChange.send()
                     }
+                    print("✅ User profile updated with fresh stats: \(updatedUser.totalWins)W/\(updatedUser.totalLosses)L")
                 }
             } catch {
                 print("❌ Failed to save Sudden Death match to Supabase: \(error)")

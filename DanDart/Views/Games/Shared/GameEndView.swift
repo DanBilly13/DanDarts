@@ -23,6 +23,8 @@ struct GameEndView: View {
     @EnvironmentObject private var authService: AuthService
     @State private var showCelebration = false
     @State private var showMatchDetails = false
+    @State private var loadedMatch: MatchResult?
+    @State private var isLoadingMatch = false
     
     // Computed property for match result text
     private var matchResultText: String? {
@@ -118,13 +120,20 @@ struct GameEndView: View {
                     // Match Details Link
                     if matchId != nil {
                         Button {
-                            showMatchDetails = true
+                            loadMatchAndShowDetails()
                         } label: {
-                            Text("View Match Details")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(AppColor.textPrimary)
-                                .underline()
+                            HStack(spacing: 8) {
+                                if isLoadingMatch {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                }
+                                Text(isLoadingMatch ? "Loading..." : "View Match Details")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(AppColor.textPrimary)
+                                    .underline()
+                            }
                         }
+                        .disabled(isLoadingMatch)
                         .opacity(showCelebration ? 1.0 : 0.0)
                         .animation(.easeIn(duration: 0.3).delay(0.7), value: showCelebration)
                     }
@@ -158,9 +167,8 @@ struct GameEndView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showMatchDetails) {
-            // Present match details using unified view with StandardSheetView wrapper
-            if let matchId = matchId,
-               let matchResult = MatchStorageManager.shared.loadMatch(byId: matchId) {
+            // Present match details using loaded match
+            if let matchResult = loadedMatch {
                 MatchDetailView(match: matchResult, isSheet: true)
             } else {
                 // Fallback if match not found
@@ -173,7 +181,7 @@ struct GameEndView: View {
                         .font(.headline)
                         .foregroundColor(AppColor.textPrimary)
                     
-                    Text("The match is being saved...")
+                    Text("Unable to load match data")
                         .font(.subheadline)
                         .foregroundColor(AppColor.textSecondary)
                     
@@ -203,6 +211,53 @@ struct GameEndView: View {
             
             // Play celebration sound
             SoundManager.shared.playGameWin()
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Load match from local storage or cloud and show details sheet
+    private func loadMatchAndShowDetails() {
+        guard let matchId = matchId else { return }
+        
+        isLoadingMatch = true
+        
+        Task {
+            // Try local storage first
+            if let localMatch = MatchStorageManager.shared.loadMatches().first(where: { $0.id == matchId }) {
+                await MainActor.run {
+                    loadedMatch = localMatch
+                    isLoadingMatch = false
+                    showMatchDetails = true
+                }
+                return
+            }
+            
+            // If not in local storage, try loading from Supabase
+            do {
+                if let userId = authService.currentUser?.id {
+                    let matchesService = MatchesService()
+                    let matches = try await matchesService.loadMatches(userId: userId)
+                    
+                    if let cloudMatch = matches.first(where: { $0.id == matchId }) {
+                        await MainActor.run {
+                            loadedMatch = cloudMatch
+                            isLoadingMatch = false
+                            showMatchDetails = true
+                        }
+                        return
+                    }
+                }
+            } catch {
+                print("⚠️ Failed to load match from cloud: \(error)")
+            }
+            
+            // Match not found anywhere
+            await MainActor.run {
+                isLoadingMatch = false
+                // Show error - match will be nil so fallback view will show
+                showMatchDetails = true
+            }
         }
     }
 }

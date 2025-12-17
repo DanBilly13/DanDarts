@@ -12,16 +12,21 @@ import SwiftUI
 struct RoundScoreDisplay: View {
     let score: Int
     let playerColor: Color
+    let showCrownForZero: Bool
+    
+    init(score: Int, playerColor: Color, showCrownForZero: Bool = true) {
+        self.score = score
+        self.playerColor = playerColor
+        self.showCrownForZero = showCrownForZero
+    }
     
     var body: some View {
         Group {
-            if score == 0 {
-                // Show crown icon for winners (score of 0)
+            if score == 0 && showCrownForZero {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(playerColor)
             } else {
-                // Show score for non-zero values
                 Text("\(score)")
                     .font(.system(size: 14, design: .rounded))
                     .monospacedDigit()

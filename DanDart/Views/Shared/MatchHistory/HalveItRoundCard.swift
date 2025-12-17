@@ -71,13 +71,13 @@ struct HalveItRoundCard: View {
                             // Scores at the end
                             HStack(spacing: 0) {
                                 if rowIndex < playerData.count {
-                                    RoundScoreDisplay(score: playerData[rowIndex].score, playerColor: playerData[rowIndex].color)
+                                    RoundScoreDisplay(score: playerData[rowIndex].score, playerColor: playerData[rowIndex].color, showCrownForZero: false)
                                 }
                                 if rowIndex + 1 < playerData.count {
-                                    RoundScoreDisplay(score: playerData[rowIndex + 1].score, playerColor: playerData[rowIndex + 1].color)
+                                    RoundScoreDisplay(score: playerData[rowIndex + 1].score, playerColor: playerData[rowIndex + 1].color, showCrownForZero: false)
                                 } else if playerData.count == 3 && rowIndex == 2 {
                                     // Invisible spacer for score alignment
-                                    RoundScoreDisplay(score: 0, playerColor: .clear)
+                                    RoundScoreDisplay(score: 0, playerColor: .clear, showCrownForZero: false)
                                         .opacity(0)
                                 }
                             }

@@ -142,10 +142,26 @@ class MatchesService: ObservableObject {
                     continue
                 }
                 
-                // Parse timestamp
+                // Parse timestamp - try multiple formats
                 let formatter = ISO8601DateFormatter()
-                guard let timestamp = formatter.date(from: timestampString) else {
-                    print("⚠️ Skipping match with invalid timestamp")
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                var timestamp = formatter.date(from: timestampString)
+                
+                // Fallback: try without fractional seconds
+                if timestamp == nil {
+                    formatter.formatOptions = [.withInternetDateTime]
+                    timestamp = formatter.date(from: timestampString)
+                }
+                
+                // Fallback: try basic ISO8601
+                if timestamp == nil {
+                    let basicFormatter = DateFormatter()
+                    basicFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                    timestamp = basicFormatter.date(from: timestampString)
+                }
+                
+                guard let timestamp = timestamp else {
+                    print("⚠️ Skipping match with invalid timestamp: \(timestampString)")
                     continue
                 }
                 
@@ -239,16 +255,23 @@ class MatchesService: ObservableObject {
     /// - Returns: Players with complete turn data
     private func loadTurnsForMatch(matchId: UUID, players: [MatchPlayer]) async throws -> [MatchPlayer] {
         // Query match_throws table for this match
-        let response = try await supabaseService.client
-            .from("match_throws")
-            .select("player_order, turn_index, throws, score_before, score_after, game_metadata")
-            .eq("match_id", value: matchId.uuidString)
-            .order("player_order")
-            .order("turn_index")
-            .execute()
+        let response: Data
+        do {
+            let result = try await supabaseService.client
+                .from("match_throws")
+                .select("*")
+                .eq("match_id", value: matchId.uuidString)
+                .order("player_order")
+                .order("turn_index")
+                .execute()
+            response = result.data
+        } catch {
+            print("⚠️ Failed to query turn data for match \(matchId): \(error)")
+            return players
+        }
         
         // Parse throws data
-        guard let throwsArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+        guard let throwsArray = try? JSONSerialization.jsonObject(with: response) as? [[String: Any]] else {
             print("⚠️ No turn data found for match \(matchId), returning players with empty turns")
             return players
         }
@@ -259,9 +282,19 @@ class MatchesService: ObservableObject {
         for throwJson in throwsArray {
             guard let playerOrder = throwJson["player_order"] as? Int,
                   let turnIndex = throwJson["turn_index"] as? Int,
-                  let dartScores = throwJson["throws"] as? [Int],
                   let scoreBefore = throwJson["score_before"] as? Int,
                   let scoreAfter = throwJson["score_after"] as? Int else {
+                continue
+            }
+            
+            // Parse throws - handle multiple formats
+            let dartScores: [Int]
+            if let throwsArray = throwJson["throws"] as? [Int] {
+                dartScores = throwsArray
+            } else if let throwsArray = throwJson["throws"] as? [Any] {
+                dartScores = throwsArray.compactMap { $0 as? Int }
+            } else {
+                print("⚠️ Skipping turn - could not parse throws data")
                 continue
             }
             
@@ -298,15 +331,11 @@ class MatchesService: ObservableObject {
         
         // Reconstruct players with turn data
         var playersWithTurns: [MatchPlayer] = []
-        
         for (index, player) in players.enumerated() {
             let turns = playerTurns[index] ?? []
             let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
-            
-            // Calculate final score and starting score from turn data
-            // For Halve-It: starting score is always 0, final score is the last turn's scoreAfter
-            let startingScore = turns.first?.scoreBefore ?? 0
-            let finalScore = turns.last?.scoreAfter ?? 0
+            let finalScore = turns.last?.scoreAfter ?? player.finalScore
+            let startingScore = turns.first?.scoreBefore ?? player.startingScore
             
             let playerWithTurns = MatchPlayer(
                 id: player.id,

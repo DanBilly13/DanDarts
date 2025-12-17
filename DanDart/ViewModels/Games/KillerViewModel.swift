@@ -59,6 +59,9 @@ class KillerViewModel: ObservableObject {
         currentThrow.count == 3 && phase == .playing
     }
     
+    // Services (optional for Supabase sync)
+    var authService: AuthService?
+    
     var anyPlayerIsKiller: Bool {
         isKiller.values.contains(true)
     }
@@ -230,6 +233,78 @@ class KillerViewModel: ObservableObject {
         
         MatchStorageManager.shared.saveMatch(matchResult)
         MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        
+        // Capture current user ID before Task
+        let currentUserId = authService?.currentUser?.id
+        
+        // Convert turn history dictionary to flat array for Supabase
+        var flatTurnHistory: [TurnHistory] = []
+        for player in players {
+            if let playerTurns = playerTurnHistory[player.id] {
+                for (index, turn) in playerTurns.enumerated() {
+                    // Convert MatchDart to ScoredThrow for TurnHistory
+                    let scoredThrows = turn.darts.map { dart in
+                        ScoredThrow(
+                            baseValue: dart.baseValue,
+                            scoreType: dart.multiplier == 1 ? .single : (dart.multiplier == 2 ? .double : .triple)
+                        )
+                    }
+                    
+                    flatTurnHistory.append(TurnHistory(
+                        player: player,
+                        playerId: player.id,
+                        turnNumber: index,
+                        darts: scoredThrows,
+                        scoreBefore: turn.scoreBefore,
+                        scoreAfter: turn.scoreAfter,
+                        isBust: turn.isBust,
+                        gameMetadata: nil
+                    ))
+                }
+            }
+        }
+        
+        // Sync to Supabase (async, non-blocking)
+        Task {
+            do {
+                let matchService = MatchService()
+                
+                // Get winner's user ID (nil for guests)
+                let winnerId = winner.userId
+                
+                let updatedUser = try await matchService.saveMatch(
+                    matchId: matchId,
+                    gameId: "killer",
+                    players: players,
+                    winnerId: winnerId,
+                    startedAt: Date().addingTimeInterval(-600), // Approximate start time
+                    endedAt: Date(),
+                    turnHistory: flatTurnHistory,
+                    matchFormat: 1,
+                    legsWon: [:],
+                    currentUserId: currentUserId
+                )
+                
+                print("✅ Killer match saved to Supabase: \(matchId)")
+                
+                // Delete from local storage after successful sync
+                await MainActor.run {
+                    MatchStorageManager.shared.deleteMatch(withId: matchId)
+                    print("🗑️ Killer match removed from local storage after sync: \(matchId)")
+                }
+                
+                // Update AuthService with fresh user data
+                if let updatedUser = updatedUser {
+                    await MainActor.run {
+                        self.authService?.currentUser = updatedUser
+                        self.authService?.objectWillChange.send()
+                    }
+                    print("✅ User profile updated with fresh stats: \(updatedUser.totalWins)W/\(updatedUser.totalLosses)L")
+                }
+            } catch {
+                print("❌ Failed to save Killer match to Supabase: \(error)")
+            }
+        }
     }
     
     private func activateKiller(playerID: UUID) {
