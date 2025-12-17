@@ -259,7 +259,7 @@ class MatchesService: ObservableObject {
         do {
             let result = try await supabaseService.client
                 .from("match_throws")
-                .select("*")
+                .select("id,match_id,player_order,turn_index,throws,score_before,score_after,is_bust,game_metadata")
                 .eq("match_id", value: matchId.uuidString)
                 .order("player_order")
                 .order("turn_index")
@@ -305,6 +305,9 @@ class MatchesService: ObservableObject {
                 targetDisplay = target
             }
             
+            // Get is_bust flag (for Knockout life losses)
+            let isBust = throwJson["is_bust"] as? Bool ?? false
+            
             // Convert dart scores to MatchDart objects
             // Note: We only have total values, so we need to infer multipliers
             let darts = dartScores.map { score -> MatchDart in
@@ -319,7 +322,7 @@ class MatchesService: ObservableObject {
                 darts: darts,
                 scoreBefore: scoreBefore,
                 scoreAfter: scoreAfter,
-                isBust: false,
+                isBust: isBust,
                 targetDisplay: targetDisplay
             )
             

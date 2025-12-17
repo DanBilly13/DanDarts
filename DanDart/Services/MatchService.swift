@@ -44,6 +44,7 @@ struct MatchThrowRecord: Codable {
     let dart_scores: [Int]
     let score_before: Int
     let score_after: Int
+    let is_bust: Bool // For Knockout: tracks life losses
     let game_metadata: [String: String]? // Game-specific data (e.g., Halve-It targets)
     
     enum CodingKeys: String, CodingKey {
@@ -53,6 +54,7 @@ struct MatchThrowRecord: Codable {
         case dart_scores = "throws" // Map to database column name
         case score_before
         case score_after
+        case is_bust
         case game_metadata
     }
 }
@@ -107,17 +109,61 @@ class MatchService: ObservableObject {
             throw error
         }
         
+        // Upload local avatar files to Supabase before saving match
+        var updatedPlayers = players
+        for (index, player) in players.enumerated() {
+            if let avatarURL = player.avatarURL,
+               (avatarURL.hasPrefix("/") || avatarURL.contains("/Documents/") || avatarURL.contains("/tmp/")) {
+                // This is a local file path - upload it to Supabase
+                print("📤 Uploading local avatar for \(player.displayName): \(avatarURL)")
+                
+                if let imageData = try? Data(contentsOf: URL(fileURLWithPath: avatarURL)) {
+                    do {
+                        let publicURL = try await uploadPlayerAvatar(imageData: imageData, playerId: player.id)
+                        print("✅ Avatar uploaded: \(publicURL)")
+                        
+                        // Update player's avatarURL to use Supabase URL
+                        var updatedPlayer = player
+                        updatedPlayer = Player(
+                            id: updatedPlayer.id,
+                            displayName: updatedPlayer.displayName,
+                            nickname: updatedPlayer.nickname,
+                            avatarURL: publicURL,
+                            isGuest: updatedPlayer.isGuest,
+                            totalWins: updatedPlayer.totalWins,
+                            totalLosses: updatedPlayer.totalLosses,
+                            userId: updatedPlayer.userId
+                        )
+                        updatedPlayers[index] = updatedPlayer
+                    } catch {
+                        print("⚠️ Failed to upload avatar for \(player.displayName): \(error)")
+                        // Continue with local path - better than failing the whole match save
+                    }
+                } else {
+                    print("⚠️ Failed to load avatar file for \(player.displayName)")
+                }
+            }
+        }
+        
+        // Use updated players with Supabase avatar URLs
+        let playersToSave = updatedPlayers
+        
         // 1. Insert match record
         let duration = Int(endedAt.timeIntervalSince(startedAt))
         
         // Create legacy players JSONB (simplified player data)
-        let legacyPlayers = players.map { player in
-            [
+        let legacyPlayers = playersToSave.map { player in
+            var playerDict: [String: Any] = [
                 "id": (player.userId ?? player.id).uuidString, // Use userId for connected players, player.id for guests
                 "displayName": player.displayName,
                 "nickname": player.nickname,
                 "isGuest": player.isGuest ? "true" : "false"
             ]
+            // Include avatarURL if present (important for match history display)
+            if let avatarURL = player.avatarURL {
+                playerDict["avatarURL"] = avatarURL
+            }
+            return playerDict
         }
         let playersJSON = try JSONSerialization.data(withJSONObject: legacyPlayers)
         let playersString = String(data: playersJSON, encoding: .utf8) ?? "[]"
@@ -167,7 +213,7 @@ class MatchService: ObservableObject {
             .execute()
         
         // 2. Insert match_players records
-        for (index, player) in players.enumerated() {
+        for (index, player) in playersToSave.enumerated() {
             let playerRecord = MatchPlayerRecord(
                 match_id: matchId.uuidString,
                 player_user_id: player.userId?.uuidString,
@@ -197,6 +243,7 @@ class MatchService: ObservableObject {
                 dart_scores: turn.darts.map { $0.totalValue },
                 score_before: turn.scoreBefore,
                 score_after: turn.scoreAfter,
+                is_bust: turn.isBust, // Include life loss flag for Knockout
                 game_metadata: turn.gameMetadata // Include game-specific data
             )
             
@@ -213,7 +260,7 @@ class MatchService: ObservableObject {
         // 4. Update player stats for connected players and get updated user
         var updatedUser: User? = nil
         if let winnerId = winnerId {
-            updatedUser = try await updatePlayerStats(winnerId: winnerId, players: players, currentUserId: currentUserId)
+            updatedUser = try await updatePlayerStats(winnerId: winnerId, players: playersToSave, currentUserId: currentUserId)
         }
         
         print("✅ Match saved successfully: \(matchId)")
@@ -299,6 +346,39 @@ class MatchService: ObservableObject {
         }
         
         return updatedCurrentUser
+    }
+    
+    // MARK: - Avatar Upload Helper
+    
+    /// Upload player avatar to Supabase Storage
+    /// - Parameters:
+    ///   - imageData: The image data to upload
+    ///   - playerId: The player's ID (used for filename)
+    /// - Returns: The public URL of the uploaded avatar
+    private func uploadPlayerAvatar(imageData: Data, playerId: UUID) async throws -> String {
+        // Generate unique filename
+        let fileExtension = "jpg"
+        let fileName = "\(playerId.uuidString)_\(Date().timeIntervalSince1970).\(fileExtension)"
+        let filePath = "avatars/\(fileName)"
+        
+        // Upload to Supabase Storage
+        try await supabaseService.client.storage
+            .from("avatars")
+            .upload(
+                filePath,
+                data: imageData,
+                options: .init(
+                    contentType: "image/jpeg",
+                    upsert: false
+                )
+            )
+        
+        // Get public URL
+        let publicURL = try supabaseService.client.storage
+            .from("avatars")
+            .getPublicURL(path: filePath)
+        
+        return publicURL.absoluteString
     }
     
     // MARK: - Match Loading

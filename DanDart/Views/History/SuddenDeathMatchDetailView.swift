@@ -258,8 +258,10 @@ struct SuddenDeathMatchDetailView: View {
     }
     
     private func isPlayerAliveInRound(player: MatchPlayer, roundNumber: Int) -> Bool {
-        let livesLostBeforeThisRound = countLivesLost(player: player, upToRound: roundNumber - 1)
-        return livesLostBeforeThisRound < startingLives
+        // Player is alive in a round if they have a turn recorded for that round
+        // This ensures eliminated players don't appear in subsequent rounds
+        let turnIndex = roundNumber - 1
+        return turnIndex < player.turns.count
     }
     
     
