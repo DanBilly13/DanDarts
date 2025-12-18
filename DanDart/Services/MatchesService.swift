@@ -129,16 +129,37 @@ class MatchesService: ObservableObject {
             
             // Filter matches to only include those where the user participated
             for json in jsonArray {
-                // Extract fields manually
-                guard let idString = json["id"] as? String,
-                      let id = UUID(uuidString: idString),
-                      let gameType = json["game_type"] as? String,
-                      let gameName = json["game_name"] as? String,
-                      let winnerIdString = json["winner_id"] as? String,
-                      let winnerId = UUID(uuidString: winnerIdString),
-                      let timestampString = json["timestamp"] as? String,
-                      let duration = json["duration"] as? Int else {
-                    print("⚠️ Skipping match with missing required fields")
+                // Extract fields manually with detailed error logging
+                guard let idString = json["id"] as? String else {
+                    print("⚠️ Skipping match - missing 'id' field")
+                    continue
+                }
+                guard let id = UUID(uuidString: idString) else {
+                    print("⚠️ Skipping match - invalid UUID for 'id': \(idString)")
+                    continue
+                }
+                guard let gameType = json["game_type"] as? String else {
+                    print("⚠️ Skipping match \(idString) - missing 'game_type' field")
+                    continue
+                }
+                guard let gameName = json["game_name"] as? String else {
+                    print("⚠️ Skipping match \(idString) - missing 'game_name' field")
+                    continue
+                }
+                guard let winnerIdString = json["winner_id"] as? String else {
+                    print("⚠️ Skipping match \(idString) - missing 'winner_id' field")
+                    continue
+                }
+                guard let winnerId = UUID(uuidString: winnerIdString) else {
+                    print("⚠️ Skipping match \(idString) - invalid UUID for 'winner_id': \(winnerIdString)")
+                    continue
+                }
+                guard let timestampString = json["timestamp"] as? String else {
+                    print("⚠️ Skipping match \(idString) - missing 'timestamp' field")
+                    continue
+                }
+                guard let duration = json["duration"] as? Int else {
+                    print("⚠️ Skipping match \(idString) - missing 'duration' field")
                     continue
                 }
                 
@@ -298,23 +319,46 @@ class MatchesService: ObservableObject {
                 continue
             }
             
-            // Get game_metadata (for Halve-It target display)
+            // Get game_metadata (for Halve-It target display and Killer dart metadata)
             var targetDisplay: String? = nil
-            if let gameMetadata = throwJson["game_metadata"] as? [String: Any],
-               let target = gameMetadata["target_display"] as? String {
-                targetDisplay = target
+            var killerDartsMetadataMap: [Int: [String: Any]] = [:] // Map dart index to metadata
+            if let gameMetadata = throwJson["game_metadata"] as? [String: Any] {
+                // Halve-It target
+                if let target = gameMetadata["target_display"] as? String {
+                    targetDisplay = target
+                }
+                // Killer darts metadata (stored as JSON string)
+                if let killerDartsJson = gameMetadata["killer_darts"] as? String,
+                   let jsonData = killerDartsJson.data(using: .utf8),
+                   let dartsArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
+                    // Build map of dart_index -> metadata
+                    for dartMeta in dartsArray {
+                        if let dartIndex = dartMeta["dart_index"] as? Int {
+                            killerDartsMetadataMap[dartIndex] = dartMeta
+                        }
+                    }
+                }
             }
             
             // Get is_bust flag (for Knockout life losses)
             let isBust = throwJson["is_bust"] as? Bool ?? false
             
             // Convert dart scores to MatchDart objects
-            // Note: We only have total values, so we need to infer multipliers
-            let darts = dartScores.map { score -> MatchDart in
-                // For now, assume all are singles (baseValue = value, multiplier = 1)
+            let darts = dartScores.enumerated().map { index, score -> MatchDart in
+                // Try to get killer metadata for this dart using the index
+                var killerMetadata: KillerDartMetadata? = nil
+                if let dartMeta = killerDartsMetadataMap[index] {
+                    if let outcomeStr = dartMeta["outcome"] as? String,
+                       let outcome = KillerDartMetadata.KillerDartOutcome(rawValue: outcomeStr) {
+                        let affectedIds = (dartMeta["affected_player_ids"] as? [String] ?? []).compactMap { UUID(uuidString: $0) }
+                        killerMetadata = KillerDartMetadata(outcome: outcome, affectedPlayerIds: affectedIds)
+                    }
+                }
+                
+                // For now, assume all are singles (baseValue = score, multiplier = 1)
                 // This is a limitation - we lose the double/triple info
                 // But for Halve-It, what matters is whether the dart hit the target (value > 0)
-                return MatchDart(baseValue: score, multiplier: 1)
+                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: killerMetadata)
             }
             
             let turn = MatchTurn(

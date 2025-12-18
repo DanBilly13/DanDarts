@@ -297,11 +297,11 @@ struct CountdownGameplayView: View {
         // MARK: - Game Logic
         // All game logic now handled by GameViewModel
     }
-    
-    
-    
-    // MARK: - Checkout Suggestion View
-    
+}
+
+// MARK: - Checkout Suggestion View
+
+extension CountdownGameplayView {
     struct CheckoutSuggestionView: View {
         let checkout: String
         
@@ -318,10 +318,10 @@ struct CountdownGameplayView: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: checkout)
         }
     }
+}
+
+// MARK: - Preview
     
-    
-    // MARK: - Preview
-    #if DEBUG
     #Preview("Countdown - 301") {
         NavigationStack {
             CountdownGameplayView(
@@ -329,12 +329,13 @@ struct CountdownGameplayView: View {
                 players: [Player.mockGuest1, Player.mockGuest2]
             )
             .environmentObject(AuthService())
+            .environmentObject(Router.shared)
             .background(AppColor.backgroundPrimary)
         }
     }
-    #endif
+ 
     
-    #if DEBUG
+
     #Preview("Best of 3") {
         NavigationStack {
             CountdownGameplayView(
@@ -343,6 +344,7 @@ struct CountdownGameplayView: View {
                 matchFormat: 3
             )
             .environmentObject(AuthService())
+            .environmentObject(Router.shared)
             .background(AppColor.backgroundPrimary)
         }
     }
@@ -355,6 +357,7 @@ struct CountdownGameplayView: View {
                 matchFormat: 5
             )
             .environmentObject(AuthService())
+            .environmentObject(Router.shared)
             .background(AppColor.backgroundPrimary)
         }
     }
@@ -367,6 +370,7 @@ struct CountdownGameplayView: View {
                 matchFormat: 7
             )
             .environmentObject(AuthService())
+            .environmentObject(Router.shared)
             .background(AppColor.backgroundPrimary)
         }
     }
@@ -378,8 +382,7 @@ struct CountdownGameplayView: View {
                 players: [Player.mockGuest1, Player.mockGuest2, Player.mockConnected1]
             )
             .environmentObject(AuthService())
+            .environmentObject(Router.shared)
             .background(AppColor.backgroundPrimary)
         }
     }
-    #endif
-}

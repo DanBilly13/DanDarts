@@ -43,14 +43,14 @@ struct HalveItGameplayView: View {
                 VStack(spacing: 0) {
                     // TOP — cards / throw / targets
                     VStack(spacing: 0) {
-                        // Player score cards (reusing 301 component, expandable into column)
+                        // Player score cards
                         StackedPlayerCards(
                             players: viewModel.players,
                             currentPlayerIndex: viewModel.currentPlayerIndex,
                             playerScores: viewModel.playerScores,
                             currentThrow: viewModel.currentThrow,
-                            legsWon: [:],  // Not used in Halve It
-                            matchFormat: 1,  // Not used in Halve It
+                            legsWon: [:],
+                            matchFormat: 1,
                             showScoreAnimation: viewModel.showScoreAnimation,
                             isExpanded: isScoreboardExpanded,
                             onTap: {
@@ -62,7 +62,7 @@ struct HalveItGameplayView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 56)
 
-                        // Current throw display (with tap-to-edit and target validation)
+                        // Current throw display
                         HalveItThrowDisplay(
                             currentThrow: viewModel.currentThrow,
                             selectedDartIndex: viewModel.selectedDartIndex,
@@ -73,15 +73,17 @@ struct HalveItGameplayView: View {
                         )
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
-                        
-                        // Target progression (moved below current throw)
+
+                        // Target progression — now height-matched to Countdown
                         TargetProgressView(
                             targets: viewModel.targets,
                             currentRound: viewModel.currentRound
                         )
+                        .frame(height: 40)
                         .padding(.top, 8)
-                        
-                        Spacer()
+
+                        // Collapsible spacer (matches Countdown)
+                        Spacer(minLength: 0)
                     }
                     
                     // Flexible gap between halves (grows on large phones)

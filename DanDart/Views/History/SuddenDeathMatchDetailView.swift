@@ -194,52 +194,72 @@ struct SuddenDeathMatchDetailView: View {
         let livesLostUpToThisRound = countLivesLost(player: player, upToRound: roundNumber)
         let isWinner = player.id == match.winnerId && isLastRound
         
-        HStack(spacing: 8) {
-            // Progress bar
-            GeometryReader { geometry in
+        // Fixed widths (max 5 lives in Sudden Death)
+        let maxLives: CGFloat = 5
+        let iconWidth: CGFloat = 16 // skull or crown width
+        let iconSpacing: CGFloat = 8 // gap between icons
+        let scoreWidth: CGFloat = 27
+        let sectionGap: CGFloat = 8 // gap between skulls and score
+        
+        // Calculate fixed trailing width: (5 icons * 16pt) + (4 gaps * 8pt) + section gap + score
+        let fixedTrailingWidth = (maxLives * iconWidth) + ((maxLives - 1) * iconSpacing) + sectionGap + scoreWidth
+        
+        GeometryReader { geometry in
+            HStack(spacing: 8) {
+                // Progress bar - width is available space minus fixed trailing width
+                let barMaxWidth = geometry.size.width - fixedTrailingWidth - 8
                 ZStack(alignment: .leading) {
-                    // Background bar (gray)
+                    // Background bar
                     RoundedRectangle(cornerRadius: 6)
                         .fill(AppColor.inputBackground)
-                        .frame(height: 12)
+                        .frame(width: barMaxWidth, height: 12)
                     
-                    // Filled bar (player's color)
+                    // Filled bar
+                    let fillWidth = barMaxWidth * (CGFloat(score) / 180.0)
                     RoundedRectangle(cornerRadius: 6)
                         .fill(playerColor(for: playerIndex))
-                        .frame(width: geometry.size.width * (CGFloat(score) / 180.0), height: 12)
+                        .frame(width: max(0, min(fillWidth, barMaxWidth)), height: 12)
                 }
-            }
-            .frame(height: 12)
-            
-            // Skulls and icons section - fixed width based on starting lives
-            HStack(spacing: 8) {
-                // Skulls for lives lost
-                HStack(spacing: 8) {
-                    ForEach(0..<livesLostUpToThisRound, id: \.self) { _ in
-                        Image("skull")
-                            .resizable()
-                            .renderingMode(.template)
-                            .foregroundColor(AppColor.textSecondary)
-                            .frame(width: 16, height: 16)
+                
+                // Skulls/crown section - fixed width for max 5 lives
+                HStack(spacing: iconSpacing) {
+                    if isWinner {
+                        // Winner: Show crown in place of last skull
+                        ForEach(0..<livesLostUpToThisRound, id: \.self) { index in
+                            if index == livesLostUpToThisRound - 1 {
+                                Image(systemName: "crown.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                                    .frame(width: iconWidth, height: iconWidth)
+                            } else {
+                                Image("skull")
+                                    .resizable()
+                                    .renderingMode(.template)
+                                    .foregroundColor(AppColor.textSecondary)
+                                    .frame(width: iconWidth, height: iconWidth)
+                            }
+                        }
+                    } else {
+                        // Non-winner: Show all skulls
+                        ForEach(0..<livesLostUpToThisRound, id: \.self) { _ in
+                            Image("skull")
+                                .resizable()
+                                .renderingMode(.template)
+                                .foregroundColor(AppColor.textSecondary)
+                                .frame(width: iconWidth, height: iconWidth)
+                        }
                     }
                 }
-                .frame(width: CGFloat(startingLives * 16 + max(0, startingLives - 1) * 8), alignment: .leading)
+                .frame(width: (maxLives * iconWidth) + ((maxLives - 1) * iconSpacing), alignment: .leading)
                 
-                // Winner crown (if applicable)
-                if isWinner {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(AppColor.interactivePrimaryBackground)
-                        .frame(width: 16, height: 18)
-                }
+                // Score - fixed width
+                Text("\(score)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(AppColor.textPrimary)
+                    .frame(width: scoreWidth, alignment: .trailing)
             }
-            
-            // Score value - fixed width container
-            Text("\(score)")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundColor(AppColor.textPrimary)
-                .frame(width: 27, height: 18, alignment: .trailing)
         }
+        .frame(height: 12)
     }
     
     // MARK: - Helper Methods

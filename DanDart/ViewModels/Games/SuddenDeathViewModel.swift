@@ -432,7 +432,7 @@ class SuddenDeathViewModel: ObservableObject {
         Task {
             do {
                 let matchService = MatchService()
-                let winnerId = winner.userId
+                let winnerId = winner.userId ?? winner.id
                 let updatedUser = try await matchService.saveMatch(
                     matchId: matchId,
                     gameId: "sudden_death",

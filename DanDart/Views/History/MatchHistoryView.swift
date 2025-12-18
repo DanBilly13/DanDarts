@@ -24,6 +24,11 @@ struct MatchHistoryView: View {
     @State private var showLocalMatches: Bool = true
     @State private var supabaseMatchIds: Set<UUID> = [] // Track which matches came from Supabase
     
+    // Cache and update tracking
+    @State private var isUpdating: Bool = false
+    @State private var lastUpdateTime: Date?
+    @State private var updateStatusText: String = ""
+    
     // Cached date formatter (expensive to create)
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -103,8 +108,12 @@ struct MatchHistoryView: View {
             .background(AppColor.backgroundPrimary)
             .ignoresSafeArea()
             .onAppear {
+                loadCachedMatchesIfNeeded()
                 loadMatches()
                 updateFilteredMatches()
+            }
+            .onChange(of: lastUpdateTime) { _, _ in
+                updateStatusText = formatUpdateStatus()
             }
     }
     
@@ -118,6 +127,23 @@ struct MatchHistoryView: View {
                 .toolbarRole(.editor)
                 .toolbar {
                     toolbarContent
+                }
+                .toolbar {
+                    if #available(iOS 18.0, *) {
+                        ToolbarItem(placement: .principal) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("History")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(AppColor.textPrimary)
+                                if !updateStatusText.isEmpty {
+                                    Text(updateStatusText)
+                                        .font(.caption2)
+                                        .foregroundColor(AppColor.textSecondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 }
                 .onChange(of: searchText) { _, _ in
                     updateFilteredMatches()
@@ -460,12 +486,73 @@ struct MatchHistoryView: View {
     
     // MARK: - Helper Methods
 
+    /// Load cached matches from UserDefaults immediately (instant display)
+    private func loadCachedMatchesIfNeeded() {
+        // Only load cache if matches array is empty
+        guard matches.isEmpty else { return }
+        
+        if let cachedData = UserDefaults.standard.data(forKey: "cachedMatches"),
+           let cachedMatches = try? JSONDecoder().decode([MatchResult].self, from: cachedData) {
+            matches = cachedMatches.sorted { $0.timestamp > $1.timestamp }
+            print("💾 Loaded \(cachedMatches.count) matches from cache")
+        }
+        
+        // Load last update time
+        if let lastUpdate = UserDefaults.standard.object(forKey: "lastMatchUpdate") as? Date {
+            lastUpdateTime = lastUpdate
+        }
+    }
+    
+    /// Save matches to cache
+    private func cacheMatches(_ matches: [MatchResult]) {
+        if let encoded = try? JSONEncoder().encode(matches) {
+            UserDefaults.standard.set(encoded, forKey: "cachedMatches")
+            let now = Date()
+            UserDefaults.standard.set(now, forKey: "lastMatchUpdate")
+            lastUpdateTime = now
+            print("💾 Cached \(matches.count) matches")
+        }
+    }
+    
+    /// Format update status text for subtitle
+    private func formatUpdateStatus() -> String {
+        if isUpdating {
+            return "Updating..."
+        }
+        
+        guard let lastUpdate = lastUpdateTime else {
+            return ""
+        }
+        
+        let now = Date()
+        let interval = now.timeIntervalSince(lastUpdate)
+        
+        if interval < 10 {
+            return "Updated just now"
+        } else if interval < 60 {
+            return "Updated \(Int(interval))s ago"
+        } else if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "Updated \(minutes)m ago"
+        } else if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "Updated \(hours)h ago"
+        } else {
+            let days = Int(interval / 86400)
+            return "Updated \(days)d ago"
+        }
+    }
+    
     /// Load matches from both Supabase and local storage, merge and deduplicate
     /// Runs silently in background - only shows errors
     private func loadMatches() {
         // 1. Load local matches first (instant, no loading indicator)
         let localMatches = MatchStorageManager.shared.loadMatches()
-        matches = localMatches.sorted { $0.timestamp > $1.timestamp }
+        
+        // If we have no cached matches, show local immediately
+        if matches.isEmpty {
+            matches = localMatches.sorted { $0.timestamp > $1.timestamp }
+        }
         
         // 2. Silently sync from Supabase in background
         guard let currentUserId = authService.currentUser?.id else {
@@ -476,6 +563,10 @@ struct MatchHistoryView: View {
         print("👤 Current user: \(authService.currentUser?.displayName ?? "Unknown") (ID: \(currentUserId))")
         
         Task {
+            await MainActor.run {
+                isUpdating = true
+            }
+            
             do {
                 // Load matches from Supabase (silent)
                 let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
@@ -486,11 +577,14 @@ struct MatchHistoryView: View {
                 
                 // Merge with local matches and remove duplicates
                 let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
+                let sortedMatches = allMatches.sorted { $0.timestamp > $1.timestamp }
                 
                 // Update UI with merged matches (silent)
                 await MainActor.run {
-                    matches = allMatches.sorted { $0.timestamp > $1.timestamp }
+                    matches = sortedMatches
                     supabaseMatchIds = supabaseIds
+                    isUpdating = false
+                    cacheMatches(sortedMatches)
                     print("📊 Final state: \(matches.count) total matches, \(supabaseMatchIds.count) from Supabase")
                 }
                 
@@ -499,6 +593,7 @@ struct MatchHistoryView: View {
             } catch {
                 // Only show error banner on failure
                 await MainActor.run {
+                    isUpdating = false
                     loadError = "Couldn't sync with cloud"
                 }
                 print("❌ Background sync error: \(error)")

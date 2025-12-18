@@ -79,7 +79,7 @@ struct HalveItThrowDisplay: View {
                 .background(AppColor.textPrimary.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 0)
         .padding(.horizontal, 8)
     }
     

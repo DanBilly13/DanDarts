@@ -290,8 +290,8 @@ class HalveItViewModel: ObservableObject {
                 // Determine game ID for database (should be "halve_it", not UUID)
                 let supabaseGameId = "halve_it"
                 
-                // Get winner's user ID (nil for guests)
-                let winnerId = winner.userId
+                // Get winner's ID (userId for connected players, player.id for guests)
+                let winnerId = winner.userId ?? winner.id
                 
                 // Convert turn history to TurnHistory format
                 let supabaseTurns = turnHistory.enumerated().map { index, turn in

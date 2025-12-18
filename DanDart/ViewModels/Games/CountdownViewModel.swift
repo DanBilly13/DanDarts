@@ -670,8 +670,8 @@ class CountdownViewModel: ObservableObject {
                 // Determine game ID for database
                 let gameId = game.title.lowercased().replacingOccurrences(of: " ", with: "_")
                 
-                // Get winner's user ID (nil for guests)
-                let winnerId = winner.userId
+                // Get winner's ID (userId for connected players, player.id for guests)
+                let winnerId = winner.userId ?? winner.id
                 
                 let updatedUser = try await matchService.saveMatch(
                     matchId: matchId,

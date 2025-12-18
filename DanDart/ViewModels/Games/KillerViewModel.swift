@@ -99,6 +99,13 @@ class KillerViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Helper: Get Match Player ID
+    
+    /// Returns the ID that will be used in MatchPlayer (userId for connected, player.id for guests)
+    private func matchPlayerId(for player: Player) -> UUID {
+        return player.userId ?? player.id
+    }
+    
     // MARK: - Game Actions
     
     func recordThrow(value: Int, multiplier: Int) {
@@ -145,7 +152,8 @@ class KillerViewModel: ObservableObject {
             if thrownNumber == playerNumber {
                 loseLife(playerID: playerID)
                 checkForImmediateWin()
-                return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: [playerID])
+                // Use matchPlayerId for consistency with MatchPlayer
+                return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: [matchPlayerId(for: currentPlayer)])
             }
             
             // Check if hit opponent's number
@@ -159,7 +167,8 @@ class KillerViewModel: ObservableObject {
                     var affectedIds: [UUID] = []
                     for _ in 0..<livesToRemove {
                         loseLife(playerID: opponent.id)
-                        affectedIds.append(opponent.id)
+                        // Use matchPlayerId for consistency with MatchPlayer
+                        affectedIds.append(matchPlayerId(for: opponent))
                     }
                     
                     // Check if this eliminated the last opponent
@@ -250,6 +259,28 @@ class KillerViewModel: ObservableObject {
                         )
                     }
                     
+                    // Serialize killer metadata into gameMetadata dictionary
+                    // Store as JSON string because [String: String] can't hold nested arrays
+                    var gameMetadata: [String: String]? = nil
+                    if !turn.darts.isEmpty {
+                        // Create array of dart metadata with indices to maintain alignment
+                        let dartsArray = turn.darts.enumerated().compactMap { dartIndex, dart -> [String: Any]? in
+                            guard let metadata = dart.killerMetadata else { return nil }
+                            return [
+                                "dart_index": dartIndex,
+                                "outcome": metadata.outcome.rawValue,
+                                "affected_player_ids": metadata.affectedPlayerIds.map { $0.uuidString }
+                            ]
+                        }
+                        
+                        // Convert to JSON string for storage
+                        if !dartsArray.isEmpty,
+                           let jsonData = try? JSONSerialization.data(withJSONObject: dartsArray),
+                           let jsonString = String(data: jsonData, encoding: .utf8) {
+                            gameMetadata = ["killer_darts": jsonString]
+                        }
+                    }
+                    
                     flatTurnHistory.append(TurnHistory(
                         player: player,
                         playerId: player.id,
@@ -258,7 +289,7 @@ class KillerViewModel: ObservableObject {
                         scoreBefore: turn.scoreBefore,
                         scoreAfter: turn.scoreAfter,
                         isBust: turn.isBust,
-                        gameMetadata: nil
+                        gameMetadata: gameMetadata
                     ))
                 }
             }
@@ -269,8 +300,8 @@ class KillerViewModel: ObservableObject {
             do {
                 let matchService = MatchService()
                 
-                // Get winner's user ID (nil for guests)
-                let winnerId = winner.userId
+                // Get winner's ID (userId for connected players, player.id for guests)
+                let winnerId = winner.userId ?? winner.id
                 
                 let updatedUser = try await matchService.saveMatch(
                     matchId: matchId,
