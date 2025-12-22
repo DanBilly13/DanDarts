@@ -494,6 +494,7 @@ struct StatCategorySection: View {
     var isDecimal: Bool = false
     var getDecimalValue: ((MatchPlayer) -> Double)?
     var forceMaxValue: Int? = nil  // Force specific max value (e.g., 100 for percentages)
+    var getOriginalIndex: ((MatchPlayer) -> Int)?  // Get original player index for correct colors
     
     // Calculate max value for scaling bars
     private var maxValue: Int {
@@ -516,7 +517,7 @@ struct StatCategorySection: View {
                 ForEach(0..<players.count, id: \.self) { index in
                     PlayerStatBar(
                         player: players[index],
-                        playerIndex: index,
+                        playerIndex: getOriginalIndex?(players[index]) ?? index,
                         value: getValue(players[index]),
                         maxValue: maxValue,
                         isDecimal: isDecimal,

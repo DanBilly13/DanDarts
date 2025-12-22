@@ -28,6 +28,13 @@ struct MatchRecord: Codable {
 struct MatchMetadata: Codable {
     let match_format: Int
     let legs_won: [String: Int]
+    let game_metadata: [String: String]?
+    
+    enum CodingKeys: String, CodingKey {
+        case match_format
+        case legs_won
+        case game_metadata
+    }
 }
 
 struct MatchPlayerRecord: Codable {
@@ -95,6 +102,7 @@ class MatchService: ObservableObject {
         turnHistory: [TurnHistory],
         matchFormat: Int,
         legsWon: [UUID: Int],
+        gameMetadata: [String: String]? = nil,
         currentUserId: UUID? = nil
     ) async throws -> User? {
         // Debug: Check AuthService state at the start
@@ -176,7 +184,8 @@ class MatchService: ObservableObject {
             winner_id: winnerId?.uuidString,
             metadata: MatchMetadata(
                 match_format: matchFormat,
-                legs_won: legsWon.mapKeys { $0.uuidString }
+                legs_won: legsWon.mapKeys { $0.uuidString },
+                game_metadata: gameMetadata
             ),
             // Legacy columns for backward compatibility
             game_type: gameId,

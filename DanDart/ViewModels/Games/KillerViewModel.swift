@@ -117,6 +117,8 @@ class KillerViewModel: ObservableObject {
         // Players should use the menu Restart option if they made a mistake.
         guard currentThrow.count < 3 else { return }
         
+        print("🎯 recordThrow called: value=\(value), multiplier=\(multiplier)")
+        
         let scoreType: ScoreType = {
             switch multiplier {
             case 2: return .double
@@ -125,6 +127,7 @@ class KillerViewModel: ObservableObject {
             }
         }()
         let dart = ScoredThrow(baseValue: value, scoreType: scoreType)
+        print("   Created ScoredThrow: base=\(dart.baseValue), type=\(scoreType), total=\(dart.totalValue)")
         currentThrow.append(dart)
         selectedDartIndex = currentThrow.count - 1
         
@@ -150,11 +153,19 @@ class KillerViewModel: ObservableObject {
         
         // If player is a Killer
         if isKiller[playerID] ?? false {
-            // Check if hit own number (any multiplier) - lose a life
+            // Check if hit own number (any multiplier) - lose lives based on multiplier
             if thrownNumber == playerNumber {
-                loseLife(playerID: playerID)
-                // Use matchPlayerId for consistency with MatchPlayer
-                return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: [matchPlayerId(for: currentPlayer)])
+                let livesToRemove = multiplier
+                print("   💀 Hit own number \(playerNumber) with multiplier \(multiplier) - removing \(livesToRemove) lives from \(currentPlayer.displayName)")
+                var affectedIds: [UUID] = []
+                for i in 0..<livesToRemove {
+                    print("      Life loss \(i+1)/\(livesToRemove): \(currentPlayer.displayName) before=\(displayPlayerLives[playerID] ?? -1)")
+                    loseLife(playerID: playerID)
+                    print("      Life loss \(i+1)/\(livesToRemove): \(currentPlayer.displayName) after=\(displayPlayerLives[playerID] ?? -1)")
+                    // Use matchPlayerId for consistency with MatchPlayer
+                    affectedIds.append(matchPlayerId(for: currentPlayer))
+                }
+                return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: affectedIds)
             }
             
             // Check if hit opponent's number
@@ -165,9 +176,12 @@ class KillerViewModel: ObservableObject {
                     
                     // Remove lives based on multiplier
                     let livesToRemove = multiplier
+                    print("   💥 Hit opponent's number \(opponentNumber) with multiplier \(multiplier) - removing \(livesToRemove) lives from \(opponent.displayName)")
                     var affectedIds: [UUID] = []
-                    for _ in 0..<livesToRemove {
+                    for i in 0..<livesToRemove {
+                        print("      Life loss \(i+1)/\(livesToRemove): \(opponent.displayName) before=\(displayPlayerLives[opponent.id] ?? -1)")
                         loseLife(playerID: opponent.id)
+                        print("      Life loss \(i+1)/\(livesToRemove): \(opponent.displayName) after=\(displayPlayerLives[opponent.id] ?? -1)")
                         // Use matchPlayerId for consistency with MatchPlayer
                         affectedIds.append(matchPlayerId(for: opponent))
                     }
@@ -254,9 +268,11 @@ class KillerViewModel: ObservableObject {
             "starting_lives": "\(startingLives)"
         ]
         // Store player numbers as "player_{uuid}": "number"
+        // Use matchPlayerId to ensure consistency with MatchPlayer IDs
         for player in players {
             if let number = playerNumbers[player.id] {
-                metadata["player_\(player.id.uuidString)"] = "\(number)"
+                let playerId = matchPlayerId(for: player)
+                metadata["player_\(playerId.uuidString)"] = "\(number)"
             }
         }
         
@@ -265,7 +281,7 @@ class KillerViewModel: ObservableObject {
             gameType: "Killer",
             gameName: "Killer",
             players: matchPlayers,
-            winnerId: winner.id,
+            winnerId: matchPlayerId(for: winner),
             timestamp: Date(),
             duration: 0,
             matchFormat: 1,
@@ -346,6 +362,7 @@ class KillerViewModel: ObservableObject {
                     turnHistory: flatTurnHistory,
                     matchFormat: 1,
                     legsWon: [:],
+                    gameMetadata: metadata,
                     currentUserId: currentUserId
                 )
                 
@@ -512,11 +529,15 @@ class KillerViewModel: ObservableObject {
     }
     
     private func moveToNextPlayer() {
+        print("🔄 moveToNextPlayer called. Current: \(currentPlayer.displayName) (index \(currentPlayerIndex))")
+        print("   Player lives: \(players.map { "\($0.displayName)=\(displayPlayerLives[$0.id] ?? -1)" }.joined(separator: ", "))")
+        
         // Find next active player (use displayPlayerLives for immediate response)
         var nextIndex = (currentPlayerIndex + 1) % players.count
         var attempts = 0
         
         while (displayPlayerLives[players[nextIndex].id] ?? 0) == 0 && attempts < players.count {
+            print("   Skipping \(players[nextIndex].displayName) (lives: \(displayPlayerLives[players[nextIndex].id] ?? -1))")
             nextIndex = (nextIndex + 1) % players.count
             attempts += 1
         }
@@ -528,6 +549,7 @@ class KillerViewModel: ObservableObject {
         }
         
         currentPlayerIndex = nextIndex
+        print("   ➡️ Next player: \(currentPlayer.displayName) (index \(currentPlayerIndex), lives: \(displayPlayerLives[currentPlayer.id] ?? -1))")
     }
     
     // MARK: - Match Storage

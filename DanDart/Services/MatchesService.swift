@@ -233,10 +233,11 @@ class MatchesService: ObservableObject {
                 let matchFormat = json["match_format"] as? Int ?? 1
                 let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
                 
-                // Parse metadata (for Halve-It difficulty, etc.)
+                // Parse metadata (for Halve-It difficulty, Killer player numbers, etc.)
                 var metadata: [String: String]? = nil
-                if let metadataDict = json["metadata"] as? [String: Any] {
-                    metadata = metadataDict.compactMapValues { $0 as? String }
+                if let metadataDict = json["metadata"] as? [String: Any],
+                   let gameMetadata = metadataDict["game_metadata"] as? [String: Any] {
+                    metadata = gameMetadata.compactMapValues { $0 as? String }
                 }
                 
                 // Load turn data from match_throws table

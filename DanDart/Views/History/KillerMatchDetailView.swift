@@ -114,7 +114,8 @@ struct KillerMatchDetailView: View {
             StatCategorySection(
                 label: "Kills",
                 players: playersSortedByKills,
-                getValue: { calculateKills(for: $0) }
+                getValue: { calculateKills(for: $0) },
+                getOriginalIndex: { originalPlayerIndex(for: $0) }
             )
             
             // Most Suicidal - only show players who shot themselves
@@ -123,25 +124,14 @@ struct KillerMatchDetailView: View {
                 StatCategorySection(
                     label: "Most Suicidal",
                     players: suicidalPlayers.sorted { calculateSelfHits(for: $0) > calculateSelfHits(for: $1) },
-                    getValue: { calculateSelfHits(for: $0) }
+                    getValue: { calculateSelfHits(for: $0) },
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
             }
         }
         .padding(.vertical, 16)
         .onAppear {
-            print("📊 Stats Section Appeared")
-            for player in match.players {
-                let kills = calculateKills(for: player)
-                let selfHits = calculateSelfHits(for: player)
-                print("   \(player.displayName): \(kills) kills, \(selfHits) self-hits")
-                print("   Turns: \(player.turns.count)")
-                for (turnIdx, turn) in player.turns.enumerated() {
-                    print("     Turn \(turnIdx + 1): \(turn.darts.count) darts")
-                    for (dartIdx, dart) in turn.darts.enumerated() {
-                        print("       Dart \(dartIdx + 1): metadata=\(dart.killerMetadata?.outcome.rawValue ?? "nil")")
-                    }
-                }
-            }
+            printGameSummary()
         }
     }
     
@@ -252,9 +242,10 @@ struct KillerMatchDetailView: View {
             VStack(spacing: 8) {
                 ForEach(match.players.indices, id: \.self) { playerIndex in
                     let player = match.players[playerIndex]
+                    let isAlive = isPlayerAliveInRound(player: player, roundNumber: roundNumber)
                     
                     // Only show if player is still alive in this round
-                    if isPlayerAliveInRound(player: player, roundNumber: roundNumber) {
+                    if isAlive {
                         playerRoundRow(
                             player: player,
                             playerIndex: playerIndex,
@@ -522,7 +513,8 @@ struct KillerMatchDetailView: View {
                             } else if metadata.outcome == .hitOpponent {
                                 // Player was hit by opponent
                                 // Count how many times this player appears in affectedPlayerIds
-                                livesLost += metadata.affectedPlayerIds.filter { $0 == player.id }.count
+                                let count = metadata.affectedPlayerIds.filter { $0 == player.id }.count
+                                livesLost += count
                             }
                         }
                     }
@@ -657,6 +649,87 @@ struct KillerMatchPlayerCard: View {
         case 2: return "2nd"
         case 3: return "3rd"
         default: return "\(placement)th"
+        }
+    }
+}
+
+// MARK: - Debug Helper
+
+extension KillerMatchDetailView {
+    private func printGameSummary() {
+        print("\n🎯 ========================================")
+        print("🎯 KILLER GAME - \(startingLives) LIVES")
+        print("🎯 ========================================\n")
+        
+        // Debug metadata
+        print("📋 Metadata keys: \(match.metadata?.keys.sorted() ?? [])")
+        
+        // Print player numbers
+        for player in match.players {
+            let number = playerNumber(for: player)
+            let key = "player_\(player.id.uuidString)"
+            let storedValue = match.metadata?[key]
+            print("   \(player.displayName) - Number: \(number) (key: \(key), stored: \(storedValue ?? "nil"))")
+        }
+        print("")
+        
+        let maxRounds = match.players.map { $0.turns.count }.max() ?? 0
+        
+        for roundNum in 1...maxRounds {
+            print("📍 R\(roundNum)")
+            print("─────────────────────────────────────────")
+            
+            for player in match.players {
+                let turnIndex = roundNum - 1
+                guard turnIndex < player.turns.count else { continue }
+                let turn = player.turns[turnIndex]
+                
+                var dartDescriptions: [String] = []
+                for (idx, dart) in turn.darts.enumerated() {
+                    print("      D\(idx+1): base=\(dart.baseValue), mult=\(dart.multiplier), value=\(dart.value), metadata=\(dart.killerMetadata?.outcome.rawValue ?? "nil")")
+                    if let metadata = dart.killerMetadata {
+                        let dartDesc = describeDart(dart: dart, metadata: metadata, thrower: player)
+                        dartDescriptions.append(dartDesc)
+                    }
+                }
+                
+                let dartsText = dartDescriptions.isEmpty ? "No darts" : dartDescriptions.joined(separator: ". ")
+                print("   \(player.displayName): \(dartsText)")
+            }
+            
+            print("\n   End of Round \(roundNum):")
+            for player in match.players {
+                let livesLost = countLivesLost(player: player, upToRound: roundNum)
+                let livesRemaining = max(0, startingLives - livesLost)
+                let status = livesRemaining == 0 ? " ❌ ELIMINATED" : ""
+                print("   • \(player.displayName): \(livesRemaining) \(livesRemaining == 1 ? "life" : "lives") left\(status)")
+            }
+            print("")
+        }
+        
+        if let winner = match.players.first(where: { $0.id == match.winnerId }) {
+            let finalLivesCount = finalLives(for: winner)
+            print("🏆 WINNER: \(winner.displayName) with \(finalLivesCount) \(finalLivesCount == 1 ? "life" : "lives") remaining")
+        }
+        print("\n🎯 ========================================\n")
+    }
+    
+    private func describeDart(dart: MatchDart, metadata: KillerDartMetadata, thrower: MatchPlayer) -> String {
+        switch metadata.outcome {
+        case .becameKiller:
+            return "'Killer mode' (D\(dart.baseValue))"
+        case .hitOwnNumber:
+            let multiplierText = dart.multiplier == 2 ? "D" : (dart.multiplier == 3 ? "T" : "")
+            return "Hit own number (\(multiplierText)\(dart.baseValue)) - Lost 1 life"
+        case .hitOpponent:
+            let multiplierText = dart.multiplier == 2 ? "D" : (dart.multiplier == 3 ? "T" : "")
+            let livesLost = metadata.affectedPlayerIds.count
+            let victimNames = metadata.affectedPlayerIds.compactMap { victimId in
+                match.players.first(where: { $0.id == victimId })?.displayName
+            }.joined(separator: ", ")
+            return "Hit \(multiplierText)\(dart.baseValue) - \(victimNames) lost \(livesLost) \(livesLost == 1 ? "life" : "lives")"
+        case .miss:
+            return "Miss"
         }
     }
 }
