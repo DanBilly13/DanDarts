@@ -82,6 +82,9 @@ struct KillerMatchDetailView: View {
             if !match.players.isEmpty && !match.players[0].turns.isEmpty {
                 roundByRoundSection
             }
+            
+            // Winner section
+            winnerSection
         }
     }
     
@@ -171,13 +174,74 @@ struct KillerMatchDetailView: View {
             let maxRounds = match.players.map { $0.turns.count }.max() ?? 0
             
             ForEach(0..<maxRounds, id: \.self) { roundIndex in
-                roundSection(roundNumber: roundIndex + 1)
+                roundSection(roundNumber: roundIndex + 1, maxRounds: maxRounds)
             }
         }
     }
     
+    private var winnerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Winner title
+            Text("Winner")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppColor.textSecondary)
+            
+            // Winner player row - clean display with just avatar, X's, and full hearts
+            if let winner = match.players.first(where: { $0.id == match.winnerId }),
+               let winnerIndex = match.players.firstIndex(where: { $0.id == match.winnerId }) {
+                HStack(spacing: 0) {
+                    // Column 1: Player avatar (28px) with player color border
+                    AsyncAvatarImage(
+                        avatarURL: winner.avatarURL,
+                        size: 28
+                    )
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(playerColor(for: winnerIndex), lineWidth: 1)
+                    )
+                    .frame(width: 28, height: 28)
+                    
+                    // Spacer
+                    Spacer()
+                    
+                    // Columns 2-4: Black X's for dart slots (unthrown)
+                    HStack(spacing: 0) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(AppColor.justBlack)
+                                .frame(width: 52, alignment: .center)
+                        }
+                    }
+                    
+                    // Spacer
+                    Spacer()
+                    
+                    // Columns 5+: Hearts showing actual remaining lives
+                    HStack(spacing: 0) {
+                        let finalLivesRemaining = finalLives(for: winner)
+                        ForEach(0..<startingLives, id: \.self) { lifeIndex in
+                            let isLost = lifeIndex < (startingLives - finalLivesRemaining)
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(isLost ? AppColor.justBlack : AppColor.justWhite)
+                                .frame(width: 28, height: 28)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(AppColor.inputBackground)
+                .frame(height: 44)
+                .cornerRadius(8)
+            }
+        }
+        
+        .frame(maxWidth: .infinity)
+    }
+    
     @ViewBuilder
-    private func roundSection(roundNumber: Int) -> some View {
+    private func roundSection(roundNumber: Int, maxRounds: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Round title
             Text("R\(roundNumber)")
@@ -215,6 +279,8 @@ struct KillerMatchDetailView: View {
         let wasAliveAtRoundStart = isPlayerAliveInRound(player: player, roundNumber: roundNumber)
         // Player was eliminated before throwing if they were alive at start but have no turn data OR empty darts
         let wasEliminatedBeforeThrowing = wasAliveAtRoundStart && (turn == nil || darts.isEmpty)
+        // Turn is incomplete if player has turn data but less than 3 darts OR any dart has nil metadata (game ended mid-turn)
+        let isIncompleteTurn = turn != nil && (darts.count < 3 || darts.contains { $0.killerMetadata == nil })
         
         HStack(spacing: 0) {
             // Column 1: Player avatar (28px) with player color border
@@ -239,7 +305,8 @@ struct KillerMatchDetailView: View {
                     dartCell(
                         dart: dartIndex < darts.count ? darts[dartIndex] : nil,
                         playerNumber: playerNumber(for: player),
-                        wasEliminatedBeforeThrowing: wasEliminatedBeforeThrowing
+                        wasEliminatedBeforeThrowing: wasEliminatedBeforeThrowing,
+                        isIncompleteTurn: isIncompleteTurn
                     )
                 }
             }
@@ -267,7 +334,7 @@ struct KillerMatchDetailView: View {
     }
     
     @ViewBuilder
-    private func dartCell(dart: MatchDart?, playerNumber: Int, wasEliminatedBeforeThrowing: Bool) -> some View {
+    private func dartCell(dart: MatchDart?, playerNumber: Int, wasEliminatedBeforeThrowing: Bool, isIncompleteTurn: Bool) -> some View {
         Group {
             if let dart = dart, let metadata = dart.killerMetadata {
                 switch metadata.outcome {
@@ -359,8 +426,9 @@ struct KillerMatchDetailView: View {
                         .foregroundColor(AppColor.justWhite .opacity(0.25))
                 }
             } else {
-                // Unthrown dart (player eliminated before throwing)
-                if wasEliminatedBeforeThrowing {
+                // No dart data - could be eliminated before throwing OR incomplete turn (game ended)
+                if wasEliminatedBeforeThrowing || isIncompleteTurn {
+                    // Black X for unthrown darts
                     Image(systemName: "xmark")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(AppColor.justBlack)

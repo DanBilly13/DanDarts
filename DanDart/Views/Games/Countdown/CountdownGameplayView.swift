@@ -44,13 +44,13 @@ struct CountdownGameplayView: View {
             // Core gameplay layout, optionally wrapped with a positioned tip overlay
             PositionedTip(
                 xPercent: 0.5,
-                yPercent: 0.8
+                yPercent: 0.55
             ) {
                 if showDoubleTripleTip {
                     TipBubble(
                         systemImageName: "cursorarrow.click",
                         title: "Doubles & Trebles",
-                        message: "Long-press any number button to choose single, double, or treble before you lift your finger.",
+                        message: "Long-press any number to choose a double, or treble.",
                         onDismiss: {
                             showDoubleTripleTip = false
                             UserDefaults.standard.set(true, forKey: "hasSeenDoubleTripleTip")

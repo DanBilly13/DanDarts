@@ -131,6 +131,9 @@ class KillerViewModel: ObservableObject {
         // Process throw and get metadata
         let metadata = processThrow(dart)
         currentThrowMetadata.append(metadata)
+        
+        // Check for immediate win AFTER metadata is appended
+        checkForImmediateWin()
     }
     
     private func processThrow(_ dart: ScoredThrow) -> KillerDartMetadata {
@@ -142,7 +145,6 @@ class KillerViewModel: ObservableObject {
         // Check if player hit their own double to become a Killer
         if thrownNumber == playerNumber && multiplier == 2 && !(isKiller[playerID] ?? false) {
             activateKiller(playerID: playerID)
-            checkForImmediateWin()
             return KillerDartMetadata(outcome: .becameKiller, affectedPlayerIds: [])
         }
         
@@ -151,7 +153,6 @@ class KillerViewModel: ObservableObject {
             // Check if hit own number (any multiplier) - lose a life
             if thrownNumber == playerNumber {
                 loseLife(playerID: playerID)
-                checkForImmediateWin()
                 // Use matchPlayerId for consistency with MatchPlayer
                 return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: [matchPlayerId(for: currentPlayer)])
             }
@@ -171,8 +172,6 @@ class KillerViewModel: ObservableObject {
                         affectedIds.append(matchPlayerId(for: opponent))
                     }
                     
-                    // Check if this eliminated the last opponent
-                    checkForImmediateWin()
                     return KillerDartMetadata(outcome: .hitOpponent, affectedPlayerIds: affectedIds)
                 }
             }
@@ -194,9 +193,43 @@ class KillerViewModel: ObservableObject {
             // Sync lives immediately
             playerLives = displayPlayerLives
             
+            // Save the current turn before saving the match
+            saveCurrentTurnToHistory()
+            
             // Save match
             saveMatch()
         }
+    }
+    
+    private func saveCurrentTurnToHistory() {
+        // Only save if there are darts in the current throw
+        guard !currentThrow.isEmpty else { return }
+        
+        // Create darts with metadata
+        let darts = currentThrow.enumerated().map { index, dart in
+            let metadata = index < currentThrowMetadata.count ? currentThrowMetadata[index] : nil
+            return MatchDart(
+                baseValue: dart.baseValue,
+                multiplier: dart.scoreType.multiplier,
+                killerMetadata: metadata
+            )
+        }
+        
+        // Get current player's turn number
+        let playerTurns = playerTurnHistory[currentPlayer.id] ?? []
+        let turn = MatchTurn(
+            turnNumber: playerTurns.count + 1,
+            darts: darts,
+            scoreBefore: 0,
+            scoreAfter: 0,
+            isBust: false
+        )
+        
+        // Append to this player's turn history
+        if playerTurnHistory[currentPlayer.id] == nil {
+            playerTurnHistory[currentPlayer.id] = []
+        }
+        playerTurnHistory[currentPlayer.id]?.append(turn)
     }
     
     private func saveMatch() {

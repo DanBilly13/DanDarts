@@ -42,48 +42,56 @@ struct KillerPlayerCard2: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Target number in rounded container with gun icon
-            HStack(spacing: 2) {
-                // Gun icon in fixed-size container to prevent rotation affecting layout
-                ZStack {
-                    Color.clear
-                        .frame(width: 17, height: 17)
-                    
-                    Image("Gun")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 17)
-                        .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
-                        //.foregroundColor(AppColor.justWhite)
-                        .opacity(isKiller ? 1.0 : 0.3)
-                        .rotationEffect(.degrees(animatingGunSpin ? 1125 : -25)) // 45° default, +1080° (3 spins) when animating
-                        .animation(.easeInOut(duration: 0.6), value: animatingGunSpin)
-                }
-                
-                Text("\(assignedNumber)")
-                    .font(.system(.title3, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
-                    //.foregroundColor(AppColor.justBlack)
-            }
-            .frame(height: 28)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 1)
-            .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(isKiller ? playerColor : AppColor.inputBackground)
-            )
-            .scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
+        VStack(spacing: 4) {
             
-            // Avatar (with double ring for current player)
-            PlayerAvatarWithRing(
-                avatarURL: player.avatarURL,
-                isCurrentPlayer: isCurrentPlayer,
-                ringColor: playerColor,
-                size: 64
-            )
+            VStack (spacing: -4){
+                // Avatar (with double ring for current player)
+                PlayerAvatarWithRing(
+                    avatarURL: player.avatarURL,
+                    isCurrentPlayer: isCurrentPlayer,
+                    ringColor: playerColor,
+                    size: 64
+                )
+                
+                // Target number in rounded container with gun icon
+                HStack(spacing: 2) {
+                    // Gun icon in fixed-size container to prevent rotation affecting layout
+                    ZStack {
+                        Color.clear
+                            .frame(width: 17, height: 17)
+                        
+                        Image("Gun")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 17)
+                            .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
+                            //.foregroundColor(AppColor.justWhite)
+                            .opacity(isKiller ? 1.0 : 0.3)
+                            .rotationEffect(.degrees(animatingGunSpin ? 1125 : -25)) // 45° default, +1080° (3 spins) when animating
+                            .animation(.easeInOut(duration: 0.6), value: animatingGunSpin)
+                    }
+                    
+                    Text("\(assignedNumber)")
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.black)
+                        .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
+                        //.foregroundColor(AppColor.justBlack)
+                }
+                .frame(height: 32)
+                .frame(width: 48)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(isKiller ? playerColor : AppColor.inputBackground)
+                )
+                //.scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
+                
+            }
+            
+            
+           
             
             VStack(spacing: 2) {
                 // Name
