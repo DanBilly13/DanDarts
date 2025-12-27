@@ -39,8 +39,15 @@ struct HalveItGameplayView: View {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
-            ZStack {
-                VStack(spacing: 0) {
+            // Core gameplay layout, wrapped with PositionedTip for proper nav bar spacing
+            PositionedTip(
+                xPercent: 0.5,
+                yPercent: 0.55
+            ) {
+                EmptyView()
+            } background: {
+                ZStack {
+                    VStack(spacing: 0) {
                     // TOP — cards / throw / targets
                     VStack(spacing: 0) {
                         // Player score cards
@@ -146,6 +153,7 @@ struct HalveItGameplayView: View {
                                 isScoreboardExpanded = false
                             }
                         }
+                    }
                 }
             }
         }

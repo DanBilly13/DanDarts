@@ -68,9 +68,9 @@ class HalveItViewModel: ObservableObject {
         self.gameId = gameId
         self.matchId = UUID()
         
-        // Initialize all players with 0 score
+        // Initialize all players with 50 score
         for player in self.players {
-            playerScores[player.id] = 0
+            playerScores[player.id] = 50
         }
     }
     

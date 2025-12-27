@@ -24,10 +24,10 @@ struct AccumulationScoreDisplay: View {
             // Top row: crown or placement, in a fixed-height container so they align
             Group {
                 if isWinner {
-                    // Trophy icon - 24px (smaller to make room for score)
-                    Image(systemName: "crown")
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundColor(Color("AccentTertiary"))
+                    // Crown icon for winner
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
                 } else {
                     // Placement text - Apple headline style
                     Text(placementText)
