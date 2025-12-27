@@ -23,7 +23,7 @@ class KillerViewModel: ObservableObject {
     @Published var currentPlayerIndex: Int = 0
     @Published var currentThrow: [ScoredThrow] = []
     private var currentThrowMetadata: [KillerDartMetadata] = [] // Parallel array for metadata
-    @Published var selectedDartIndex: Int? = nil
+    @Published var selectedDartIndex: Int? = 0  // Start with dart 1 highlighted
     @Published var winner: Player? = nil
     @Published var isGameOver: Bool = false
     @Published var phase: TurnPhase = .playing
@@ -129,11 +129,13 @@ class KillerViewModel: ObservableObject {
         let dart = ScoredThrow(baseValue: value, scoreType: scoreType)
         print("   Created ScoredThrow: base=\(dart.baseValue), type=\(scoreType), total=\(dart.totalValue)")
         currentThrow.append(dart)
-        selectedDartIndex = currentThrow.count - 1
         
         // Process throw and get metadata
         let metadata = processThrow(dart)
         currentThrowMetadata.append(metadata)
+        
+        // Move highlight to next dart position (or stay on last if all 3 thrown)
+        selectedDartIndex = min(currentThrow.count, 2)
         
         // Check for immediate win AFTER metadata is appended
         checkForImmediateWin()
@@ -450,7 +452,7 @@ class KillerViewModel: ObservableObject {
     func clearThrow() {
         currentThrow.removeAll()
         currentThrowMetadata.removeAll()
-        selectedDartIndex = nil
+        selectedDartIndex = 0  // Reset to dart 1 for next turn
     }
     
     func undoLastDart() {
