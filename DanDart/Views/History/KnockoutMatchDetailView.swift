@@ -180,7 +180,8 @@ struct KnockoutMatchDetailView: View {
         let turnIndex = roundNumber - 1
         let score = turnIndex < player.turns.count ? player.turns[turnIndex].turnTotal : 0
         let livesLostUpToThisRound = countLivesLost(player: player, upToRound: roundNumber)
-        let isWinner = player.id == match.winnerId && isLastRound
+        // Show crown on winner's last actual turn, not the last round overall
+        let isWinner = player.id == match.winnerId && turnIndex == player.turns.count - 1
         
         HStack(spacing: 8) {
             // Progress bar
@@ -254,8 +255,9 @@ struct KnockoutMatchDetailView: View {
     }
     
     private func isPlayerAliveInRound(player: MatchPlayer, roundNumber: Int) -> Bool {
-        let livesLostBeforeThisRound = countLivesLost(player: player, upToRound: roundNumber - 1)
-        return livesLostBeforeThisRound < startingLives
+        // Check if player actually has a turn recorded for this round
+        let turnIndex = roundNumber - 1
+        return turnIndex < player.turns.count
     }
     
     
@@ -269,7 +271,7 @@ struct KnockoutMatchDetailView: View {
             let maxTurns = match.players.map { $0.turns.count }.max() ?? 0
             
             ForEach(0..<maxTurns, id: \.self) { roundIndex in
-                let playerData = match.players.enumerated().map { playerIndex, player in
+                let playerData = match.players.enumerated().map { _, player in
                     let turn = roundIndex < player.turns.count ? player.turns[roundIndex] : nil
                     let darts = turn?.darts.map { $0.displayText } ?? []
                     // For Knockout, scoreAfter represents the turn score
@@ -281,13 +283,14 @@ struct KnockoutMatchDetailView: View {
                     } else {
                         scoreRemaining = player.startingScore
                     }
-                    let isBust = turn?.isBust ?? false
+                    // In Knockout, isBust means lost a life, but scores should still show in player color
+                    // Don't pass isBust flag to avoid red coloring
                     
                     return ThrowBreakdownCard.PlayerTurnData(
                         darts: darts,
                         scoreRemaining: scoreRemaining,
-                        color: playerColor(for: playerIndex),
-                        isBust: isBust
+                        color: playerColor(for: originalPlayerIndex(for: player)),
+                        isBust: false  // Always false for Knockout - scores stay in player color
                     )
                 }
                 

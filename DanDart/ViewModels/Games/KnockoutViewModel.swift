@@ -42,6 +42,7 @@ class KnockoutViewModel: ObservableObject {
     private let soundManager = SoundManager.shared
     let matchId = UUID()
     private let matchStartTime = Date()
+    private let originalPlayerOrder: [Player] // Preserve original order for consistent colors
     
     // Turn history tracking: [Player.id: [MatchTurn]]
     private var turnHistory: [UUID: [MatchTurn]] = [:]
@@ -87,6 +88,8 @@ class KnockoutViewModel: ObservableObject {
     // MARK: - Initialization
     
     init(players: [Player], startingLives: Int) {
+        // Store original player order for consistent color assignment
+        self.originalPlayerOrder = players
         // Randomize player order for fair play
         self.players = players.shuffled()
         self.startingLives = startingLives
@@ -313,7 +316,8 @@ class KnockoutViewModel: ObservableObject {
         let duration = Date().timeIntervalSince(matchStartTime)
         
         // Create match players with final lives remaining and turn history
-        let matchPlayers = players.map { player in
+        // Use original player order to maintain consistent color assignment
+        let matchPlayers = originalPlayerOrder.map { player in
             MatchPlayer(
                 id: player.id,
                 displayName: player.displayName,
