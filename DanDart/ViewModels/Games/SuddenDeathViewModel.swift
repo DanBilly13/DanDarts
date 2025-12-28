@@ -224,14 +224,20 @@ class SuddenDeathViewModel: ObservableObject {
         let minScore = activeRoundScores.values.min() ?? 0
         let losers = activeRoundScores.filter { $0.value == minScore }.map { $0.key }
         
-        // Mark life loss in turn history
-        markLifeLossInHistory(playerIds: losers)
+        // Special rule: If only 2 players remain and they tie, no one loses a life
+        // Both players play again in the next round
+        let isTwoPlayerTie = activePlayers.count == 2 && losers.count == 2
         
-        // Apply life loss for all losers (game state only; UI will update at
-        // the start of the next round via displayPlayerLives)
-        for id in losers {
-            if let currentLives = playerLives[id], currentLives > 0 {
-                playerLives[id] = max(0, currentLives - 1)
+        if !isTwoPlayerTie {
+            // Mark life loss in turn history
+            markLifeLossInHistory(playerIds: losers)
+            
+            // Apply life loss for all losers (game state only; UI will update at
+            // the start of the next round via displayPlayerLives)
+            for id in losers {
+                if let currentLives = playerLives[id], currentLives > 0 {
+                    playerLives[id] = max(0, currentLives - 1)
+                }
             }
         }
         

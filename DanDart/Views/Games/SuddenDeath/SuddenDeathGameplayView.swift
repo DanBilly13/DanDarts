@@ -171,9 +171,11 @@ struct SuddenDeathGameplayView: View {
             // preventing previously eliminated players from reappearing.
             playersToShow = viewModel.players.filter { (viewModel.displayPlayerLives[$0.id] ?? 0) > 0 }
         }
-        let spacing: CGFloat = playersToShow.count <= 3 ? 32 : -8
         
-        return HStack(spacing: spacing) {
+        // Use PlayerCardLayout for consistent spacing and sizing
+        let layout = PlayerCardLayout(playerCount: playersToShow.count)
+        
+        return HStack(spacing: layout.spacing) {
             ForEach(playersToShow) { player in
                 SuddenDeathPlayerCard(
                     player: player,
@@ -184,7 +186,8 @@ struct SuddenDeathGameplayView: View {
                     isInDanger: viewModel.playersInDanger.contains(player.id),
                     isCurrentPlayer: player.id == viewModel.currentPlayer.id,
                     showScoreAnimation: viewModel.scoreAnimationPlayerId == player.id,
-                    showSkullWiggle: viewModel.showSkullWiggle
+                    showSkullWiggle: viewModel.showSkullWiggle,
+                    playerIndex: viewModel.players.firstIndex(where: { $0.id == player.id }) ?? 0
                 )
             }
         }
@@ -206,11 +209,25 @@ struct SuddenDeathPlayerCard: View {
     let isCurrentPlayer: Bool
     let showScoreAnimation: Bool
     let showSkullWiggle: Bool
+    let playerIndex: Int
     
     @State private var wiggleAngle: Double = 0
     
     private var firstName: String {
         player.displayName.split(separator: " ").first.map(String.init) ?? player.displayName
+    }
+    
+    // Get player color based on index
+    private var playerColor: Color {
+        switch playerIndex {
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
+        }
     }
     
     var body: some View {
@@ -233,6 +250,7 @@ struct SuddenDeathPlayerCard: View {
             PlayerAvatarWithRing(
                 avatarURL: player.avatarURL,
                 isCurrentPlayer: isCurrentPlayer,
+                ringColor: playerColor,
                 size: 64
             )
             
@@ -240,7 +258,7 @@ struct SuddenDeathPlayerCard: View {
             Text(firstName)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(AppColor.textPrimary)
+                .foregroundColor(playerColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: 56)
@@ -249,7 +267,7 @@ struct SuddenDeathPlayerCard: View {
             Text(roundScore.map { "\($0)" } ?? "-")
                 .font(.system(.title3, design: .monospaced))
                 .fontWeight(.bold)
-                .foregroundColor(AppColor.textPrimary)
+                .foregroundColor(playerColor)
                 .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
                 .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
                 .onChange(of: showScoreAnimation) { _, newValue in

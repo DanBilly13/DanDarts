@@ -192,17 +192,18 @@ struct SuddenDeathMatchDetailView: View {
         let turnIndex = roundNumber - 1
         let score = turnIndex < player.turns.count ? player.turns[turnIndex].turnTotal : 0
         let livesLostUpToThisRound = countLivesLost(player: player, upToRound: roundNumber)
-        let isWinner = player.id == match.winnerId && isLastRound
+        // Show crown on winner's last actual turn, not the last round overall
+        let isWinner = player.id == match.winnerId && turnIndex == player.turns.count - 1
         
-        // Fixed widths (max 5 lives in Sudden Death)
-        let maxLives: CGFloat = 5
+        // Dynamic widths based on actual starting lives
+        let actualStartingLives = CGFloat(startingLives)
         let iconWidth: CGFloat = 16 // skull or crown width
         let iconSpacing: CGFloat = 8 // gap between icons
         let scoreWidth: CGFloat = 27
         let sectionGap: CGFloat = 8 // gap between skulls and score
         
-        // Calculate fixed trailing width: (5 icons * 16pt) + (4 gaps * 8pt) + section gap + score
-        let fixedTrailingWidth = (maxLives * iconWidth) + ((maxLives - 1) * iconSpacing) + sectionGap + scoreWidth
+        // Calculate fixed trailing width based on actual starting lives
+        let fixedTrailingWidth = (actualStartingLives * iconWidth) + ((actualStartingLives - 1) * iconSpacing) + sectionGap + scoreWidth
         
         GeometryReader { geometry in
             HStack(spacing: 8) {
@@ -221,17 +222,13 @@ struct SuddenDeathMatchDetailView: View {
                         .frame(width: max(0, min(fillWidth, barMaxWidth)), height: 12)
                 }
                 
-                // Skulls/crown section - fixed width for max 5 lives
+                // Skulls/crown section - fixed width based on starting lives
                 HStack(spacing: iconSpacing) {
                     if isWinner {
-                        // Winner: Show crown in place of last skull
-                        ForEach(0..<livesLostUpToThisRound, id: \.self) { index in
-                            if index == livesLostUpToThisRound - 1 {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                                    .frame(width: iconWidth, height: iconWidth)
-                            } else {
+                        // Winner: Always show crown, with skulls before it if they lost lives
+                        // Show all skulls except the last position, which is reserved for crown
+                        if livesLostUpToThisRound > 0 {
+                            ForEach(0..<max(0, livesLostUpToThisRound - 1), id: \.self) { _ in
                                 Image("skull")
                                     .resizable()
                                     .renderingMode(.template)
@@ -239,6 +236,11 @@ struct SuddenDeathMatchDetailView: View {
                                     .frame(width: iconWidth, height: iconWidth)
                             }
                         }
+                        // Crown always shows for winner (replaces last skull if any, or stands alone)
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .frame(width: iconWidth, height: iconWidth)
                     } else {
                         // Non-winner: Show all skulls
                         ForEach(0..<livesLostUpToThisRound, id: \.self) { _ in
@@ -250,7 +252,7 @@ struct SuddenDeathMatchDetailView: View {
                         }
                     }
                 }
-                .frame(width: (maxLives * iconWidth) + ((maxLives - 1) * iconSpacing), alignment: .leading)
+                .frame(width: (actualStartingLives * iconWidth) + ((actualStartingLives - 1) * iconSpacing), alignment: .leading)
                 
                 // Score - fixed width
                 Text("\(score)")
@@ -307,13 +309,14 @@ struct SuddenDeathMatchDetailView: View {
                     } else {
                         scoreRemaining = player.startingScore
                     }
-                    let isBust = turn?.isBust ?? false
+                    // In Sudden Death, isBust means lost a life, not an invalid score
+                    // Scores should always show in player color, not red
                     
                     return ThrowBreakdownCard.PlayerTurnData(
                         darts: darts,
                         scoreRemaining: scoreRemaining,
                         color: playerColor(for: playerIndex),
-                        isBust: isBust
+                        isBust: false  // Always false for Sudden Death - scores stay in player color
                     )
                 }
                 
