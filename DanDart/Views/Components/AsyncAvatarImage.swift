@@ -53,12 +53,24 @@ struct AsyncAvatarImage: View {
                         }
                     }
                 } else {
-                    // Local asset or file path - use UIImage to avoid URL parsing
-                    if let uiImage = UIImage(named: avatarURL) ?? (avatarURL.hasPrefix("/") ? UIImage(contentsOfFile: avatarURL) : nil) {
+                    // Check if this is an SF Symbol (contains "." like "person.circle.fill")
+                    let isSFSymbol = avatarURL.contains(".")
+                    
+                    if isSFSymbol {
+                        // SF Symbol avatar - render at larger size to fill circle
+                        Image(systemName: avatarURL)
+                            .font(.system(size: size * 0.8, weight: .medium))
+                            .foregroundColor(AppColor.textSecondary)
+                    } else if let uiImage = UIImage(named: avatarURL) ?? (avatarURL.hasPrefix("/") ? UIImage(contentsOfFile: avatarURL) : nil) {
+                        // Local asset or file path - use UIImage
+                        // Check if this is a predefined asset (avatar1-4) or a file path
+                        let isPredefinedAsset = avatarURL.hasPrefix("avatar") && !avatarURL.hasPrefix("/")
+                        
                         Image(uiImage: uiImage)
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .aspectRatio(contentMode: isPredefinedAsset ? .fit : .fill)
                             .frame(width: size, height: size)
+                            .scaleEffect(isPredefinedAsset ? 1.1 : 1.0) // Scale up predefined assets slightly to fill circle
                             .clipShape(Circle())
                     } else {
                         // Asset/file not found - show placeholder

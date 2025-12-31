@@ -381,7 +381,7 @@ struct ReceivedRequestCard: View {
             // Player Card with time label
             ZStack(alignment: .topTrailing) {
                 PlayerCard(player: request.user.toPlayer())
-                
+                /*
                 // Time label
                 Text(request.timeAgo)
                     .font(.system(size: 12, weight: .medium))
@@ -391,6 +391,7 @@ struct ReceivedRequestCard: View {
                     .background(AppColor.backgroundPrimary.opacity(0.8))
                     .cornerRadius(8)
                     .padding(8)
+                 */
             }
             
             // Action Buttons
@@ -448,11 +449,11 @@ struct SentRequestCard: View {
                     HStack(spacing: 0) {
                         Text("\(request.user.totalWins)W")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppColor.player1)
+                            .foregroundColor(AppColor.justWhite)
                         
                         Text("\(request.user.totalLosses)L")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppColor.player2)
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     
                     Text("\(Int((Double(request.user.totalWins) / Double(request.user.totalWins + request.user.totalLosses)) * 100))%")
@@ -469,16 +470,13 @@ struct SentRequestCard: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 16)
+        .padding(.trailing, 32)
         .padding(.vertical, 16)
         .frame(height: 80)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppColor.inputBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppColor.textSecondary.opacity(0.3), lineWidth: 1)
-        )
+        .clipShape(Capsule())
         .opacity(isProcessing ? 0.5 : 1.0)
     }
 }
