@@ -44,7 +44,7 @@ struct AvatarOptionView: View {
                         .clipShape(Circle())
                 case .symbol:
                     Image(systemName: option.id)
-                        .font(.system(size: size * 0.4, weight: .medium))
+                        .font(.system(size: size * 0.5, weight: .regular))
                         .foregroundColor(AppColor.textSecondary)
                 }
             }

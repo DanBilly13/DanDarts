@@ -44,9 +44,13 @@ struct AvatarSelectionViewV2: View {
         AvatarOption(id: "avatar2", type: .asset),
         AvatarOption(id: "avatar3", type: .asset),
         AvatarOption(id: "avatar4", type: .asset),
-        AvatarOption(id: "person.circle.fill", type: .symbol),
+        AvatarOption(id: "avatar5", type: .asset),
+        AvatarOption(id: "avatar6", type: .asset),
+        AvatarOption(id: "avatar7", type: .asset),
+        AvatarOption(id: "avatar8", type: .asset),
+        /*AvatarOption(id: "person.circle.fill", type: .symbol),
         AvatarOption(id: "person.crop.circle.fill", type: .symbol),
-        AvatarOption(id: "figure.wave.circle.fill", type: .symbol)
+        AvatarOption(id: "figure.wave.circle.fill", type: .symbol)*/
     ]
 
     var body: some View {
@@ -142,11 +146,21 @@ struct AvatarSelectionViewV2: View {
                 .frame(width: 140, height: 140)
 
             if let image = selectedAvatarImage {
+                #if canImport(UIKit)
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 140, height: 140)
                     .clipShape(Circle())
+                #elseif canImport(AppKit)
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 140, height: 140)
+                    .clipShape(Circle())
+                #else
+                EmptyView()
+                #endif
             } else if !selectedAvatar.isEmpty {
                 #if canImport(UIKit)
                 if let uiImage = UIImage(named: selectedAvatar) {
@@ -161,9 +175,17 @@ struct AvatarSelectionViewV2: View {
                         .foregroundColor(AppColor.textSecondary)
                 }
                 #else
-                Image(systemName: selectedAvatar)
-                    .font(.system(size: 64, weight: .regular))
-                    .foregroundColor(AppColor.textSecondary)
+                if let nsImage = NSImage(named: NSImage.Name(selectedAvatar)) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 140, height: 140)
+                        .clipShape(Circle())
+                } else {
+                    Image(systemName: selectedAvatar)
+                        .font(.system(size: 64, weight: .regular))
+                        .foregroundColor(AppColor.textSecondary)
+                }
                 #endif
             } else {
                 Image(systemName: "person.circle.fill")
@@ -263,3 +285,14 @@ private extension View {
         }
     }
 }
+
+#if DEBUG
+#Preview("AvatarSelectionViewV2") {
+    AvatarSelectionViewV2(
+        selectedAvatar: .constant("person.circle.fill"),
+        selectedPhotoItem: .constant(nil),
+        selectedAvatarImage: .constant(nil)
+    )
+    .padding()
+}
+#endif

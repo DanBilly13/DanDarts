@@ -57,10 +57,11 @@ struct AsyncAvatarImage: View {
                     let isSFSymbol = avatarURL.contains(".")
                     
                     if isSFSymbol {
-                        // SF Symbol avatar - render at larger size to fill circle
+                        // SF Symbol avatar - use consistent 55% sizing
                         Image(systemName: avatarURL)
-                            .font(.system(size: size * 0.8, weight: .medium))
+                            .font(.system(size: size * 0.55, weight: .regular))
                             .foregroundColor(AppColor.textSecondary)
+                            .frame(width: size, height: size)
                     } else if let uiImage = UIImage(named: avatarURL) ?? (avatarURL.hasPrefix("/") ? UIImage(contentsOfFile: avatarURL) : nil) {
                         // Local asset or file path - use UIImage
                         // Check if this is a predefined asset (avatar1-4) or a file path

@@ -30,7 +30,7 @@ struct AvatarHelper {
                 Image(systemName: placeholder)
                     .font(.system(size: size * 0.5, weight: .medium))
                     .foregroundColor(Color("TextSecondary"))
-                    .frame(width: size, height: size)
+                    .frame(width: size, height: size, alignment: .center)
             }
         }
     }
@@ -75,6 +75,13 @@ struct PlayerAvatarView: View {
         self.badgeText = badgeText
     }
     
+    private var placeholderIcon: some View {
+        Image(systemName: placeholder)
+            .font(.system(size: size * 0.5, weight: .medium))
+            .foregroundColor(Color("TextSecondary"))
+            .frame(width: size, height: size, alignment: .center)
+    }
+    
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Circle()
@@ -82,7 +89,7 @@ struct PlayerAvatarView: View {
                 .frame(width: size, height: size)
             
             if let avatarURL = avatarURL {
-                // Check if it's a URL, file path, or local asset
+                // Check if it's a URL, file path, SF Symbol, or local asset
                 if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
                     // Remote URL - use CachedAsyncImage for better performance
                     if let url = URL(string: avatarURL) {
@@ -98,9 +105,7 @@ struct PlayerAvatarView: View {
                         }
                     } else {
                         // Invalid URL - show placeholder
-                        Image(systemName: placeholder)
-                            .font(.system(size: size * 0.5, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                        placeholderIcon
                     }
                 } else if avatarURL.hasPrefix("/") || avatarURL.contains("/Documents/") {
                     // File path - load from local storage
@@ -117,14 +122,22 @@ struct PlayerAvatarView: View {
                             }
                     } else {
                         // Failed to load file - show placeholder
-                        Image(systemName: placeholder)
-                            .font(.system(size: size * 0.5, weight: .medium))
-                            .foregroundColor(Color("TextSecondary"))
+                        placeholderIcon
                             .onAppear {
                                 print("⚠️ Failed to load avatar from file: \(avatarURL)")
                                 print("   File exists: \(FileManager.default.fileExists(atPath: avatarURL))")
                             }
                     }
+                } else if avatarURL.contains(".") && avatarURL.contains("fill") {
+                    // SF Symbol name (e.g., "person.circle.fill", "figure.wave.circle.fill")
+                    // Use 55% sizing for better visibility in player cards and lists
+                    Image(systemName: avatarURL)
+                        .font(.system(size: size * 0.55, weight: .regular))
+                        .foregroundColor(Color("TextSecondary"))
+                        .frame(width: size, height: size, alignment: .center)
+                        .onAppear {
+                            print("🎭 Rendering SF Symbol: \(avatarURL)")
+                        }
                 } else {
                     // Local asset - use UIImage to avoid URL parsing
                     if let uiImage = UIImage(named: avatarURL) {
@@ -137,19 +150,18 @@ struct PlayerAvatarView: View {
                                 print("🎨 Loading from asset: \(avatarURL)")
                             }
                     } else {
-                        // Asset not found - show placeholder
-                        Image(systemName: placeholder)
-                            .font(.system(size: size * 0.5, weight: .medium))
+                        // Asset not found - try as SF Symbol before showing placeholder
+                        Image(systemName: avatarURL)
+                            .font(.system(size: size * 0.55, weight: .regular))
                             .foregroundColor(Color("TextSecondary"))
+                            .frame(width: size, height: size, alignment: .center)
                             .onAppear {
-                                print("⚠️ Asset not found: \(avatarURL)")
+                                print("⚠️ Asset not found, trying as SF Symbol: \(avatarURL)")
                             }
                     }
                 }
             } else {
-                Image(systemName: placeholder)
-                    .font(.system(size: size * 0.5, weight: .medium))
-                    .foregroundColor(Color("TextSecondary"))
+                placeholderIcon
             }
             if showBadge {
                 ZStack {
