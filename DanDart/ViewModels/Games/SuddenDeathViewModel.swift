@@ -395,7 +395,7 @@ class SuddenDeathViewModel: ObservableObject {
             gameType: "sudden_death",
             gameName: "Sudden Death",
             players: matchPlayers,
-            winnerId: winner.id,
+            winnerId: winner.userId ?? winner.id,
             timestamp: matchStartTime,
             duration: duration,
             matchFormat: 1,
@@ -404,7 +404,7 @@ class SuddenDeathViewModel: ObservableObject {
         )
         
         MatchStorageManager.shared.saveMatch(matchResult)
-        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.userId ?? winner.id)
         
         let currentUserId = authService?.currentUser?.id
         

@@ -59,9 +59,15 @@ class CountdownViewModel: ObservableObject {
     var isTurnComplete: Bool {
         // Turn is complete if:
         // 1. All 3 darts thrown
-        // 2. Bust recorded
-        // 3. Player has reached exactly zero (winner)
+        // 2. Bust recorded (explicit bust button pressed)
+        // 3. Player has gone bust (detected automatically)
+        // 4. Player has reached exactly zero (winner)
         if currentThrow.count == 3 || currentThrow.contains(where: { $0.baseValue == -1 }) {
+            return true
+        }
+        
+        // Check if player has gone bust (show Bust button immediately)
+        if isBust {
             return true
         }
         
@@ -644,7 +650,7 @@ class CountdownViewModel: ObservableObject {
             gameType: game.title,
             gameName: game.title,
             players: matchPlayers,
-            winnerId: winner.id,
+            winnerId: winner.userId ?? winner.id,
             duration: matchDuration,
             matchFormat: matchFormat,
             totalLegsPlayed: currentLeg,
@@ -655,7 +661,7 @@ class CountdownViewModel: ObservableObject {
         MatchStorageManager.shared.saveMatch(matchResult)
         
         // Update player stats
-        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.userId ?? winner.id)
         
         // Capture current user ID before entering Task (to avoid race conditions)
         let currentUserId = authService?.currentUser?.id

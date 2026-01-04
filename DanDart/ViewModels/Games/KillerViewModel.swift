@@ -292,7 +292,7 @@ class KillerViewModel: ObservableObject {
         )
         
         MatchStorageManager.shared.saveMatch(matchResult)
-        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: matchPlayerId(for: winner))
         
         // Capture current user ID before Task
         let currentUserId = authService?.currentUser?.id

@@ -121,85 +121,77 @@ struct FriendProfileView: View {
             Text("Are you sure you want to remove \(friend.displayName) from your friends?")
         }
         .onAppear {
+            let friendId = friend.userId ?? friend.id
+            
+            // Check if we have cached data for this friend
+            if let cachedMatches = HeadToHeadCache.shared.getMatches(for: friendId) {
+                headToHeadMatches = cachedMatches
+                isLoadingMatches = false
+                return
+            }
+            
+            // No cache or cache expired - load fresh data
             loadHeadToHeadMatches()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
+            let friendId = friend.userId ?? friend.id
+            HeadToHeadCache.shared.invalidate(for: friendId)
+            loadHeadToHeadMatches()
+        }
+        .refreshable {
+            // Manual pull-to-refresh - invalidate cache first
+            let friendId = friend.userId ?? friend.id
+            HeadToHeadCache.shared.invalidate(for: friendId)
+            await loadHeadToHeadMatchesAsync()
         }
     }
     
     // MARK: - Helper Methods
     
-    /// Load head-to-head matches from both local storage and Supabase
-    private func loadHeadToHeadMatches() {
+    /// Load head-to-head matches from Supabase only (async version for refreshable)
+    private func loadHeadToHeadMatchesAsync() async {
         isLoadingMatches = true
         
-        // 1. Load local matches first (instant display)
-        let localMatches = MatchStorageManager.shared.loadMatches()
-        
-        // Filter for head-to-head matches (both current user and friend must be in the match)
-        let currentUserId = authService.currentUser?.id
-        let friendUserId = friend.userId ?? friend.id
-        
-        let filteredLocal = localMatches.filter { match in
-            let playerIds = match.players.map { $0.id }
-            return playerIds.contains(friendUserId) && 
-                   (currentUserId != nil && playerIds.contains(currentUserId!))
-        }
-        
-        headToHeadMatches = filteredLocal.sorted { $0.timestamp > $1.timestamp }
-        
-        // 2. Load from Supabase in background (if user is authenticated)
-        guard let userId = currentUserId else {
-            isLoadingMatches = false
-            print("⚠️ No current user, showing local matches only")
+        guard let userId = authService.currentUser?.id else {
+            await MainActor.run {
+                isLoadingMatches = false
+                headToHeadMatches = []
+            }
             return
         }
         
-        Task {
-            do {
-                // Load all matches for current user from Supabase
-                let supabaseMatches = try await matchesService.loadMatches(userId: userId)
+        let friendUserId = friend.userId ?? friend.id
+        
+        do {
+            let supabaseMatches = try await matchesService.loadMatches(userId: userId)
+            
+            let filteredMatches = supabaseMatches.filter { match in
+                let connectedPlayerIds = match.players.filter { !$0.isGuest }.map { $0.id }
+                return connectedPlayerIds.contains(friendUserId) && connectedPlayerIds.contains(userId)
+            }
+            
+            await MainActor.run {
+                headToHeadMatches = filteredMatches.sorted { $0.timestamp > $1.timestamp }
+                isLoadingMatches = false
                 
-                // Filter for head-to-head matches
-                let filteredSupabase = supabaseMatches.filter { match in
-                    let playerIds = match.players.map { $0.id }
-                    return playerIds.contains(friendUserId) && playerIds.contains(userId)
-                }
-                
-                // Merge local and Supabase matches, remove duplicates
-                let allMatches = mergeMatches(local: filteredLocal, supabase: filteredSupabase)
-                
-                await MainActor.run {
-                    headToHeadMatches = allMatches.sorted { $0.timestamp > $1.timestamp }
-                    isLoadingMatches = false
-                }
-                
-                print("✅ Loaded \(headToHeadMatches.count) head-to-head matches with \(friend.displayName)")
-                
-            } catch {
-                await MainActor.run {
-                    isLoadingMatches = false
-                }
-                print("❌ Failed to load Supabase matches: \(error)")
-                // Keep showing local matches on error
+                let friendId = friend.userId ?? friend.id
+                HeadToHeadCache.shared.setMatches(headToHeadMatches, for: friendId)
+            }
+            
+        } catch {
+            await MainActor.run {
+                isLoadingMatches = false
             }
         }
     }
     
-    /// Merge local and Supabase matches, removing duplicates
-    private func mergeMatches(local: [MatchResult], supabase: [MatchResult]) -> [MatchResult] {
-        var matchesById: [UUID: MatchResult] = [:]
-        
-        // Add local matches first
-        for match in local {
-            matchesById[match.id] = match
+    /// Load head-to-head matches from Supabase only
+    private func loadHeadToHeadMatches() {
+        Task {
+            await loadHeadToHeadMatchesAsync()
         }
-        
-        // Add Supabase matches (will overwrite local if same ID)
-        for match in supabase {
-            matchesById[match.id] = match
-        }
-        
-        return Array(matchesById.values)
     }
+    
     
     /// Remove friend and dismiss view
     private func removeFriend() {
@@ -233,8 +225,37 @@ struct HeadToHeadStatsView: View {
         
         return gameTypes.compactMap { gameName in
             let gameMatches = matches.filter { $0.gameName == gameName }
-            let currentUserWins = gameMatches.filter { $0.winnerId == currentUserId }.count
-            let friendWins = gameMatches.filter { $0.winnerId == friendId }.count
+            
+            // Count wins by checking if winner is current user or friend
+            // Handle both local matches (winnerId = MatchPlayer.id) and Supabase matches (winnerId = user account ID)
+            let currentUserWins = gameMatches.filter { match in
+                // Check if winnerId matches current user's account ID
+                if match.winnerId == currentUserId {
+                    return true
+                }
+                // Also check if any connected player with current user's ID won
+                if let winner = match.players.first(where: { $0.id == match.winnerId }),
+                   !winner.isGuest,
+                   winner.id == currentUserId {
+                    return true
+                }
+                return false
+            }.count
+            
+            let friendWins = gameMatches.filter { match in
+                // Check if winnerId matches friend's account ID
+                if match.winnerId == friendId {
+                    return true
+                }
+                // Also check if any connected player with friend's ID won
+                if let winner = match.players.first(where: { $0.id == match.winnerId }),
+                   !winner.isGuest,
+                   winner.id == friendId {
+                    return true
+                }
+                return false
+            }.count
+            
             let totalMatches = gameMatches.count
             
             guard totalMatches > 0 else { return nil }

@@ -338,7 +338,7 @@ class KnockoutViewModel: ObservableObject {
             gameType: "Knockout",
             gameName: "Knockout",
             players: matchPlayers,
-            winnerId: winner.id,
+            winnerId: winner.userId ?? winner.id,
             timestamp: matchStartTime,
             duration: duration,
             matchFormat: 1,
@@ -350,7 +350,7 @@ class KnockoutViewModel: ObservableObject {
         MatchStorageManager.shared.saveMatch(matchResult)
         
         // Update player stats
-        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.id)
+        MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.userId ?? winner.id)
         
         // Capture current user ID before Task
         let currentUserId = authService?.currentUser?.id
