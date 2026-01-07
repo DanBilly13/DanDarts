@@ -125,7 +125,27 @@ class MatchService: ObservableObject {
                 // This is a local file path - upload it to Supabase
                 print("📤 Uploading local avatar for \(player.displayName): \(avatarURL)")
                 
-                if let imageData = try? Data(contentsOf: URL(fileURLWithPath: avatarURL)) {
+                // For guest avatars, the stored path may be invalid due to iOS container changes
+                // Extract filename and look in current Documents/guest_avatars directory
+                var imageData: Data? = nil
+                
+                // First try the stored path directly
+                if let data = try? Data(contentsOf: URL(fileURLWithPath: avatarURL)) {
+                    imageData = data
+                } else if player.isGuest, avatarURL.contains("guest_avatars") {
+                    // Path is stale - try to find the file in current Documents directory
+                    let filename = URL(fileURLWithPath: avatarURL).lastPathComponent
+                    if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                        let currentPath = documentsDirectory
+                            .appendingPathComponent("guest_avatars", isDirectory: true)
+                            .appendingPathComponent(filename)
+                        
+                        print("🔄 Trying current path: \(currentPath.path)")
+                        imageData = try? Data(contentsOf: currentPath)
+                    }
+                }
+                
+                if let imageData = imageData {
                     do {
                         let publicURL = try await uploadPlayerAvatar(imageData: imageData, playerId: player.id)
                         print("✅ Avatar uploaded: \(publicURL)")
@@ -148,7 +168,7 @@ class MatchService: ObservableObject {
                         // Continue with local path - better than failing the whole match save
                     }
                 } else {
-                    print("⚠️ Failed to load avatar file for \(player.displayName)")
+                    print("⚠️ Failed to load avatar file for \(player.displayName) - file not found")
                 }
             }
         }
@@ -239,24 +259,11 @@ class MatchService: ObservableObject {
         // 3. Insert match_throws records (bulk insert)
         var throwRecords: [MatchThrowRecord] = []
         
-        // 🔍 DEBUG: Log player structure
-        print("🔍 DEBUG: Players array for match \(matchId):")
-        for (index, player) in players.enumerated() {
-            print("  [\(index)] \(player.displayName) - ID: \(player.id), UserID: \(player.userId?.uuidString ?? "nil"), IsGuest: \(player.isGuest)")
-        }
-        
-        print("🔍 DEBUG: Processing \(turnHistory.count) turns")
-        
         for turn in turnHistory {
             // Find player order
             guard let playerOrder = players.firstIndex(where: { $0.id == turn.playerId }) else {
-                print("⚠️ DEBUG: Could not find player for turn.playerId: \(turn.playerId)")
                 continue
             }
-            
-            // 🔍 DEBUG: Log turn details
-            print("🔍 DEBUG: Turn \(turn.turnNumber) - Player: \(turn.player.displayName), PlayerID: \(turn.playerId), PlayerOrder: \(playerOrder)")
-            print("  Darts: \(turn.darts.map { $0.totalValue })")
             
             let throwRecord = MatchThrowRecord(
                 match_id: matchId.uuidString,
@@ -265,16 +272,14 @@ class MatchService: ObservableObject {
                 dart_scores: turn.darts.map { $0.totalValue },
                 score_before: turn.scoreBefore,
                 score_after: turn.scoreAfter,
-                is_bust: turn.isBust, // Include life loss flag for Knockout
-                game_metadata: turn.gameMetadata // Include game-specific data
+                is_bust: turn.isBust,
+                game_metadata: turn.gameMetadata
             )
             
             throwRecords.append(throwRecord)
         }
         
-        print("🔍 DEBUG: Created \(throwRecords.count) throw records")
-        print("🔍 DEBUG: First throw record: \(throwRecords.first.map { "player_order: \($0.player_order), dart_scores: \($0.dart_scores)" } ?? "none")")
-        
+        // Insert match throws
         if !throwRecords.isEmpty {
             try await supabaseService.client
                 .from("match_throws")
