@@ -239,11 +239,24 @@ class MatchService: ObservableObject {
         // 3. Insert match_throws records (bulk insert)
         var throwRecords: [MatchThrowRecord] = []
         
+        // 🔍 DEBUG: Log player structure
+        print("🔍 DEBUG: Players array for match \(matchId):")
+        for (index, player) in players.enumerated() {
+            print("  [\(index)] \(player.displayName) - ID: \(player.id), UserID: \(player.userId?.uuidString ?? "nil"), IsGuest: \(player.isGuest)")
+        }
+        
+        print("🔍 DEBUG: Processing \(turnHistory.count) turns")
+        
         for turn in turnHistory {
             // Find player order
             guard let playerOrder = players.firstIndex(where: { $0.id == turn.playerId }) else {
+                print("⚠️ DEBUG: Could not find player for turn.playerId: \(turn.playerId)")
                 continue
             }
+            
+            // 🔍 DEBUG: Log turn details
+            print("🔍 DEBUG: Turn \(turn.turnNumber) - Player: \(turn.player.displayName), PlayerID: \(turn.playerId), PlayerOrder: \(playerOrder)")
+            print("  Darts: \(turn.darts.map { $0.totalValue })")
             
             let throwRecord = MatchThrowRecord(
                 match_id: matchId.uuidString,
@@ -258,6 +271,9 @@ class MatchService: ObservableObject {
             
             throwRecords.append(throwRecord)
         }
+        
+        print("🔍 DEBUG: Created \(throwRecords.count) throw records")
+        print("🔍 DEBUG: First throw record: \(throwRecords.first.map { "player_order: \($0.player_order), dart_scores: \($0.dart_scores)" } ?? "none")")
         
         if !throwRecords.isEmpty {
             try await supabaseService.client

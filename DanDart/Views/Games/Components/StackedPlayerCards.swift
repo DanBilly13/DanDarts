@@ -10,6 +10,7 @@ struct StackedPlayerCards: View {
     let showScoreAnimation: Bool
     let isExpanded: Bool
     let onTap: (() -> Void)?
+    let getOriginalIndex: ((Player) -> Int)? // Function to get original player index for color consistency
 
     var body: some View {
         VStack(spacing: 16) {
@@ -23,7 +24,7 @@ struct StackedPlayerCards: View {
                         currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
                         legsWon: legsWon[player.id] ?? 0,
                         matchFormat: matchFormat,
-                        playerIndex: index,
+                        playerIndex: getOriginalIndex?(player) ?? index,
                         showScoreAnimation: showScoreAnimation && index == currentPlayerIndex
                     )
                     .overlay(

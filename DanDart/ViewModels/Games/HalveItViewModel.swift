@@ -262,7 +262,7 @@ class HalveItViewModel: ObservableObject {
         
         // Create match result with difficulty metadata
         let matchResult = MatchResult(
-            id: UUID(),
+            id: matchId,
             gameType: "Halve It",
             gameName: "Halve It",
             players: matchPlayers,

@@ -64,7 +64,8 @@ struct HalveItGameplayView: View {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                     isScoreboardExpanded = true
                                 }
-                            }
+                            },
+                            getOriginalIndex: nil
                         )
                         .padding(.horizontal, 16)
                         .padding(.top, 56)

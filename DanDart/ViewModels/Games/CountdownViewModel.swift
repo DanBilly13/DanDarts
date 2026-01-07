@@ -49,11 +49,18 @@ class CountdownViewModel: ObservableObject {
     let game: Game
     let startingScore: Int
     private let matchStartTime: Date
+    private let originalPlayerOrder: [Player] // Store original randomized order for color consistency
     
     // MARK: - Computed Properties
     
     var currentPlayer: Player {
         players[currentPlayerIndex]
+    }
+    
+    /// Get the original index of a player for consistent color assignment
+    /// This ensures player colors don't change when order rotates in multi-leg matches
+    func originalIndex(of player: Player) -> Int {
+        return originalPlayerOrder.firstIndex(where: { $0.id == player.id }) ?? 0
     }
     
     var isTurnComplete: Bool {
@@ -163,7 +170,9 @@ class CountdownViewModel: ObservableObject {
     init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         // Randomize player order for fair play
-        self.players = players.shuffled()
+        let shuffledPlayers = players.shuffled()
+        self.players = shuffledPlayers
+        self.originalPlayerOrder = shuffledPlayers // Store for color consistency
         self.matchStartTime = Date()
         self.matchFormat = matchFormat
         
@@ -445,6 +454,9 @@ class CountdownViewModel: ObservableObject {
     
     /// Reset for a new leg (after leg win but match continues)
     func resetLeg() {
+        // Rotate player order for next leg
+        rotatePlayerOrder()
+        
         // Reset scores for new leg
         for player in players {
             playerScores[player.id] = startingScore
@@ -465,6 +477,22 @@ class CountdownViewModel: ObservableObject {
         updateCheckoutSuggestion()
         
         SoundManager.shared.resetMissCounter()
+    }
+    
+    /// Rotate player order for multi-leg matches
+    /// 2 players: alternate starting player (P1 P2 → P2 P1 → P1 P2)
+    /// 3+ players: rotate entire order left by 1 (P1 P2 P3 P4 → P2 P3 P4 P1)
+    private func rotatePlayerOrder() {
+        guard players.count >= 2 else { return }
+        
+        if players.count == 2 {
+            // Simple alternation for 2 players
+            players.reverse()
+        } else {
+            // Rotate left by 1 for 3+ players
+            let firstPlayer = players.removeFirst()
+            players.append(firstPlayer)
+        }
     }
     
     // MARK: - Private Helpers

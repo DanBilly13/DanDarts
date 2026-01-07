@@ -77,6 +77,9 @@ struct CountdownGameplayView: View {
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                         isScoreboardExpanded = true
                                     }
+                                },
+                                getOriginalIndex: { player in
+                                    gameViewModel.originalIndex(of: player)
                                 }
                             )
                             .padding(.horizontal, 16)
