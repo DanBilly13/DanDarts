@@ -6,10 +6,25 @@
 //
 
 import SwiftUI
+import FirebaseCore
+import FirebaseAnalytics
+import FirebaseCrashlytics
+import FirebasePerformance
 
 @main
 struct DartFreakApp: App {
     @StateObject private var authService = AuthService.shared
+    
+    init() {
+        // Initialize Firebase
+        FirebaseApp.configure()
+        
+        // Enable Analytics collection
+        Analytics.setAnalyticsCollectionEnabled(true)
+        
+        // Enable Crashlytics
+        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
+    }
     
     var body: some Scene {
         WindowGroup {

@@ -15,6 +15,10 @@
 		9E12AC372E9A4A32006F3847 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 9E12AC362E9A4A32006F3847 /* Supabase */; };
 		9E21F04B2EA4E1630097BEC4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9E21F04A2EA4E1630097BEC4 /* GoogleSignIn */; };
 		9E21F04D2EA4E1630097BEC4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 9E21F04C2EA4E1630097BEC4 /* GoogleSignInSwift */; };
+		9EBDDF3E2F11292D0008A530 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 9EBDDF3D2F11292D0008A530 /* FirebaseAnalytics */; };
+		9EBDDF402F11292D0008A530 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 9EBDDF3F2F11292D0008A530 /* FirebaseCrashlytics */; };
+		9EBDDF422F11292D0008A530 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 9EBDDF412F11292D0008A530 /* FirebaseMessaging */; };
+		9EBDDF442F11292D0008A530 /* FirebasePerformance in Frameworks */ = {isa = PBXBuildFile; productRef = 9EBDDF432F11292D0008A530 /* FirebasePerformance */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,12 +82,16 @@
 			files = (
 				9E12AC312E9A4A32006F3847 /* PostgREST in Frameworks */,
 				9E12AC2F2E9A4A32006F3847 /* Functions in Frameworks */,
+				9EBDDF442F11292D0008A530 /* FirebasePerformance in Frameworks */,
 				9E12AC372E9A4A32006F3847 /* Supabase in Frameworks */,
 				9E21F04D2EA4E1630097BEC4 /* GoogleSignInSwift in Frameworks */,
 				9E12AC2D2E9A4A32006F3847 /* Auth in Frameworks */,
 				9E12AC352E9A4A32006F3847 /* Storage in Frameworks */,
 				9E12AC332E9A4A32006F3847 /* Realtime in Frameworks */,
+				9EBDDF402F11292D0008A530 /* FirebaseCrashlytics in Frameworks */,
 				9E21F04B2EA4E1630097BEC4 /* GoogleSignIn in Frameworks */,
+				9EBDDF422F11292D0008A530 /* FirebaseMessaging in Frameworks */,
+				9EBDDF3E2F11292D0008A530 /* FirebaseAnalytics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,6 +150,7 @@
 				9E12ABDC2E997D5A006F3847 /* Sources */,
 				9E12ABDD2E997D5A006F3847 /* Frameworks */,
 				9E12ABDE2E997D5A006F3847 /* Resources */,
+				9EBDDF452F113A980008A530 /* Firebase Crashlytics */,
 			);
 			buildRules = (
 			);
@@ -160,6 +169,10 @@
 				9E12AC362E9A4A32006F3847 /* Supabase */,
 				9E21F04A2EA4E1630097BEC4 /* GoogleSignIn */,
 				9E21F04C2EA4E1630097BEC4 /* GoogleSignInSwift */,
+				9EBDDF3D2F11292D0008A530 /* FirebaseAnalytics */,
+				9EBDDF3F2F11292D0008A530 /* FirebaseCrashlytics */,
+				9EBDDF412F11292D0008A530 /* FirebaseMessaging */,
+				9EBDDF432F11292D0008A530 /* FirebasePerformance */,
 			);
 			productName = DanDart;
 			productReference = 9E12ABE02E997D5A006F3847 /* DanDart.app */;
@@ -246,6 +259,7 @@
 			packageReferences = (
 				9E12AC2A2E9A4903006F3847 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				9E21F0472EA4D88A0097BEC4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				9EBDDF3C2F11292D0008A530 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9E12ABE12E997D5A006F3847 /* Products */;
@@ -282,6 +296,31 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		9EBDDF452F113A980008A530 /* Firebase Crashlytics */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 8;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/$(PROJECT_DIR)/DanDart/GoogleService-Info.plist",
+				"$(SRCROOT)/$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+				"$(SRCROOT)/$(DWARF_DSYM_FOLDER_PATH)/$(DWARF_DSYM_FILE_NAME)",
+				"$(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Firebase Crashlytics";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+			shellPath = /bin/sh;
+			shellScript = "echo \"Build dir: ${BUILT_PRODUCTS_DIR}\"\necho \"Product name: ${PRODUCT_NAME}\"\necho \"Listing app bundle contents:\"\nls -la \"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/\" | grep -i google\n\nexport GOOGLE_SERVICE_INFO_PLIST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/GoogleService-Info.plist\"\n\n\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9E12ABDC2E997D5A006F3847 /* Sources */ = {
@@ -644,6 +683,14 @@
 				minimumVersion = 9.0.0;
 			};
 		};
+		9EBDDF3C2F11292D0008A530 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.7.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -686,6 +733,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9E21F0472EA4D88A0097BEC4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		9EBDDF3D2F11292D0008A530 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EBDDF3C2F11292D0008A530 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		9EBDDF3F2F11292D0008A530 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EBDDF3C2F11292D0008A530 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		9EBDDF412F11292D0008A530 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EBDDF3C2F11292D0008A530 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		9EBDDF432F11292D0008A530 /* FirebasePerformance */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EBDDF3C2F11292D0008A530 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebasePerformance;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
