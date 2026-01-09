@@ -5,6 +5,16 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>dartfreak</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dartfreak</string>
+			</array>
+		</dict>
+		<dict>
 			<key>CFBundleIdentifier</key>
 			<string></string>
 			<key>CFBundleTypeRole</key>
@@ -41,7 +51,5 @@
 			</dict>
 		</dict>
 	</dict>
-	<key>NSCameraUsageDescription</key>
-	<string>DanDarts uses the camera so you can take a profile photo.</string>
 </dict>
 </plist>
