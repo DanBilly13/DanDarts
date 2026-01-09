@@ -10,6 +10,7 @@ import SwiftUI
 struct MatchHistoryView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var matchesService = MatchesService()
+    private let analytics = AnalyticsService.shared
     
     @State private var selectedFilter: GameFilter = .all
     @State private var matches: [MatchResult] = []
@@ -111,6 +112,9 @@ struct MatchHistoryView: View {
                 loadCachedMatchesIfNeeded()
                 loadMatches()
                 updateFilteredMatches()
+                
+                // Log match history viewed event
+                analytics.logMatchHistoryViewed(totalMatches: matches.count)
             }
             .onChange(of: lastUpdateTime) { _, _ in
                 updateStatusText = formatUpdateStatus()

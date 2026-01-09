@@ -31,6 +31,7 @@ class CountdownViewModel: ObservableObject {
     
     // Services
     private var authService: AuthService?
+    private let analytics = AnalyticsService.shared
     
     /// Inject AuthService from the view
     func setAuthService(_ service: AuthService) {
@@ -193,6 +194,16 @@ class CountdownViewModel: ObservableObject {
             playerScores[player.id] = startingScore
             legsWon[player.id] = 0
         }
+        
+        // Log game started event
+        let gameType = game.title.contains("301") ? "301" : "501"
+        let hasGuests = players.contains(where: { $0.userId == nil })
+        analytics.logGameStarted(
+            gameType: gameType,
+            playerCount: players.count,
+            hasGuests: hasGuests,
+            matchFormat: matchFormat
+        )
     }
     
     // MARK: - Game Actions
@@ -690,6 +701,18 @@ class CountdownViewModel: ObservableObject {
         
         // Update player stats
         MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.userId ?? winner.id)
+        
+        // Log game completed event
+        let gameType = game.title.contains("301") ? "301" : "501"
+        let winnerType = winner.userId != nil ? "user" : "guest"
+        let totalThrows = matchPlayers.reduce(0) { $0 + $1.totalDartsThrown }
+        analytics.logGameCompleted(
+            gameType: gameType,
+            winnerType: winnerType,
+            durationSeconds: Int(matchDuration),
+            totalThrows: totalThrows,
+            matchFormat: matchFormat
+        )
         
         // Capture current user ID before entering Task (to avoid race conditions)
         let currentUserId = authService?.currentUser?.id

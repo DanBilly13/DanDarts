@@ -11,6 +11,7 @@ import Supabase
 @MainActor
 class FriendsService: ObservableObject {
     private let supabaseService = SupabaseService.shared
+    private let analytics = AnalyticsService.shared
     
     // MARK: - Friend Search
     
@@ -77,10 +78,14 @@ class FriendsService: ObservableObject {
             createdAt: Date()
         )
         
+        // Insert new friend request
         try await supabaseService.client
             .from("friendships")
             .insert(friendship)
             .execute()
+        
+        // Log friend request sent event
+        analytics.logFriendRequestSent()
     }
     
     /// Add a friend (legacy method - now calls sendFriendRequest)
@@ -245,6 +250,9 @@ class FriendsService: ObservableObject {
             .update(["status": "accepted"])
             .eq("id", value: requestId)
             .execute()
+        
+        // Log friend request accepted event
+        analytics.logFriendRequestAccepted()
     }
     
     /// Deny a friend request (Task 304)

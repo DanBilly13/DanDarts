@@ -11,6 +11,7 @@ import PhotosUI
 struct ProfileSetupView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
+    private let analytics = AnalyticsService.shared
     
     // MARK: - Form State
     @State private var selectedAvatar: String = "avatar1" // Default to first avatar
@@ -159,6 +160,11 @@ struct ProfileSetupView: View {
                 bio: nil,
                 avatarIcon: avatarURL
             )
+            
+            // Log profile setup completed event
+            let hasAvatar = selectedAvatarImage != nil
+            let signupMethod = authService.currentUser?.email?.contains("@") == true ? "email" : "google"
+            analytics.logProfileSetupCompleted(hasAvatar: hasAvatar, signupMethod: signupMethod)
             
             // Navigate to main app
             dismiss()
