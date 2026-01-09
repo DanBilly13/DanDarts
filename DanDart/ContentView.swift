@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Main app entry point with authentication flow
 //

@@ -1,6 +1,6 @@
 //
 //  PreGameHypeView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Pre-game hype screen with boxing match style presentation
 //

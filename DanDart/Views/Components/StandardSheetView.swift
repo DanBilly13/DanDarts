@@ -1,6 +1,6 @@
 //
 //  StandardSheetView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Created by Windsurf on 29/10/2025.
 //  Standard sheet layout wrapper for consistent presentation across the app

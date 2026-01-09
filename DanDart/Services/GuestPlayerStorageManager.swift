@@ -1,6 +1,6 @@
 //
 //  GuestPlayerStorageManager.swift
-//  DanDart
+//  Dart Freak
 //
 //  Local storage manager for guest players
 //

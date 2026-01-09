@@ -1,6 +1,6 @@
 //
 //  NavigationManager.swift
-//  DanDart
+//  Dart Freak
 //
 //  Simple navigation manager to handle dismiss to root functionality
 //

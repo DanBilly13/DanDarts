@@ -1,6 +1,6 @@
 //
 //  FriendSearchView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Sheet view for searching and adding friends
 //

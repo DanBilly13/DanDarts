@@ -1,6 +1,6 @@
 //
 //  FriendsStorageManager.swift
-//  DanDart
+//  Dart Freak
 //
 //  Manager for saving and loading friends list to/from local JSON storage
 //

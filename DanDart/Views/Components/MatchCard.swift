@@ -1,6 +1,6 @@
 //
 //  MatchCard.swift
-//  DanDart
+//  Dart Freak
 //
 //  Match card component for displaying match history
 //

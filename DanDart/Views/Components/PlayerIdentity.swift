@@ -1,6 +1,6 @@
 //
 //  PlayerIdentity.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable player identity component (avatar + name + nickname)
 //

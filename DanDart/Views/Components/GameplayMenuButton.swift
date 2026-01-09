@@ -1,6 +1,6 @@
 //
 //  GameplayMenuButton.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable menu button for gameplay screens
 //  Provides consistent styling across all game modes

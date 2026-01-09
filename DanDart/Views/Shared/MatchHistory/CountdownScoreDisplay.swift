@@ -1,6 +1,6 @@
 //
 //  CountdownScoreDisplay.swift
-//  DanDart
+//  Dart Freak
 //
 //  Score display for countdown games (301, 501)
 //  Lower score is better, winner always has 0

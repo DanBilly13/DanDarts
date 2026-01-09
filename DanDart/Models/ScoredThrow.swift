@@ -1,6 +1,6 @@
 //
 //  ScoredThrow.swift
-//  DanDart
+//  Dart Freak
 //
 //  Model representing a single dart throw with its score type
 //  Used across all dart game modes

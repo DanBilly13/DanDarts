@@ -1,6 +1,6 @@
 //
 //  HalveItViewModel.swift
-//  DanDart
+//  Dart Freak
 //
 //  Game state manager for Halve It game
 //  Handles scoring, turn management, and win detection

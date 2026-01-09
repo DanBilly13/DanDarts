@@ -1,6 +1,6 @@
 //
 //  ProfileView.swift
-//  DanDart
+//  Dart Freak
 //
 //  User profile view with settings and logout
 //

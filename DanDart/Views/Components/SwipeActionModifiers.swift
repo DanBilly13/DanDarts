@@ -1,6 +1,6 @@
 //
 //  SwipeActionModifiers.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable swipe action modifiers for consistent styling across the app
 //

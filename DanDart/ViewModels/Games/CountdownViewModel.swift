@@ -1,6 +1,6 @@
 //
 //  CountdownViewModel.swift
-//  DanDart
+//  Dart Freak
 //
 //  Game state manager for countdown games (301/501)
 //  Handles scoring, turn management, and win detection

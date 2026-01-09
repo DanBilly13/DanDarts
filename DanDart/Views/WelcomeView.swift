@@ -1,6 +1,6 @@
 //
 //  WelcomeView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Welcome screen for unauthenticated users
 //

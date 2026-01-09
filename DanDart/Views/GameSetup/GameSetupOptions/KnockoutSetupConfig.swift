@@ -1,6 +1,6 @@
 //
 //  KnockoutSetupConfig.swift
-//  DanDart
+//  Dart Freak
 //
 //  Configuration for Knockout game setup
 //

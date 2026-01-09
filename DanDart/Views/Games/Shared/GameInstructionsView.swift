@@ -1,6 +1,6 @@
 //
 //  GameInstructionsView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Game instructions sheet for displaying rules and gameplay
 //

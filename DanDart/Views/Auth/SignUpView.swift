@@ -1,6 +1,6 @@
 //
 //  SignUpView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Sign up screen for user registration
 //

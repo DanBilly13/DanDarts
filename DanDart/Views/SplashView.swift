@@ -1,6 +1,6 @@
 //
 //  SplashView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Splash screen shown during app launch
 //

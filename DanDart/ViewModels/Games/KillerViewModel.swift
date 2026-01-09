@@ -1,6 +1,6 @@
 //
 //  KillerViewModel.swift
-//  DanDart
+//  Dart Freak
 //
 //  ViewModel for Killer game mode
 //  Players are assigned random numbers (1-20), must hit their double to become a Killer,

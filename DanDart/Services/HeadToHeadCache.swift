@@ -1,6 +1,6 @@
 //
 //  HeadToHeadCache.swift
-//  DanDart
+//  Dart Freak
 //
 //  Singleton cache for head-to-head match data
 //

@@ -1,6 +1,6 @@
 //
 //  FriendRequestsView.swift
-//  DanDart
+//  Dart Freak
 //
 //  View for managing friend requests (received and sent)
 //  Task 302: Create Friend Requests View

@@ -1,6 +1,6 @@
 //
 //  GameCard.swift
-//  DanDart
+//  Dart Freak
 //
 //  Game card component for displaying dart games in the games list
 //

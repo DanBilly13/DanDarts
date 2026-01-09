@@ -1,6 +1,6 @@
 //
 //  ImageCache.swift
-//  DanDart
+//  Dart Freak
 //
 //  Image caching utility for faster avatar loading
 //

@@ -1,6 +1,6 @@
 //
 //  CurrentThrowDisplay.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable component for displaying current throw with tap-to-edit functionality
 //  Shows 3 dart slots, selected dart border, and total score

@@ -1,6 +1,6 @@
 //
 //  KnockoutGameplayView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Created by DanDarts Team
 //

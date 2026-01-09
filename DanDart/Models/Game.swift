@@ -1,6 +1,6 @@
 //
 //  Game.swift
-//  DanDart
+//  Dart Freak
 //
 //  Game model for dart game types and configurations
 //

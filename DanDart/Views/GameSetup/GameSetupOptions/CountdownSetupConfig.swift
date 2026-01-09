@@ -1,6 +1,6 @@
 //
 //  CountdownSetupConfig.swift
-//  DanDart
+//  Dart Freak
 //
 //  Configuration for 301/501 game setup
 //

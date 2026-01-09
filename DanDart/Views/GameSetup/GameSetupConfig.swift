@@ -1,6 +1,6 @@
 //
 //  GameSetupConfig.swift
-//  DanDart
+//  Dart Freak
 //
 //  Configuration protocol for game setup views
 //  Allows each game type to define its specific options and parameters

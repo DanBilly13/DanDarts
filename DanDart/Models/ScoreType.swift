@@ -1,6 +1,6 @@
 //
 //  ScoreType.swift
-//  DanDart
+//  Dart Freak
 //
 //  Enum representing dart scoring types (single, double, triple)
 //  Used across all dart game modes

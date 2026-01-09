@@ -1,6 +1,6 @@
 //
 //  SuddenDeathMatchDetailView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Detailed view of a completed Sudden Death match
 //

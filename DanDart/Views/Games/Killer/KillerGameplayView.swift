@@ -1,6 +1,6 @@
 //
 //  KillerGameplayView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Main gameplay view for Killer game mode
 //  Layout adapted from Sudden Death with Killer-specific components

@@ -1,6 +1,6 @@
 //
 //  NavigationButton.swift
-//  DanDart
+//  Dart Freak
 //
 //  Router-based navigation button component
 //

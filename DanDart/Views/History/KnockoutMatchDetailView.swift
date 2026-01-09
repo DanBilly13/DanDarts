@@ -1,6 +1,6 @@
 //
 //  KnockoutMatchDetailView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Detailed view of a completed Knockout match
 //

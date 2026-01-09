@@ -1,6 +1,6 @@
 //
 //  MatchHistoryView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Match history view with filters and list of past matches
 //

@@ -1,6 +1,6 @@
 //
 //  PlayerCardLayout.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable layout utility for player card spacing and sizing
 //  Used in: Killer, Sudden Death

@@ -1,6 +1,6 @@
 //
 //  SignInView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Sign in screen for user authentication
 //

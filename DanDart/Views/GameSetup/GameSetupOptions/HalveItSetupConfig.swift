@@ -1,6 +1,6 @@
 //
 //  HalveItSetupConfig.swift
-//  DanDart
+//  Dart Freak
 //
 //  Configuration for Halve-It game setup
 //

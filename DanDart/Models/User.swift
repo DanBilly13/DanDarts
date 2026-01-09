@@ -1,6 +1,6 @@
 //
 //  User.swift
-//  DanDart
+//  Dart Freak
 //
 //  User model for authenticated players
 //

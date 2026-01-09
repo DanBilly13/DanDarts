@@ -1,6 +1,6 @@
 //
 //  AuthService.swift
-//  DanDart
+//  Dart Freak
 //
 //  Authentication service for user management
 //

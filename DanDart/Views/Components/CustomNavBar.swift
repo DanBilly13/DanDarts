@@ -1,6 +1,6 @@
 //
 //  CustomNavBar.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable custom navigation bar components
 //  iOS 18+ optimized with subtitle support

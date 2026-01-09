@@ -1,6 +1,6 @@
 //
 //  HalveItThrowDisplay.swift
-//  DanDart
+//  Dart Freak
 //
 //  Halve-It specific throw display showing target hits/misses
 //  Shows red X for missed targets, normal display for hits

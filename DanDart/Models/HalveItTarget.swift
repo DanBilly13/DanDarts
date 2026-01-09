@@ -1,6 +1,6 @@
 //
 //  HalveItTarget.swift
-//  DanDart
+//  Dart Freak
 //
 //  Target types for Halve It game
 //

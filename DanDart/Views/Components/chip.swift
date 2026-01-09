@@ -1,6 +1,6 @@
 //
 //  chip.swift
-//  DanDart
+//  Dart Freak
 //
 //  Created by Billingham Daniel on 2025-11-03.
 //

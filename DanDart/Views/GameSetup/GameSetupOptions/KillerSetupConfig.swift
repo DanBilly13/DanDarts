@@ -1,6 +1,6 @@
 //
 //  KillerSetupConfig.swift
-//  DanDart
+//  Dart Freak
 //
 //  Configuration for Killer game setup
 //

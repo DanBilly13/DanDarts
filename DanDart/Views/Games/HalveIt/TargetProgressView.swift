@@ -1,6 +1,6 @@
 //
 //  TargetProgressView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Displays the target sequence for Halve It game
 //  Shows current target highlighted, completed targets dimmed

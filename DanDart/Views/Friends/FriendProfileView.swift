@@ -1,6 +1,6 @@
 //
 //  FriendProfileView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Profile view for viewing friend details and head-to-head stats
 //

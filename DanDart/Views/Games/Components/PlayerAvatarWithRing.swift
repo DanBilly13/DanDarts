@@ -1,6 +1,6 @@
 //
 //  PlayerAvatarWithRing.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable avatar component with current player ring indicator
 //  Used in: Sudden Death, Knockout, Killer

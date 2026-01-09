@@ -1,6 +1,6 @@
 //
 //  AvatarSelectionView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable avatar selection component with photo picker and predefined avatars
 //

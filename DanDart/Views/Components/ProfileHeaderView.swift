@@ -1,6 +1,6 @@
 //
 //  ProfileHeaderView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable profile header component for user and friend profiles
 //

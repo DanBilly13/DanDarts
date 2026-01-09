@@ -1,6 +1,6 @@
 //
 //  FriendsCache.swift
-//  DanDart
+//  Dart Freak
 //
 //  Persistent cache for friends data to avoid reloading on sheet presentations
 //

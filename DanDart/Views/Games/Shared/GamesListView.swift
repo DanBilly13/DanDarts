@@ -1,6 +1,6 @@
 //
 //  GamesListView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Horizontal scrolling list of dart games with snap-to-center behavior
 //

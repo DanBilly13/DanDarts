@@ -1,6 +1,6 @@
 //
 //  ScoringButtonGrid.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable dartboard scoring input grid with long-press for doubles/triples
 //  Used across multiple dart game modes

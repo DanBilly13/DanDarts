@@ -1,6 +1,6 @@
 //
 //  KillerMatchDetailView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Detailed view of a completed Killer match
 //  Shows player rankings, round-by-round grid with icons, and hearts

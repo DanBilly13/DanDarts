@@ -1,6 +1,6 @@
 //
 //  SupabaseService.swift
-//  DanDart
+//  Dart Freak
 //
 //  Supabase configuration and client setup
 //

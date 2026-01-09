@@ -1,6 +1,6 @@
 //
 //  ProfileSetupView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Profile setup screen for new users
 //

@@ -1,6 +1,6 @@
 //
 //  AvatarHelper.swift
-//  DanDart
+//  Dart Freak
 //
 //  Avatar utility functions for consistent avatar display across the app
 //

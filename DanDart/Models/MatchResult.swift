@@ -1,6 +1,6 @@
 //
 //  MatchResult.swift
-//  DanDart
+//  Dart Freak
 //
 //  Model for storing completed match data locally
 //

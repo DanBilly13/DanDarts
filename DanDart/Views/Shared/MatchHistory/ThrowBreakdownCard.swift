@@ -1,6 +1,6 @@
 //
 //  ThrowBreakdownCard.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable component for displaying 301/501 turn breakdown
 //  Shows round number, dart throws, and remaining scores

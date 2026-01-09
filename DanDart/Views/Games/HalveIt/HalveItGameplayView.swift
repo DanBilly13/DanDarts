@@ -1,6 +1,6 @@
 //
 //  HalveItGameplayView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Full-screen gameplay view for Halve It game
 //  Shows target progression and accumulated scoring

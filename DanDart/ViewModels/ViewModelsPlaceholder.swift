@@ -1,6 +1,6 @@
 //
 //  ViewModelsPlaceholder.swift
-//  DanDart
+//  Dart Freak
 //
 //  Placeholder file to maintain folder structure
 //  This file can be removed once actual ViewModels are added

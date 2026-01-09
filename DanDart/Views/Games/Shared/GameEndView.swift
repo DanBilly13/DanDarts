@@ -1,6 +1,6 @@
 //
 //  GameEndView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Game end screen showing winner and celebration
 //  Design: Dark dramatic with winner spotlight

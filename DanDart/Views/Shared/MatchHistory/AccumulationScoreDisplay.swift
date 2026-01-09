@@ -1,6 +1,6 @@
 //
 //  AccumulationScoreDisplay.swift
-//  DanDart
+//  Dart Freak
 //
 //  Score display for accumulation games (Halve It, Cricket, etc.)
 //  Higher score is better, winner's score is meaningful

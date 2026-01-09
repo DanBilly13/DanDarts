@@ -1,6 +1,6 @@
 //
 //  TopBarSub.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable top bar with title, subtitle, and trailing action button
 //  Used for navigation views like match details

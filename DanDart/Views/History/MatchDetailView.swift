@@ -1,6 +1,6 @@
 //
 //  MatchDetailView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Detailed view of a completed match with turn-by-turn breakdown
 //

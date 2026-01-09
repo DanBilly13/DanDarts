@@ -1,6 +1,6 @@
 //
 //  AsyncAvatarImage.swift
-//  DanDart
+//  Dart Freak
 //
 //  Async image loader for avatars - supports both local assets and remote URLs
 //

@@ -1,6 +1,6 @@
 //
 //  MatchesService.swift
-//  DanDart
+//  Dart Freak
 //
 //  Service for syncing match results to Supabase
 //

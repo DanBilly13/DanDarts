@@ -1,6 +1,6 @@
 //
 //  SearchPlayerSheet.swift
-//  DanDart
+//  Dart Freak
 //
 //  Sheet for selecting players (yourself, friends, or guests) when setting up a game
 //

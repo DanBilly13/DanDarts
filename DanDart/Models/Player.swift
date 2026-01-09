@@ -1,6 +1,6 @@
 //
 //  Player.swift
-//  DanDart
+//  Dart Freak
 //
 //  Player model for game participants (guests and connected users)
 //

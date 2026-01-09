@@ -1,6 +1,6 @@
 //
 //  DartHitIndicators.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable 3-dot hit/miss indicator for dart throws
 //

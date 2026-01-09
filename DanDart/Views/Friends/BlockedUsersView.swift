@@ -1,6 +1,6 @@
 //
 //  BlockedUsersView.swift
-//  DanDart
+//  Dart Freak
 //
 //  View for managing blocked users
 //  Task 307: Create Block List Management

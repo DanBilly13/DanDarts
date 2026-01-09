@@ -1,6 +1,6 @@
 //
 //  CountdownGameplayView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Full-screen gameplay view for countdown games (301/501)
 //  Design: Calculator-inspired scoring with dark theme

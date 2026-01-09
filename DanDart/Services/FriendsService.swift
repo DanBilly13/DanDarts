@@ -1,6 +1,6 @@
 //
 //  FriendsService.swift
-//  DanDart
+//  Dart Freak
 //
 //  Service for managing friend relationships and searching users
 //

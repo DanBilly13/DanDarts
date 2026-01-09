@@ -1,6 +1,6 @@
 //
 //  RoundScoreDisplay.swift
-//  DanDart
+//  Dart Freak
 //
 //  Color-coded score display for match history rounds
 //

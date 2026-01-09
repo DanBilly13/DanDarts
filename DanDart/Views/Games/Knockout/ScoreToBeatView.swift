@@ -1,6 +1,6 @@
 //
 //  ScoreToBeatView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Score to beat display for Sudden Death game
 //  Shows the current high score that players must beat to stay in the game

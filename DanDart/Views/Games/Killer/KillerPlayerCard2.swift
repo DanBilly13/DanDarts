@@ -1,6 +1,6 @@
 //
 //  KillerPlayerCard2.swift
-//  DanDart
+//  Dart Freak
 //
 //  New design for Killer player card:
 //  - Target number in rounded container above avatar

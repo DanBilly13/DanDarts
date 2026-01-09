@@ -1,6 +1,6 @@
 //
 //  MatchStorageManager.swift
-//  DanDart
+//  Dart Freak
 //
 //  Manager for saving and loading match results to/from local JSON storage
 //

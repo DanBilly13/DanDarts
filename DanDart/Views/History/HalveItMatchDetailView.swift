@@ -1,6 +1,6 @@
 //
 //  HalveItMatchDetailView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Match detail view for Halve It games
 //  Uses same layout as 301/501 matches

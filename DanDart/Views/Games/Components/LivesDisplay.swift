@@ -1,6 +1,6 @@
 //
 //  LivesDisplay.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable lives display component for games with life-based mechanics
 //  Used in: Sudden Death, Knockout, Killer

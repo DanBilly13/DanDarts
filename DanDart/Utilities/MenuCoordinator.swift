@@ -1,6 +1,6 @@
 //
 //  MenuCoordinator.swift
-//  DanDart
+//  Dart Freak
 //
 //  Singleton coordinator for managing popup menus across the app
 //  Ensures only one menu is active at a time

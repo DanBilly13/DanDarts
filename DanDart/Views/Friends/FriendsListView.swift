@@ -1,6 +1,6 @@
 //
 //  FriendsListView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Unified friends view with requests and friends list
 //

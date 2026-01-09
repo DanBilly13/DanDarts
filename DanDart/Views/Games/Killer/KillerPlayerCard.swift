@@ -1,6 +1,6 @@
 //
 //  KillerPlayerCard.swift
-//  DanDart
+//  Dart Freak
 //
 //  Player card for Killer game showing:
 //  - Killer chip (30% or 100% opacity)

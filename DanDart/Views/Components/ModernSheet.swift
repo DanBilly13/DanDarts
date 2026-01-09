@@ -1,6 +1,6 @@
 //
 //  ModernSheet.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable modern sheet presentation with iOS 18+ optimizations
 //

@@ -1,6 +1,6 @@
 //
 //  MainTabView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Main tab navigation structure for authenticated users
 //

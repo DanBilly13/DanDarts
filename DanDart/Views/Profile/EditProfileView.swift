@@ -1,6 +1,6 @@
 //
 //  EditProfileView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Edit profile view for updating user information
 //

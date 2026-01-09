@@ -1,6 +1,6 @@
 //
 //  PlayerCard.swift
-//  DanDart
+//  Dart Freak
 //
 //  Player card component for displaying player info in game setup and selection
 //

@@ -1,6 +1,6 @@
 //
 //  UIImage+Resize.swift
-//  DanDart
+//  Dart Freak
 //
 //  Extension for resizing UIImage to reduce file size before upload
 //

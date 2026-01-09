@@ -1,6 +1,6 @@
 //
 //  TopBar.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable top bar component for main app screens
 //

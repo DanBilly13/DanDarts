@@ -1,6 +1,6 @@
 //
 //  LegIndicators.swift
-//  DanDart
+//  Dart Freak
 //
 //  Reusable leg indicators component for multi-leg matches
 //

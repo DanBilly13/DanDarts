@@ -1,6 +1,6 @@
 //
 //  AddGuestPlayerView.swift
-//  DanDart
+//  Dart Freak
 //
 //  Sheet for adding new guest players with display name and nickname validation
 //

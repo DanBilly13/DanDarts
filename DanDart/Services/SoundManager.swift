@@ -1,6 +1,6 @@
 //
 //  SoundManager.swift
-//  DanDart
+//  Dart Freak
 //
 //  Sound management service for game audio effects
 //

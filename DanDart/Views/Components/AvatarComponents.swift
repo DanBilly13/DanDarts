@@ -1,6 +1,6 @@
 //
 //  AvatarComponents.swift
-//  DanDart
+//  Dart Freak
 //
 //  Shared avatar selection components used across the app
 //
