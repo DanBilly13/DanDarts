@@ -27,7 +27,7 @@ struct WelcomeView: View {
                         .foregroundColor(AppColor.brandPrimary)
                     
                     // App Logo Text (Hidden tap for MainTab preview)
-                    Text("DanDarts")
+                    Text("DartFreak")
                         .font(.system(size: 42, weight: .bold, design: .default))
                         .foregroundColor(AppColor.brandPrimary)
                         .onTapGesture(count: 3) {

@@ -25,6 +25,11 @@ struct FriendsListView: View {
     @State private var isLoadingRequests: Bool = false
     @State private var loadError: String?
     @State private var processingRequestId: UUID? = nil
+    
+    // Guest players loaded from local storage
+    @State private var guests: [Player] = []
+    @State private var showDeleteGuestConfirmation: Bool = false
+    @State private var guestToDelete: Player? = nil
 
     // iOS 26+ can show a navigation subtitle without affecting layout
     private var navigationSubtitleText: String? {
@@ -36,6 +41,9 @@ struct FriendsListView: View {
             parts.append("\(receivedRequests.count) request\(receivedRequests.count == 1 ? "" : "s")")
         }
         parts.append("\(friends.count) friend\(friends.count == 1 ? "" : "s")")
+        if !guests.isEmpty {
+            parts.append("\(guests.count) guest\(guests.count == 1 ? "" : "s")")
+        }
         return parts.joined(separator: " • ")
     }
     
@@ -133,8 +141,8 @@ struct FriendsListView: View {
                             .foregroundColor(AppColor.textPrimary)
                             .textCase(nil)
                     }
-                } else if !isLoadingFriends && !isLoadingRequests {
-                    // Empty State - No friends
+                } else if !isLoadingFriends && !isLoadingRequests && guests.isEmpty {
+                    // Empty State - No friends and no guests
                     Section {
                         VStack(spacing: 16) {
                             Image(systemName: "person.2.slash")
@@ -166,6 +174,33 @@ struct FriendsListView: View {
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                }
+                
+                // Guests Section
+                if !guests.isEmpty {
+                    Section {
+                        ForEach(guests) { guest in
+                            PlayerCard(player: guest)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button {
+                                        guestToDelete = guest
+                                        showDeleteGuestConfirmation = true
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                    }
+                                    .tint(.clear)
+                                }
+                        }
+                    } header: {
+                        Text("Guests")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(AppColor.textPrimary)
+                            .textCase(nil)
+                    }
                 }
                 
                 // Loading State
@@ -207,6 +242,7 @@ struct FriendsListView: View {
         .onAppear {
             loadFriends()
             loadRequests()
+            loadGuests()
         }
         // MARK: Sheet
         .sheet(isPresented: $showSearch) {
@@ -237,6 +273,18 @@ struct FriendsListView: View {
         } message: {
             if let friend = friendToDelete {
                 Text("Are you sure you want to remove \(friend.displayName) from your friends?")
+            }
+        }
+        .alert("Delete Guest?", isPresented: $showDeleteGuestConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let guest = guestToDelete {
+                    deleteGuest(guest)
+                }
+            }
+        } message: {
+            if let guest = guestToDelete {
+                Text("Are you sure you want to delete \(guest.displayName)? This cannot be undone.")
             }
         }
     }
@@ -467,6 +515,29 @@ struct FriendsListView: View {
                 processingRequestId = nil
             }
         }
+    }
+    
+    /// Load guest players from local storage
+    private func loadGuests() {
+        guests = GuestPlayerStorageManager.shared.loadGuestPlayers()
+        print("✅ Loaded \(guests.count) guest players from local storage")
+    }
+    
+    /// Delete guest player
+    private func deleteGuest(_ guest: Player) {
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        // Remove from local storage
+        GuestPlayerStorageManager.shared.deleteGuestPlayer(id: guest.id)
+        
+        // Reload guests list
+        loadGuests()
+        
+        // Show success message
+        successMessage = "\(guest.displayName) deleted"
+        showSuccessAlert = true
     }
 }
 

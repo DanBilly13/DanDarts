@@ -22,7 +22,7 @@ struct SplashView: View {
                 .foregroundColor(AppColor.brandPrimary)
             
             // App Logo Text
-            Text("DanDarts")
+            Text("DartFreak")
                 .font(.system(size: 48, weight: .bold, design: .default))
                 .foregroundColor(AppColor.brandPrimary)
             
