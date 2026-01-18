@@ -181,7 +181,7 @@ struct GameSetupView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, heroHeight - topBarHeight + contentSpacing)
-                .padding(.bottom, 16)
+                .padding(.bottom, 100)
             }
             .background(Color.clear)
             .environmentObject(setupState)

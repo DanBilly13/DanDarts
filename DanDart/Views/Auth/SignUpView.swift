@@ -78,15 +78,33 @@ struct SignUpView: View {
                                     .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
                                     .scaleEffect(0.8)
                             } else {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 16, weight: .medium))
+                                Image("Google")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 16, height: 16)
                             }
                             Text(authService.isLoading ? "Signing up with Google..." : "Continue with Google")
                         }
                     }
                     .padding(.horizontal, 32)
                     
-                    
+                    // Apple Sign In Button
+                    AppButton(
+                        role: .primary,
+                        controlSize: .extraLarge,
+                        isDisabled: true,
+                        compact: true,
+                        action: {
+                            // TODO: Implement Apple Sign In
+                        }
+                    ) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Continue with Apple")
+                        }
+                    }
+                    .padding(.horizontal, 32)
                     
                     // OR Divider
                     HStack {
