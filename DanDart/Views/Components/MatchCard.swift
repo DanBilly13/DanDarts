@@ -53,6 +53,20 @@ struct MatchCard: View {
                 HStack {
                     // Game name chip
                     gameNameChip
+                    
+                    // Practice badge for single-player matches
+                    if match.isPractice {
+                        Text("Practice")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColor.textSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppColor.inputBackground.opacity(0.5))
+                            .clipShape(Capsule())
+                    }
+                    
+                    Spacer()
+                    
                     // Date with cloud icon
                     HStack(spacing: 4) {
                         Text(relativeDate)

@@ -12,6 +12,15 @@ struct MatchDetailView: View {
     var isSheet: Bool = false  // Set to true when presented as sheet
     @Environment(\.dismiss) private var dismiss
     
+    // Computed property for match title
+    private var matchTitle: String {
+        if match.isPractice {
+            return "\(match.gameName) • Practice"
+        } else {
+            return match.gameName
+        }
+    }
+    
     var body: some View {
         // Route to game-specific detail view
         if match.gameName == "Halve It" {
@@ -38,7 +47,7 @@ struct MatchDetailView: View {
                     .toolbarRole(.editor)
                     .toolbar {
                         TopBarSub(
-                            title: match.gameName,
+                            title: matchTitle,
                             subtitle: match.formattedDate
                         ) {
                             TopBarCloseButton {
@@ -61,7 +70,7 @@ struct MatchDetailView: View {
                 .toolbar(.hidden, for: .tabBar)
                 .toolbar {
                     TopBarSub(
-                        title: match.gameName,
+                        title: matchTitle,
                         subtitle: match.formattedDate
                     ) {
                         TopBarCloseButton {

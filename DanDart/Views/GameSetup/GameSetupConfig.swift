@@ -39,6 +39,9 @@ protocol GameSetupConfigurable {
     /// Maximum number of players allowed
     var playerLimit: Int { get }
     
+    /// Minimum number of players required (default: 2, can be 1 for practice mode)
+    var minimumPlayers: Int { get }
+    
     /// Label for the options section (e.g., "Match Format", "Difficulty", "Lives")
     var optionLabel: String { get }
     
@@ -60,4 +63,5 @@ protocol GameSetupConfigurable {
 extension GameSetupConfigurable {
     var showOptions: Bool { true }
     var defaultSelection: Int { 0 }
+    var minimumPlayers: Int { 2 }
 }

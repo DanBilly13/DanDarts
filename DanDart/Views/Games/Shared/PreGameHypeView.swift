@@ -65,9 +65,14 @@ struct PreGameHypeView: View {
                             .font(.system(size: 28, weight: .bold, design: .default))
                             .foregroundColor(AppColor.textPrimary)
                         
-                        // Show "Assigning random numbers..." for Killer game
+                        // Show "Assigning random numbers..." for Killer game, "Practice Match" for single player
                         if game.title == "Killer" {
                             Text("ASSIGNING RANDOM NUMBERS...")
+                                .font(.system(size: 14, weight: .semibold, design: .default))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .tracking(2)
+                        } else if players.count == 1 {
+                            Text("PRACTICE MATCH")
                                 .font(.system(size: 14, weight: .semibold, design: .default))
                                 .foregroundColor(AppColor.interactivePrimaryBackground)
                                 .tracking(2)
@@ -125,7 +130,9 @@ struct PreGameHypeView: View {
     
     @ViewBuilder
     private var playersSection: some View {
-        if players.count == 2 {
+        if players.count == 1 {
+            singlePlayerLayout
+        } else if players.count == 2 {
             twoPlayerLayout
         } else if players.count == 3 {
             threePlayerLayout
@@ -133,6 +140,16 @@ struct PreGameHypeView: View {
             fourPlayerLayout
         } else {
             multiPlayerGrid
+        }
+    }
+    
+    // 1 Player: Centered (practice mode)
+    private var singlePlayerLayout: some View {
+        HStack {
+            Spacer()
+            playerCard(players[0], index: 0)
+                .frame(maxWidth: 200)
+            Spacer()
         }
     }
     

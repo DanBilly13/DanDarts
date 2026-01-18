@@ -10,6 +10,7 @@ import SwiftUI
 struct CountdownSetupConfig: GameSetupConfigurable {
     let game: Game
     let playerLimit: Int = 8
+    let minimumPlayers: Int = 1 // Allow single player for practice mode
     let optionLabel: String = "Match Format"
     let defaultSelection: Int = 0 // Best of 1
     

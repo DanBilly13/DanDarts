@@ -41,7 +41,7 @@ struct GameSetupView: View {
     }
     
     private var canStartGame: Bool {
-        selectedPlayers.count >= 2
+        selectedPlayers.count >= config.minimumPlayers
     }
     
     var body: some View {

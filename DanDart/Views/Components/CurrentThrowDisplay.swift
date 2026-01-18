@@ -19,6 +19,8 @@ struct CurrentThrowDisplay: View {
             // Individual throw scores
             ForEach(0..<3, id: \.self) { index in
                 let isSelected = selectedDartIndex == index
+                let isCurrentDart = index == currentThrow.count // Auto-highlight next empty dart
+                let shouldHighlight = isSelected || isCurrentDart
                 let hasDart = index < currentThrow.count
                 
                 Button(action: {
@@ -40,12 +42,12 @@ struct CurrentThrowDisplay: View {
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(
-                                    isSelected ? AppColor.interactivePrimaryBackground : Color.clear,
-                                    lineWidth: isSelected ? 2 : 0
+                                    shouldHighlight ? AppColor.justWhite.opacity(0.3) : Color.clear,
+                                    lineWidth: shouldHighlight ? 2 : 0
                                 )
                         )
-                        .scaleEffect(isSelected ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+                        .scaleEffect(shouldHighlight ? 1.0 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: shouldHighlight)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .allowsHitTesting(hasDart)

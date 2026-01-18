@@ -36,6 +36,17 @@ struct CountdownGameplayView: View {
         _gameViewModel = StateObject(wrappedValue: CountdownViewModel(game: game, players: players, matchFormat: matchFormat))
     }
     
+    // Computed property for navigation title
+    private var navigationTitle: String {
+        if players.count == 1 {
+            return "\(game.title) • Practice"
+        } else if gameViewModel.matchFormat > 1 {
+            return "Leg \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)"
+        } else {
+            return game.title
+        }
+    }
+    
     var body: some View {
         ZStack {
             AppColor.backgroundPrimary
@@ -179,7 +190,7 @@ struct CountdownGameplayView: View {
                     }
                 }
             }
-            .navigationTitle(gameViewModel.matchFormat > 1 ? "Leg \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)" : game.title)
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

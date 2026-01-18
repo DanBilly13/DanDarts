@@ -22,6 +22,9 @@ struct MatchResult: Identifiable, Codable, Hashable {
     let metadata: [String: String]? // Game-specific metadata (e.g., Halve-It difficulty)
     
     // Computed properties
+    var isPractice: Bool {
+        players.count == 1
+    }
     var winner: MatchPlayer? {
         players.first { $0.id == winnerId }
     }
@@ -74,6 +77,7 @@ struct MatchResult: Identifiable, Codable, Hashable {
         hasher.combine(totalLegsPlayed)
         hasher.combine(metadata?.keys.sorted())
         hasher.combine(metadata?.values.sorted())
+        // Note: isPractice is computed from players.count, so no need to hash separately
     }
     
     // Custom Equatable implementation
