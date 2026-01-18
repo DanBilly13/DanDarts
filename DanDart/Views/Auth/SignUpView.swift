@@ -10,6 +10,7 @@ import SwiftUI
 struct SignUpView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
+    var onSwitchToSignIn: (() -> Void)? = nil
     
     // MARK: - Form State
     @State private var displayName = ""
@@ -22,6 +23,8 @@ struct SignUpView: View {
     @State private var showErrors = false
     @State private var errorMessage = ""
     @State private var useEmail = false
+    @State private var showTerms = false
+    @State private var showPrivacy = false
     
     // MARK: - Computed Properties
     private var isFormValid: Bool {
@@ -153,8 +156,15 @@ struct SignUpView: View {
                             .padding(.top, 4)
                         }
                     }
+                    
+                    // Terms & Privacy Acceptance
+                    TermsAndPrivacyText(showTerms: $showTerms, showPrivacy: $showPrivacy)
+                        .padding(.top, 8)
+                    
                     // Sign In Link
-                    NavigationLink(destination: SignInView()) {
+                    Button(action: {
+                        onSwitchToSignIn?()
+                    }) {
                         HStack {
                             Text("Already have an account?")
                                 .font(.system(size: 16, weight: .medium))
@@ -178,6 +188,16 @@ struct SignUpView: View {
                         dismiss()
                     }
                     .foregroundColor(AppColor.interactivePrimaryBackground)
+                }
+            }
+            .sheet(isPresented: $showTerms) {
+                NavigationStack {
+                    TermsAndConditions()
+                }
+            }
+            .sheet(isPresented: $showPrivacy) {
+                NavigationStack {
+                    PrivacyPolicy()
                 }
             }
         }
@@ -230,7 +250,7 @@ struct SignUpView: View {
             print("❌ Unexpected error: \(error)")
             
             // Check if it's a timeout
-            if error.localizedDescription.contains("timed out") || 
+            if error.localizedDescription.contains("timed out") ||
                error.localizedDescription.contains("network") ||
                error.localizedDescription.contains("connection") {
                 errorMessage = "Connection timeout. Please try signing in with Google instead."

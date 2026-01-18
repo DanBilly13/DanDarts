@@ -15,9 +15,10 @@ struct ProfileView: View {
     @State private var showLogoutConfirmation: Bool = false
     @State private var showEditProfile: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: 24) {
                     // Profile Header (Reusable Component)
@@ -77,6 +78,16 @@ struct ProfileView: View {
             } message: {
                 Text("This will delete all locally stored match history. Matches synced to the cloud will not be affected.\n\nThis cannot be undone.")
             }
+            .navigationDestination(for: String.self) { destination in
+                switch destination {
+                case "privacy":
+                    PrivacyPolicy()
+                case "terms":
+                    TermsAndConditions()
+                default:
+                    EmptyView()
+                }
+            }
         }
     }
     
@@ -130,18 +141,6 @@ struct ProfileView: View {
                     showChevron: true
                 ) {
                     // TODO: Navigate to appearance settings
-                }
-                
-                Divider()
-                    .background(AppColor.textSecondary.opacity(0.2))
-                    .padding(.leading, 44)
-                
-                SettingsRow(
-                    icon: "shield",
-                    title: "Privacy",
-                    showChevron: true
-                ) {
-                    // TODO: Navigate to privacy settings
                 }
                 
                 Divider()
@@ -208,9 +207,7 @@ struct ProfileView: View {
                 
                 // Privacy Policy
                 Button(action: {
-                    if let url = URL(string: "https://dandarts.app/privacy") {
-                        UIApplication.shared.open(url)
-                    }
+                    navigationPath.append("privacy")
                 }) {
                     HStack(spacing: 16) {
                         Image(systemName: "hand.raised")
@@ -224,7 +221,7 @@ struct ProfileView: View {
                         
                         Spacer()
                         
-                        Image(systemName: "arrow.up.right")
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(AppColor.textSecondary)
                     }
@@ -238,11 +235,9 @@ struct ProfileView: View {
                     .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
-                // Terms of Service
+                // Terms and Conditions
                 Button(action: {
-                    if let url = URL(string: "https://dandarts.app/terms") {
-                        UIApplication.shared.open(url)
-                    }
+                    navigationPath.append("terms")
                 }) {
                     HStack(spacing: 16) {
                         Image(systemName: "doc.text")
@@ -250,13 +245,13 @@ struct ProfileView: View {
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                             .frame(width: 28)
                         
-                        Text("Terms of Service")
+                        Text("Terms and Conditions")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppColor.textPrimary)
                         
                         Spacer()
                         
-                        Image(systemName: "arrow.up.right")
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(AppColor.textSecondary)
                     }

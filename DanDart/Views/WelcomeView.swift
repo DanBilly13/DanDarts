@@ -13,6 +13,7 @@ struct WelcomeView: View {
     @State private var showingSignUp = false
     @State private var navigateToGames = false
     @State private var showMainTabPreview = false
+    @State private var pendingSheetSwap: SheetSwap?
     
     var body: some View {
         GeometryReader { geometry in
@@ -95,10 +96,32 @@ struct WelcomeView: View {
         .background(AppColor.backgroundPrimary)
         .ignoresSafeArea()
         .sheet(isPresented: $showingSignIn) {
-            SignInView()
+            SignInView(onSwitchToSignUp: {
+                showingSignIn = false
+                pendingSheetSwap = .toSignUp
+            })
         }
         .sheet(isPresented: $showingSignUp) {
-            SignUpView()
+            SignUpView(onSwitchToSignIn: {
+                showingSignUp = false
+                pendingSheetSwap = .toSignIn
+            })
+        }
+        .onChange(of: showingSignIn) { _, isShowing in
+            if !isShowing, pendingSheetSwap == .toSignUp {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showingSignUp = true
+                    pendingSheetSwap = nil
+                }
+            }
+        }
+        .onChange(of: showingSignUp) { _, isShowing in
+            if !isShowing, pendingSheetSwap == .toSignIn {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showingSignIn = true
+                    pendingSheetSwap = nil
+                }
+            }
         }
         .fullScreenCover(isPresented: $navigateToGames) {
             // Navigate to Games Tab (placeholder until MainTabView is created)
@@ -133,9 +156,15 @@ struct WelcomeView: View {
         .fullScreenCover(isPresented: $showMainTabPreview) {
             // Clean MainTabView Preview - no extra UI elements
             MainTabView()
-                .environmentObject(AuthService())
+                .environmentObject(authService)
         }
     }
+}
+
+// MARK: - Sheet Swap Enum
+private enum SheetSwap {
+    case toSignIn
+    case toSignUp
 }
 
 // MARK: - Custom Button Styles

@@ -10,11 +10,14 @@ import SwiftUI
 struct SignInView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
+    var onSwitchToSignUp: (() -> Void)? = nil
     
     @State private var email = ""
     @State private var password = ""
     @State private var errorMessage = ""
     @State private var isLoading = false
+    @State private var showTerms = false
+    @State private var showPrivacy = false
     
     var body: some View {
         NavigationView {
@@ -159,10 +162,16 @@ struct SignInView: View {
                     
                     Spacer(minLength: 8)
                     
+                    // Terms & Privacy Acceptance
+                    TermsAndPrivacyText(showTerms: $showTerms, showPrivacy: $showPrivacy)
+                        .padding(.top, 8)
+                    
                     // Bottom Links
                     VStack(spacing: 16) {
                         // Sign Up Link
-                        NavigationLink(destination: SignUpView()) {
+                        Button(action: {
+                            onSwitchToSignUp?()
+                        }) {
                             HStack {
                                 Text("Don't have an account?")
                                     .font(.system(size: 16, weight: .medium))
@@ -188,6 +197,16 @@ struct SignInView: View {
                         dismiss()
                     }
                     .foregroundColor(AppColor.interactivePrimaryBackground)
+                }
+            }
+            .sheet(isPresented: $showTerms) {
+                NavigationStack {
+                    TermsAndConditions()
+                }
+            }
+            .sheet(isPresented: $showPrivacy) {
+                NavigationStack {
+                    PrivacyPolicy()
                 }
             }
         }

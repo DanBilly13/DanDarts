@@ -49,9 +49,9 @@ struct SuddenDeathGameplayView: View {
                     
                     Spacer(minLength: 0)
                 }
-                .safeAreaInset(edge: .top) {
+                /*.safeAreaInset(edge: .top) {
                     Color.clear.frame(height: 16)
-                }
+                }*/
                 
                 // Flexible space between top and bottom halves
                 Spacer(minLength: 0)
@@ -191,9 +191,7 @@ struct SuddenDeathGameplayView: View {
                 )
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .frame(height: 126)
-        
+        .frame(maxWidth: .infinity, alignment: .center)        
     }
 }
 
@@ -253,34 +251,36 @@ struct SuddenDeathPlayerCard: View {
                 ringColor: playerColor,
                 size: 64
             )
-            
-            // Name
-            Text(firstName)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(playerColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: 56)
-            
-            // Round score ('-' until player has thrown) with pop animation on save
-            Text(roundScore.map { "\($0)" } ?? "-")
-                .font(.system(.title3, design: .monospaced))
-                .fontWeight(.bold)
-                .foregroundColor(playerColor)
-                .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
-                .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
-                .onChange(of: showScoreAnimation) { _, newValue in
-                    if newValue {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+            VStack (spacing: 2) {
+                // Name
+                Text(firstName)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(playerColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 56)
+                
+                // Round score ('-' until player has thrown) with pop animation on save
+                Text(roundScore.map { "\($0)" } ?? "-")
+                    .font(.system(.title3, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(playerColor)
+                    .scaleEffect(showScoreAnimation ? 1.35 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.4), value: showScoreAnimation)
+                    .onChange(of: showScoreAnimation) { _, newValue in
+                        if newValue {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                        }
                     }
-                }
-            
-            // Lives row (hide if startingLives == 1)
-            LivesDisplay(lives: lives, startingLives: startingLives)
+                
+                // Lives row (hide if startingLives == 1)
+                LivesDisplay(lives: lives, startingLives: startingLives)
+            }
+           
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 0)
         .onAppear {
             print("[SuddenDeathCard] appear for \(player.displayName) | isInDanger: \(isInDanger) | showSkullWiggle: \(showSkullWiggle)")
         }

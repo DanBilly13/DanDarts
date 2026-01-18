@@ -108,26 +108,12 @@ struct PlayerAvatarView: View {
                         placeholderIcon
                     }
                 } else if avatarURL.hasPrefix("/") || avatarURL.contains("/Documents/") {
-                    // File path - load from local storage
-                    let fileURL = URL(fileURLWithPath: avatarURL)
-                    if let imageData = try? Data(contentsOf: fileURL),
-                       let uiImage = UIImage(data: imageData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: size, height: size)
-                            .clipShape(Circle())
-                            .onAppear {
-                                print("✅ Loaded avatar from file: \(avatarURL)")
-                            }
-                    } else {
-                        // Failed to load file - show placeholder
-                        placeholderIcon
-                            .onAppear {
-                                print("⚠️ Failed to load avatar from file: \(avatarURL)")
-                                print("   File exists: \(FileManager.default.fileExists(atPath: avatarURL))")
-                            }
-                    }
+                    // File path - load from local storage with path reconstruction
+                    FilePathImageView(
+                        avatarURL: avatarURL,
+                        size: size,
+                        placeholder: placeholder
+                    )
                 } else if avatarURL.contains(".") && avatarURL.contains("fill") {
                     // SF Symbol name (e.g., "person.circle.fill", "figure.wave.circle.fill")
                     // Use 55% sizing for better visibility in player cards and lists
@@ -211,4 +197,72 @@ struct PlayerAvatarView: View {
     }
     .padding()
     .background(Color("BackgroundPrimary"))
+}
+
+// MARK: - File Path Image View
+
+private struct FilePathImageView: View {
+    let avatarURL: String
+    let size: CGFloat
+    let placeholder: String
+    
+    @State private var loadedImage: UIImage?
+    @State private var didAttemptLoad = false
+    
+    var body: some View {
+        Group {
+            if let loadedImage = loadedImage {
+                Image(uiImage: loadedImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: placeholder)
+                    .font(.system(size: size * 0.5, weight: .medium))
+                    .foregroundColor(Color("TextSecondary"))
+            }
+        }
+        .onAppear {
+            if !didAttemptLoad {
+                loadImage()
+            }
+        }
+    }
+    
+    private func loadImage() {
+        didAttemptLoad = true
+        
+        // Try original path first
+        var fileURL = URL(fileURLWithPath: avatarURL)
+        var imageData: Data?
+        
+        // If file doesn't exist at original path, try reconstructing with current Documents directory
+        if !FileManager.default.fileExists(atPath: avatarURL) {
+            // Extract filename from path
+            let filename = (avatarURL as NSString).lastPathComponent
+            
+            // Get current Documents directory
+            if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let avatarsDirectory = documentsDirectory.appendingPathComponent("guest_avatars")
+                let reconstructedURL = avatarsDirectory.appendingPathComponent(filename)
+                
+                if FileManager.default.fileExists(atPath: reconstructedURL.path) {
+                    fileURL = reconstructedURL
+                    imageData = try? Data(contentsOf: fileURL)
+                    print("✅ Loaded avatar from reconstructed path: \(reconstructedURL.path)")
+                } else {
+                    print("⚠️ Avatar file not found at original or reconstructed path: \(filename)")
+                }
+            }
+        } else {
+            imageData = try? Data(contentsOf: fileURL)
+            print("✅ Loaded avatar from original path: \(avatarURL)")
+        }
+        
+        if let imageData = imageData,
+           let uiImage = UIImage(data: imageData) {
+            loadedImage = uiImage
+        }
+    }
 }
