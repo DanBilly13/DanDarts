@@ -15,7 +15,7 @@ struct TermsAndPrivacyText: View {
         Text(termsAndPrivacyAttributedString)
             .font(.footnote)
             .foregroundStyle(.secondary)
-            .tint(AppColor.interactivePrimaryBackground)
+            .tint(AppColor.justWhite)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 32)

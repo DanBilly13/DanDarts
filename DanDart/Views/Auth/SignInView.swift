@@ -15,9 +15,16 @@ struct SignInView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var errorMessage = ""
-    @State private var isLoading = false
+    @State private var isLoadingEmail = false
+    @State private var isLoadingGoogle = false
+    @State private var isLoadingApple = false
     @State private var showTerms = false
     @State private var showPrivacy = false
+    
+    // Computed property for any loading state
+    private var isAnyLoading: Bool {
+        isLoadingEmail || isLoadingGoogle || isLoadingApple
+    }
     
     var body: some View {
         NavigationView {
@@ -30,7 +37,7 @@ struct SignInView: View {
                             .font(.system(size: 60, weight: .medium))
                             .foregroundColor(AppColor.brandPrimary)
                         
-                        Text("Welcome Back")
+                        Text("Please sign in")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(AppColor.textPrimary)
                         
@@ -38,53 +45,67 @@ struct SignInView: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(Color("TextSecondary"))*/
                     }
-                    .padding(.top, 32)
                     
-                    // Google Sign-In Button (Primary)
-                    AppButton(
-                        role: .primary,
-                        controlSize: .extraLarge,
-                        isDisabled: isLoading,
-                        compact: true,
-                        action: {
-                            Task {
-                                await signInWithGoogle()
+                    
+                    HStack {
+                        // Google Sign-In Button (Primary)
+                        AppButton(
+                            role: .primary,
+                            controlSize: .extraLarge,
+                            isDisabled: isAnyLoading,
+                            compact: true,
+                            action: {
+                                Task {
+                                    await signInWithGoogle()
+                                }
+                            }
+                        ) {
+                            HStack(spacing: 8) {
+                                if isLoadingGoogle {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image("Google")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 16, height: 16)
+                                }
+                                Text(isLoadingGoogle ? "Signing in..." : "Google")
                             }
                         }
-                    ) {
-                        HStack(spacing: 8) {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image("Google")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 16, height: 16)
+                        
+                        
+                        // Apple Sign In Button
+                        AppButton(
+                            role: .primary,
+                            controlSize: .extraLarge,
+                            isDisabled: isAnyLoading,
+                            compact: true,
+                            action: {
+                                Task {
+                                    await signInWithApple()
+                                }
                             }
-                            Text(isLoading ? "Signing in with Google..." : "Sign in with Google")
+                        ) {
+                            HStack(spacing: 8) {
+                                if isLoadingApple {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "apple.logo")
+                                        .font(.system(size: 16, weight: .medium))
+                                }
+                                Text(isLoadingApple ? "Signing in..." : "Apple")
+                            }
                         }
+                        
+                        
                     }
                     .padding(.horizontal, 32)
                     
-                    // Apple Sign In Button
-                    AppButton(
-                        role: .primary,
-                        controlSize: .extraLarge,
-                        isDisabled: true,
-                        compact: true,
-                        action: {
-                            // TODO: Implement Apple Sign In
-                        }
-                    ) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "apple.logo")
-                                .font(.system(size: 16, weight: .medium))
-                            Text("Sign in with Apple")
-                        }
-                    }
-                    .padding(.horizontal, 32)
+                    
                     
                     // Divider
                     HStack {
@@ -102,7 +123,7 @@ struct SignInView: View {
                             .foregroundColor(AppColor.textSecondary.opacity(0.3))
                     }
                     .padding(.horizontal, 32)
-                    .padding(.top, 24)
+                    .padding(.top, 0)
                     
                     // Error Message
                     if !errorMessage.isEmpty {
@@ -118,7 +139,7 @@ struct SignInView: View {
                     }
                     
                     // Email Sign-In Form Section
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         // Email TextField
                         DartTextField(
                             label: "Email",
@@ -152,14 +173,14 @@ struct SignInView: View {
                                 // TODO: Implement forgot password
                             }
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                         }
                         
                         // Sign In with Email Button (Primary Outline)
                         AppButton(
                             role: .primaryOutline,
                             controlSize: .extraLarge,
-                            isDisabled: isLoading,
+                            isDisabled: isAnyLoading,
                             compact: true,
                             action: {
                                 Task {
@@ -168,23 +189,23 @@ struct SignInView: View {
                             }
                         ) {
                             HStack(spacing: 8) {
-                                if isLoading {
+                                if isLoadingEmail {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: AppColor.interactivePrimaryBackground))
                                         .scaleEffect(0.8)
                                 }
-                                Text(isLoading ? "Signing In..." : "Sign in with Email")
+                                Text(isLoadingEmail ? "Signing In..." : "Sign in with Email")
                             }
                         }
                     }
                     .padding(.horizontal, 32)
           
                     
-                    Spacer(minLength: 8)
+                    
                     
                     // Terms & Privacy Acceptance
-                    TermsAndPrivacyText(showTerms: $showTerms, showPrivacy: $showPrivacy)
-                        .padding(.top, 8)
+                    /*TermsAndPrivacyText(showTerms: $showTerms, showPrivacy: $showPrivacy)*/
+                        Spacer()
                     
                     // Bottom Links
                     VStack(spacing: 16) {
@@ -251,7 +272,7 @@ struct SignInView: View {
         }
         
         // Set loading state
-        isLoading = true
+        isLoadingEmail = true
         
         do {
             // Call AuthService sign in
@@ -270,7 +291,7 @@ struct SignInView: View {
         }
         
         // Reset loading state
-        isLoading = false
+        isLoadingEmail = false
     }
     
     /// Sign in with Google OAuth
@@ -279,7 +300,7 @@ struct SignInView: View {
         errorMessage = ""
         
         // Set loading state
-        isLoading = true
+        isLoadingGoogle = true
         
         do {
             // Call AuthService Google OAuth
@@ -308,7 +329,45 @@ struct SignInView: View {
         }
         
         // Reset loading state
-        isLoading = false
+        isLoadingGoogle = false
+    }
+    
+    /// Sign in with Apple OAuth
+    private func signInWithApple() async {
+        // Clear previous error
+        errorMessage = ""
+        
+        // Set loading state
+        isLoadingApple = true
+        
+        do {
+            // Call AuthService Apple OAuth
+            let isNewUser = try await authService.signInWithApple()
+            
+            // Dismiss SignInView
+            // If new user: ContentView will show ProfileSetupView
+            // If existing user: ContentView will show MainTabView
+            dismiss()
+            
+        } catch let error as AuthError {
+            // Handle specific OAuth errors
+            switch error {
+            case .oauthCancelled:
+                // Don't show error for cancelled OAuth
+                break
+            case .oauthFailed:
+                errorMessage = "Apple sign in failed. Please try again"
+            case .networkError:
+                errorMessage = "Network error. Please check your connection and try again"
+            default:
+                errorMessage = "Failed to sign in with Apple. Please try again"
+            }
+        } catch {
+            errorMessage = "An unexpected error occurred. Please try again"
+        }
+        
+        // Reset loading state
+        isLoadingApple = false
     }
 }
 

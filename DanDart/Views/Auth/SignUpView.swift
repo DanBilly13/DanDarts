@@ -25,6 +25,14 @@ struct SignUpView: View {
     @State private var useEmail = false
     @State private var showTerms = false
     @State private var showPrivacy = false
+    @State private var isLoadingEmail = false
+    @State private var isLoadingGoogle = false
+    @State private var isLoadingApple = false
+    
+    // Computed property for any loading state
+    private var isAnyLoading: Bool {
+        isLoadingEmail || isLoadingGoogle || isLoadingApple
+    }
     
     // MARK: - Computed Properties
     private var isFormValid: Bool {
@@ -66,14 +74,14 @@ struct SignUpView: View {
                     AppButton(
                         role: .primary,
                         controlSize: .extraLarge,
-                        isDisabled: authService.isLoading,
+                        isDisabled: isAnyLoading,
                         compact: true,
                         action: {
                             Task { await handleGoogleSignUp() }
                         }
                     ) {
                         HStack(spacing: 8) {
-                            if authService.isLoading {
+                            if isLoadingGoogle {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
                                     .scaleEffect(0.8)
@@ -83,7 +91,7 @@ struct SignUpView: View {
                                     .scaledToFit()
                                     .frame(width: 16, height: 16)
                             }
-                            Text(authService.isLoading ? "Signing up with Google..." : "Continue with Google")
+                            Text(isLoadingGoogle ? "Signing up..." : "Continue with Google")
                         }
                     }
                     .padding(.horizontal, 32)
@@ -92,16 +100,24 @@ struct SignUpView: View {
                     AppButton(
                         role: .primary,
                         controlSize: .extraLarge,
-                        isDisabled: true,
+                        isDisabled: isAnyLoading,
                         compact: true,
                         action: {
-                            // TODO: Implement Apple Sign In
+                            Task {
+                                await signUpWithApple()
+                            }
                         }
                     ) {
                         HStack(spacing: 8) {
-                            Image(systemName: "apple.logo")
-                                .font(.system(size: 16, weight: .medium))
-                            Text("Continue with Apple")
+                            if isLoadingApple {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            Text(isLoadingApple ? "Signing up..." : "Continue with Apple")
                         }
                     }
                     .padding(.horizontal, 32)
@@ -152,7 +168,7 @@ struct SignUpView: View {
                                 email: $email,
                                 password: $password,
                                 confirmPassword: $confirmPassword,
-                                isLoading: authService.isLoading,
+                                isLoading: isLoadingEmail,
                                 isFormValid: isFormValid,
                                 errorMessage: $errorMessage,
                                 onSubmit: {
@@ -234,6 +250,7 @@ struct SignUpView: View {
         }
         
         print("✅ Form validation passed")
+        isLoadingEmail = true
         
         do {
             // Call AuthService to create the account
@@ -276,10 +293,13 @@ struct SignUpView: View {
                 errorMessage = "An unexpected error occurred. Please try again"
             }
         }
+        
+        isLoadingEmail = false
     }
     
     private func handleGoogleSignUp() async {
         errorMessage = ""
+        isLoadingGoogle = true
         
         do {
             // Call AuthService Google OAuth
@@ -306,6 +326,41 @@ struct SignUpView: View {
         } catch {
             errorMessage = "An unexpected error occurred. Please try again"
         }
+        
+        isLoadingGoogle = false
+    }
+    
+    private func signUpWithApple() async {
+        errorMessage = ""
+        isLoadingApple = true
+        
+        do {
+            // Call AuthService Apple OAuth
+            let isNewUser = try await authService.signInWithApple()
+            
+            // Dismiss SignUpView
+            // If new user: ContentView will show ProfileSetupView
+            // If existing user: ContentView will show MainTabView
+            dismiss()
+            
+        } catch let error as AuthError {
+            // Handle specific OAuth errors
+            switch error {
+            case .oauthCancelled:
+                // Don't show error for cancelled OAuth
+                break
+            case .oauthFailed:
+                errorMessage = "Apple sign in failed. Please try again"
+            case .networkError:
+                errorMessage = "Network error. Please check your connection and try again"
+            default:
+                errorMessage = "Failed to sign in with Apple. Please try again"
+            }
+        } catch {
+            errorMessage = "An unexpected error occurred. Please try again"
+        }
+        
+        isLoadingApple = false
     }
 }
 

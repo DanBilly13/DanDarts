@@ -51,7 +51,5 @@
 			</dict>
 		</dict>
 	</dict>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>We use analytics to improve your experience and understand how you use Dart Freak. Your data helps us make the app better for everyone.</string>
 </dict>
 </plist>

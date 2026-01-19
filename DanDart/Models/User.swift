@@ -11,6 +11,7 @@ import Foundation
 enum AuthProvider: String, Codable {
     case email = "email"
     case google = "google"
+    case apple = "apple"
 }
 
 struct User: Codable, Identifiable {

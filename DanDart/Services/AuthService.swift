@@ -9,6 +9,8 @@ import Foundation
 import Supabase
 import GoogleSignIn
 import SwiftUI
+import AuthenticationServices
+import CryptoKit
 
 // MARK: - Custom Auth Response (for REST API)
 struct CustomAuthResponse: Codable {
@@ -441,6 +443,149 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Sign in with Apple OAuth (Native iOS)
+    func signInWithApple() async throws -> Bool {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            // 1. Generate nonce for security
+            print("ℹ️ Step 1: Generating nonce...")
+            let nonce = randomNonceString()
+            let hashedNonce = sha256(nonce)
+            print("✅ Nonce generated")
+            
+            // 2. Create Apple Sign In request
+            print("ℹ️ Step 2: Creating Apple Sign In request...")
+            let appleIDProvider = ASAuthorizationAppleIDProvider()
+            let request = appleIDProvider.createRequest()
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = hashedNonce
+            
+            // 3. Perform Apple Sign In (using coordinator)
+            print("ℹ️ Step 3: Presenting Apple Sign In...")
+            let authorization = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ASAuthorization, Error>) in
+                let coordinator = AppleSignInCoordinator(continuation: continuation)
+                let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+                authorizationController.delegate = coordinator
+                authorizationController.presentationContextProvider = coordinator
+                authorizationController.performRequests()
+                
+                // Keep coordinator alive
+                objc_setAssociatedObject(authorizationController, "coordinator", coordinator, .OBJC_ASSOCIATION_RETAIN)
+            }
+            print("✅ Apple Sign In completed")
+            
+            // 4. Extract credentials
+            print("ℹ️ Step 4: Extracting credentials...")
+            guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let identityToken = appleIDCredential.identityToken,
+                  let tokenString = String(data: identityToken, encoding: .utf8) else {
+                print("❌ Failed to extract credentials")
+                throw AuthError.oauthFailed
+            }
+            print("✅ Credentials extracted")
+            
+            // Get Apple user info
+            let appleUserID = appleIDCredential.user
+            let appleEmail = appleIDCredential.email // Only available on first sign in
+            let appleFullName = appleIDCredential.fullName
+            let appleName = [appleFullName?.givenName, appleFullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            
+            // 5. Sign in to Supabase with Apple ID token
+            print("ℹ️ Step 5: Signing in to Supabase...")
+            let session = try await supabaseService.client.auth.signInWithIdToken(
+                credentials: .init(
+                    provider: .apple,
+                    idToken: tokenString,
+                    nonce: nonce
+                )
+            )
+            print("✅ Supabase sign-in successful")
+            
+            // 6. Check if user profile exists in users table
+            let userId = session.user.id
+            
+            do {
+                // Try to fetch existing user profile
+                print("🔍 Fetching user profile for ID: \(userId)")
+                let existingUser: User = try await supabaseService.client
+                    .from("users")
+                    .select()
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                    .value
+                
+                print("✅ User profile fetched: \(existingUser.displayName)")
+                print("   Stats: \(existingUser.totalWins)W / \(existingUser.totalLosses)L")
+                print("   Games played: \(existingUser.gamesPlayed)")
+                
+                // User exists, set authentication state
+                currentUser = existingUser
+                updateAuthenticationState()
+                
+                // Return false to indicate existing user
+                return false
+                
+            } catch {
+                // User doesn't exist, create new profile with Apple data
+                // Use email from session if not provided in credentials (subsequent sign-ins)
+                let userEmail = appleEmail ?? session.user.email ?? ""
+                
+                // Generate a unique nickname from email or name
+                let baseNickname = generateNicknameFromApple(email: userEmail, name: appleName)
+                let uniqueNickname = try await ensureUniqueNickname(baseNickname)
+                
+                let newUser = User(
+                    id: userId,
+                    displayName: appleName.isEmpty ? "Apple User" : appleName,
+                    nickname: uniqueNickname,
+                    email: userEmail.isEmpty ? nil : userEmail,
+                    handle: nil, // Will be set in Profile Setup
+                    avatarURL: nil, // Apple doesn't provide avatar
+                    authProvider: .apple,
+                    createdAt: Date(),
+                    lastSeenAt: Date(),
+                    totalWins: 0,
+                    totalLosses: 0
+                )
+                
+                try await supabaseService.client
+                    .from("users")
+                    .insert(newUser)
+                    .execute()
+                
+                // Set current user but mark as needing profile setup
+                currentUser = newUser
+                needsProfileSetup = true
+                // Don't call updateAuthenticationState() yet - wait for profile setup
+                
+                // Return true to indicate new user
+                return true
+            }
+            
+        } catch let error as AuthError {
+            print("❌ Apple Sign-In failed with AuthError: \(error)")
+            throw error
+        } catch {
+            // Handle OAuth-specific errors
+            print("❌ Apple Sign-In failed with error: \(error)")
+            print("❌ Error description: \(error.localizedDescription)")
+            
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("cancelled") || errorMessage.contains("cancel") {
+                throw AuthError.oauthCancelled
+            } else if errorMessage.contains("network") || errorMessage.contains("connection") {
+                throw AuthError.networkError
+            } else {
+                throw AuthError.oauthFailed
+            }
+        }
+    }
+    
     /// Check for existing session on app launch
     func checkSession() async {
         isLoading = true
@@ -848,6 +993,79 @@ class AuthService: ObservableObject {
         return "user\(Int.random(in: 1000...9999))"
     }
     
+    /// Generate a nickname from Apple OAuth data
+    private func generateNicknameFromApple(email: String, name: String) -> String {
+        // Try to use name first, then email username
+        if !name.isEmpty {
+            // Clean the name: remove spaces, special chars, make lowercase
+            let cleanName = name
+                .lowercased()
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "[^a-zA-Z0-9_]", with: "", options: .regularExpression)
+            
+            if cleanName.count >= 3 {
+                return String(cleanName.prefix(20)) // Max 20 chars
+            }
+        }
+        
+        // Fallback to email username
+        if let emailUsername = email.split(separator: "@").first {
+            let cleanUsername = String(emailUsername)
+                .lowercased()
+                .replacingOccurrences(of: "[^a-zA-Z0-9_]", with: "", options: .regularExpression)
+            
+            if cleanUsername.count >= 3 {
+                return String(cleanUsername.prefix(20))
+            }
+        }
+        
+        // Final fallback
+        return "user\(Int.random(in: 1000...9999))"
+    }
+    
+    /// Generate a random nonce string for Apple Sign In security
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remainingLength = length
+        
+        while remainingLength > 0 {
+            let randoms: [UInt8] = (0..<16).map { _ in
+                var random: UInt8 = 0
+                let errorCode = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
+                if errorCode != errSecSuccess {
+                    fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+                }
+                return random
+            }
+            
+            randoms.forEach { random in
+                if remainingLength == 0 {
+                    return
+                }
+                
+                if random < charset.count {
+                    result.append(charset[Int(random)])
+                    remainingLength -= 1
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    /// Hash the nonce using SHA256
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashedData = SHA256.hash(data: inputData)
+        let hashString = hashedData.compactMap {
+            String(format: "%02x", $0)
+        }.joined()
+        
+        return hashString
+    }
+    
     /// Ensure nickname is unique by checking database and adding numbers if needed
     private func ensureUniqueNickname(_ baseNickname: String) async throws -> String {
         var nickname = baseNickname
@@ -962,6 +1180,32 @@ class AuthService: ObservableObject {
             print("❌ REST API error: \(error)")
             throw AuthError.networkError
         }
+    }
+}
+
+// MARK: - Apple Sign In Coordinator
+class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let continuation: CheckedContinuation<ASAuthorization, Error>
+    
+    init(continuation: CheckedContinuation<ASAuthorization, Error>) {
+        self.continuation = continuation
+        super.init()
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        continuation.resume(returning: authorization)
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        continuation.resume(throwing: error)
+    }
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            fatalError("No window available for Apple Sign In")
+        }
+        return window
     }
 }
 
