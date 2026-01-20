@@ -83,13 +83,15 @@ struct SignUpView: View {
                         HStack(spacing: 8) {
                             if isLoadingGoogle {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
-                                    .scaleEffect(0.8)
+                                    .controlSize(.small)
+                                    .tint(AppColor.textOnPrimary)
+                                    .frame(width: 16, height: 16)
                             } else {
                                 Image("Google")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 16, height: 16)
+                                    .opacity(isAnyLoading && !isLoadingGoogle ? 0.2 : 1)
                             }
                             Text(isLoadingGoogle ? "Signing up..." : "Continue with Google")
                         }
@@ -111,11 +113,13 @@ struct SignUpView: View {
                         HStack(spacing: 8) {
                             if isLoadingApple {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.textOnPrimary))
-                                    .scaleEffect(0.8)
+                                    .controlSize(.small)
+                                    .tint(AppColor.textOnPrimary)
+                                    .frame(width: 16, height: 16)
                             } else {
                                 Image(systemName: "apple.logo")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 20, weight: .medium))
+                                    .frame(width: 16, height: 16)
                             }
                             Text(isLoadingApple ? "Signing up..." : "Continue with Apple")
                         }
