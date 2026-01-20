@@ -8,7 +8,7 @@ struct TipBubble: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: systemImageName)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(AppColor.brandPrimary)
@@ -17,28 +17,30 @@ struct TipBubble: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(.headline, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundColor(AppColor.textPrimary)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(title)
+                            .font(.system(.headline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundColor(AppColor.textPrimary)
+
+                        Spacer(minLength: 0)
+
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(AppColor.textSecondary)
+                                .padding(6)
+                                .background(AppColor.inputBackground)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     Text(message)
                         .font(.system(.subheadline, design: .rounded))
                         .foregroundColor(AppColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Spacer(minLength: 0)
-
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(AppColor.textSecondary)
-                        .padding(6)
-                        .background(AppColor.inputBackground)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(14)

@@ -21,6 +21,8 @@ struct KillerGameplayView: View {
     @State private var showInstructions = false
     @State private var showExitConfirmation = false
     @State private var navigateToGameEnd = false
+    @State private var showGameTip: Bool = false
+    @State private var currentTip: GameTip? = nil
     
     // Initialize with game, players, and starting lives
     init(game: Game, players: [Player], startingLives: Int) {
@@ -35,7 +37,24 @@ struct KillerGameplayView: View {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
-            VStack(spacing: 0) {
+            PositionedTip(
+                xPercent: 0.5,
+                yPercent: 0.55
+            ) {
+                if showGameTip, let tip = currentTip {
+                    TipBubble(
+                        systemImageName: tip.icon,
+                        title: tip.title,
+                        message: tip.message,
+                        onDismiss: {
+                            showGameTip = false
+                            TipManager.shared.markTipAsSeen(for: game.title)
+                        }
+                    )
+                    .padding(.horizontal, 24)
+                }
+            } background: {
+                VStack(spacing: 0) {
                 // TOP HALF — player cards + current throw
                 VStack {
                     playerCardsRow
@@ -101,6 +120,7 @@ struct KillerGameplayView: View {
                     .padding(.bottom, 34)
                 }
             }
+            }
         }
         .background(AppColor.backgroundPrimary)
         .navigationTitle(game.title)
@@ -134,6 +154,17 @@ struct KillerGameplayView: View {
         .toolbar(.hidden, for: .tabBar)
         .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
+        .onAppear {
+            // Show game-specific tip if available and not seen before
+            if TipManager.shared.shouldShowTip(for: game.title) {
+                currentTip = TipManager.shared.getTip(for: game.title)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        showGameTip = true
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
         }

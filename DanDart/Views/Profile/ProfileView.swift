@@ -15,6 +15,7 @@ struct ProfileView: View {
     @State private var showLogoutConfirmation: Bool = false
     @State private var showEditProfile: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
+    @State private var showResetTipsConfirmation: Bool = false
     @State private var navigationPath = NavigationPath()
     
     var body: some View {
@@ -44,6 +45,11 @@ struct ProfileView: View {
                     
                     // Settings Section
                     settingsSection
+                    
+                    #if DEBUG
+                    // Developer Section
+                    developerSection
+                    #endif
                     
                     // About Section
                     aboutSection
@@ -78,6 +84,14 @@ struct ProfileView: View {
             } message: {
                 Text("This will delete all locally stored match history. Matches synced to the cloud will not be affected.\n\nThis cannot be undone.")
             }
+            .alert("Reset All Tips", isPresented: $showResetTipsConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Reset", role: .destructive) {
+                    resetAllTips()
+                }
+            } message: {
+                Text("This will reset all game tips so they appear again on your next game.\n\nThis is a debug feature for testing.")
+            }
             .navigationDestination(for: String.self) { destination in
                 switch destination {
                 case "privacy":
@@ -102,7 +116,51 @@ struct ProfileView: View {
         feedback.notificationOccurred(.success)
     }
     
+    private func resetAllTips() {
+        TipManager.shared.resetAllTips()
+        print("🔄 All game tips reset")
+        
+        // Haptic feedback
+        let feedback = UINotificationFeedbackGenerator()
+        feedback.notificationOccurred(.success)
+    }
+    
     // MARK: - Sub Views
+    
+    private var developerSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Developer")
+                .font(.system(.footnote, design: .rounded))
+                .fontWeight(.regular)
+                .foregroundColor(AppColor.textPrimary)
+            
+            VStack(spacing: 0) {
+                SettingsRow(
+                    icon: "arrow.counterclockwise.circle",
+                    title: "Reset All Tips",
+                    showChevron: false,
+                    destructive: true
+                ) {
+                    showResetTipsConfirmation = true
+                }
+                
+                Divider()
+                    .background(AppColor.textSecondary.opacity(0.2))
+                    .padding(.leading, 44)
+                
+                SettingsRow(
+                    icon: "trash",
+                    title: "Clear Local Matches",
+                    showChevron: false,
+                    destructive: true
+                ) {
+                    showClearMatchesConfirmation = true
+                }
+            }
+            .background(AppColor.inputBackground)
+            .cornerRadius(12)
+        }
+    }
     
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -153,19 +211,6 @@ struct ProfileView: View {
                     showChevron: true
                 ) {
                     // TODO: Navigate to help
-                }
-                
-                Divider()
-                    .background(AppColor.textSecondary.opacity(0.2))
-                    .padding(.leading, 44)
-                
-                SettingsRow(
-                    icon: "trash",
-                    title: "Clear Local Matches",
-                    showChevron: false,
-                    destructive: true
-                ) {
-                    showClearMatchesConfirmation = true
                 }
             }
             .background(AppColor.inputBackground)

@@ -21,7 +21,8 @@ struct CountdownGameplayView: View {
     @State private var showExitAlert: Bool = false
     @State private var navigateToGameEnd: Bool = false
     @State private var showLegWinCelebration: Bool = false
-    @State private var showDoubleTripleTip: Bool = false
+    @State private var showGameTip: Bool = false
+    @State private var currentTip: GameTip? = nil
     @State private var isScoreboardExpanded: Bool = false
     
     @Environment(\.dismiss) private var dismiss
@@ -57,14 +58,14 @@ struct CountdownGameplayView: View {
                 xPercent: 0.5,
                 yPercent: 0.55
             ) {
-                if showDoubleTripleTip {
+                if showGameTip, let tip = currentTip {
                     TipBubble(
-                        systemImageName: "cursorarrow.click",
-                        title: "Doubles & Trebles",
-                        message: "Long-press any number to choose a double, or treble.",
+                        systemImageName: tip.icon,
+                        title: tip.title,
+                        message: tip.message,
                         onDismiss: {
-                            showDoubleTripleTip = false
-                            UserDefaults.standard.set(true, forKey: "hasSeenDoubleTripleTip")
+                            showGameTip = false
+                            TipManager.shared.markTipAsSeen(for: game.title)
                         }
                     )
                     .padding(.horizontal, 24)
@@ -212,21 +213,13 @@ struct CountdownGameplayView: View {
                 // Inject authService into the ViewModel
                 gameViewModel.setAuthService(authService)
                 
-                // Show long-press tip only once for 301 games
-                let isCountdown301 = game.title.contains("301")
-                let hasSeenTip = UserDefaults.standard.bool(forKey: "hasSeenDoubleTripleTip")
-                
-                #if DEBUG
-                let shouldShowTip = isCountdown301
-                #else
-                let shouldShowTip = isCountdown301 && !hasSeenTip
-                #endif
-                
-                if shouldShowTip {
+                // Show game-specific tip if available and not seen before
+                if TipManager.shared.shouldShowTip(for: game.title) {
+                    currentTip = TipManager.shared.getTip(for: game.title)
                     // Slight delay so it appears after navigation transition
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         withAnimation {
-                            showDoubleTripleTip = true
+                            showGameTip = true
                         }
                     }
                 }

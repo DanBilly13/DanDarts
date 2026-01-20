@@ -21,6 +21,8 @@ struct HalveItGameplayView: View {
     @State private var showExitAlert: Bool = false
     @State private var navigateToGameEnd: Bool = false
     @State private var isScoreboardExpanded: Bool = false
+    @State private var showGameTip: Bool = false
+    @State private var currentTip: GameTip? = nil
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
@@ -44,7 +46,18 @@ struct HalveItGameplayView: View {
                 xPercent: 0.5,
                 yPercent: 0.55
             ) {
-                EmptyView()
+                if showGameTip, let tip = currentTip {
+                    TipBubble(
+                        systemImageName: tip.icon,
+                        title: tip.title,
+                        message: tip.message,
+                        onDismiss: {
+                            showGameTip = false
+                            TipManager.shared.markTipAsSeen(for: game.title)
+                        }
+                    )
+                    .padding(.horizontal, 24)
+                }
             } background: {
                 ZStack {
                     VStack(spacing: 0) {
@@ -179,6 +192,17 @@ struct HalveItGameplayView: View {
         .onAppear {
             // Inject authService into the ViewModel
             viewModel.setAuthService(authService)
+            
+            // Show game-specific tip if available and not seen before
+            if TipManager.shared.shouldShowTip(for: game.title) {
+                currentTip = TipManager.shared.getTip(for: game.title)
+                // Slight delay so it appears after navigation transition
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        showGameTip = true
+                    }
+                }
+            }
         }
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }

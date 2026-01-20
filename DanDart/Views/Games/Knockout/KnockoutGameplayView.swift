@@ -21,6 +21,8 @@ struct KnockoutGameplayView: View {
     @State private var showExitConfirmation = false
     @State private var navigateToGameEnd = false
     @StateObject private var menuCoordinator = MenuCoordinator.shared
+    @State private var showGameTip: Bool = false
+    @State private var currentTip: GameTip? = nil
     
     // Initialize with game, players, and starting lives
     init(game: Game, players: [Player], startingLives: Int) {
@@ -35,7 +37,24 @@ struct KnockoutGameplayView: View {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
             
-            VStack(spacing: 0) {
+            PositionedTip(
+                xPercent: 0.5,
+                yPercent: 0.55
+            ) {
+                if showGameTip, let tip = currentTip {
+                    TipBubble(
+                        systemImageName: tip.icon,
+                        title: tip.title,
+                        message: tip.message,
+                        onDismiss: {
+                            showGameTip = false
+                            TipManager.shared.markTipAsSeen(for: game.title)
+                        }
+                    )
+                    .padding(.horizontal, 24)
+                }
+            } background: {
+                VStack(spacing: 0) {
                 
                 VStack (spacing: 0) {
                     
@@ -126,6 +145,7 @@ struct KnockoutGameplayView: View {
                     .padding(.bottom, 34)
                 }
             }
+            }
         }
         .background(AppColor.backgroundPrimary)
         .navigationTitle(game.title)
@@ -146,6 +166,16 @@ struct KnockoutGameplayView: View {
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled()
         .ignoresSafeArea(.container, edges: .bottom)
+        .onAppear {
+            if TipManager.shared.shouldShowTip(for: game.title) {
+                currentTip = TipManager.shared.getTip(for: game.title)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        showGameTip = true
+                    }
+                }
+            }
+        }
         .alert("Exit Game", isPresented: $showExitConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Leave Game", role: .destructive) {
