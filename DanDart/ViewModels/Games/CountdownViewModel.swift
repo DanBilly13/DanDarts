@@ -22,6 +22,9 @@ class CountdownViewModel: ObservableObject {
     @Published var suggestedCheckout: String? = nil
     @Published var selectedDartIndex: Int? = nil
     
+    // Undo functionality
+    @Published private(set) var lastVisit: Visit? = nil
+    
     // Multi-leg match tracking
     @Published var currentLeg: Int = 1
     @Published var legsWon: [UUID: Int] = [:] // Player ID to legs won
@@ -164,6 +167,11 @@ class CountdownViewModel: ObservableObject {
     /// Check if this is a multi-leg match
     var isMultiLegMatch: Bool {
         return matchFormat > 1
+    }
+    
+    /// Check if undo is available
+    var canUndo: Bool {
+        return lastVisit != nil && winner == nil
     }
     
     // MARK: - Initialization
@@ -312,6 +320,17 @@ class CountdownViewModel: ObservableObject {
             return
         }
         
+        // Record visit for undo functionality (before applying changes)
+        lastVisit = Visit(
+            playerID: currentPlayer.id,
+            playerName: currentPlayer.displayName,
+            dartsThrown: currentThrow,
+            scoreChange: throwTotal,
+            previousScore: currentScore,
+            newScore: newScore,
+            currentPlayerIndex: currentPlayerIndex
+        )
+        
         // Valid score - update player score
         playerScores[currentPlayer.id] = newScore
         
@@ -419,27 +438,36 @@ class CountdownViewModel: ObservableObject {
         SoundManager.shared.resetMissCounter()
     }
     
-    /// Undo the last turn (restore previous state)
-    func undoLastTurn() {
-        guard let lastTurn = lastTurn else { return }
+    /// Undo the last visit (restore previous state)
+    func undoLastVisit() {
+        guard let visit = lastVisit else { return }
         guard winner == nil else { return } // Can't undo after game is won
         
-        // Restore player score
-        playerScores[lastTurn.player.id] = lastTurn.scoreBefore
+        // Restore player score to previous value
+        playerScores[visit.playerID] = visit.previousScore
         
-        // Switch back to previous player
-        currentPlayerIndex = players.firstIndex(where: { $0.id == lastTurn.player.id }) ?? 0
+        // Restore player index to what it was before the visit
+        currentPlayerIndex = visit.currentPlayerIndex
         
-        // Remove last turn from history
-        if let index = turnHistory.firstIndex(where: { $0.id == lastTurn.id }) {
-            turnHistory.remove(at: index)
+        // Remove the last turn from history (if it matches this visit)
+        if let lastHistoryTurn = turnHistory.last,
+           lastHistoryTurn.player.id == visit.playerID {
+            turnHistory.removeLast()
+            self.lastTurn = turnHistory.last
         }
         
-        // Update lastTurn to the new last turn (if any)
-        self.lastTurn = turnHistory.last
+        // Clear the last visit (can only undo once)
+        lastVisit = nil
         
         // Clear current throw
         currentThrow.removeAll()
+        selectedDartIndex = nil
+        
+        // Update checkout suggestion for restored player
+        updateCheckoutSuggestion()
+        
+        // Play subtle sound feedback
+        SoundManager.shared.playButtonTap()
     }
     
     /// Restart the game with same players

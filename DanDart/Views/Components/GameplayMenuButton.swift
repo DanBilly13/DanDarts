@@ -12,12 +12,21 @@ struct GameplayMenuButton: View {
     let onInstructions: () -> Void
     let onRestart: () -> Void
     let onExit: () -> Void
+    var onUndo: (() -> Void)? = nil
+    var canUndo: Bool = false
     
     var body: some View {
         Menu {
             Button("Instructions") { 
                 onInstructions() 
             }
+            
+            if canUndo, let undoAction = onUndo {
+                Button(action: undoAction) {
+                    Label("Undo Last Visit", systemImage: "arrow.uturn.backward.circle")
+                }
+            }
+            
             Button("Restart Game") { 
                 onRestart() 
             }

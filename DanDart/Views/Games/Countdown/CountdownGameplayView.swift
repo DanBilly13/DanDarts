@@ -19,6 +19,7 @@ struct CountdownGameplayView: View {
     @State private var showInstructions: Bool = false
     @State private var showRestartAlert: Bool = false
     @State private var showExitAlert: Bool = false
+    @State private var showUndoConfirmation: Bool = false
     @State private var navigateToGameEnd: Bool = false
     @State private var showLegWinCelebration: Bool = false
     @State private var showGameTip: Bool = false
@@ -198,7 +199,9 @@ struct CountdownGameplayView: View {
                     GameplayMenuButton(
                         onInstructions: { showInstructions = true },
                         onRestart: { showRestartAlert = true },
-                        onExit: { showExitAlert = true }
+                        onExit: { showExitAlert = true },
+                        onUndo: { showUndoConfirmation = true },
+                        canUndo: gameViewModel.canUndo
                     )
                 }
             }
@@ -240,6 +243,18 @@ struct CountdownGameplayView: View {
                 }
             } message: {
                 Text("Are you sure you want to restart the game? All progress will be lost.")
+            }
+            .alert("Undo Last Visit", isPresented: $showUndoConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Undo", role: .destructive) {
+                    gameViewModel.undoLastVisit()
+                }
+            } message: {
+                if let visit = gameViewModel.lastVisit {
+                    Text("Undo visit by \(visit.playerName)?\n\nScore will revert from \(visit.newScore) to \(visit.previousScore).")
+                } else {
+                    Text("Undo the last visit?")
+                }
             }
             .sheet(isPresented: $showInstructions) {
                 GameInstructionsView(game: game)
