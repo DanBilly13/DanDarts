@@ -310,7 +310,8 @@ struct CountdownGameplayView: View {
                         },
                         matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
                         legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                        matchId: gameViewModel.matchId
+                        matchId: gameViewModel.matchId,
+                        matchResult: gameViewModel.savedMatchResult
                     )
                 }
             }

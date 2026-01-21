@@ -18,6 +18,7 @@ struct GameEndView: View {
     let matchFormat: Int?
     let legsWon: [UUID: Int]?
     let matchId: UUID? // For navigating to match details
+    let matchResult: MatchResult? // Optional pre-loaded match result for instant access
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
@@ -218,6 +219,14 @@ struct GameEndView: View {
     
     /// Load match from local storage or cloud and show details sheet
     private func loadMatchAndShowDetails() {
+        // If we already have the match result passed in, use it instantly!
+        if let matchResult = matchResult {
+            loadedMatch = matchResult
+            showMatchDetails = true
+            return
+        }
+        
+        // Otherwise, fall back to loading from storage
         guard let matchId = matchId else { return }
         
         isLoadingMatch = true
@@ -274,7 +283,8 @@ struct GameEndView: View {
         onBackToGames: { print("Back to Games") },
         matchFormat: nil,
         legsWon: nil,
-        matchId: UUID()
+        matchId: UUID(),
+        matchResult: nil
     )
     .environmentObject(AuthService.mockAuthenticated)
 }
@@ -292,7 +302,8 @@ struct GameEndView: View {
         onBackToGames: { print("Back to Games") },
         matchFormat: 3,
         legsWon: [player1.id: 2, player2.id: 1],
-        matchId: UUID()
+        matchId: UUID(),
+        matchResult: nil
     )
     .environmentObject(AuthService.mockAuthenticated)
 }

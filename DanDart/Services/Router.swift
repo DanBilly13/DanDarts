@@ -194,7 +194,8 @@ class Router: ObservableObject {
                 onBackToGames: onBackToGames,
                 matchFormat: matchFormat,
                 legsWon: legsWon,
-                matchId: matchId
+                matchId: matchId,
+                matchResult: nil // Router doesn't have access to savedMatchResult
             )
         }
     }
