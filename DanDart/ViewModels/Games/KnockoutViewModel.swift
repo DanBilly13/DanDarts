@@ -47,6 +47,9 @@ class KnockoutViewModel: ObservableObject {
     // Turn history tracking: [Player.id: [MatchTurn]]
     private var turnHistory: [UUID: [MatchTurn]] = [:]
     
+    // Match saving
+    private var hasBeenSaved: Bool = false // Prevent double-saving
+    
     // Services (optional for Supabase sync)
     var authService: AuthService?
     
@@ -311,6 +314,11 @@ class KnockoutViewModel: ObservableObject {
     /// Save match result to local storage and Supabase
     private func saveMatchResult() {
         guard let winner = winner else { return }
+        guard !hasBeenSaved else {
+            print("⚠️ Knockout match already saved, skipping duplicate save")
+            return
+        }
+        hasBeenSaved = true
         
         // Calculate match duration
         let duration = Date().timeIntervalSince(matchStartTime)

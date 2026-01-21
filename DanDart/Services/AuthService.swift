@@ -259,6 +259,11 @@ class AuthService: ObservableObject {
             currentUser = userProfile
             updateAuthenticationState()
             
+            // 5. Preload match history in background
+            Task {
+                await MatchHistoryService.shared.preloadMatches(userId: userProfile.id)
+            }
+            
             print("🎉 Sign in complete!")
             
         } catch let error as PostgrestError {
@@ -369,6 +374,11 @@ class AuthService: ObservableObject {
                 currentUser = existingUser
                 updateAuthenticationState()
                 
+                // Preload match history in background
+                Task {
+                    await MatchHistoryService.shared.preloadMatches(userId: existingUser.id)
+                }
+                
                 // Return false to indicate existing user (navigate to GamesTab)
                 return false
                 
@@ -401,6 +411,11 @@ class AuthService: ObservableObject {
                 currentUser = newUser
                 needsProfileSetup = true
                 // Don't call updateAuthenticationState() yet - wait for profile setup
+                
+                // Preload match history in background (will be empty for new users, but sets up the service)
+                Task {
+                    await MatchHistoryService.shared.preloadMatches(userId: newUser.id)
+                }
                 
                 // Return true to indicate new user (navigate to Profile Setup)
                 return true
@@ -509,6 +524,11 @@ class AuthService: ObservableObject {
                 currentUser = existingUser
                 updateAuthenticationState()
                 
+                // Preload match history in background
+                Task {
+                    await MatchHistoryService.shared.preloadMatches(userId: existingUser.id)
+                }
+                
                 // Return false to indicate existing user
                 return false
                 
@@ -544,6 +564,11 @@ class AuthService: ObservableObject {
                 currentUser = newUser
                 needsProfileSetup = true
                 // Don't call updateAuthenticationState() yet - wait for profile setup
+                
+                // Preload match history in background (will be empty for new users, but sets up the service)
+                Task {
+                    await MatchHistoryService.shared.preloadMatches(userId: newUser.id)
+                }
                 
                 // Return true to indicate new user
                 return true

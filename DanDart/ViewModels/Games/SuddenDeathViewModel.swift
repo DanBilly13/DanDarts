@@ -46,6 +46,10 @@ class SuddenDeathViewModel: ObservableObject {
     let matchId = UUID()
     private let matchStartTime = Date()
     
+    // Match saving
+    @Published var savedMatchResult: MatchResult? = nil // Saved match data for passing to GameEndView
+    private var hasBeenSaved: Bool = false // Prevent double-saving
+    
     // Services (optional for Supabase sync)
     var authService: AuthService?
     
@@ -368,6 +372,11 @@ class SuddenDeathViewModel: ObservableObject {
     
     private func saveMatchResult() {
         guard let winner = winner else { return }
+        guard !hasBeenSaved else {
+            print("⚠️ Sudden Death match already saved, skipping duplicate save")
+            return
+        }
+        hasBeenSaved = true
         
         let duration = Date().timeIntervalSince(matchStartTime)
         

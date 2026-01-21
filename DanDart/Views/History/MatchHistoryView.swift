@@ -9,13 +9,10 @@ import SwiftUI
 
 struct MatchHistoryView: View {
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var matchesService = MatchesService()
+    @StateObject private var historyService = MatchHistoryService.shared
     private let analytics = AnalyticsService.shared
     
     @State private var selectedFilter: GameFilter = .all
-    @State private var matches: [MatchResult] = []
-    @State private var isRefreshing: Bool = false
-    @State private var loadError: String?
     @State private var searchText: String = ""
     @State private var filteredMatches: [MatchResult] = []
     @State private var isSearchPresented: Bool = false
@@ -25,9 +22,7 @@ struct MatchHistoryView: View {
     @State private var showLocalMatches: Bool = true
     @State private var supabaseMatchIds: Set<UUID> = [] // Track which matches came from Supabase
     
-    // Cache and update tracking
-    @State private var isUpdating: Bool = false
-    @State private var lastUpdateTime: Date?
+    // Update status tracking
     @State private var updateStatusText: String = ""
     
     // Cached date formatter (expensive to create)
@@ -55,7 +50,7 @@ struct MatchHistoryView: View {
     
     // Update filtered matches based on current state
     private func updateFilteredMatches() {
-        var filtered = matches
+        var filtered = historyService.matches
         
         // TEMPORARY: Filter out local matches if toggle is off
         if !showLocalMatches {
@@ -109,14 +104,22 @@ struct MatchHistoryView: View {
             .background(AppColor.backgroundPrimary)
             .ignoresSafeArea()
             .onAppear {
-                loadCachedMatchesIfNeeded()
-                loadMatches()
+                // Check if data is stale and refresh if needed
+                if historyService.isStale {
+                    Task {
+                        guard let userId = authService.currentUser?.id else { return }
+                        await historyService.refreshMatches(userId: userId)
+                    }
+                }
                 updateFilteredMatches()
                 
                 // Log match history viewed event
-                analytics.logMatchHistoryViewed(totalMatches: matches.count)
+                analytics.logMatchHistoryViewed(totalMatches: historyService.matches.count)
             }
-            .onChange(of: lastUpdateTime) { _, _ in
+            .onChange(of: historyService.matches) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: historyService.lastLoadedTime) { _, _ in
                 updateStatusText = formatUpdateStatus()
             }
     }
@@ -155,9 +158,6 @@ struct MatchHistoryView: View {
                 .onChange(of: selectedFilter) { _, _ in
                     updateFilteredMatches()
                 }
-                .onChange(of: matches) { _, _ in
-                    updateFilteredMatches()
-                }
                 .onChange(of: isSearchPresented) { _, _ in
                     updateFilteredMatches()
                 }
@@ -176,7 +176,7 @@ struct MatchHistoryView: View {
             if !isSearchPresented {
                 VStack(spacing: 0) {
                     // Error banner (pinned at top)
-                    if let error = loadError {
+                    if let error = historyService.loadError {
                         errorBanner(message: error)
                             .padding(.horizontal, 16)
                     }
@@ -244,7 +244,7 @@ struct MatchHistoryView: View {
             Spacer()
             
             Button(action: {
-                loadError = nil
+                historyService.loadError = nil
             }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16))
@@ -342,16 +342,16 @@ struct MatchHistoryView: View {
                 .padding(.bottom, 6)
             }
             .padding(.top, 16)
-        }
-        .refreshable {
-            await refreshMatches()
+            .refreshable {
+                guard let userId = authService.currentUser?.id else { return }
+                await historyService.refreshMatches(userId: userId)
+            }
         }
     }
-    
+
     private func matchRowView(_ match: MatchResult) -> some View {
         MatchCard(match: match)
     }
-    
     // Search overlay (Liquid Glass pattern)
     private var searchOverlay: some View {
         ZStack {
@@ -489,42 +489,14 @@ struct MatchHistoryView: View {
     }
     
     // MARK: - Helper Methods
-
-    /// Load cached matches from UserDefaults immediately (instant display)
-    private func loadCachedMatchesIfNeeded() {
-        // Only load cache if matches array is empty
-        guard matches.isEmpty else { return }
-        
-        if let cachedData = UserDefaults.standard.data(forKey: "cachedMatches"),
-           let cachedMatches = try? JSONDecoder().decode([MatchResult].self, from: cachedData) {
-            matches = cachedMatches.sorted { $0.timestamp > $1.timestamp }
-            print("💾 Loaded \(cachedMatches.count) matches from cache")
-        }
-        
-        // Load last update time
-        if let lastUpdate = UserDefaults.standard.object(forKey: "lastMatchUpdate") as? Date {
-            lastUpdateTime = lastUpdate
-        }
-    }
-    
-    /// Save matches to cache
-    private func cacheMatches(_ matches: [MatchResult]) {
-        if let encoded = try? JSONEncoder().encode(matches) {
-            UserDefaults.standard.set(encoded, forKey: "cachedMatches")
-            let now = Date()
-            UserDefaults.standard.set(now, forKey: "lastMatchUpdate")
-            lastUpdateTime = now
-            print("💾 Cached \(matches.count) matches")
-        }
-    }
     
     /// Format update status text for subtitle
     private func formatUpdateStatus() -> String {
-        if isUpdating {
+        if historyService.isLoading {
             return "Updating..."
         }
         
-        guard let lastUpdate = lastUpdateTime else {
+        guard let lastUpdate = historyService.lastLoadedTime else {
             return ""
         }
         
@@ -545,116 +517,6 @@ struct MatchHistoryView: View {
             let days = Int(interval / 86400)
             return "Updated \(days)d ago"
         }
-    }
-    
-    /// Load matches from both Supabase and local storage, merge and deduplicate
-    /// Runs silently in background - only shows errors
-    private func loadMatches() {
-        // 1. Load local matches first (instant, no loading indicator)
-        let localMatches = MatchStorageManager.shared.loadMatches()
-        
-        // If we have no cached matches, show local immediately
-        if matches.isEmpty {
-            matches = localMatches.sorted { $0.timestamp > $1.timestamp }
-        }
-        
-        // 2. Silently sync from Supabase in background
-        guard let currentUserId = authService.currentUser?.id else {
-            print("⚠️ No current user, showing local matches only")
-            return
-        }
-        
-        print("👤 Current user: \(authService.currentUser?.displayName ?? "Unknown") (ID: \(currentUserId))")
-        
-        Task {
-            await MainActor.run {
-                isUpdating = true
-            }
-            
-            do {
-                // Load matches from Supabase (silent)
-                let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
-                
-                // Track which matches came from Supabase
-                let supabaseIds = Set(supabaseMatches.map { $0.id })
-                print("📊 Supabase match IDs: \(supabaseIds)")
-                
-                // Merge with local matches and remove duplicates
-                let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
-                let sortedMatches = allMatches.sorted { $0.timestamp > $1.timestamp }
-                
-                // Update UI with merged matches (silent)
-                await MainActor.run {
-                    matches = sortedMatches
-                    supabaseMatchIds = supabaseIds
-                    isUpdating = false
-                    cacheMatches(sortedMatches)
-                    print("📊 Final state: \(matches.count) total matches, \(supabaseMatchIds.count) from Supabase")
-                }
-                
-                print("✅ Silently synced: \(supabaseMatches.count) from cloud, \(localMatches.count) local, \(matches.count) total")
-                
-            } catch {
-                // Only show error banner on failure
-                await MainActor.run {
-                    isUpdating = false
-                    loadError = "Couldn't sync with cloud"
-                }
-                print("❌ Background sync error: \(error)")
-                // Keep showing local matches on error
-            }
-        }
-    }
-    
-    /// Merge local and Supabase matches, removing duplicates
-    private func mergeMatches(local: [MatchResult], supabase: [MatchResult]) -> [MatchResult] {
-        var matchesById: [UUID: MatchResult] = [:]
-        
-        // Add local matches first
-        for match in local {
-            matchesById[match.id] = match
-        }
-        
-        // Add Supabase matches (will overwrite local if same ID)
-        for match in supabase {
-            matchesById[match.id] = match
-        }
-        
-        return Array(matchesById.values)
-    }
-    
-    /// Refresh matches from Supabase
-    private func refreshMatches() async {
-        isRefreshing = true
-        
-        guard let currentUserId = authService.currentUser?.id else {
-            isRefreshing = false
-            return
-        }
-        
-        do {
-            // Load from Supabase
-            let supabaseMatches = try await matchesService.loadMatches(userId: currentUserId)
-            
-            // Track which matches came from Supabase
-            let supabaseIds = Set(supabaseMatches.map { $0.id })
-            
-            // Load local matches
-            let localMatches = MatchStorageManager.shared.loadMatches()
-            
-            // Merge and update
-            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
-            matches = allMatches.sorted { $0.timestamp > $1.timestamp }
-            supabaseMatchIds = supabaseIds
-            
-            print("✅ Refreshed: \(matches.count) total matches")
-            
-        } catch {
-            print("❌ Refresh error: \(error)")
-            loadError = "Failed to refresh matches"
-        }
-        
-        isRefreshing = false
     }
 }
 
