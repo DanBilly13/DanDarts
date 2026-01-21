@@ -47,6 +47,7 @@ class CountdownViewModel: ObservableObject {
     
     // Match saving
     @Published var matchId: UUID? = nil // ID for saved match
+    @Published var savedMatchResult: MatchResult? = nil // Saved match data for passing to GameEndView
     private var hasBeenSaved: Bool = false // Prevent double-saving
     
     // Game configuration
@@ -723,6 +724,9 @@ class CountdownViewModel: ObservableObject {
             totalLegsPlayed: currentLeg,
             metadata: nil // No game-specific metadata for countdown games
         )
+        
+        // Store match result for passing to GameEndView (instant access)
+        self.savedMatchResult = matchResult
         
         // Save to local storage
         MatchStorageManager.shared.saveMatch(matchResult)

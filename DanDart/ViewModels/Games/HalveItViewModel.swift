@@ -30,6 +30,9 @@ class HalveItViewModel: ObservableObject {
     // Animation state
     @Published var showScoreAnimation: Bool = false // Triggers arcade-style score pop
     
+    // Match saving
+    @Published var savedMatchResult: MatchResult? = nil // Saved match data for passing to GameEndView
+    
     // Services
     private var authService: AuthService?
     
@@ -273,6 +276,9 @@ class HalveItViewModel: ObservableObject {
             totalLegsPlayed: 1,
             metadata: ["difficulty": difficulty.rawValue]
         )
+        
+        // Store match result for passing to GameEndView (instant access)
+        self.savedMatchResult = matchResult
         
         // Save to local storage
         MatchStorageManager.shared.saveMatch(matchResult)

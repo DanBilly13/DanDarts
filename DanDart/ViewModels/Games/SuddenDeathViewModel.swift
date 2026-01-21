@@ -412,6 +412,9 @@ class SuddenDeathViewModel: ObservableObject {
             metadata: ["starting_lives": "\(startingLives)"]
         )
         
+        // Store match result for passing to GameEndView (instant access)
+        self.savedMatchResult = matchResult
+        
         MatchStorageManager.shared.saveMatch(matchResult)
         MatchStorageManager.shared.updatePlayerStats(for: matchPlayers, winnerId: winner.userId ?? winner.id)
         
