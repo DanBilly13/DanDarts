@@ -33,9 +33,10 @@ struct SignInView: View {
                     // Header Section
                     VStack(spacing: 16) {
                         // App Logo
-                        Image(systemName: "target")
-                            .font(.system(size: 60, weight: .medium))
-                            .foregroundColor(AppColor.brandPrimary)
+                        Image("DartHeadOnly")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: 100)
                         
                         Text("Please sign in")
                             .font(.system(size: 28, weight: .bold))

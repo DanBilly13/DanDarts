@@ -21,15 +21,11 @@ struct WelcomeView: View {
                 VStack(spacing: 24) {
                     Spacer()
                     
-                    // App Logo Icon
-                    Image(systemName: "target")
-                        .font(.system(size: 72, weight: .medium))
-                        .foregroundColor(AppColor.brandPrimary)
-                    
-                    // App Logo Text
-                    Text("DartFreak")
-                        .font(.system(size: 42, weight: .bold, design: .default))
-                        .foregroundColor(AppColor.brandPrimary)
+                    // App Logo
+                    Image("DartFreakLogo02")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: 240)
                     
                     // Tagline
                     Text("Focus on the fun, not the math")
@@ -38,9 +34,9 @@ struct WelcomeView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                     
-                    Spacer()
+                    /*Spacer()*/
                 }
-                .frame(height: geometry.size.height * 0.6)
+                /*.frame(height: geometry.size.height * 0.6)*/
                 
                 // Bottom section with buttons
                 VStack(spacing: 16) {
@@ -60,7 +56,7 @@ struct WelcomeView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 64)
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom, 32))
                 .frame(height: geometry.size.height * 0.4)
             }

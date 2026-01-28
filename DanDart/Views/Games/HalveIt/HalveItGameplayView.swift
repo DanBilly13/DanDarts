@@ -50,7 +50,8 @@ struct HalveItGameplayView: View {
                     TipBubble(
                         systemImageName: tip.icon,
                         title: tip.title,
-                        message: tip.message,
+                        message1: tip.message1,
+                        message2: tip.message2,
                         onDismiss: {
                             showGameTip = false
                             TipManager.shared.markTipAsSeen(for: game.title)

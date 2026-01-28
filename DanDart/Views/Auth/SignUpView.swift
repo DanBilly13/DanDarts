@@ -56,19 +56,21 @@ struct SignUpView: View {
                     // Header Section
                     VStack(spacing: 16) {
                         // App Logo
-                        Image(systemName: "target")
-                            .font(.system(size: 60, weight: .medium))
-                            .foregroundColor(AppColor.brandPrimary)
+                        Image("SplashScreen")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: 100)
+                            
                         
                         Text("Create Account")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(AppColor.textPrimary)
+                            
                         
-                        Text("Join the DanDarts community")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
+                        
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 24)
+                    
                     
                     // Google Sign Up Button (match SignInView style)
                     AppButton(

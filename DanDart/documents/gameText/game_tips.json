@@ -3,42 +3,55 @@
     "gameTitle": "301",
     "icon": "hand.tap.fill",
     "title": "Doubles & Trebles",
-    "message": "Reach exactly zero by finishing on a double.\n\nLong-press any number to choose single, double, or treble."
+    "message1": "Reach exactly zero by finishing on a double.",
+    "message2": "Long-press any number to score doubles and trebles."
+
   },
   {
     "gameTitle": "501",
     "icon": "hand.tap.fill",
     "title": "Doubles & Trebles",
-    "message": "Reach exactly zero by finishing on a double.\n\nLong-press any number to choose single, double, or treble."
+    "message1": "Reach exactly zero by finishing on a double.",
+    "message2": "Long-press any number to score doubles and trebles."
   },
   {
     "gameTitle": "Halve-It",
     "icon": "scissors",
     "title": "Hit or Get Chopped",
-    "message": "Hit the target with at least one dart or your score gets halved!\n\nLong-press any number for doubles and trebles."
+    "message1": "Hit the target with at least one dart or your score gets halved!",
+    "message2": "Long-press any number to score doubles and trebles."
+
   },
   {
     "gameTitle": "Killer",
     "icon": "scope",
     "title": "Become a Killer",
-    "message": "Hit your own double first to become a Killer, then attack others!\n\nLong-press any number for doubles and trebles."
+    "message1": "Hit your own double first to become a killer. Then hit your opponents’ numbers to take their lives.",
+    "message2": "Long-press any number to score doubles and trebles."
+
   },
   {
     "gameTitle": "Knockout",
     "icon": "flame.fill",
     "title": "Beat the High Score",
-    "message": "Beat the current high score or lose a life.\n\nLong-press any number for doubles and trebles."
+    "message1": "Beat the current high score or lose a life.",
+    "message2": "Long-press any number to score doubles and trebles."
+
   },
   {
     "gameTitle": "Sudden Death",
     "icon": "bolt.fill",
     "title": "Avoid Elimination",
-    "message": "The lowest score each round is eliminated. Score high to survive!\n\nLong-press any number for doubles and trebles."
+    "message1": "The player with the lowest score in each round loses a life.",
+    "message2": "Long-press any number to score doubles and trebles."
+
   },
   {
     "gameTitle": "English Cricket",
     "icon": "cricket.ball.fill",
     "title": "Score Runs & Take Wickets",
-    "message": "Batters score runs on 15-20 and bull. Bowlers take wickets by hitting the bull.\n\nLong-press any number for doubles and trebles."
+    "message1": "Batters score runs on 15-20 and bull. Bowlers take wickets by hitting the bull.",
+    "message2": "Long-press any number to score doubles and trebles."
+
   }
 ]

@@ -22,6 +22,9 @@ class CountdownViewModel: ObservableObject {
     @Published var suggestedCheckout: String? = nil
     @Published var selectedDartIndex: Int? = nil
     
+    // Track if turn started with a checkout available
+    private var turnStartedWithCheckout: Bool = false
+    
     // Undo functionality
     @Published private(set) var lastVisit: Visit? = nil
     
@@ -305,6 +308,7 @@ class CountdownViewModel: ObservableObject {
             
             currentThrow.removeAll()
             selectedDartIndex = nil
+            turnStartedWithCheckout = false // Reset for next turn
             
             // Set transition flag to hide bust button during switch
             isTransitioningPlayers = true
@@ -382,6 +386,7 @@ class CountdownViewModel: ObservableObject {
                 // Clear current throw and selection
                 currentThrow.removeAll()
                 selectedDartIndex = nil
+                turnStartedWithCheckout = false // Reset for next turn
                 
                 // Note: UI should show leg win celebration before calling resetLeg()
                 // Don't automatically reset here - let UI handle the transition
@@ -392,6 +397,7 @@ class CountdownViewModel: ObservableObject {
         // Clear current throw and selection
         currentThrow.removeAll()
         selectedDartIndex = nil
+        turnStartedWithCheckout = false // Reset for next turn
         
         // Set transition flag to hide bust button during animation
         isTransitioningPlayers = true
@@ -570,9 +576,19 @@ class CountdownViewModel: ObservableObject {
         let remainingAfterThrow = currentScore - currentThrowTotal
         let dartsLeft = 3 - currentThrow.count
         
+        // At start of turn (no darts thrown), track if checkout is available
+        if currentThrow.isEmpty {
+            turnStartedWithCheckout = (remainingAfterThrow >= 2 && remainingAfterThrow <= 170)
+        }
+        
         // Only suggest checkouts for scores 2-170 with darts remaining
         guard remainingAfterThrow >= 2 && remainingAfterThrow <= 170 && dartsLeft > 0 else {
-            suggestedCheckout = nil
+            // If turn started with checkout but now unavailable, show "Not Available" message
+            if turnStartedWithCheckout && !currentThrow.isEmpty && remainingAfterThrow > 1 {
+                suggestedCheckout = "Checkout: Not Available. \(remainingAfterThrow)pts remaining"
+            } else {
+                suggestedCheckout = nil
+            }
             return
         }
         
@@ -580,7 +596,12 @@ class CountdownViewModel: ObservableObject {
         if let checkout = calculateCheckout(score: remainingAfterThrow, dartsAvailable: dartsLeft) {
             suggestedCheckout = checkout
         } else {
-            suggestedCheckout = nil
+            // Checkout not possible with remaining darts
+            if turnStartedWithCheckout && !currentThrow.isEmpty {
+                suggestedCheckout = "Checkout: Not Available. \(remainingAfterThrow)pts remaining"
+            } else {
+                suggestedCheckout = nil
+            }
         }
     }
     

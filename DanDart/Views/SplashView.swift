@@ -13,31 +13,14 @@ struct SplashView: View {
     @State private var shouldNavigate = false
     
     var body: some View {
-        VStack(spacing: 30) {
+        VStack {
             Spacer()
             
-            // App Logo Icon
-            Image(systemName: "target")
-                .font(.system(size: 80, weight: .medium))
-                .foregroundColor(AppColor.brandPrimary)
-            
-            // App Logo Text
-            Text("DartFreak")
-                .font(.system(size: 48, weight: .bold, design: .default))
-                .foregroundColor(AppColor.brandPrimary)
-            
-            Spacer()
-            
-            // Loading Indicator
-            VStack(spacing: 16) {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AppColor.interactivePrimaryForeground))
-                    .scaleEffect(1.2)
-                
-                Text("Loading...")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppColor.textSecondary)
-            }
+            // Splash Screen Logo
+            Image("SplashScreen")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: 200)
             
             Spacer()
         }

@@ -3,28 +3,30 @@ import SwiftUI
 struct TipBubble: View {
     let systemImageName: String
     let title: String
-    let message: String
+    let message1: String
+    let message2: String
+    
     let onDismiss: () -> Void
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: systemImageName)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(AppColor.brandPrimary)
                     .padding(8)
                     .background(AppColor.brandPrimary.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
+                
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(title)
                             .font(.system(.headline, design: .rounded))
                             .fontWeight(.semibold)
                             .foregroundColor(AppColor.textPrimary)
-
+                        
                         Spacer(minLength: 0)
-
+                        
                         Button(action: onDismiss) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 12, weight: .bold))
@@ -35,11 +37,17 @@ struct TipBubble: View {
                         }
                         .buttonStyle(.plain)
                     }
-
-                    Text(message)
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundColor(AppColor.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    VStack (alignment: .leading, spacing: 8) {
+                        Text(message1)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundColor(AppColor.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(message2)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundColor(AppColor.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
                 }
             }
         }
@@ -61,7 +69,7 @@ struct PositionedTip<TipContent: View, Background: View>: View {
     let yPercent: CGFloat
     let tip: TipContent
     let background: Background
-
+    
     init(
         xPercent: CGFloat,
         yPercent: CGFloat,
@@ -73,12 +81,12 @@ struct PositionedTip<TipContent: View, Background: View>: View {
         self.tip = tip()
         self.background = background()
     }
-
+    
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 background
-
+                
                 tip
                     .position(
                         x: clamped(xPercent) * proxy.size.width,
@@ -87,7 +95,7 @@ struct PositionedTip<TipContent: View, Background: View>: View {
             }
         }
     }
-
+    
     private func clamped(_ value: CGFloat) -> CGFloat {
         min(1, max(0, value))
     }
@@ -96,20 +104,21 @@ struct PositionedTip<TipContent: View, Background: View>: View {
 #Preview("Default Tip") {
     ZStack {
         AppColor.backgroundPrimary.ignoresSafeArea()
-
+        
         VStack(spacing: 24) {
             Spacer()
-
+            
             TipBubble(
                 systemImageName: "cursorarrow.click",
                 title: "Doubles & Trebles",
-                message: "Long‑press any number button to choose single, double, or treble before you release.",
+                message1: "Hit your own double first to become a killer. Then hit your opponents’ numbers to take their lives.",
+                message2: "Long‑press any number button to choose doubles and trebles.",
                 onDismiss: {}
             )
             .padding(.horizontal, 24)
-
+            
             Spacer()
-
+            
             // Simulated scoring grid background for context
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(AppColor.inputBackground)

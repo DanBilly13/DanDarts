@@ -13,7 +13,8 @@ struct GameTip: Codable {
     let gameTitle: String
     let icon: String
     let title: String
-    let message: String
+    let message1: String
+    let message2: String
 }
 
 // MARK: - TipManager
