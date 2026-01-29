@@ -257,6 +257,12 @@ struct FriendSearchView: View {
             do {
                 // Send friend request in Supabase (status: pending)
                 try await friendsService.sendFriendRequest(userId: currentUserId, friendId: user.id)
+
+                // Notify parent view so the Friends tab can refresh sent/received requests
+                onFriendAdded(user.toPlayer())
+
+                // Notify badge/count listeners
+                NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
                 
                 // Success haptic feedback
                 let successFeedback = UINotificationFeedbackGenerator()

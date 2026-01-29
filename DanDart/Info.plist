@@ -12,6 +12,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>dartfreak</string>
+				<string>dandarts</string>
 			</array>
 		</dict>
 		<dict>

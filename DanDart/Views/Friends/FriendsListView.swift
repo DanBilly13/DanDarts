@@ -10,10 +10,15 @@ import SwiftUI
 struct FriendsListView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var friendsService = FriendsService()
+    @StateObject private var inviteService = InviteService()
     
     @State private var showSearch: Bool = false
     @State private var showSuccessAlert: Bool = false
     @State private var successMessage: String = ""
+    @State private var showInviteShareSheet: Bool = false
+    @State private var isCreatingInvite: Bool = false
+    @State private var inviteURLToShare: URL? = nil
+    @State private var inviteErrorMessage: String? = nil
     @State private var showDeleteConfirmation: Bool = false
     @State private var friendToDelete: Player? = nil
     
@@ -231,6 +236,21 @@ struct FriendsListView: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        createInviteLink()
+                    } label: {
+                        if isCreatingInvite {
+                            ProgressView()
+                                .tint(AppColor.interactivePrimaryBackground)
+                        } else {
+                            Image(systemName: "person.badge.plus")
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                        }
+                    }
+                    .disabled(isCreatingInvite)
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
                     ToolbarSearchButton {
                         showSearch = true
                     }
@@ -243,6 +263,16 @@ struct FriendsListView: View {
             loadFriends()
             loadRequests()
             loadGuests()
+        }
+        .sheet(isPresented: $showInviteShareSheet) {
+            if let url = inviteURLToShare {
+                ShareSheet(
+                    activityItems: [
+                        "Join me on DanDarts — add me as a friend:",
+                        url
+                    ]
+                )
+            }
         }
         // MARK: Sheet
         .sheet(isPresented: $showSearch) {
@@ -262,6 +292,20 @@ struct FriendsListView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(successMessage)
+        }
+        .alert("Invite Error", isPresented: Binding(
+            get: { inviteErrorMessage != nil },
+            set: { newValue in
+                if !newValue {
+                    inviteErrorMessage = nil
+                }
+            }
+        )) {
+            Button("OK", role: .cancel) {
+                inviteErrorMessage = nil
+            }
+        } message: {
+            Text(inviteErrorMessage ?? "")
         }
         .alert("Remove Friend?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -291,6 +335,29 @@ struct FriendsListView: View {
     
 
     // MARK: - Helper Methods
+
+    private func createInviteLink() {
+        guard let currentUserId = authService.currentUser?.id else {
+            inviteErrorMessage = "You must be signed in to invite friends"
+            return
+        }
+
+        isCreatingInvite = true
+        inviteErrorMessage = nil
+
+        Task {
+            do {
+                let url = try await inviteService.createInvite(inviterId: currentUserId)
+                inviteURLToShare = url
+                showInviteShareSheet = true
+                isCreatingInvite = false
+            } catch {
+                isCreatingInvite = false
+                inviteErrorMessage = "Failed to create invite link. Please try again."
+                print("❌ Create invite link error: \(error)")
+            }
+        }
+    }
     
     /// Load friends from Supabase
     private func loadFriends() {

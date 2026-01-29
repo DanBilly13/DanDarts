@@ -12,6 +12,13 @@ struct MainTabView: View {
     @StateObject private var friendsService = FriendsService()
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
+
+    private struct InviteTokenToClaim: Identifiable {
+        let id: String
+        let token: String
+    }
+
+    @State private var inviteTokenToClaim: InviteTokenToClaim? = nil
     
     var body: some View {
         TabView {
@@ -56,6 +63,12 @@ struct MainTabView: View {
                 .tag(2)
         }
         .accentColor(AppColor.interactivePrimaryBackground)
+        .sheet(item: $inviteTokenToClaim, onDismiss: {
+            PendingInviteStore.shared.clearToken()
+        }) { token in
+            InviteClaimView(token: token.token)
+                .modernSheet(title: "Invite", detents: [.medium])
+        }
         .sheet(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
@@ -67,6 +80,10 @@ struct MainTabView: View {
         .onAppear {
             configureTabBarAppearance()
             loadPendingRequestCount()
+
+            if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
+                inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
+            }
             
             // Listen for friend request changes
             NotificationCenter.default.addObserver(
@@ -76,9 +93,23 @@ struct MainTabView: View {
             ) { _ in
                 loadPendingRequestCount()
             }
+
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("InviteLinkReceived"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                if let token = PendingInviteStore.shared.getToken() {
+                    inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
+                }
+            }
         }
         .onChange(of: authService.currentUser?.id) { _, _ in
             loadPendingRequestCount()
+
+            if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
+                inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
+            }
         }
     }
     
