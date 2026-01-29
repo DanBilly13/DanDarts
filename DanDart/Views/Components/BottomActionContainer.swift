@@ -17,8 +17,8 @@ struct BottomActionContainer<Content: View>: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.4),
-                    Color.black.opacity(0.0)
+                    AppColor.surfaceSecondary.opacity(0.9),
+                    AppColor.surfaceSecondary.opacity(0.0)
                 ],
                 startPoint: .bottom,
                 endPoint: .top

@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct GameSetupView: View {
     let game: Game
@@ -68,27 +67,23 @@ struct GameSetupView: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
                     // Cover Image - use canonical coverImageName with gradient fallback
-                    Group {
-                        if UIImage(named: config.game.coverImageName) != nil {
-                            Image(config.game.coverImageName)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(height: heroHeight)
-                                .scaleEffect(imageScale)
-                                .clipped()
-                        } else {
-                            // Fallback gradient if no image
-                            LinearGradient(
-                                colors: [
-                                    AppColor.interactivePrimaryBackground.opacity(0.6),
-                                    AppColor.interactivePrimaryBackground.opacity(0.3)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .frame(height: heroHeight)
-                        }
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                AppColor.interactivePrimaryBackground.opacity(0.6),
+                                AppColor.interactivePrimaryBackground.opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+
+                        Image(config.game.coverImageName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .scaleEffect(imageScale)
                     }
+                    .frame(height: heroHeight)
+                    .clipped()
                     
                     // Gradient overlay for text readability
                     LinearGradient(
@@ -277,7 +272,8 @@ struct GameSetupView: View {
             .modernSheet(
                 title: "Add Players",
                 subtitle: "\(setupState.selectedPlayers.count) of \(config.playerLimit) players",
-                detents: [.large]
+                detents: [.large],
+                background: AppColor.surfacePrimary
             ) {
                 Button(action: {
                     // Trigger add guest player from SearchPlayerSheet

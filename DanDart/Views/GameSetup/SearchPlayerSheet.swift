@@ -123,7 +123,7 @@ struct SearchPlayerSheet: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
         }
-        .background(AppColor.backgroundPrimary)
+        .background(AppColor.surfacePrimary)
         .safeAreaInset(edge: .bottom) {
             BottomActionContainer {
                 AppButton(role: .primary,

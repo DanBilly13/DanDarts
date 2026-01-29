@@ -69,12 +69,14 @@ struct WelcomeView: View {
                 showingSignIn = false
                 pendingSheetSwap = .toSignUp
             })
+            .modernSheet(title: "Sign In", detents: [.large], background: AppColor.surfacePrimary)
         }
         .sheet(isPresented: $showingSignUp) {
             SignUpView(onSwitchToSignIn: {
                 showingSignUp = false
                 pendingSheetSwap = .toSignIn
             })
+            .modernSheet(title: "Sign Up", detents: [.large], background: AppColor.surfacePrimary)
         }
         .onChange(of: showingSignIn) { _, isShowing in
             if !isShowing, pendingSheetSwap == .toSignUp {

@@ -61,7 +61,7 @@ struct ProfileView: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .background(AppColor.backgroundPrimary)
+            .background(AppColor.surfacePrimary)
             .alert("Log Out", isPresented: $showLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Log Out", role: .destructive) {
@@ -96,8 +96,13 @@ struct ProfileView: View {
                 switch destination {
                 case "privacy":
                     PrivacyPolicy()
+                        .background(AppColor.surfacePrimary)
                 case "terms":
                     TermsAndConditions()
+                        .background(AppColor.surfacePrimary)
+                case "support":
+                    Support()
+                        .background(AppColor.surfacePrimary)
                 default:
                     EmptyView()
                 }
@@ -182,35 +187,11 @@ struct ProfileView: View {
                     .padding(.leading, 44)
                 
                 SettingsRow(
-                    icon: "bell",
-                    title: "Notifications",
-                    showChevron: true
-                ) {
-                    // TODO: Navigate to notifications settings
-                }
-                
-                Divider()
-                    .background(AppColor.textSecondary.opacity(0.2))
-                    .padding(.leading, 44)
-                
-                SettingsRow(
-                    icon: "paintbrush",
-                    title: "Appearance",
-                    showChevron: true
-                ) {
-                    // TODO: Navigate to appearance settings
-                }
-                
-                Divider()
-                    .background(AppColor.textSecondary.opacity(0.2))
-                    .padding(.leading, 44)
-                
-                SettingsRow(
                     icon: "questionmark.circle",
                     title: "Help & Support",
                     showChevron: true
                 ) {
-                    // TODO: Navigate to help
+                    navigationPath.append("support")
                 }
             }
             .background(AppColor.inputBackground)

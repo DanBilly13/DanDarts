@@ -224,7 +224,7 @@ struct EditProfileView: View {
                 }
             )
         }
-        .background(AppColor.backgroundPrimary)
+        .background(AppColor.surfacePrimary)
         .onAppear {
             loadCurrentProfile()
         }
@@ -287,7 +287,7 @@ private struct SheetTopBarSub: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppColor.backgroundPrimary)
+        .background(AppColor.surfacePrimary)
     }
 }
     

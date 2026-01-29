@@ -220,7 +220,7 @@ struct SignUpView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColor.backgroundPrimary)
+            .background(AppColor.surfacePrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -234,11 +234,13 @@ struct SignUpView: View {
                 NavigationStack {
                     TermsAndConditions()
                 }
+                .background(AppColor.surfacePrimary)
             }
             .sheet(isPresented: $showPrivacy) {
                 NavigationStack {
                     PrivacyPolicy()
                 }
+                .background(AppColor.surfacePrimary)
             }
         }
     }

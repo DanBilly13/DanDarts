@@ -62,19 +62,21 @@ struct MainTabView: View {
                 }
                 .tag(2)
         }
+        .background(AppColor.backgroundPrimary)
         .accentColor(AppColor.interactivePrimaryBackground)
         .sheet(item: $inviteTokenToClaim, onDismiss: {
             PendingInviteStore.shared.clearToken()
         }) { token in
             InviteClaimView(token: token.token)
-                .modernSheet(title: "Invite", detents: [.medium])
+                .modernSheet(title: "Invite", detents: [.medium], background: AppColor.surfacePrimary)
         }
         .sheet(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
                 .modernSheet(
                     title: "Profile",
-                    detents: [.large]
+                    detents: [.large],
+                    background: AppColor.surfacePrimary
                 )
         }
         .onAppear {
@@ -206,14 +208,14 @@ struct GamesTabView: View {
                             .navigationTransition(
                                 .zoom(sourceID: game.id, in: gameHeroNamespace)
                             )
-                            .background(Color.black)
+                            .background(AppColor.backgroundPrimary)
                     } else {
                         view
-                            .background(Color.black)
+                            .background(AppColor.backgroundPrimary)
                     }
                 default:
                     router.view(for: route)
-                        .background(Color.black)
+                        .background(AppColor.backgroundPrimary)
                 }
             }
         }

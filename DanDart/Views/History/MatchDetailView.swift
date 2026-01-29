@@ -41,7 +41,7 @@ struct MatchDetailView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 24)
                     }
-                    .background(AppColor.backgroundPrimary)
+                    .background(AppColor.surfacePrimary)
                     .navigationBarTitleDisplayMode(.inline)
                     .navigationBarBackButtonHidden(true)
                     .toolbarRole(.editor)

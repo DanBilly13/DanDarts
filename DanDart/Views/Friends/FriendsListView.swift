@@ -285,13 +285,9 @@ struct FriendsListView: View {
             }
             .modernSheet(
                 title: "Find Friends",
-                detents: [.medium, .large]
+                detents: [.medium, .large],
+                background: AppColor.surfacePrimary
             )
-        }
-        .alert("Success", isPresented: $showSuccessAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(successMessage)
         }
         .alert("Invite Error", isPresented: Binding(
             get: { inviteErrorMessage != nil },

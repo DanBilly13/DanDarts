@@ -356,7 +356,7 @@ struct MatchHistoryView: View {
     private var searchOverlay: some View {
         ZStack {
             // Dim background (covers everything including tab bar)
-            Color.black.opacity(0.4)
+            AppColor.justBlack.opacity(0.4)
                 .ignoresSafeArea(edges: .all)
                 .onTapGesture {
                     stopSearch()

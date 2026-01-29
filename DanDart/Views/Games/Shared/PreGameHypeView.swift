@@ -55,7 +55,7 @@ struct PreGameHypeView: View {
             GeometryReader { geometry in
                 ZStack {
                     // Solid black background to prevent white page
-                    Color.black
+                    AppColor.backgroundPrimary
                         .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -122,7 +122,7 @@ struct PreGameHypeView: View {
         .onTapGesture {
             navigateToGameplay()
         }
-        .background(Color.black)
+        .background(AppColor.backgroundPrimary)
         .preferredColorScheme(.dark)
     }
     

@@ -48,8 +48,8 @@ struct GameEndView: View {
             LinearGradient(
                 colors: [
                     AppColor.backgroundPrimary,
-                    Color.black,
-                    Color.black
+                    AppColor.justBlack,
+                    AppColor.justBlack
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -167,10 +167,11 @@ struct GameEndView: View {
         }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
-        .sheet(isPresented: $showMatchDetails) {
-            // Present match details using loaded match
+        .navigationDestination(isPresented: $showMatchDetails) {
+            // Navigate to match details as a main screen
             if let matchResult = loadedMatch {
-                MatchDetailView(match: matchResult, isSheet: true)
+                MatchDetailView(match: matchResult, isSheet: false)
+                    .background(AppColor.backgroundPrimary)
             } else {
                 // Fallback if match not found
                 VStack(spacing: 16) {
@@ -185,13 +186,10 @@ struct GameEndView: View {
                     Text("Unable to load match data")
                         .font(.subheadline)
                         .foregroundColor(AppColor.textSecondary)
-                    
-                    Button("Close") {
-                        showMatchDetails = false
-                    }
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
                 .padding(40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppColor.backgroundPrimary)
             }
         }
         .onAppear {

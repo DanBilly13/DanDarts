@@ -128,7 +128,7 @@ struct AddGuestPlayerView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 34)
             }
-            .background(AppColor.backgroundPrimary)
+            .background(AppColor.surfacePrimary)
             .navigationBarBackButtonHidden(true)
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {

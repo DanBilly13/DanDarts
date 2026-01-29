@@ -102,7 +102,7 @@ struct StandardSheetView<Content: View>: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(AppColor.backgroundPrimary)
+            .background(AppColor.surfacePrimary)
             
             // Title - Large and Bold
             HStack {
@@ -114,7 +114,7 @@ struct StandardSheetView<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 16)
-            .background(AppColor.backgroundPrimary)
+            .background(AppColor.surfacePrimary)
             
             // Content area
             if useScrollView {
@@ -152,11 +152,11 @@ struct StandardSheetView<Content: View>: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
-                    .background(AppColor.backgroundPrimary)
+                    .background(AppColor.surfacePrimary)
                 }
             }
         }
-        .background(AppColor.backgroundPrimary)
+        .background(AppColor.surfacePrimary)
     }
 }
 
