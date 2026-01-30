@@ -132,9 +132,10 @@ struct SearchPlayerSheet: View {
                 } label: {
                     Text("Done")
                 }
-                .frame(maxWidth: .infinity)
+                
                 .frame(width: UIScreen.main.bounds.width * 0.5)
             }
+            .frame(maxWidth: .infinity)
         }
         .onAppear {
             loadGuestPlayers()

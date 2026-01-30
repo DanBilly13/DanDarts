@@ -33,13 +33,13 @@ struct MarkDownBlockRenderer: View {
                         switch block {
                         case .h1(let text):
                             Text(text)
-                                .font(.title)
+                                .font(.title2)
                                 .fontWeight(.semibold)
                                 .padding(.top, 4)
 
                         case .h2(let text):
                             Text(text)
-                                .font(.title2)
+                                .font(.title3)
                                 .fontWeight(.semibold)
                                 .padding(.top, 8)
 
@@ -74,6 +74,7 @@ struct MarkDownBlockRenderer: View {
                     }
                 }
             }
+            .foregroundStyle(AppColor.justWhite)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()

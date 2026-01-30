@@ -26,6 +26,7 @@ struct GameEndView: View {
     @State private var showMatchDetails = false
     @State private var loadedMatch: MatchResult?
     @State private var isLoadingMatch = false
+    @State private var hasPlayedWinSound = false
     
     // Computed property for match result text
     private var matchResultText: String? {
@@ -209,7 +210,10 @@ struct GameEndView: View {
             }
             
             // Play celebration sound
-            SoundManager.shared.playGameWin()
+            if !hasPlayedWinSound {
+                hasPlayedWinSound = true
+                SoundManager.shared.playGameWin()
+            }
         }
     }
     

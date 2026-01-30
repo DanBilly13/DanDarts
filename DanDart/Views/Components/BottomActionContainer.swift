@@ -11,14 +11,15 @@ struct BottomActionContainer<Content: View>: View {
         VStack(spacing: 12) {
             content
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 24)
         .background(
             LinearGradient(
                 colors: [
-                    AppColor.surfaceSecondary.opacity(0.9),
-                    AppColor.surfaceSecondary.opacity(0.0)
+                    AppColor.justBlack.opacity(0.4),
+                    AppColor.justBlack.opacity(0.0)
                 ],
                 startPoint: .bottom,
                 endPoint: .top

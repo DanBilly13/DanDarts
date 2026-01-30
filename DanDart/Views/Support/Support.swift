@@ -72,6 +72,7 @@ struct Support: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .foregroundStyle(AppColor.justWhite)
             .padding(.horizontal, 32)
             .frame(maxWidth: .infinity)
             .multilineTextAlignment(.leading)

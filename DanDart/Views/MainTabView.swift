@@ -170,20 +170,26 @@ struct GamesTabView: View {
     
     var body: some View {
         NavigationStack(path: $router.path) {
-            // Games List Content
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(games) { game in
-                        GameCard(game: game) {
-                            router.push(.gameSetup(game: game))
+            ZStack {
+                AppColor.backgroundPrimary
+                    .padding(-60)
+                    .ignoresSafeArea()
+
+                // Games List Content
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(games) { game in
+                            GameCard(game: game) {
+                                router.push(.gameSetup(game: game))
+                            }
+                            .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
                         }
-                        .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
                     }
+                    .padding()
                 }
-                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppColor.backgroundPrimary)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColor.backgroundPrimary)
             .navigationTitle("Games")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarRole(.editor)
@@ -219,6 +225,11 @@ struct GamesTabView: View {
                 }
             }
         }
+        .background(
+            AppColor.backgroundPrimary
+                .padding(-60)
+                .ignoresSafeArea()
+        )
         .environmentObject(router)
     }
 }
