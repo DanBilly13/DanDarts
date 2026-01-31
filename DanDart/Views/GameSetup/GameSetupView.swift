@@ -279,8 +279,8 @@ struct GameSetupView: View {
                     // Trigger add guest player from SearchPlayerSheet
                     NotificationCenter.default.post(name: NSNotification.Name("ShowAddGuestPlayer"), object: nil)
                 }) {
-                    Image(systemName: "person.badge.plus")
-                        .font(.system(size: 14, weight: .semibold))
+                    Text("Guest")
+                        .font(.system(size: 17, weight: .regular))
                         .foregroundColor(AppColor.interactivePrimaryBackground)
                 }
                 .accessibilityLabel("Add Guest")

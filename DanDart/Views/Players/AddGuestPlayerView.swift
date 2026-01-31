@@ -32,28 +32,15 @@ struct AddGuestPlayerView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 8) {
-                    Text("Add Guest Player")
-                        .font(.system(size: 28, weight: .bold, design: .default))
-                        .foregroundColor(AppColor.textPrimary)
-                    
-                    Text("Create a local player profile")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-                }
-                .padding(.top, 24)
-                .padding(.horizontal, 24)
-                
-                // Form
+        NavigationStack {
+            ScrollView {
                 VStack(spacing: 24) {
                     // Avatar Selection
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(spacing: 16) {
                         Text("Profile Picture")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(AppColor.textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         
                         AvatarSelectionViewV2(
                             selectedAvatar: $selectedAvatar,
@@ -61,6 +48,7 @@ struct AddGuestPlayerView: View {
                             selectedAvatarImage: $selectedAvatarImage
                         )
                     }
+                    
                     // Display Name Field
                     DartTextField(
                         label: "Display Name",
@@ -95,16 +83,11 @@ struct AddGuestPlayerView: View {
                             .foregroundColor(AppColor.textSecondary)
                             .padding(.leading, 2)
                     }
-                }
-                .padding(.top, 32)
-                .padding(.horizontal, 24)
-                
-                Spacer()
-                
-                // Action Buttons
-                VStack(spacing: 12) {
+                    
+                    // Save Button at Bottom
                     AppButton(
                         role: .primary,
+                        controlSize: .large,
                         isDisabled: !isSaveEnabled || isLoading,
                         action: savePlayer
                     ) {
@@ -116,20 +99,26 @@ struct AddGuestPlayerView: View {
                             Text(isLoading ? "Creating..." : "Save Player")
                         }
                     }
-
-                    AppButton(
-                        role: .tertiary,
-                        isDisabled: isLoading,
-                        action: { dismiss() }
-                    ) {
-                        Text("Cancel")
+                    .padding(.top, 8)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 24)
+            }
+            .navigationTitle("Add Guest Player")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 34)
             }
             .background(AppColor.surfacePrimary)
-            .navigationBarBackButtonHidden(true)
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
                     await handlePhotoSelection(newItem)

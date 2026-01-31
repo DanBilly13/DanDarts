@@ -73,14 +73,23 @@ struct ModernSheetContainer<Content: View, TrailingButtons: View>: View {
                             .frame(maxWidth: .infinity)
                         }
                         
-                        ToolbarItemGroup(placement: .navigationBarTrailing) {
-                            // Custom trailing buttons (each one becomes its own trailing item)
-                            if let trailingButtons = trailingButtons {
+                        // Custom trailing buttons
+                        if let trailingButtons = trailingButtons {
+                            ToolbarItem(placement: .navigationBarTrailing) {
                                 trailingButtons
                             }
+                        }
+                        
+                        // Spacer to split glass backgrounds
+                        if trailingButtons != nil && showCloseButton {
+                            if #available(iOS 26.0, *) {
+                                ToolbarSpacer(placement: .navigationBarTrailing)
+                            }
+                        }
 
-                            // Close button (its own trailing item)
-                            if showCloseButton {
+                        // Close button (separate glass container)
+                        if showCloseButton {
+                            ToolbarItem(placement: .navigationBarTrailing) {
                                 Button(action: { dismiss() }) {
                                     Image(systemName: "xmark")
                                         .font(.system(size: 14, weight: .semibold))

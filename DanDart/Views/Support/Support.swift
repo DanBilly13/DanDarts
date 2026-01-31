@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
-import UIKit
+#if canImport(UIKit)
+ import UIKit
+#endif
 
 struct Support: View {
     var body: some View {
@@ -20,8 +22,7 @@ struct Support: View {
                     
                     Text("We're thrilled to have you on board! If you encounter any issues or have ideas to improve the app, please don't hesitate to reach out.")
                         .font(.body)
-                        .foregroundColor(.secondary)
-                }
+                    .foregroundColor(AppColor.textSecondary)                }
                 
                 
                 VStack(alignment: .leading, spacing: 16) {
@@ -32,16 +33,11 @@ struct Support: View {
                             .font(.body)
                         Text("Help us squash it by reporting any bugs you discover.")
                             .font(.body)
-                            .foregroundColor(.secondary)
-                    }
+                        .foregroundColor(AppColor.textSecondary)                    }
                     
-                    AppButton(role: .secondary, action: {
-                        if let url = URL(string: "https://dartfreak.canny.io/bugs") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        Text("Report a bug")
-                    }
+                    Link("Report a bug", destination: URL(string: "https://dartfreak.canny.io/bugs")!)
+                        .font(.body)
+                        .foregroundStyle(AppColor.brandPrimary)
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
@@ -51,25 +47,27 @@ struct Support: View {
                             .font(.body)
                         Text("Suggest new features to make Dart Freak even better.")
                             .font(.body)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(AppColor.textSecondary)
                     }
                     
-                    AppButton(role: .secondary, action: {
-                        if let url = URL(string: "https://dartfreak.canny.io/feature-requests") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        Text("Suggest a feature")
-                    }
+                    Link("Suggest a feature", destination: URL(string: "https://dartfreak.canny.io/feature-requests")!)
+                        .font(.body)
+                        .foregroundStyle(AppColor.brandPrimary)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Something else?")
                         .font(.system(.title3, design: .rounded))
                         .font(.body)
-                    Text("If your message doesn’t fit a bug or feature request, you can reach us at support@dartfreak.com")
-                        .font(.body)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("If your message doesn’t fit a bug or feature request, you can reach us at")
+                            .font(.body)
+                            .foregroundColor(AppColor.textSecondary)
+                        Link("support@dartfreak.com", destination: URL(string: "mailto:support@dartfreak.com")!)
+                            .font(.body)
+                            .tint(AppColor.brandPrimary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .foregroundStyle(AppColor.justWhite)

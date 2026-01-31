@@ -585,7 +585,7 @@ class CountdownViewModel: ObservableObject {
         guard remainingAfterThrow >= 2 && remainingAfterThrow <= 170 && dartsLeft > 0 else {
             // If turn started with checkout but now unavailable, show "Not Available" message
             if turnStartedWithCheckout && !currentThrow.isEmpty && remainingAfterThrow > 1 {
-                suggestedCheckout = "Checkout: Not Available. \(remainingAfterThrow)pts remaining"
+                suggestedCheckout = "Not Available \(remainingAfterThrow)pts left"
             } else {
                 suggestedCheckout = nil
             }
@@ -598,7 +598,7 @@ class CountdownViewModel: ObservableObject {
         } else {
             // Checkout not possible with remaining darts
             if turnStartedWithCheckout && !currentThrow.isEmpty {
-                suggestedCheckout = "Checkout: Not Available. \(remainingAfterThrow)pts remaining"
+                suggestedCheckout = "Not Available \(remainingAfterThrow)pts left"
             } else {
                 suggestedCheckout = nil
             }

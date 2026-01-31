@@ -23,10 +23,13 @@ struct MarkDownBlockRenderer: View {
                         Text(title)
                             .font(.title)
                             .fontWeight(.semibold)
+                            .foregroundStyle(AppColor.justWhite)
                         Text("We couldn’t load the text.")
                             .font(.body)
+                            .foregroundStyle(AppColor.textSecondary)
                         Text("Please try again later.")
                             .font(.body)
+                            .foregroundStyle(AppColor.textSecondary)
                     }
                 } else {
                     ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
@@ -36,28 +39,32 @@ struct MarkDownBlockRenderer: View {
                                 .font(.title2)
                                 .fontWeight(.semibold)
                                 .padding(.top, 4)
+                                .foregroundStyle(AppColor.justWhite)
 
                         case .h2(let text):
                             Text(text)
                                 .font(.title3)
                                 .fontWeight(.semibold)
                                 .padding(.top, 8)
+                                .foregroundStyle(AppColor.justWhite)
 
                         case .h3(let text):
                             Text(text)
                                 .font(.headline)
                                 .fontWeight(.semibold)
                                 .padding(.top, 4)
+                                .foregroundStyle(AppColor.justWhite)
 
                         case .paragraph(let text):
                             Text(text)
                                 .font(.body)
+                                .foregroundStyle(AppColor.textSecondary)
 
                         case .italic(let text):
                             Text(text)
                                 .font(.subheadline)
                                 .italic()
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppColor.textSecondary)
 
                         case .bullets(let items):
                             VStack(alignment: .leading, spacing: 8) {
@@ -65,8 +72,10 @@ struct MarkDownBlockRenderer: View {
                                     HStack(alignment: .top, spacing: 10) {
                                         Text("•")
                                             .font(.body)
+                                            .foregroundStyle(AppColor.textSecondary)
                                         Text(item)
                                             .font(.body)
+                                            .foregroundStyle(AppColor.textSecondary)
                                     }
                                 }
                             }
@@ -74,7 +83,6 @@ struct MarkDownBlockRenderer: View {
                     }
                 }
             }
-            .foregroundStyle(AppColor.justWhite)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()

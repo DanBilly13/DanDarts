@@ -9,14 +9,22 @@ import SwiftUI
 import PhotosUI
 
 struct ProfileView: View {
+    private enum ProfileDestination: Hashable {
+        case editProfile
+        case privacy
+        case terms
+        case support
+    }
+
     @EnvironmentObject var authService: AuthService
     @StateObject private var soundManager = SoundManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
     @State private var showEditProfile: Bool = false
+    @State private var showEditProfileV2: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
     @State private var showResetTipsConfirmation: Bool = false
-    @State private var navigationPath = NavigationPath()
+    @State private var navigationPath: [ProfileDestination] = []
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -27,17 +35,29 @@ struct ProfileView: View {
                         ProfileHeaderView(
                             player: currentUser.toPlayer()
                         ) {
-                            // Edit Profile Button
-                            AppButton(
-                                role: .tertiaryOutline,
-                                controlSize: .regular,
-                                action: {
-                                    showEditProfile = true
+                            HStack(spacing: 12) {
+                                // Old Edit Profile (commented out for testing)
+//                                AppButton(
+//                                    role: .tertiaryOutline,
+//                                    controlSize: .regular,
+//                                    action: {
+//                                        showEditProfile = true
+//                                    }
+//                                ) {
+//                                    Text("Edit Profile")
+//                                }
+
+                                AppButton(
+                                    role: .primary,
+                                    controlSize: .regular,
+                                    action: {
+                                        navigationPath.append(.editProfile)
+                                    }
+                                ) {
+                                    Text("Edit Profile")
                                 }
-                            ) {
-                                Text("Edit Profile")
+                                .frame(maxWidth: 180)
                             }
-                            .frame(width: 120)
                             .padding(.top, 8)
                         }
                         .padding(.top, 24)
@@ -62,6 +82,43 @@ struct ProfileView: View {
                 .padding(.horizontal, 16)
             }
             .background(AppColor.surfacePrimary)
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppColor.textPrimary)
+                }
+            }
+            .navigationDestination(isPresented: $showEditProfile) {
+                EditProfileView()
+                    .environmentObject(authService)
+                    .background(AppColor.surfacePrimary)
+            }
+            .navigationDestination(isPresented: $showEditProfileV2) {
+                EditProfileV2View()
+                    .environmentObject(authService)
+                    .background(AppColor.surfacePrimary)
+            }
+            .navigationDestination(for: ProfileDestination.self) { destination in
+                switch destination {
+                case .editProfile:
+                    EditProfileV2View()
+                        .environmentObject(authService)
+                        .background(AppColor.surfacePrimary)
+                case .privacy:
+                    PrivacyPolicy()
+                        .background(AppColor.surfacePrimary)
+                case .terms:
+                    TermsAndConditions()
+                        .background(AppColor.surfacePrimary)
+                case .support:
+                    Support()
+                        .background(AppColor.surfacePrimary)
+                }
+            }
             .alert("Log Out", isPresented: $showLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Log Out", role: .destructive) {
@@ -71,10 +128,6 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("Are you sure you want to log out?")
-            }
-            .sheet(isPresented: $showEditProfile) {
-                EditProfileView()
-                    .environmentObject(authService)
             }
             .alert("Clear Local Matches", isPresented: $showClearMatchesConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -91,21 +144,6 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("This will reset all game tips so they appear again on your next game.\n\nThis is a debug feature for testing.")
-            }
-            .navigationDestination(for: String.self) { destination in
-                switch destination {
-                case "privacy":
-                    PrivacyPolicy()
-                        .background(AppColor.surfacePrimary)
-                case "terms":
-                    TermsAndConditions()
-                        .background(AppColor.surfacePrimary)
-                case "support":
-                    Support()
-                        .background(AppColor.surfacePrimary)
-                default:
-                    EmptyView()
-                }
             }
         }
     }
@@ -191,7 +229,7 @@ struct ProfileView: View {
                     title: "Help & Support",
                     showChevron: true
                 ) {
-                    navigationPath.append("support")
+                    navigationPath.append(.support)
                 }
             }
             .background(AppColor.inputBackground)
@@ -233,7 +271,7 @@ struct ProfileView: View {
                 
                 // Privacy Policy
                 Button(action: {
-                    navigationPath.append("privacy")
+                    navigationPath.append(.privacy)
                 }) {
                     HStack(spacing: 16) {
                         Image(systemName: "hand.raised")
@@ -263,7 +301,7 @@ struct ProfileView: View {
                 
                 // Terms and Conditions
                 Button(action: {
-                    navigationPath.append("terms")
+                    navigationPath.append(.terms)
                 }) {
                     HStack(spacing: 16) {
                         Image(systemName: "doc.text")

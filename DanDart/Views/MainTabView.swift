@@ -70,14 +70,9 @@ struct MainTabView: View {
             InviteClaimView(token: token.token)
                 .modernSheet(title: "Invite", detents: [.medium], background: AppColor.surfacePrimary)
         }
-        .sheet(isPresented: $showProfile) {
+        .fullScreenCover(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
-                .modernSheet(
-                    title: "Profile",
-                    detents: [.large],
-                    background: AppColor.surfacePrimary
-                )
         }
         .onAppear {
             configureTabBarAppearance()
