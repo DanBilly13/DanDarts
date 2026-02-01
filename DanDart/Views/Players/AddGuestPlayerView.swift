@@ -37,10 +37,7 @@ struct AddGuestPlayerView: View {
                 VStack(spacing: 24) {
                     // Avatar Selection
                     VStack(spacing: 16) {
-                        Text("Profile Picture")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(AppColor.textPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                  
                         
                         AvatarSelectionViewV2(
                             selectedAvatar: $selectedAvatar,
@@ -78,13 +75,15 @@ struct AddGuestPlayerView: View {
                             validateNickname(newValue)
                         }
                         
-                        Text("Used for quick identification during games")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
-                            .padding(.leading, 2)
+                      
                     }
-                    
-                    // Save Button at Bottom
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 24)
+            }
+            .background(AppColor.surfacePrimary)
+            .safeAreaInset(edge: .bottom) {
+                BottomActionContainer {
                     AppButton(
                         role: .primary,
                         controlSize: .large,
@@ -94,15 +93,14 @@ struct AddGuestPlayerView: View {
                         HStack(spacing: 8) {
                             if isLoading {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .controlSize(.small)
+                                    .tint(AppColor.textOnPrimary)
+                                    .frame(width: 16, height: 16)
                             }
                             Text(isLoading ? "Creating..." : "Save Player")
                         }
                     }
-                    .padding(.top, 8)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 24)
             }
             .navigationTitle("Add Guest Player")
             .navigationBarTitleDisplayMode(.inline)
@@ -118,7 +116,6 @@ struct AddGuestPlayerView: View {
                     }
                 }
             }
-            .background(AppColor.surfacePrimary)
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
                     await handlePhotoSelection(newItem)

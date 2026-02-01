@@ -42,7 +42,7 @@
     "gameTitle": "Sudden Death",
     "icon": "bolt.fill",
     "title": "Avoid Elimination",
-    "message1": "The player with the lowest score in each round loses a life.",
+    "message1": "The player with the lowest score at the end of each round loses a life.",
     "message2": "Long-press any number to score doubles and trebles."
 
   },

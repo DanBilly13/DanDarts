@@ -22,6 +22,7 @@ struct EditProfileV2View: View {
     @State private var originalAvatarURL: String?
     @State private var isAvatarDirty: Bool = false
     @State private var isHydratingExistingAvatar: Bool = false
+    @State private var isInitialLoad: Bool = true
     
     // MARK: - Original Values (for change detection)
     @State private var originalDisplayName: String = ""
@@ -51,7 +52,17 @@ struct EditProfileV2View: View {
         let nicknameChanged = nickname != originalNickname
         let emailChanged = email != originalEmail
         
-        return nameChanged || nicknameChanged || emailChanged || isAvatarDirty
+        let hasChanges = nameChanged || nicknameChanged || emailChanged || isAvatarDirty
+        
+        // Debug logging
+        print("🔍 hasUnsavedChanges check:")
+        print("  - Name: '\(displayName)' vs '\(originalDisplayName)' = \(nameChanged)")
+        print("  - Nickname: '\(nickname)' vs '\(originalNickname)' = \(nicknameChanged)")
+        print("  - Email: '\(email)' vs '\(originalEmail)' = \(emailChanged)")
+        print("  - Avatar dirty: \(isAvatarDirty)")
+        print("  - RESULT: \(hasChanges)")
+        
+        return hasChanges
     }
     
     // MARK: - Validation
@@ -79,10 +90,7 @@ struct EditProfileV2View: View {
             VStack(spacing: 24) {
                 // Avatar Selection
                 VStack(spacing: 16) {
-                    Text("Profile Picture")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(AppColor.textPrimary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
                     
                     AvatarSelectionViewV2(
                         selectedAvatar: $selectedAvatar,
@@ -235,9 +243,13 @@ struct EditProfileV2View: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: {
+                    print("⬅️ BACK/CANCEL button tapped")
+                    print("  hasUnsavedChanges: \(hasUnsavedChanges)")
                     if hasUnsavedChanges {
+                        print("  → Showing unsaved changes alert")
                         showUnsavedChangesAlert = true
                     } else {
+                        print("  → Dismissing view")
                         dismiss()
                     }
                 }) {
@@ -256,21 +268,30 @@ struct EditProfileV2View: View {
         .onAppear {
             loadCurrentProfile()
         }
-        .onChange(of: selectedAvatar) { _, newValue in
-            if !newValue.isEmpty {
+        .onChange(of: selectedAvatar) { oldValue, newValue in
+            print("🎨 selectedAvatar changed from '\(oldValue)' to: '\(newValue)', isInitialLoad: \(isInitialLoad), originalAvatarURL: '\(originalAvatarURL ?? "nil")'")
+            // Only mark as dirty if not initial load AND the value is different from original
+            if !isInitialLoad && !newValue.isEmpty && newValue != originalAvatarURL {
+                print("  → Marking avatar as dirty (changed from original)")
                 isAvatarDirty = true
+            } else {
+                print("  → Not marking as dirty (isInitialLoad: \(isInitialLoad), matches original: \(newValue == originalAvatarURL))")
             }
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
-            if newItem != nil {
+            print("📸 selectedPhotoItem changed, isInitialLoad: \(isInitialLoad)")
+            if !isInitialLoad && newItem != nil {
+                print("  → Marking avatar as dirty")
                 isAvatarDirty = true
             }
         }
         .onChange(of: selectedAvatarImage) { _, newImage in
+            print("🖼️ selectedAvatarImage changed, isInitialLoad: \(isInitialLoad), isHydratingExistingAvatar: \(isHydratingExistingAvatar)")
             if isHydratingExistingAvatar {
                 return
             }
-            if newImage != nil && selectedPhotoItem == nil && selectedAvatar.isEmpty {
+            if !isInitialLoad && newImage != nil && selectedPhotoItem == nil && selectedAvatar.isEmpty {
+                print("  → Marking avatar as dirty")
                 isAvatarDirty = true
             }
         }
@@ -281,10 +302,13 @@ struct EditProfileV2View: View {
         }
         .alert("Unsaved Changes", isPresented: $showUnsavedChangesAlert) {
             Button("Discard Changes", role: .destructive) {
+                print("🗑️ DISCARD CHANGES tapped")
                 resetForm()
                 dismiss()
             }
-            Button("Keep Editing", role: .cancel) { }
+            Button("Keep Editing", role: .cancel) {
+                print("✏️ KEEP EDITING tapped")
+            }
         } message: {
             Text("You have unsaved changes. Are you sure you want to go back?")
         }
@@ -300,6 +324,13 @@ struct EditProfileV2View: View {
     // MARK: - Actions
     
     private func resetForm() {
+        print("🔄 RESET FORM called")
+        print("  Before reset:")
+        print("    - displayName: '\(displayName)'")
+        print("    - nickname: '\(nickname)'")
+        print("    - email: '\(email)'")
+        print("    - isAvatarDirty: \(isAvatarDirty)")
+        
         // Reset all fields to original values
         displayName = originalDisplayName
         nickname = originalNickname
@@ -308,6 +339,7 @@ struct EditProfileV2View: View {
         // Reset avatar to original state
         isAvatarDirty = false
         selectedPhotoItem = nil
+        isInitialLoad = true
         
         if let originalURL = originalAvatarURL {
             if originalURL.hasPrefix("http://") || originalURL.hasPrefix("https://") {
@@ -317,20 +349,33 @@ struct EditProfileV2View: View {
                     await loadCustomAvatar(from: originalURL)
                     await MainActor.run {
                         isHydratingExistingAvatar = false
+                        isInitialLoad = false
                     }
                 }
             } else {
                 selectedAvatar = originalURL
                 selectedAvatarImage = nil
+                isInitialLoad = false
             }
         } else {
             selectedAvatar = "avatar1"
             selectedAvatarImage = nil
+            isInitialLoad = false
         }
+        
+        print("  After reset:")
+        print("    - displayName: '\(displayName)'")
+        print("    - nickname: '\(nickname)'")
+        print("    - email: '\(email)'")
+        print("    - isAvatarDirty: \(isAvatarDirty)")
     }
 
     private func loadCurrentProfile() {
-        guard let currentUser = authService.currentUser else { return }
+        print("📥 LOAD CURRENT PROFILE called")
+        guard let currentUser = authService.currentUser else {
+            print("  ⚠️ No current user found")
+            return
+        }
         
         displayName = currentUser.displayName
         nickname = currentUser.nickname
@@ -340,6 +385,12 @@ struct EditProfileV2View: View {
         originalDisplayName = displayName
         originalNickname = nickname
         originalEmail = email
+        
+        print("  Loaded values:")
+        print("    - displayName: '\(displayName)'")
+        print("    - nickname: '\(nickname)'")
+        print("    - email: '\(email)'")
+        print("    - avatarURL: '\(currentUser.avatarURL ?? "nil")'")
         
         // Set avatar
         originalAvatarURL = currentUser.avatarURL
@@ -353,13 +404,20 @@ struct EditProfileV2View: View {
                     await loadCustomAvatar(from: avatarURL)
                     await MainActor.run {
                         isHydratingExistingAvatar = false
+                        isInitialLoad = false
+                        print("  ✅ Initial load complete, isInitialLoad set to false")
                     }
                 }
             } else {
                 selectedAvatar = avatarURL
                 selectedAvatarImage = nil
                 selectedPhotoItem = nil
+                isInitialLoad = false
+                print("  ✅ Initial load complete, isInitialLoad set to false")
             }
+        } else {
+            isInitialLoad = false
+            print("  ✅ Initial load complete (no avatar), isInitialLoad set to false")
         }
     }
 

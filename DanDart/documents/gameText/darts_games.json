@@ -15,7 +15,7 @@
       "title": "Halve-It",
       "subtitle": "No one escapes the chop",
       "players": "2-6",
-      "instructions": "Halve-It is a six-round challenge of accuracy. You start on zero, and each round sets a single target to aim for.\n\nOn your turn (a visit), you throw three darts at that target. Every hit scores its value. Miss with all three, and your score is cut in half — the Chop.\n\nA score can never drop below zero.\n\nExample:\nIf you're on 10 points and the target is 5, hitting 5 with all three darts scores 15, taking you to 25.\nIf you miss the target with all three, your score is halved from 10 to 5.\n\nChoose your difficulty and the app will set the six targets for you:\n- Easy: mostly singles\n- Medium: singles and doubles\n- Hard: more doubles and trebles\n- Pro: all doubles and trebles\n\nAfter all six rounds, the highest score wins."
+      "instructions": "Halve-It is a six-round challenge of accuracy. You start on 50 points, and each round sets a single target to aim for.\n\nOn your turn (a visit), you throw three darts at that target. Every hit scores its value. Miss with all three, and your score is cut in half — the Chop.\n\nA score can never drop below zero.\n\nExample:\nIf you're on 10 points and the target is 5, hitting 5 with all three darts scores 15, taking you to 25.\nIf you miss the target with all three, your score is halved from 10 to 5.\n\nChoose your difficulty and the app will set the six targets for you:\n- Easy: mostly singles\n- Medium: singles and doubles\n- Hard: more doubles and trebles\n- Pro: all doubles and trebles\n\nAfter all six rounds, the highest score wins."
     },
     {
       "title": "Knockout",
