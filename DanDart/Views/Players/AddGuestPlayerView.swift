@@ -81,6 +81,7 @@ struct AddGuestPlayerView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(AppColor.surfacePrimary)
             .safeAreaInset(edge: .bottom) {
                 BottomActionContainer {

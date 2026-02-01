@@ -243,16 +243,23 @@ struct FriendsListView: View {
                             ProgressView()
                                 .tint(AppColor.interactivePrimaryBackground)
                         } else {
-                            Image(systemName: "person.badge.plus")
+                            Text("Invite")
+                                .font(.system(size: 17, weight: .regular))
                                 .foregroundColor(AppColor.interactivePrimaryBackground)
                         }
                     }
                     .disabled(isCreatingInvite)
                 }
+                
+                ToolbarSpacer(placement: .navigationBarTrailing)
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    ToolbarSearchButton {
+                    Button {
                         showSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
             }

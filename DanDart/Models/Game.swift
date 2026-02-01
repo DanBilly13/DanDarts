@@ -84,7 +84,9 @@ extension Game {
         }
         do {
             let data = try Data(contentsOf: url)
-            return try JSONDecoder().decode([Game].self, from: data)
+            let allGames = try JSONDecoder().decode([Game].self, from: data)
+            // Filter out English Cricket for TestFlight
+            return allGames.filter { $0.title != "English Cricket" }
         } catch {
 #if DEBUG
             fatalError("❌ Failed to decode darts_games.json: \(error)")
