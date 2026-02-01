@@ -270,8 +270,8 @@ class KnockoutViewModel: ObservableObject {
         if let lastPlayer = activePlayers.first {
             winner = lastPlayer
             isGameOver = true
-            soundManager.playGameWin()
-            print("🎉 \(lastPlayer.displayName) wins Sudden Death!")
+            // Note: Game sounds carry over to end screen
+            print("🎉 \(lastPlayer.displayName) wins Knockout!")
             
             // Save match result
             saveMatchResult()

@@ -305,7 +305,7 @@ class SuddenDeathViewModel: ObservableObject {
                     await MainActor.run {
                         guard let self else { return }
                         self.isGameOver = true
-                        self.soundManager.playGameWin()
+                        // Note: Game sounds carry over to end screen
                         self.saveMatchResult()
                     }
                 }

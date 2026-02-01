@@ -209,11 +209,8 @@ struct GameEndView: View {
                 }
             }
             
-            // Play celebration sound
-            if !hasPlayedWinSound {
-                hasPlayedWinSound = true
-                SoundManager.shared.playGameWin()
-            }
+            // Note: Game win sound now plays from the game logic itself
+            // (e.g., Winner301 for 301/501 games) and carries over to this screen
         }
     }
     

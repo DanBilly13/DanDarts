@@ -354,8 +354,12 @@ class CountdownViewModel: ObservableObject {
         // Valid score - update player score
         playerScores[currentPlayer.id] = newScore
         
-        // Play save score sound
-        SoundManager.shared.playCountdownSaveScore()
+        // Play appropriate sound - winner sound if game won, save score otherwise
+        if newScore == 0 {
+            SoundManager.shared.playCountdownWinner()
+        } else {
+            SoundManager.shared.playCountdownSaveScore()
+        }
         
         // Trigger score animation (arcade-style pop)
         showScoreAnimation = true
@@ -386,8 +390,7 @@ class CountdownViewModel: ObservableObject {
                 winner = currentPlayer
                 isMatchWon = true
                 
-                // Play celebration sound
-                SoundManager.shared.playGameWin()
+                // Note: Winner301 sound already played when saving the winning score
                 
                 // Save match result to local storage
                 saveMatchResult()

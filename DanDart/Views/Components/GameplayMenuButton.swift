@@ -15,11 +15,29 @@ struct GameplayMenuButton: View {
     var onUndo: (() -> Void)? = nil
     var canUndo: Bool = false
     
+    @ObservedObject private var soundManager = SoundManager.shared
+    
     var body: some View {
         Menu {
-            Button("Instructions") { 
-                onInstructions() 
+            Button {
+                onInstructions()
+            } label: {
+                Label("Instructions", systemImage: "info.circle")
             }
+            
+            // Sound Effects Toggle
+            Button {
+                soundManager.soundEffectsEnabled.toggle()
+            } label: {
+                Label {
+                    Text("Sound Effects")
+                } icon: {
+                    Image(systemName: soundManager.soundEffectsEnabled ? "speaker.wave.2" : "speaker.slash")
+                        .foregroundColor(soundManager.soundEffectsEnabled ? .green : .red)
+                }
+            }
+            
+            Divider()
             
             if canUndo, let undoAction = onUndo {
                 Button(action: undoAction) {
@@ -27,11 +45,21 @@ struct GameplayMenuButton: View {
                 }
             }
             
-            Button("Restart Game") { 
-                onRestart() 
+            Button {
+                onRestart()
+            } label: {
+                Label("Restart Game", systemImage: "restart.circle")
             }
-            Button("Quit Game", role: .destructive) {
+            
+            Button(role: .destructive) {
                 onExit()
+            } label: {
+                Label {
+                    Text("Quit Game")
+                } icon: {
+                    Image(systemName: "trash.circle")
+                        .foregroundColor(.red)
+                }
             }
         } label: {
             Image(systemName: "questionmark")

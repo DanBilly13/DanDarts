@@ -298,6 +298,11 @@ class SoundManager: ObservableObject {
         playSound(named: "Scored")
     }
     
+    /// Play winner sound (when player wins the game)
+    func playHalveItWinner() {
+        playSound(named: "WinnerHalveIt")
+    }
+    
     // MARK: - 301/501 Game Sound Effects
     
     /// Play miss one sound (first miss of visit)
@@ -328,6 +333,11 @@ class SoundManager: ObservableObject {
     /// Play save score sound (when saving the score)
     func playCountdownSaveScore() {
         playSound(named: "SaveScore")
+    }
+    
+    /// Play winner sound (when player wins the game)
+    func playCountdownWinner() {
+        playSound(named: "Winner301")
     }
 }
 

@@ -240,6 +240,9 @@ class HalveItViewModel: ObservableObject {
         
         winner = winningPlayer
         
+        // Play winner sound
+        soundManager.playHalveItWinner()
+        
         // Save match result
         saveMatchResult()
     }
