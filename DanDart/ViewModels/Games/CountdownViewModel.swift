@@ -250,11 +250,23 @@ class CountdownViewModel: ObservableObject {
             currentThrow.append(scoredThrow)
         }
         
-        // Play sound effects
+        // Play sound effects based on hit/miss and dart number
         if scoredThrow.totalValue == 0 {
-            SoundManager.shared.playMissSound()
+            // Missed - play progressive miss sounds
+            let dartNumber = currentThrow.count // 1, 2, or 3
+            switch dartNumber {
+            case 1:
+                SoundManager.shared.playCountdownCat()
+            case 2:
+                SoundManager.shared.playCountdownBrokenGlass()
+            case 3:
+                SoundManager.shared.playCountdownHorse()
+            default:
+                break
+            }
         } else {
-            SoundManager.shared.playScoreSound()
+            // Hit the board - play thud
+            SoundManager.shared.playCountdownThud()
         }
         
         // Check for 180 (perfect score with 3 darts)
@@ -298,6 +310,9 @@ class CountdownViewModel: ObservableObject {
         
         if isBustTurn || (newScore == 0 && !finishedOnDouble) {
             // Bust - score stays the same
+            // Play bust sound
+            SoundManager.shared.playCountdownBust()
+            
             saveTurnHistory(
                 player: currentPlayer,
                 darts: currentThrow,
@@ -338,6 +353,9 @@ class CountdownViewModel: ObservableObject {
         
         // Valid score - update player score
         playerScores[currentPlayer.id] = newScore
+        
+        // Play save score sound
+        SoundManager.shared.playCountdownSaveScore()
         
         // Trigger score animation (arcade-style pop)
         showScoreAnimation = true

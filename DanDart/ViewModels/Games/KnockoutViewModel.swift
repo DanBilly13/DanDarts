@@ -171,7 +171,7 @@ class KnockoutViewModel: ObservableObject {
         if currentPlayerIndex == 0 && scoreToBeat == 0 {
             scoreToBeat = turnScore
             playerToBeatIndex = 0
-            soundManager.playScoreSound()
+            soundManager.playKnockoutHighScore()
             triggerScoreAnimation()
         } else {
             // Check if current player beat the score
@@ -179,7 +179,7 @@ class KnockoutViewModel: ObservableObject {
                 // New player to beat!
                 scoreToBeat = turnScore
                 playerToBeatIndex = currentPlayerIndex
-                soundManager.playScoreSound()
+                soundManager.playKnockoutHighScore()
                 triggerScoreAnimation()
                 
                 // Wait for score pop animation to complete before switching players
@@ -193,7 +193,8 @@ class KnockoutViewModel: ObservableObject {
             } else {
                 // Lost a life
                 if let currentLives = playerLives[currentPlayer.id] {
-                    soundManager.playMissSound()
+                    // Play knocked out sound
+                    soundManager.playKnockoutKnockedOut()
                     triggerSkullWiggle()
                     
                     // Mark life loss in turn history
@@ -201,6 +202,9 @@ class KnockoutViewModel: ObservableObject {
                     
                     // Trigger life loss animation
                     triggerLifeLossAnimation(for: currentPlayer.id)
+                    
+                    // Check if player will be eliminated
+                    let willBeEliminated = currentLives - 1 == 0
                     
                     // Wait for life loss animation, then update lives
                     Task {
@@ -211,6 +215,8 @@ class KnockoutViewModel: ObservableObject {
                             // Check if player is eliminated
                             if playerLives[currentPlayer.id] == 0 {
                                 print("💀 \(currentPlayer.displayName) is eliminated!")
+                                // Play eliminated sound
+                                soundManager.playKnockoutEliminated()
                             }
                             
                             // After life is lost, proceed with turn completion

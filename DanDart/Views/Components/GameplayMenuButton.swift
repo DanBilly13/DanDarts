@@ -34,8 +34,8 @@ struct GameplayMenuButton: View {
                 onExit()
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 18, weight: .semibold))
+            Image(systemName: "questionmark")
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(Color("InteractiveSecondaryBackground"))
         }
     }

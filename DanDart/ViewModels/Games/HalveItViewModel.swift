@@ -35,6 +35,7 @@ class HalveItViewModel: ObservableObject {
     
     // Services
     private var authService: AuthService?
+    private let soundManager = SoundManager.shared
     
     /// Inject AuthService from the view
     func setAuthService(_ service: AuthService) {
@@ -81,16 +82,38 @@ class HalveItViewModel: ObservableObject {
     
     /// Record a dart throw
     func recordThrow(baseValue: Int, scoreType: ScoreType) {
+        let dart = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
+        
+        // Check if dart hits the current target
+        let hitsTarget = currentTarget.isHit(by: dart)
+        
         // If a dart is selected, replace it instead of appending
         if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
-            let dart = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
             currentThrow[selectedIndex] = dart
             selectedDartIndex = nil  // Clear selection after replacement
         } else {
             // Normal append behavior
             guard currentThrow.count < 3 else { return }
-            let dart = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
             currentThrow.append(dart)
+        }
+        
+        // Play sound based on whether dart hit target
+        if hitsTarget {
+            // Hit the target - play thud
+            soundManager.playHalveItThud()
+        } else {
+            // Missed the target - play miss sound based on dart number
+            let dartNumber = currentThrow.count // 1, 2, or 3
+            switch dartNumber {
+            case 1:
+                soundManager.playHalveItCat()
+            case 2:
+                soundManager.playHalveItBrokenGlass()
+            case 3:
+                soundManager.playHalveItHorse()
+            default:
+                break
+            }
         }
     }
     
@@ -131,12 +154,19 @@ class HalveItViewModel: ObservableObject {
         
         // Determine new score
         let scoreAfter: Int
+        let wasHalved: Bool
         if currentThrow.isEmpty || (!hitTarget && currentThrow.count == 3) {
             // Missed all 3 darts - halve score (round up)
             scoreAfter = Int(ceil(Double(scoreBefore) / 2.0))
+            wasHalved = true
+            // Play halved sound
+            soundManager.playHalveItHalved()
         } else {
             // Hit target - add points
             scoreAfter = scoreBefore + pointsScored
+            wasHalved = false
+            // Play scored sound
+            soundManager.playHalveItScored()
         }
         
         // Update player score

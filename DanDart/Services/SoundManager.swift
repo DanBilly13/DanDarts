@@ -248,6 +248,87 @@ class SoundManager: ObservableObject {
     func playSuddenDeathLifeLost() {
         playSound(named: "LifeLost")
     }
+    
+    // MARK: - Knockout Game Sound Effects
+    
+    /// Play high score sound (when player beats the high score)
+    func playKnockoutHighScore() {
+        playSound(named: "HighScore")
+    }
+    
+    /// Play knocked out sound (when player fails to beat the score)
+    func playKnockoutKnockedOut() {
+        playSound(named: "Knockedout")
+    }
+    
+    /// Play eliminated sound (when player loses all lives)
+    func playKnockoutEliminated() {
+        playSound(named: "Eliminated")
+    }
+    
+    // MARK: - HalveIt Game Sound Effects
+    
+    /// Play cat sound (first miss of visit)
+    func playHalveItCat() {
+        playSound(named: "Cat")
+    }
+    
+    /// Play broken glass sound (second miss of visit)
+    func playHalveItBrokenGlass() {
+        playSound(named: "Brokenglass")
+    }
+    
+    /// Play horse sound (third miss of visit)
+    func playHalveItHorse() {
+        playSound(named: "Horse")
+    }
+    
+    /// Play thud sound (when player hits target)
+    func playHalveItThud() {
+        playSound(named: "Thud")
+    }
+    
+    /// Play halved sound (when score gets halved)
+    func playHalveItHalved() {
+        playSound(named: "Halved")
+    }
+    
+    /// Play scored sound (when player successfully scores)
+    func playHalveItScored() {
+        playSound(named: "Scored")
+    }
+    
+    // MARK: - 301/501 Game Sound Effects
+    
+    /// Play miss one sound (first miss of visit)
+    func playCountdownCat() {
+        playSound(named: "MissOne")
+    }
+    
+    /// Play miss two sound (second miss of visit)
+    func playCountdownBrokenGlass() {
+        playSound(named: "MissTwo")
+    }
+    
+    /// Play miss three sound (third miss of visit)
+    func playCountdownHorse() {
+        playSound(named: "MissThree")
+    }
+    
+    /// Play throw sound (when player hits the board)
+    func playCountdownThud() {
+        playSound(named: "Throw")
+    }
+    
+    /// Play bust sound (when player goes bust)
+    func playCountdownBust() {
+        playSound(named: "Bust")
+    }
+    
+    /// Play save score sound (when saving the score)
+    func playCountdownSaveScore() {
+        playSound(named: "SaveScore")
+    }
 }
 
 // MARK: - Preview Helper
