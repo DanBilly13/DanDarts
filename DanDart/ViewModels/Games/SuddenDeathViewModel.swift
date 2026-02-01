@@ -157,6 +157,23 @@ class SuddenDeathViewModel: ObservableObject {
         let total = currentThrowTotal
         roundScores[currentPlayer.id] = total
         
+        // Play sound based on score position
+        // Check if this is the lowest score so far
+        let otherScores = roundScores.filter { $0.key != currentPlayer.id }.values
+        if !otherScores.isEmpty {
+            let minOtherScore = otherScores.min() ?? Int.max
+            if total <= minOtherScore {
+                // This player has the lowest score (or tied for lowest)
+                soundManager.playSuddenDeathLowScore()
+            } else {
+                // This player is safe (higher than lowest)
+                soundManager.playSuddenDeathSafe()
+            }
+        } else {
+            // First player to score - no comparison yet, play safe sound
+            soundManager.playSuddenDeathSafe()
+        }
+        
         // Record turn in history
         recordTurn(playerId: currentPlayer.id, score: total)
         
@@ -243,16 +260,38 @@ class SuddenDeathViewModel: ObservableObject {
                     playerLives[id] = max(0, currentLives - 1)
                 }
             }
-        }
-        
-        // Trigger skull wiggle for players in danger during the pause at the
-        // end of the round (or before game end in the final round).
-        print("[SuddenDeath] 💀 Skull spinning – end-of-round pause active")
-        showSkullWiggle = true
-        Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            await MainActor.run {
-                self?.showSkullWiggle = false
+            
+            // Wait for Safe sound to finish (~1.8s), then play LifeLost and trigger skull animation together
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8s - wait for Safe to finish
+                await MainActor.run {
+                    guard let self else { return }
+                    
+                    // Play LifeLost sound
+                    self.soundManager.playSuddenDeathLifeLost()
+                    
+                    // Trigger skull wiggle at the same time
+                    print("[SuddenDeath] 💀 Skull spinning – end-of-round pause active")
+                    self.showSkullWiggle = true
+                    
+                    // Reset skull animation after 400ms
+                    Task {
+                        try? await Task.sleep(nanoseconds: 400_000_000)
+                        await MainActor.run {
+                            self.showSkullWiggle = false
+                        }
+                    }
+                }
+            }
+        } else {
+            // Two-player tie - no life loss, but still show skull wiggle immediately
+            print("[SuddenDeath] 💀 Skull spinning – two-player tie, no life loss")
+            showSkullWiggle = true
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                await MainActor.run {
+                    self?.showSkullWiggle = false
+                }
             }
         }
         
@@ -275,8 +314,9 @@ class SuddenDeathViewModel: ObservableObject {
         }
         
         // Delay starting the next round so the UI can briefly show who lost
+        // Extended to 2.5s to allow Safe sound (1.8s) + skull animation + LifeLost to play
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 second pause
+            try? await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 second pause
             await MainActor.run {
                 guard let self else { return }
                 self.roundNumber += 1

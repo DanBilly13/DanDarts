@@ -62,6 +62,9 @@ class KillerViewModel: ObservableObject {
     // Services (optional for Supabase sync)
     var authService: AuthService?
     
+    // Sound manager
+    private let soundManager = SoundManager.shared
+    
     var anyPlayerIsKiller: Bool {
         isKiller.values.contains(true)
     }
@@ -173,6 +176,55 @@ class KillerViewModel: ObservableObject {
             // Check if hit opponent's number
             for opponent in players where opponent.id != playerID {
                 if let opponentNumber = playerNumbers[opponent.id], thrownNumber == opponentNumber {
+                    // Play hit sound first
+                    soundManager.playKillerHit()
+                    
+                    // Check if this hit will eliminate the opponent
+                    let opponentLives = displayPlayerLives[opponent.id] ?? 0
+                    let willEliminate = opponentLives <= multiplier
+                    
+                    // Play kill sound based on multiplier (with slight delay)
+                    // Store multiplier for potential elimination sound timing
+                    let hitMultiplier = multiplier
+                    Task {
+                        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s delay
+                        await MainActor.run {
+                            switch hitMultiplier {
+                            case 1:
+                                self.soundManager.playKillSingle()
+                            case 2:
+                                self.soundManager.playKillDouble()
+                            case 3:
+                                self.soundManager.playKillTriple()
+                            default:
+                                break
+                            }
+                        }
+                    }
+                    
+                    // If this will eliminate the opponent, play Dead sound with overlap timing
+                    if willEliminate {
+                        // Calculate delay based on kill sound duration (0.3s initial delay + sound duration - 0.25s overlap)
+                        // KillSingle: ~1.0s, KillDouble: ~1.5s, KillTriple: ~2.0s
+                        let killSoundDuration: Double = {
+                            switch hitMultiplier {
+                            case 1: return 1.0  // KillSingle
+                            case 2: return 1.5  // KillDouble
+                            case 3: return 2.0  // KillTriple
+                            default: return 1.0
+                            }
+                        }()
+                        
+                        let deadSoundDelay = 0.3 + killSoundDuration - 0.25 // Start 0.25s before kill sound ends
+                        
+                        Task {
+                            try? await Task.sleep(nanoseconds: UInt64(deadSoundDelay * 1_000_000_000))
+                            await MainActor.run {
+                                self.soundManager.playKillerDead()
+                            }
+                        }
+                    }
+                    
                     // Trigger gun spin animation for the attacker (current player)
                     triggerGunSpin(playerID: playerID)
                     
@@ -194,6 +246,7 @@ class KillerViewModel: ObservableObject {
         }
         
         // Miss - didn't hit any relevant number
+        soundManager.playKillerMiss()
         return KillerDartMetadata(outcome: .miss, affectedPlayerIds: [])
     }
     
@@ -393,6 +446,9 @@ class KillerViewModel: ObservableObject {
     private func activateKiller(playerID: UUID) {
         isKiller[playerID] = true
         animatingKillerActivation = playerID
+        
+        // Play killer unlocked sound
+        soundManager.playKillerUnlocked()
         
         // Haptic feedback
         let impact = UIImpactFeedbackGenerator(style: .heavy)

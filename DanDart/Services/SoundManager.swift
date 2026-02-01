@@ -194,6 +194,60 @@ class SoundManager: ObservableObject {
         // TODO: Implement button tap sound
         AudioServicesPlaySystemSound(1104) // Keyboard click as placeholder
     }
+    
+    // MARK: - Killer Game Sound Effects
+    
+    /// Play killer unlocked sound (when player becomes a killer)
+    func playKillerUnlocked() {
+        playSound(named: "KillerUnlocked")
+    }
+    
+    /// Play killer miss sound
+    func playKillerMiss() {
+        playSound(named: "Miss")
+    }
+    
+    /// Play killer hit sound (initial hit on opponent)
+    func playKillerHit() {
+        playSound(named: "Hit")
+    }
+    
+    /// Play kill single sound (after hit)
+    func playKillSingle() {
+        playSound(named: "KillSingle")
+    }
+    
+    /// Play kill double sound (after hit)
+    func playKillDouble() {
+        playSound(named: "KillDouble")
+    }
+    
+    /// Play kill triple sound (after hit)
+    func playKillTriple() {
+        playSound(named: "KillTriple")
+    }
+    
+    /// Play dead sound (when player is eliminated)
+    func playKillerDead() {
+        playSound(named: "Dead")
+    }
+    
+    // MARK: - Sudden Death Game Sound Effects
+    
+    /// Play low score sound (when player has lowest score)
+    func playSuddenDeathLowScore() {
+        playSound(named: "LowScore")
+    }
+    
+    /// Play safe sound (when player scores higher than lowest)
+    func playSuddenDeathSafe() {
+        playSound(named: "Safe")
+    }
+    
+    /// Play life lost sound (when player loses a life)
+    func playSuddenDeathLifeLost() {
+        playSound(named: "LifeLost")
+    }
 }
 
 // MARK: - Preview Helper
