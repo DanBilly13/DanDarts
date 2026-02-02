@@ -251,6 +251,25 @@ struct ScoringButton: View {
             }
         }
         .frame(width: 64, height: 64)
+        .onLongPressGesture(minimumDuration: 0.25, pressing: { isPressing in
+            // This closure is called immediately when press starts/ends
+            if isPressing && canShowContextMenu {
+                // User started pressing - prepare for potential long press
+            } else if !isPressing && canShowContextMenu {
+                // User released before long press completed
+            }
+        }, perform: {
+            // Long press completed - show menu
+            if canShowContextMenu {
+                // Haptic feedback for long press
+                let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                impactFeedback.impactOccurred()
+                
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    menuCoordinator.showMenu(for: buttonId)
+                }
+            }
+        })
         .onTapGesture {
             // If any menu is open, just close it without scoring
             if menuCoordinator.activeMenuId != nil {
@@ -271,17 +290,6 @@ struct ScoringButton: View {
             
             // Default to single
             onScoreSelected(baseValue, .single)
-        }
-        .onLongPressGesture(minimumDuration: 0.25) {
-            if canShowContextMenu {
-                // Haptic feedback for long press
-                let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
-                impactFeedback.impactOccurred()
-                
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    menuCoordinator.showMenu(for: buttonId)
-                }
-            }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
