@@ -136,6 +136,26 @@ class HalveItViewModel: ObservableObject {
         selectedDartIndex = nil  // Clear selection when clearing
     }
     
+    /// Delete the current throw or move back to previous throw
+    func deleteThrow() {
+        // If there's a selected dart, delete it and keep that position selected
+        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
+            currentThrow.remove(at: selectedIndex)
+            // Keep the same index selected (now points to empty slot or next throw)
+        } else if !currentThrow.isEmpty {
+            // No selection, delete the last throw and select that position
+            let lastIndex = currentThrow.count - 1
+            currentThrow.removeLast()
+            selectedDartIndex = lastIndex
+        }
+        // If currentThrow is empty and no selection, do nothing
+    }
+    
+    /// Check if delete button should be enabled
+    var canDelete: Bool {
+        !currentThrow.isEmpty
+    }
+    
     // MARK: - Turn Management
     
     /// Complete the current turn and calculate score

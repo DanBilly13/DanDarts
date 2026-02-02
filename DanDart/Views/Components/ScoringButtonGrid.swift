@@ -13,13 +13,22 @@ import SwiftUI
 struct ScoringButtonGrid: View {
     let onScoreSelected: (Int, ScoreType) -> Void
     let showBustButton: Bool
+    let onDelete: (() -> Void)?
+    let canDelete: Bool
     
     // Sequential numbers 1-20
     private let dartboardNumbers = Array(1...20)
     
-    init(onScoreSelected: @escaping (Int, ScoreType) -> Void, showBustButton: Bool = true) {
+    init(
+        onScoreSelected: @escaping (Int, ScoreType) -> Void,
+        showBustButton: Bool = true,
+        onDelete: (() -> Void)? = nil,
+        canDelete: Bool = false
+    ) {
         self.onScoreSelected = onScoreSelected
         self.showBustButton = showBustButton
+        self.onDelete = onDelete
+        self.canDelete = canDelete
     }
     
     var body: some View {
@@ -54,12 +63,24 @@ struct ScoringButtonGrid: View {
                 onScoreSelected: onScoreSelected
             )
             
-            // Bust (conditionally shown)
+            // Bust (conditionally shown) or empty spacer
             if showBustButton {
                 ScoringButton(
                     title: "Bust",
                     baseValue: -1, // -1 indicates bust
                     onScoreSelected: onScoreSelected
+                )
+            } else {
+                // Empty spacer to maintain grid alignment when bust not shown
+                Color.clear
+                    .frame(width: 64, height: 64)
+            }
+            
+            // Delete button (positioned under button 20, bottom right - 5th position)
+            if let onDelete = onDelete {
+                DeleteButton(
+                    onDelete: onDelete,
+                    isDisabled: !canDelete
                 )
             }
         }
@@ -352,10 +373,67 @@ struct ScoringButton: View {
     }
 }
 
+// MARK: - Delete Button Component
+
+struct DeleteButton: View {
+    let onDelete: () -> Void
+    let isDisabled: Bool
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: {
+            guard !isDisabled else { return }
+            
+            // Haptic feedback
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+            
+            onDelete()
+        }) {
+            ZStack {
+                Circle()
+                    .fill(AppColor.justWhite.opacity(isDisabled ? 0.3 : 0.9))
+                    .frame(width: 64, height: 64)
+                
+                Image(systemName: "delete.left")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(isDisabled ? AppColor.textSecondary : AppColor.justBlack)
+            }
+        }
+        .frame(width: 64, height: 64)
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .disabled(isDisabled)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed && !isDisabled {
+                        withAnimation(.easeInOut(duration: 0.1)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+        )
+    }
+}
+
 #Preview("Scoring Grid") {
-    ScoringButtonGrid(onScoreSelected: { value, type in
-        print("Selected score: \(value), type: \(type)")
-    }, showBustButton: true)
+    ScoringButtonGrid(
+        onScoreSelected: { value, type in
+            print("Selected score: \(value), type: \(type)")
+        },
+        showBustButton: true,
+        onDelete: {
+            print("Delete pressed")
+        },
+        canDelete: true
+    )
     .padding()
     .background(AppColor.backgroundPrimary)
 }

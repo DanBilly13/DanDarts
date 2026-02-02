@@ -239,14 +239,19 @@ struct FriendsListView: View {
                     Button {
                         createInviteLink()
                     } label: {
-                        if isCreatingInvite {
-                            ProgressView()
-                                .tint(AppColor.interactivePrimaryBackground)
-                        } else {
+                        ZStack {
                             Text("Invite")
                                 .font(.system(size: 17, weight: .regular))
                                 .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .opacity(isCreatingInvite ? 0 : 1)
+
+                            if isCreatingInvite {
+                                ProgressView()
+                                    .tint(AppColor.interactivePrimaryBackground)
+                            }
                         }
+                        // Keep the tappable/visual width stable
+                        .frame(minWidth: 44)
                     }
                     .disabled(isCreatingInvite)
                 }

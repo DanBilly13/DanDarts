@@ -134,7 +134,11 @@ struct CountdownGameplayView: View {
                                 onScoreSelected: { baseValue, scoreType in
                                     gameViewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
                                 },
-                                showBustButton: gameViewModel.canBust
+                                showBustButton: gameViewModel.canBust,
+                                onDelete: {
+                                    gameViewModel.deleteThrow()
+                                },
+                                canDelete: gameViewModel.canDelete
                             )
                             .padding(.horizontal, 16)
                             

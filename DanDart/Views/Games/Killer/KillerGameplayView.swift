@@ -91,7 +91,11 @@ struct KillerGameplayView: View {
                         onScoreSelected: { baseValue, scoreType in
                             viewModel.recordThrow(value: baseValue, multiplier: scoreType.multiplier)
                         },
-                        showBustButton: false
+                        showBustButton: false,
+                        onDelete: {
+                            viewModel.deleteThrow()
+                        },
+                        canDelete: viewModel.canDelete
                     )
                     .padding(.horizontal, 16)
                     

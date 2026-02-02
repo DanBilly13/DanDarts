@@ -83,7 +83,11 @@ struct SuddenDeathGameplayView: View {
                             let scoredThrow = ScoredThrow(baseValue: baseValue, scoreType: scoreType)
                             viewModel.recordThrow(scoredThrow)
                         },
-                        showBustButton: false
+                        showBustButton: false,
+                        onDelete: {
+                            viewModel.deleteThrow()
+                        },
+                        canDelete: viewModel.canDelete
                     )
                     .padding(.horizontal, 16)
                     

@@ -289,6 +289,27 @@ class CountdownViewModel: ObservableObject {
         selectedDartIndex = nil
     }
     
+    /// Delete the current throw or move back to previous throw
+    func deleteThrow() {
+        // If there's a selected dart, delete it and keep that position selected
+        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
+            currentThrow.remove(at: selectedIndex)
+            // Keep the same index selected (now points to empty slot or next throw)
+            // This maintains the active border on the cleared position
+        } else if !currentThrow.isEmpty {
+            // No selection, delete the last throw and select that position
+            let lastIndex = currentThrow.count - 1
+            currentThrow.removeLast()
+            selectedDartIndex = lastIndex
+        }
+        // If currentThrow is empty and no selection, do nothing
+    }
+    
+    /// Check if delete button should be enabled
+    var canDelete: Bool {
+        !currentThrow.isEmpty
+    }
+    
     /// Save the current turn and switch to next player
     func saveScore() {
         guard !currentThrow.isEmpty else { return }
