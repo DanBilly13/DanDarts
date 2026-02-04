@@ -401,12 +401,12 @@ struct DeleteButton: View {
         }) {
             ZStack {
                 Circle()
-                    .fill(AppColor.justWhite.opacity(isDisabled ? 0.3 : 0.9))
+                    .fill(AppColor.inputBackground.opacity(isDisabled ? 0.0 : 1))
                     .frame(width: 64, height: 64)
                 
                 Image(systemName: "delete.left")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(isDisabled ? AppColor.textSecondary : AppColor.justBlack)
+                    .foregroundColor(isDisabled ? AppColor.justBlack : AppColor.justWhite)
             }
         }
         .frame(width: 64, height: 64)

@@ -349,7 +349,7 @@ extension CountdownGameplayView {
 }
 
 // MARK: - Preview
-    
+#if DEBUG
     #Preview("Countdown - 301") {
         NavigationStack {
             CountdownGameplayView(
@@ -414,3 +414,4 @@ extension CountdownGameplayView {
             .background(AppColor.backgroundPrimary)
         }
     }
+#endif

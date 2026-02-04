@@ -222,14 +222,6 @@ struct SignUpView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.surfacePrimary)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                }
-            }
             .sheet(isPresented: $showTerms) {
                 NavigationStack {
                     TermsAndConditions()
