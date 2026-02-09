@@ -18,21 +18,23 @@ struct WelcomeView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 // Top section with logo and tagline
-                VStack(spacing: 24) {
+                VStack(spacing: 8) {
                     Spacer()
                     
                     // App Logo
-                    Image("DartFreakLogo02")
+                    Image("DartFreakStackedLogo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: 240)
                     
                     // Tagline
-                    Text("Games · Scoring · Stats · Rivalry")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
+                   /* Text("KEEP SCORE")
+                        .font(.system(.headline, design: .rounded))
+                        .kerning(2)
+                        .fontWeight(.bold)
+                        .foregroundColor(AppColor.justWhite)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                        .padding(.horizontal, 32)*/
                     
                     /*Spacer()*/
                 }

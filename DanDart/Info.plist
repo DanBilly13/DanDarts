@@ -4,6 +4,8 @@
 <dict>
 	<key>NSApplicationCrashOnExceptions</key>
 	<true/>
+	<key>GOOGLE_CLIENT_ID</key>
+	<string>873425113437-h5avmtu297u914djmg0k952jubdk1k4p.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
