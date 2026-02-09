@@ -87,12 +87,19 @@ class HalveItViewModel: ObservableObject {
         // Check if dart hits the current target
         let hitsTarget = currentTarget.isHit(by: dart)
         
-        // If a dart is selected, replace it instead of appending
-        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
-            currentThrow[selectedIndex] = dart
-            selectedDartIndex = nil  // Clear selection after replacement
+        // If a dart is selected, replace it or fill that position
+        if let selectedIndex = selectedDartIndex, selectedIndex <= currentThrow.count, selectedIndex < 3 {
+            if selectedIndex < currentThrow.count {
+                // Replace existing dart
+                currentThrow[selectedIndex] = dart
+            } else {
+                // Fill empty position (after undo/delete)
+                currentThrow.append(dart)
+            }
+            // Advance to next position if there's room, otherwise clear selection
+            selectedDartIndex = (currentThrow.count < 3) ? currentThrow.count : nil
         } else {
-            // Normal append behavior
+            // No selection, just append if we have room
             guard currentThrow.count < 3 else { return }
             currentThrow.append(dart)
         }

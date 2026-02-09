@@ -241,12 +241,19 @@ class CountdownViewModel: ObservableObject {
         
         let scoredThrow = ScoredThrow(baseValue: value, scoreType: scoreType)
         
-        // If a dart is selected, replace it instead of appending
-        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
-            currentThrow[selectedIndex] = scoredThrow
-            selectedDartIndex = nil // Deselect after replacement
+        // If a dart is selected, replace it or fill that position
+        if let selectedIndex = selectedDartIndex, selectedIndex <= currentThrow.count, selectedIndex < 3 {
+            if selectedIndex < currentThrow.count {
+                // Replace existing dart
+                currentThrow[selectedIndex] = scoredThrow
+            } else {
+                // Fill empty position (after undo/delete)
+                currentThrow.append(scoredThrow)
+            }
+            // Advance to next position if there's room, otherwise clear selection
+            selectedDartIndex = (currentThrow.count < 3) ? currentThrow.count : nil
         } else if currentThrow.count < 3 {
-            // Otherwise append if we have room
+            // No selection, just append
             currentThrow.append(scoredThrow)
         }
         

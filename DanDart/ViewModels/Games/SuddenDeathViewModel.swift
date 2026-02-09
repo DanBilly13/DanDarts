@@ -108,11 +108,19 @@ class SuddenDeathViewModel: ObservableObject {
     // MARK: - Game Actions
     
     func recordThrow(_ scoredThrow: ScoredThrow) {
-        // Replace selected dart or append
-        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
-            currentThrow[selectedIndex] = scoredThrow
-            selectedDartIndex = nil
+        // If a dart is selected, replace it or fill that position
+        if let selectedIndex = selectedDartIndex, selectedIndex <= currentThrow.count, selectedIndex < 3 {
+            if selectedIndex < currentThrow.count {
+                // Replace existing dart
+                currentThrow[selectedIndex] = scoredThrow
+            } else {
+                // Fill empty position (after undo/delete)
+                currentThrow.append(scoredThrow)
+            }
+            // Advance to next position if there's room, otherwise clear selection
+            selectedDartIndex = (currentThrow.count < 3) ? currentThrow.count : nil
         } else {
+            // No selection, just append if we have room
             guard currentThrow.count < 3 else { return }
             currentThrow.append(scoredThrow)
         }

@@ -28,7 +28,7 @@ struct WelcomeView: View {
                         .frame(maxWidth: 240)
                     
                     // Tagline
-                    Text("Focus on the fun, not the math")
+                    Text("Games · Scoring · Stats · Rivalry")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(AppColor.textSecondary)
                         .multilineTextAlignment(.center)
