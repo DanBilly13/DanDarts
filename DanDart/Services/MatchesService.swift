@@ -87,6 +87,10 @@ class MatchesService: ObservableObject {
             
             print("✅ Match synced to Supabase: \(match.id)")
             print("   Response status: \(response.response.statusCode)")
+            
+            // Insert participants into match_participants table for fast queries
+            try await insertMatchParticipants(matchId: match.id, players: match.players)
+            
             return match.id
             
         } catch let error as NSError {
@@ -99,6 +103,52 @@ class MatchesService: ObservableObject {
         } catch {
             print("❌ Match sync failed: \(error)")
             throw MatchSyncError.syncFailed
+        }
+    }
+    
+    /// Insert match participants into match_participants table
+    /// - Parameters:
+    ///   - matchId: The match ID
+    ///   - players: Array of players in the match
+    private func insertMatchParticipants(matchId: UUID, players: [MatchPlayer]) async throws {
+        print("🔵 [Participants] Inserting \(players.count) participants for match \(matchId)")
+        
+        struct MatchParticipantInsert: Codable {
+            let matchId: String
+            let userId: String
+            let isGuest: Bool
+            let displayName: String
+            
+            enum CodingKeys: String, CodingKey {
+                case matchId = "match_id"
+                case userId = "user_id"
+                case isGuest = "is_guest"
+                case displayName = "display_name"
+            }
+        }
+        
+        let participants = players.map { player in
+            print("   - \(player.displayName) (ID: \(player.id), Guest: \(player.isGuest))")
+            return MatchParticipantInsert(
+                matchId: matchId.uuidString,
+                userId: player.id.uuidString,
+                isGuest: player.isGuest,
+                displayName: player.displayName
+            )
+        }
+        
+        do {
+            let response = try await supabaseService.client
+                .from("match_participants")
+                .insert(participants)
+                .execute()
+            
+            print("   ✅ Inserted \(participants.count) participants into match_participants table")
+            print("   Response status: \(response.response.statusCode)")
+        } catch {
+            print("   ❌ Failed to insert match participants: \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            // Don't throw - this is not critical for match sync
         }
     }
     
@@ -402,6 +452,370 @@ class MatchesService: ObservableObject {
         }
         
         return playersWithTurns
+    }
+    
+    // MARK: - Optimized Query Methods (Using match_participants table)
+    
+    /// Load head-to-head matches between two users (OPTIMIZED)
+    /// Uses match_participants table for fast filtering
+    /// - Parameters:
+    ///   - userId: Current user's ID
+    ///   - friendId: Friend's user ID
+    ///   - limit: Maximum number of matches to return (default 50)
+    /// - Returns: Array of match results
+    func loadHeadToHeadMatchesOptimized(userId: UUID, friendId: UUID, limit: Int = 50) async throws -> [MatchResult] {
+        let startTime = Date()
+        print("🚀 [H2H Optimized] Loading matches between \(userId) and \(friendId)")
+        
+        do {
+            // Step 1: Find match IDs where BOTH users participated (using match_participants table)
+            let participantsResponse = try await supabaseService.client
+                .from("match_participants")
+                .select("match_id")
+                .eq("user_id", value: userId.uuidString)
+                .eq("is_guest", value: false)
+                .execute()
+            
+            guard let userMatchesJson = try? JSONSerialization.jsonObject(with: participantsResponse.data) as? [[String: Any]] else {
+                print("✅ [H2H Optimized] No matches found for user")
+                return []
+            }
+            
+            let userMatchIds = Set(userMatchesJson.compactMap { ($0["match_id"] as? String).flatMap(UUID.init) })
+            
+            // Get friend's match IDs
+            let friendParticipantsResponse = try await supabaseService.client
+                .from("match_participants")
+                .select("match_id")
+                .eq("user_id", value: friendId.uuidString)
+                .eq("is_guest", value: false)
+                .execute()
+            
+            guard let friendMatchesJson = try? JSONSerialization.jsonObject(with: friendParticipantsResponse.data) as? [[String: Any]] else {
+                print("✅ [H2H Optimized] No matches found for friend")
+                return []
+            }
+            
+            let friendMatchIds = Set(friendMatchesJson.compactMap { ($0["match_id"] as? String).flatMap(UUID.init) })
+            
+            // Find intersection (matches where BOTH participated)
+            let commonMatchIds = Array(userMatchIds.intersection(friendMatchIds))
+            
+            guard !commonMatchIds.isEmpty else {
+                print("✅ [H2H Optimized] No head-to-head matches found")
+                return []
+            }
+            
+            print("   Found \(commonMatchIds.count) head-to-head match IDs")
+            
+            // Step 2: Load match details for these IDs (with limit)
+            let limitedMatchIds = Array(commonMatchIds.prefix(limit))
+            let matches = try await loadMatchesByIds(limitedMatchIds)
+            
+            let duration = Date().timeIntervalSince(startTime)
+            print("✅ [H2H Optimized] Loaded \(matches.count) matches in \(String(format: "%.2f", duration))s")
+            
+            return matches.sorted { $0.timestamp > $1.timestamp }
+            
+        } catch {
+            print("❌ [H2H Optimized] Load failed: \(error)")
+            throw MatchSyncError.loadFailed
+        }
+    }
+    
+    /// Load matches by specific match IDs with batched turn data loading
+    /// - Parameter matchIds: Array of match IDs to load
+    /// - Returns: Array of match results with turn data
+    private func loadMatchesByIds(_ matchIds: [UUID]) async throws -> [MatchResult] {
+        guard !matchIds.isEmpty else { return [] }
+        
+        print("   Loading \(matchIds.count) matches by ID...")
+        
+        // Step 1: Load match metadata (WITHOUT players column to avoid double-encoded JSON issue)
+        let matchIdsStrings = matchIds.map { $0.uuidString }
+        let matchesResponse = try await supabaseService.client
+            .from("matches")
+            .select("id, game_type, game_name, winner_id, timestamp, duration, match_format, total_legs_played, metadata")
+            .in("id", values: matchIdsStrings)
+            .execute()
+        
+        guard let matchesJson = try? JSONSerialization.jsonObject(with: matchesResponse.data) as? [[String: Any]] else {
+            print("   No matches found")
+            return []
+        }
+        
+        // Step 1b: Load participants for these matches from match_participants table
+        let participantsResponse = try await supabaseService.client
+            .from("match_participants")
+            .select("match_id, user_id, is_guest, display_name")
+            .in("match_id", values: matchIdsStrings)
+            .execute()
+        
+        guard let participantsJson = try? JSONSerialization.jsonObject(with: participantsResponse.data) as? [[String: Any]] else {
+            print("   No participants found")
+            return []
+        }
+        
+        // Group participants by match_id
+        var participantsByMatch: [UUID: [[String: Any]]] = [:]
+        for participantJson in participantsJson {
+            guard let matchIdString = participantJson["match_id"] as? String,
+                  let matchId = UUID(uuidString: matchIdString) else {
+                continue
+            }
+            
+            if participantsByMatch[matchId] == nil {
+                participantsByMatch[matchId] = []
+            }
+            participantsByMatch[matchId]?.append(participantJson)
+        }
+        
+        print("   Loaded \(participantsJson.count) participants from match_participants table")
+        
+        // Step 2: Batch-load ALL turn data for these matches in ONE query
+        let turnsResponse = try await supabaseService.client
+            .from("match_throws")
+            .select("id,match_id,player_order,turn_index,throws,score_before,score_after,is_bust,game_metadata")
+            .in("match_id", values: matchIdsStrings)
+            .order("player_order")
+            .order("turn_index")
+            .execute()
+        
+        guard let turnsJson = try? JSONSerialization.jsonObject(with: turnsResponse.data) as? [[String: Any]] else {
+            print("   No turn data found")
+            return []
+        }
+        
+        print("   Loaded \(turnsJson.count) turns in batch")
+        
+        // Step 3: Group turns by match_id
+        var turnsByMatch: [UUID: [[String: Any]]] = [:]
+        for turnJson in turnsJson {
+            guard let matchIdString = turnJson["match_id"] as? String,
+                  let matchId = UUID(uuidString: matchIdString) else {
+                continue
+            }
+            
+            if turnsByMatch[matchId] == nil {
+                turnsByMatch[matchId] = []
+            }
+            turnsByMatch[matchId]?.append(turnJson)
+        }
+        
+        // Step 4: Build MatchResult objects with turns
+        var matches: [MatchResult] = []
+        
+        for json in matchesJson {
+            guard let idString = json["id"] as? String,
+                  let id = UUID(uuidString: idString),
+                  let gameType = json["game_type"] as? String,
+                  let gameName = json["game_name"] as? String,
+                  let winnerIdString = json["winner_id"] as? String,
+                  let winnerId = UUID(uuidString: winnerIdString),
+                  let timestampString = json["timestamp"] as? String,
+                  let timestamp = ISO8601DateFormatter().date(from: timestampString),
+                  let duration = json["duration"] as? Int else {
+                continue
+            }
+            
+            let matchFormat = json["match_format"] as? Int ?? 1
+            let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
+            
+            // Build players from match_participants data
+            let participantsData = participantsByMatch[id] ?? []
+            let basicPlayers = participantsData.compactMap { participantJson -> MatchPlayer? in
+                guard let userIdString = participantJson["user_id"] as? String,
+                      let userId = UUID(uuidString: userIdString),
+                      let displayName = participantJson["display_name"] as? String else {
+                    return nil
+                }
+                
+                let isGuest = participantJson["is_guest"] as? Bool ?? false
+                
+                return MatchPlayer(
+                    id: userId,
+                    displayName: displayName,
+                    nickname: "",
+                    avatarURL: nil,
+                    isGuest: isGuest,
+                    finalScore: 0,
+                    startingScore: 0,
+                    totalDartsThrown: 0,
+                    turns: [],
+                    legsWon: 0
+                )
+            }
+            
+            // Get metadata
+            var metadata: [String: String] = [:]
+            if let gameMetadata = json["metadata"] as? [String: Any] {
+                metadata = gameMetadata.compactMapValues { $0 as? String }
+            }
+            
+            // Get turns for this match
+            let matchTurns = turnsByMatch[id] ?? []
+            let playersWithTurns = buildPlayersWithTurns(players: basicPlayers, turnsJson: matchTurns)
+            
+            let match = MatchResult(
+                id: id,
+                gameType: gameType,
+                gameName: gameName,
+                players: playersWithTurns,
+                winnerId: winnerId,
+                timestamp: timestamp,
+                duration: TimeInterval(duration),
+                matchFormat: matchFormat,
+                totalLegsPlayed: totalLegsPlayed,
+                metadata: metadata
+            )
+            
+            matches.append(match)
+        }
+        
+        return matches
+    }
+    
+    /// Build players with turn data from JSON
+    private func buildPlayersWithTurns(players: [MatchPlayer], turnsJson: [[String: Any]]) -> [MatchPlayer] {
+        // Group turns by player_order
+        var playerTurns: [Int: [MatchTurn]] = [:]
+        
+        for turnJson in turnsJson {
+            guard let playerOrder = turnJson["player_order"] as? Int,
+                  let turnIndex = turnJson["turn_index"] as? Int,
+                  let scoreBefore = turnJson["score_before"] as? Int,
+                  let scoreAfter = turnJson["score_after"] as? Int else {
+                continue
+            }
+            
+            // Parse throws
+            let dartScores: [Int]
+            if let throwsArray = turnJson["throws"] as? [Int] {
+                dartScores = throwsArray
+            } else if let throwsArray = turnJson["throws"] as? [Any] {
+                dartScores = throwsArray.compactMap { $0 as? Int }
+            } else {
+                continue
+            }
+            
+            // Get metadata
+            var targetDisplay: String? = nil
+            var killerDartsMetadataMap: [Int: [String: Any]] = [:]
+            if let gameMetadata = turnJson["game_metadata"] as? [String: Any] {
+                if let target = gameMetadata["target_display"] as? String {
+                    targetDisplay = target
+                }
+                if let killerDartsJson = gameMetadata["killer_darts"] as? String,
+                   let jsonData = killerDartsJson.data(using: .utf8),
+                   let dartsArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
+                    for dartMeta in dartsArray {
+                        if let dartIndex = dartMeta["dart_index"] as? Int {
+                            killerDartsMetadataMap[dartIndex] = dartMeta
+                        }
+                    }
+                }
+            }
+            
+            let isBust = turnJson["is_bust"] as? Bool ?? false
+            
+            // Convert to MatchDart objects
+            let darts = dartScores.enumerated().map { index, score -> MatchDart in
+                var killerMetadata: KillerDartMetadata? = nil
+                if let dartMeta = killerDartsMetadataMap[index] {
+                    if let outcomeStr = dartMeta["outcome"] as? String,
+                       let outcome = KillerDartMetadata.KillerDartOutcome(rawValue: outcomeStr) {
+                        let affectedIds = (dartMeta["affected_player_ids"] as? [String] ?? []).compactMap { UUID(uuidString: $0) }
+                        killerMetadata = KillerDartMetadata(outcome: outcome, affectedPlayerIds: affectedIds)
+                    }
+                }
+                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: killerMetadata)
+            }
+            
+            let turn = MatchTurn(
+                turnNumber: turnIndex,
+                darts: darts,
+                scoreBefore: scoreBefore,
+                scoreAfter: scoreAfter,
+                isBust: isBust,
+                targetDisplay: targetDisplay
+            )
+            
+            if playerTurns[playerOrder] == nil {
+                playerTurns[playerOrder] = []
+            }
+            playerTurns[playerOrder]?.append(turn)
+        }
+        
+        // Reconstruct players with turn data
+        var playersWithTurns: [MatchPlayer] = []
+        for (index, player) in players.enumerated() {
+            let turns = playerTurns[index] ?? []
+            let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
+            let finalScore = turns.last?.scoreAfter ?? player.finalScore
+            let startingScore = turns.first?.scoreBefore ?? player.startingScore
+            
+            let playerWithTurns = MatchPlayer(
+                id: player.id,
+                displayName: player.displayName,
+                nickname: player.nickname,
+                avatarURL: player.avatarURL,
+                isGuest: player.isGuest,
+                finalScore: finalScore,
+                startingScore: startingScore,
+                totalDartsThrown: totalDarts,
+                turns: turns,
+                legsWon: player.legsWon
+            )
+            
+            playersWithTurns.append(playerWithTurns)
+        }
+        
+        return playersWithTurns
+    }
+    
+    /// Parse players array from JSON (handles double-encoded JSON)
+    private func parsePlayersFromJson(_ playersData: Any?) -> [MatchPlayer] {
+        guard let playersData = playersData else { return [] }
+        
+        var playersArray: [[String: Any]] = []
+        
+        // Try to parse as array directly
+        if let array = playersData as? [[String: Any]] {
+            playersArray = array
+        }
+        // Try to parse as JSON string (double-encoded)
+        else if let jsonString = playersData as? String,
+                let jsonData = jsonString.data(using: .utf8),
+                let array = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
+            playersArray = array
+        }
+        
+        return playersArray.compactMap { playerJson in
+            guard let idString = playerJson["id"] as? String,
+                  let id = UUID(uuidString: idString),
+                  let displayName = playerJson["displayName"] as? String else {
+                return nil
+            }
+            
+            let nickname = playerJson["nickname"] as? String ?? ""
+            let avatarURL = playerJson["avatarURL"] as? String
+            let isGuestString = playerJson["isGuest"] as? String
+            let isGuest = (isGuestString == "true") || (playerJson["isGuest"] as? Bool == true)
+            let legsWon = playerJson["legsWon"] as? Int ?? 0
+            
+            return MatchPlayer(
+                id: id,
+                displayName: displayName,
+                nickname: nickname,
+                avatarURL: avatarURL,
+                isGuest: isGuest,
+                finalScore: 0,
+                startingScore: 0,
+                totalDartsThrown: 0,
+                turns: [],
+                legsWon: legsWon
+            )
+        }
     }
     
     // MARK: - Retry Failed Syncs

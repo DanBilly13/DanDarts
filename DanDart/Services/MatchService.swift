@@ -228,6 +228,9 @@ class MatchService: ObservableObject {
             .insert(matchRecord)
             .execute()
         
+        // Insert into match_participants table for fast queries
+        try await insertMatchParticipants(matchId: matchId, players: playersToSave)
+        
         // Delete old child records if this is a re-save (handles duplicates)
         try? await supabaseService.client
             .from("match_players")
@@ -409,6 +412,60 @@ class MatchService: ObservableObject {
             .getPublicURL(path: filePath)
         
         return publicURL.absoluteString
+    }
+    
+    /// Insert match participants into match_participants table
+    /// - Parameters:
+    ///   - matchId: The match ID
+    ///   - players: Array of players in the match
+    private func insertMatchParticipants(matchId: UUID, players: [Player]) async throws {
+        print("🔵 [Participants] Inserting \(players.count) participants for match \(matchId)")
+        
+        struct MatchParticipantInsert: Codable {
+            let matchId: String
+            let userId: String
+            let isGuest: Bool
+            let displayName: String
+            
+            enum CodingKeys: String, CodingKey {
+                case matchId = "match_id"
+                case userId = "user_id"
+                case isGuest = "is_guest"
+                case displayName = "display_name"
+            }
+        }
+        
+        // Delete old participants if this is a re-save
+        try? await supabaseService.client
+            .from("match_participants")
+            .delete()
+            .eq("match_id", value: matchId.uuidString)
+            .execute()
+        
+        let participants = players.map { player in
+            let userId = player.userId ?? player.id // Use userId for connected, player.id for guests
+            print("   - \(player.displayName) (ID: \(userId), Guest: \(player.isGuest))")
+            return MatchParticipantInsert(
+                matchId: matchId.uuidString,
+                userId: userId.uuidString,
+                isGuest: player.isGuest,
+                displayName: player.displayName
+            )
+        }
+        
+        do {
+            let response = try await supabaseService.client
+                .from("match_participants")
+                .insert(participants)
+                .execute()
+            
+            print("   ✅ Inserted \(participants.count) participants into match_participants table")
+            print("   Response status: \(response.response.statusCode)")
+        } catch {
+            print("   ❌ Failed to insert match participants: \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            // Don't throw - this is not critical for match sync
+        }
     }
     
     // MARK: - Match Loading

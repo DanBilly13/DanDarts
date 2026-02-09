@@ -24,13 +24,6 @@ struct FriendProfileView: View {
                 ProfileHeaderView(player: friend)
                     .padding(.top, 24)
                 
-                // Action Button
-                AppButton(role: .primary, controlSize: .regular) {
-                    // TODO: Navigate to game selection with friend pre-selected
-                } label: {
-                    Label("Challenge to Game", systemImage: "gamecontroller.fill")
-                }
-                
                 // Head-to-Head Section
                 VStack(alignment: .leading, spacing: 16) {
                     // Header with title and avatars
@@ -95,23 +88,20 @@ struct FriendProfileView: View {
                         )
                     }
                 }
-                
-                // Remove Friend Link at Bottom
-                Button(action: {
-                    showRemoveConfirmation = true
-                }) {
-                    Text("Remove Friend")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-                }
-                .padding(.top, 32)
-                .padding(.bottom, 40)
             }
             .padding(.horizontal, 16)
+            .padding(.bottom, 40)
         }
         .background(AppColor.backgroundPrimary)
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                FriendProfileMenuButton {
+                    showRemoveConfirmation = true
+                }
+            }
+        }
         .alert("Remove Friend?", isPresented: $showRemoveConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Remove", role: .destructive) {
@@ -149,10 +139,15 @@ struct FriendProfileView: View {
     // MARK: - Helper Methods
     
     /// Load head-to-head matches from Supabase only (async version for refreshable)
+    /// OPTIMIZED: Uses match_participants table and batched turn loading
     private func loadHeadToHeadMatchesAsync() async {
+        let startTime = Date()
+        print("🔵 [H2H Optimized] Starting head-to-head load for friend: \(friend.displayName)")
+        
         isLoadingMatches = true
         
         guard let userId = authService.currentUser?.id else {
+            print("❌ [H2H Optimized] No current user ID")
             await MainActor.run {
                 isLoadingMatches = false
                 headToHeadMatches = []
@@ -161,24 +156,30 @@ struct FriendProfileView: View {
         }
         
         let friendUserId = friend.userId ?? friend.id
+        print("🔵 [H2H Optimized] Current user: \(userId), Friend: \(friendUserId)")
         
         do {
-            let supabaseMatches = try await matchesService.loadMatches(userId: userId)
-            
-            let filteredMatches = supabaseMatches.filter { match in
-                let connectedPlayerIds = match.players.filter { !$0.isGuest }.map { $0.id }
-                return connectedPlayerIds.contains(friendUserId) && connectedPlayerIds.contains(userId)
-            }
+            // Use the new optimized query method
+            let matches = try await matchesService.loadHeadToHeadMatchesOptimized(
+                userId: userId,
+                friendId: friendUserId,
+                limit: 50
+            )
             
             await MainActor.run {
-                headToHeadMatches = filteredMatches.sorted { $0.timestamp > $1.timestamp }
+                headToHeadMatches = matches
                 isLoadingMatches = false
                 
                 let friendId = friend.userId ?? friend.id
                 HeadToHeadCache.shared.setMatches(headToHeadMatches, for: friendId)
+                
+                let totalDuration = Date().timeIntervalSince(startTime)
+                print("✅ [H2H Optimized] Total load completed in \(String(format: "%.2f", totalDuration))s")
             }
             
         } catch {
+            let totalDuration = Date().timeIntervalSince(startTime)
+            print("❌ [H2H Optimized] Load failed after \(String(format: "%.2f", totalDuration))s: \(error)")
             await MainActor.run {
                 isLoadingMatches = false
             }
