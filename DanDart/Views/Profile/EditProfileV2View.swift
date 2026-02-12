@@ -503,14 +503,28 @@ struct EditProfileV2View: View {
 }
 
 // MARK: - Preview
-#Preview("Email User") {
+#Preview("Email User - With AI (iOS 18.1+)") {
     NavigationStack {
         EditProfileV2View()
             .environmentObject(AuthService.mockEmailUser)
     }
 }
 
-#Preview("Google User") {
+#Preview("Email User - Without AI (Older)") {
+    NavigationStack {
+        EditProfileV2View()
+            .environmentObject(AuthService.mockEmailUser)
+    }
+}
+
+#Preview("Google User - With AI (iOS 18.1+)") {
+    NavigationStack {
+        EditProfileV2View()
+            .environmentObject(AuthService.mockGoogleUser)
+    }
+}
+
+#Preview("Google User - Without AI (Older)") {
     NavigationStack {
         EditProfileV2View()
             .environmentObject(AuthService.mockGoogleUser)

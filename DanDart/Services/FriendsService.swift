@@ -13,6 +13,260 @@ class FriendsService: ObservableObject {
     private let supabaseService = SupabaseService.shared
     private let analytics = AnalyticsService.shared
     
+    // MARK: - Realtime Subscription
+    
+    private var realtimeChannel: RealtimeChannelV2?
+    @Published var friendshipChanged: Bool = false
+    
+    /// Setup realtime subscription for friendship changes
+    func setupRealtimeSubscription(userId: UUID) async {
+        print("🔵 [Realtime] Setting up subscription for user: \(userId)")
+        
+        // Remove existing subscription first
+        await removeRealtimeSubscription()
+        
+        // Create channel for friendships table
+        let channelName = "friendships:\(userId.uuidString)"
+        let channel = supabaseService.client.realtimeV2.channel(channelName)
+        
+        // Listen for changes where user is requester
+        let requesterFilter = "requester_id=eq.\(userId.uuidString)"
+        channel.onPostgresChange(
+            InsertAction.self,
+            schema: "public",
+            table: "friendships",
+            filter: requesterFilter
+        ) { [weak self] action in
+            Task { @MainActor in
+                self?.handleFriendshipInsert(action, userId: userId)
+            }
+        }
+        
+        channel.onPostgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "friendships",
+            filter: requesterFilter
+        ) { [weak self] action in
+            Task { @MainActor in
+                self?.handleFriendshipUpdate(action, userId: userId)
+            }
+        }
+        
+        channel.onPostgresChange(
+            DeleteAction.self,
+            schema: "public",
+            table: "friendships",
+            filter: requesterFilter
+        ) { [weak self] action in
+            Task { @MainActor in
+                self?.handleFriendshipDelete(action, userId: userId)
+            }
+        }
+        
+        // Listen for changes where user is addressee
+        let addresseeFilter = "addressee_id=eq.\(userId.uuidString)"
+        channel.onPostgresChange(
+            InsertAction.self,
+            schema: "public",
+            table: "friendships",
+            filter: addresseeFilter
+        ) { [weak self] action in
+            Task { @MainActor in
+                self?.handleFriendshipInsert(action, userId: userId)
+            }
+        }
+        
+        channel.onPostgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "friendships",
+            filter: addresseeFilter
+        ) { [weak self] action in
+            Task { @MainActor in
+                self?.handleFriendshipUpdate(action, userId: userId)
+            }
+        }
+        
+        channel.onPostgresChange(
+            DeleteAction.self,
+            schema: "public",
+            table: "friendships",
+            filter: addresseeFilter
+        ) { [weak self] action in
+            Task { @MainActor in
+                self?.handleFriendshipDelete(action, userId: userId)
+            }
+        }
+        
+        // Subscribe to the channel
+        do {
+            try await channel.subscribe()
+            print("✅ [Realtime] Subscription active for user: \(userId)")
+        } catch {
+            print("❌ [Realtime] Subscription failed: \(error)")
+        }
+        
+        realtimeChannel = channel
+    }
+    
+    /// Remove realtime subscription
+    func removeRealtimeSubscription() async {
+        if let channel = realtimeChannel {
+            print("🔵 [Realtime] Removing subscription")
+            await channel.unsubscribe()
+            realtimeChannel = nil
+        }
+    }
+    
+    /// Handle INSERT events (new friend request)
+    private func handleFriendshipInsert(_ action: InsertAction, userId: UUID) {
+        print("🔔 [Realtime] Friendship INSERT detected")
+        
+        // Toggle the published property to trigger view updates
+        friendshipChanged.toggle()
+        
+        // Post notification for badge updates
+        NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+        
+        // Handle toast for new request received
+        Task {
+            await handleInsertToast(record: action.record, currentUserId: userId)
+        }
+    }
+    
+    /// Handle UPDATE events (request accepted)
+    private func handleFriendshipUpdate(_ action: UpdateAction, userId: UUID) {
+        print("🔔 [Realtime] Friendship UPDATE detected")
+        
+        // Toggle the published property to trigger view updates
+        friendshipChanged.toggle()
+        
+        // Post notification for badge updates
+        NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+        
+        // Handle toast for request accepted
+        Task {
+            await handleUpdateToast(record: action.record, currentUserId: userId)
+        }
+    }
+    
+    /// Handle DELETE events (request denied/withdrawn)
+    private func handleFriendshipDelete(_ action: DeleteAction, userId: UUID) {
+        print("🔔 [Realtime] Friendship DELETE detected")
+        
+        // Toggle the published property to trigger view updates
+        friendshipChanged.toggle()
+        
+        // Post notification for badge updates
+        NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+        
+        // Handle toast for request denied
+        Task {
+            await handleDeleteToast(record: action.oldRecord, currentUserId: userId)
+        }
+    }
+    
+    /// Handle toast for INSERT action (new friend request received)
+    private func handleInsertToast(record: [String: AnyJSON], currentUserId: UUID) async {
+        guard let addresseeIdString = record["addressee_id"]?.stringValue,
+              addresseeIdString == currentUserId.uuidString,
+              let requesterIdString = record["requester_id"]?.stringValue,
+              let requesterId = UUID(uuidString: requesterIdString),
+              let friendshipIdString = record["id"]?.stringValue,
+              let friendshipId = UUID(uuidString: friendshipIdString) else {
+            return
+        }
+        
+        // Fetch requester's data
+        do {
+            let users: [User] = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: requesterId.uuidString)
+                .execute()
+                .value
+            
+            guard let requester = users.first else { return }
+            
+            let toast = FriendRequestToast(
+                type: .requestReceived,
+                user: requester,
+                message: "New friend request from \(requester.displayName)",
+                friendshipId: friendshipId
+            )
+            FriendRequestToastManager.shared.showToast(toast)
+        } catch {
+            print("❌ [Realtime] Failed to fetch user data for toast: \(error)")
+        }
+    }
+    
+    /// Handle toast for UPDATE action (friend request accepted)
+    private func handleUpdateToast(record: [String: AnyJSON], currentUserId: UUID) async {
+        guard let statusString = record["status"]?.stringValue,
+              statusString == "accepted",
+              let requesterIdString = record["requester_id"]?.stringValue,
+              requesterIdString == currentUserId.uuidString,
+              let addresseeIdString = record["addressee_id"]?.stringValue,
+              let addresseeId = UUID(uuidString: addresseeIdString) else {
+            return
+        }
+        
+        // Fetch addressee's data (the person who accepted)
+        do {
+            let users: [User] = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: addresseeId.uuidString)
+                .execute()
+                .value
+            
+            guard let addressee = users.first else { return }
+            
+            let toast = FriendRequestToast(
+                type: .requestAccepted,
+                user: addressee,
+                message: "\(addressee.displayName) accepted your friend request",
+                friendshipId: nil
+            )
+            FriendRequestToastManager.shared.showToast(toast)
+        } catch {
+            print("❌ [Realtime] Failed to fetch user data for toast: \(error)")
+        }
+    }
+    
+    /// Handle toast for DELETE action (friend request denied)
+    private func handleDeleteToast(record: [String: AnyJSON], currentUserId: UUID) async {
+        guard let requesterIdString = record["requester_id"]?.stringValue,
+              requesterIdString == currentUserId.uuidString,
+              let addresseeIdString = record["addressee_id"]?.stringValue,
+              let addresseeId = UUID(uuidString: addresseeIdString) else {
+            return
+        }
+        
+        // Fetch addressee's data (the person who denied)
+        do {
+            let users: [User] = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: addresseeId.uuidString)
+                .execute()
+                .value
+            
+            guard let addressee = users.first else { return }
+            
+            let toast = FriendRequestToast(
+                type: .requestDenied,
+                user: addressee,
+                message: "\(addressee.displayName) declined your friend request",
+                friendshipId: nil
+            )
+            FriendRequestToastManager.shared.showToast(toast)
+        } catch {
+            print("❌ [Realtime] Failed to fetch user data for toast: \(error)")
+        }
+    }
+    
     // MARK: - Friend Search
     
     /// Search for users by display name or nickname

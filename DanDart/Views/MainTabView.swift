@@ -12,6 +12,7 @@ struct MainTabView: View {
     @StateObject private var friendsService = FriendsService()
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
+    @State private var selectedTab: Int = 0
 
     private struct InviteTokenToClaim: Identifiable {
         let id: String
@@ -21,7 +22,8 @@ struct MainTabView: View {
     @State private var inviteTokenToClaim: InviteTokenToClaim? = nil
     
     var body: some View {
-        TabView {
+        ZStack {
+            TabView(selection: $selectedTab) {
             // Games Tab
             GamesTabView(showProfile: $showProfile)
                 .tabItem {
@@ -61,9 +63,23 @@ struct MainTabView: View {
                     //Text("History")
                 }
                 .tag(2)
+            }
+            .background(AppColor.backgroundPrimary)
+            .accentColor(AppColor.interactivePrimaryBackground)
+            
+            // Toast Overlay
+            FriendRequestToastContainer(
+                onNavigate: { toast in
+                    handleToastNavigation(toast)
+                },
+                onAccept: { friendshipId in
+                    handleAcceptRequest(friendshipId)
+                },
+                onDeny: { friendshipId in
+                    handleDenyRequest(friendshipId)
+                }
+            )
         }
-        .background(AppColor.backgroundPrimary)
-        .accentColor(AppColor.interactivePrimaryBackground)
         .sheet(item: $inviteTokenToClaim, onDismiss: {
             PendingInviteStore.shared.clearToken()
         }) { token in
@@ -127,6 +143,82 @@ struct MainTabView: View {
                 await MainActor.run {
                     pendingRequestCount = 0
                 }
+            }
+        }
+    }
+    
+    private func handleToastNavigation(_ toast: FriendRequestToast) {
+        switch toast.type {
+        case .requestReceived:
+            // Navigate to Friends tab (where requests are shown)
+            selectedTab = 1
+        case .requestAccepted:
+            // Navigate to Friends tab to see new friend
+            selectedTab = 1
+        case .requestDenied:
+            // Just dismiss - no navigation needed
+            break
+        }
+    }
+    
+    private func handleAcceptRequest(_ friendshipId: UUID) {
+        Task {
+            do {
+                let friendsService = FriendsService()
+                try await friendsService.acceptFriendRequest(requestId: friendshipId)
+                
+                // Success haptic feedback
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                #endif
+                
+                // Dismiss toast after success
+                await MainActor.run {
+                    FriendRequestToastManager.shared.dismissCurrentToast()
+                }
+                
+                // Reload pending request count
+                loadPendingRequestCount()
+            } catch {
+                print("❌ Failed to accept friend request from toast: \(error)")
+                
+                // Error haptic feedback
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
+            }
+        }
+    }
+    
+    private func handleDenyRequest(_ friendshipId: UUID) {
+        Task {
+            do {
+                let friendsService = FriendsService()
+                try await friendsService.denyFriendRequest(requestId: friendshipId)
+                
+                // Light haptic feedback (subtle)
+                #if canImport(UIKit)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                #endif
+                
+                // Dismiss toast after success
+                await MainActor.run {
+                    FriendRequestToastManager.shared.dismissCurrentToast()
+                }
+                
+                // Reload pending request count
+                loadPendingRequestCount()
+            } catch {
+                print("❌ Failed to deny friend request from toast: \(error)")
+                
+                // Error haptic feedback
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
             }
         }
     }
@@ -262,7 +354,7 @@ struct HistoryTabView: View {
 }
 
 // MARK: - Preview
-#Preview {
+#Preview("Main Tab") {
     MainTabView()
         .environmentObject(AuthService())
 }
@@ -271,4 +363,24 @@ struct HistoryTabView: View {
     MainTabView()
         .environmentObject(AuthService())
         .preferredColorScheme(.dark)
+}
+
+#Preview("Main Tab - With Toast") {
+    let authService = AuthService()
+    let toastManager = FriendRequestToastManager.shared
+    
+    MainTabView()
+        .environmentObject(authService)
+        .onAppear {
+            // Show a sample toast after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                let toast = FriendRequestToast(
+                    type: .requestReceived,
+                    user: User.mockUser1,
+                    message: "New friend request from \(User.mockUser1.displayName)",
+                    friendshipId: UUID()
+                )
+                toastManager.showToast(toast)
+            }
+        }
 }

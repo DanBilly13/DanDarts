@@ -20,7 +20,6 @@ struct ProfileView: View {
     @StateObject private var soundManager = SoundManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
-    @State private var showEditProfile: Bool = false
     @State private var showEditProfileV2: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
     @State private var showResetTipsConfirmation: Bool = false
@@ -91,11 +90,6 @@ struct ProfileView: View {
                     }
                     .foregroundColor(AppColor.textPrimary)
                 }
-            }
-            .navigationDestination(isPresented: $showEditProfile) {
-                EditProfileView()
-                    .environmentObject(authService)
-                    .background(AppColor.surfacePrimary)
             }
             .navigationDestination(isPresented: $showEditProfileV2) {
                 EditProfileV2View()

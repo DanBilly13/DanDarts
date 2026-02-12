@@ -21,7 +21,6 @@ struct AvatarSelectionViewV2: View {
 
     @State private var showCameraSheet: Bool = false
     @State private var showImagePlaygroundSheet: Bool = false
-    @State private var showAIGenerationSheet: Bool = false
 
     @State private var isLaunchingImagePlayground: Bool = false
     @State private var imagePlaygroundLoaderRotationDegrees: Double = 0
@@ -59,7 +58,9 @@ struct AvatarSelectionViewV2: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
-                    aiButton
+                    if isImagePlaygroundAvailable {
+                        aiButton
+                    }
                     cameraButton
                     libraryButton
 
@@ -91,13 +92,6 @@ struct AvatarSelectionViewV2: View {
                 selectedPhotoItem = nil
                 selectedAvatar = ""
             }
-        }
-        .sheet(isPresented: $showAIGenerationSheet) {
-            AIGeneratedAvatarSheetView(
-                selectedAvatar: $selectedAvatar,
-                selectedPhotoItem: $selectedPhotoItem,
-                selectedAvatarImage: $selectedAvatarImage
-            )
         }
         #endif
         #if canImport(ImagePlayground)
@@ -201,14 +195,10 @@ struct AvatarSelectionViewV2: View {
 
     private var aiButton: some View {
         Button(action: {
-            if isImagePlaygroundAvailable {
-                startImagePlaygroundLaunchFeedback()
-                showImagePlaygroundSheet = true
-            } else {
-                showAIGenerationSheet = true
-            }
+            startImagePlaygroundLaunchFeedback()
+            showImagePlaygroundSheet = true
         }) {
-            actionIcon(systemName: "sparkles", isEnabled: isImagePlaygroundAvailable)
+            actionIcon(systemName: "sparkles", isEnabled: true)
                 .overlay {
                     if isLaunchingImagePlayground {
                         Circle()
@@ -287,12 +277,37 @@ private extension View {
 }
 
 #if DEBUG
-#Preview("AvatarSelectionViewV2") {
-    AvatarSelectionViewV2(
-        selectedAvatar: .constant("person.circle.fill"),
-        selectedPhotoItem: .constant(nil),
-        selectedAvatarImage: .constant(nil)
-    )
+#Preview("With AI Button (iOS 18.1+)") {
+    VStack(spacing: 16) {
+        Text("Supported Device")
+            .font(.caption)
+            .foregroundColor(.secondary)
+        
+        AvatarSelectionViewV2(
+            selectedAvatar: .constant("avatar1"),
+            selectedPhotoItem: .constant(nil),
+            selectedAvatarImage: .constant(nil)
+        )
+    }
     .padding()
+    .background(Color(UIColor.systemBackground))
+}
+
+#Preview("Without AI Button (Older Devices)") {
+    VStack(spacing: 16) {
+        Text("Unsupported Device - AI button hidden")
+            .font(.caption)
+            .foregroundColor(.secondary)
+        
+        // Note: On actual older devices, isImagePlaygroundAvailable will be false
+        // and the AI button will be automatically hidden
+        AvatarSelectionViewV2(
+            selectedAvatar: .constant("avatar2"),
+            selectedPhotoItem: .constant(nil),
+            selectedAvatarImage: .constant(nil)
+        )
+    }
+    .padding()
+    .background(Color(UIColor.systemBackground))
 }
 #endif

@@ -692,16 +692,23 @@ class AuthService: ObservableObject {
         defer { isLoading = false }
         
         do {
-            // 1. Call Supabase sign out
+            // 1. Remove realtime subscriptions
+            let friendsService = FriendsService()
+            await friendsService.removeRealtimeSubscription()
+            
+            // 2. Clear toast notifications
+            await FriendRequestToastManager.shared.clearAll()
+            
+            // 3. Call Supabase sign out
             try await supabaseService.client.auth.signOut()
             
-            // 2. Clear Keychain session (handled by Supabase SDK automatically)
+            // 4. Clear Keychain session (handled by Supabase SDK automatically)
             
-            // 3. Reset currentUser to nil and set isAuthenticated to false
+            // 5. Reset currentUser to nil and set isAuthenticated to false
             clearAuthenticationState()
             
         } catch {
-            // 4. Handle sign out errors gracefully
+            // 6. Handle sign out errors gracefully
             // Even if sign out fails on server, clear local state for security
             clearAuthenticationState()
             

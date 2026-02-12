@@ -4,7 +4,7 @@ import SwiftUI
 /// - secondary: solid green background, white text & icon
 /// - tertiary: pale/white background, red text & icon
 /// - primaryOutline: red outline, white text, red icon
-/// - secondaryOutline: green outline, white text, green icon
+/// - secondaryOutline: red outline, black text, red icon, white background
 /// - tertiaryOutline: red outline variant, white text, red icon
 enum AppButtonRole {
     case primary
@@ -111,12 +111,15 @@ private struct AppButtonStyle: ButtonStyle {
                 return pressed ? base.opacity(role == .tertiary ? 0.85 : 0.90) : base
             }()
             Capsule().fill(bg)
-                .shadow(radius: (role == .tertiary || !isEnabled) ? 0 : 2)
 
-        case .primaryOutline, .secondaryOutline, .tertiaryOutline:
+        case .primaryOutline, .tertiaryOutline:
             // Use app background to clearly differentiate from disabled filled buttons
             let bg = AppColor.backgroundPrimary
             Capsule().fill(bg)
+            
+        case .secondaryOutline:
+            // White background for secondary outline (deny button style)
+            Capsule().fill(AppColor.justWhite)
         }
     }
 
@@ -132,7 +135,7 @@ private struct AppButtonStyle: ButtonStyle {
         case .secondaryOutline:
             Capsule()
                 .strokeBorder(
-                    AppColor.interactiveSecondaryForeground.opacity(isEnabled ? 1 : 0.5),
+                    AppColor.interactivePrimaryBackground.opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         case .tertiaryOutline:
@@ -280,9 +283,9 @@ private extension View {
         case .primaryOutline, .tertiaryOutline: // red outline → white text, red icon
             textColor = white
             iconTint = primaryBase
-        case .secondaryOutline: // green outline → white text, green icon
-            textColor = white
-            iconTint = secondaryBase
+        case .secondaryOutline: // red outline → black text, red icon, white background
+            textColor = dim(AppColor.justBlack)
+            iconTint = primaryBase
         }
 
         return self
