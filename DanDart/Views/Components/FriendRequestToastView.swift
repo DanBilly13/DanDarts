@@ -118,6 +118,9 @@ struct FriendRequestToastContainer: View {
     
     @State private var isProcessing = false
     
+    // Animation configuration
+    private let transition = ToastTransition()
+    
     var body: some View {
         VStack {
             if let toast = toastManager.currentToast {
@@ -142,8 +145,8 @@ struct FriendRequestToastContainer: View {
                 )
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: toastManager.currentToast?.id)
+                .transition(transition.entry)
+                .animation(transition.slideIn, value: toastManager.currentToast?.id)
             }
             
             Spacer()
@@ -208,4 +211,141 @@ struct FriendRequestToastContainer: View {
     )
     .padding()
     .background(AppColor.backgroundPrimary)
+}
+
+// MARK: - Animated Previews
+
+#Preview("Animated - Default") {
+    AnimatedToastPreview(config: .default)
+}
+
+#Preview("Animated - Snappy") {
+    AnimatedToastPreview(config: .snappy)
+}
+
+#Preview("Animated - Smooth") {
+    AnimatedToastPreview(config: .smooth)
+}
+
+#Preview("Animated - Bouncy") {
+    AnimatedToastPreview(config: .bouncy)
+}
+
+// MARK: - Preview Helper
+
+struct AnimatedToastPreview: View {
+    let config: ToastAnimationConfig
+    @State private var showToast = false
+    
+    private let transition: ToastTransition
+    
+    init(config: ToastAnimationConfig) {
+        self.config = config
+        self.transition = ToastTransition(config: config)
+    }
+    
+    var body: some View {
+        ZStack {
+            AppColor.backgroundPrimary
+                .ignoresSafeArea()
+            
+            VStack {
+                // Animation info
+                VStack(spacing: 8) {
+                    Text("Animation: \(configName)")
+                        .font(.headline)
+                        .foregroundColor(AppColor.textPrimary)
+                    
+                    Text("Delay: \(String(format: "%.1f", config.initialDelay))s")
+                        .font(.caption)
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    Text("Slide-in: \(String(format: "%.2f", config.slideInResponse))s response, \(String(format: "%.2f", config.slideInDamping)) damping")
+                        .font(.caption)
+                        .foregroundColor(AppColor.textSecondary)
+                }
+                .padding()
+                .background(AppColor.inputBackground)
+                .cornerRadius(12)
+                .padding()
+                
+                Spacer()
+                
+                // Control button
+                Button {
+                    showToast = false
+                    // Delay to show animation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showToast = true
+                    }
+                } label: {
+                    Text("Show Toast Animation")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(AppColor.interactivePrimaryBackground)
+                        .cornerRadius(12)
+                }
+                .padding()
+            }
+            
+            // Toast overlay
+            VStack {
+                if showToast {
+                    FriendRequestToastView(
+                        toast: FriendRequestToast(
+                            type: .requestReceived,
+                            user: User.mockUser1,
+                            message: "New friend request from \(User.mockUser1.displayName)",
+                            friendshipId: UUID()
+                        ),
+                        onTap: {
+                            withAnimation(transition.slideOut) {
+                                showToast = false
+                            }
+                        },
+                        onDismiss: {
+                            withAnimation(transition.slideOut) {
+                                showToast = false
+                            }
+                        },
+                        onAccept: { _ in
+                            withAnimation(transition.slideOut) {
+                                showToast = false
+                            }
+                        },
+                        onDeny: { _ in
+                            withAnimation(transition.slideOut) {
+                                showToast = false
+                            }
+                        },
+                        isProcessing: false
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 60)
+                    .transition(transition.entry)
+                }
+                
+                Spacer()
+            }
+            .animation(transition.slideIn, value: showToast)
+        }
+        .onAppear {
+            // Auto-show on appear with delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + config.initialDelay) {
+                showToast = true
+            }
+        }
+    }
+    
+    private var configName: String {
+        switch config.initialDelay {
+        case 0.5: return "Snappy"
+        case 0.6: return "Bouncy"
+        case 0.8: return "Default"
+        case 1.0: return "Smooth"
+        default: return "Custom"
+        }
+    }
 }

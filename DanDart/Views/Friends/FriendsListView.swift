@@ -275,18 +275,6 @@ struct FriendsListView: View {
             loadFriends()
             loadRequests()
             loadGuests()
-            
-            // Setup realtime subscription
-            if let userId = authService.currentUser?.id {
-                Task {
-                    await friendsService.setupRealtimeSubscription(userId: userId)
-                }
-            }
-        }
-        .onDisappear {
-            Task {
-                await friendsService.removeRealtimeSubscription()
-            }
         }
         .onReceive(friendsService.$friendshipChanged) { _ in
             // Reload friends and requests when friendship changes detected

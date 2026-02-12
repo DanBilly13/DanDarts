@@ -19,30 +19,62 @@ class FriendRequestToastManager: ObservableObject {
     @Published var currentToast: FriendRequestToast?
     @Published var toastQueue: [FriendRequestToast] = []
     
+    /// Animation configuration for toast transitions
+    let animationConfig: ToastAnimationConfig
+    
     private var dismissTask: Task<Void, Never>?
     
-    private init() {}
+    private init(animationConfig: ToastAnimationConfig = .default) {
+        self.animationConfig = animationConfig
+    }
     
-    /// Show a toast notification
-    func showToast(_ toast: FriendRequestToast) {
+    /// Show a toast notification with optional delay
+    /// - Parameters:
+    ///   - toast: The toast to show
+    ///   - delay: Optional delay in seconds before showing (useful for app launch/return)
+    func showToast(_ toast: FriendRequestToast, delay: Double? = nil) {
+        print("🎯 [ToastManager] showToast called")
+        print("🎯 [ToastManager] Toast type: \(toast.type)")
+        print("🎯 [ToastManager] User: \(toast.user.displayName)")
+        print("🎯 [ToastManager] Delay: \(delay ?? 0)s")
+        print("🎯 [ToastManager] Current toast: \(currentToast != nil ? "exists" : "nil")")
+        
         // If there's already a toast showing, queue this one
         if currentToast != nil {
+            print("🎯 [ToastManager] Queuing toast (current toast exists)")
             toastQueue.append(toast)
             return
         }
         
-        // Show the toast
-        currentToast = toast
+        // Apply delay if specified
+        let delaySeconds = delay ?? 0
         
-        // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-        
-        // Auto-dismiss after 3.5 seconds
-        dismissTask?.cancel()
-        dismissTask = Task {
-            try? await Task.sleep(nanoseconds: 3_500_000_000) // 3.5 seconds
-            await dismissCurrentToast()
+        Task {
+            if delaySeconds > 0 {
+                print("🎯 [ToastManager] Waiting \(delaySeconds)s before showing toast")
+                try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+            }
+            
+            print("🎯 [ToastManager] Setting currentToast")
+            currentToast = toast
+            
+            // Haptic feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            
+            // Only auto-dismiss for non-interactive toasts
+            // requestReceived has Accept/Deny buttons, so user must manually dismiss
+            if toast.type != .requestReceived {
+                print("🎯 [ToastManager] Toast displayed, auto-dismiss in 3.5s")
+                dismissTask?.cancel()
+                dismissTask = Task {
+                    try? await Task.sleep(nanoseconds: 3_500_000_000) // 3.5 seconds
+                    await dismissCurrentToast()
+                }
+            } else {
+                print("🎯 [ToastManager] Toast displayed, NO auto-dismiss (interactive toast with buttons)")
+                dismissTask?.cancel() // Cancel any existing dismiss task
+            }
         }
     }
     

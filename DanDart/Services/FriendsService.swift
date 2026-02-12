@@ -103,6 +103,9 @@ class FriendsService: ObservableObject {
         do {
             try await channel.subscribe()
             print("✅ [Realtime] Subscription active for user: \(userId)")
+            
+            // Check for existing pending requests and show toast for most recent
+            await checkForPendingRequestsOnReturn(userId: userId)
         } catch {
             print("❌ [Realtime] Subscription failed: \(error)")
         }
@@ -169,14 +172,43 @@ class FriendsService: ObservableObject {
     
     /// Handle toast for INSERT action (new friend request received)
     private func handleInsertToast(record: [String: AnyJSON], currentUserId: UUID) async {
-        guard let addresseeIdString = record["addressee_id"]?.stringValue,
-              addresseeIdString == currentUserId.uuidString,
-              let requesterIdString = record["requester_id"]?.stringValue,
-              let requesterId = UUID(uuidString: requesterIdString),
-              let friendshipIdString = record["id"]?.stringValue,
-              let friendshipId = UUID(uuidString: friendshipIdString) else {
+        print("📝 [Toast] handleInsertToast called")
+        print("📝 [Toast] Record: \(record)")
+        print("📝 [Toast] Current user: \(currentUserId)")
+        
+        guard let addresseeIdString = record["addressee_id"]?.stringValue else {
+            print("❌ [Toast] Failed to get addressee_id")
             return
         }
+        print("📝 [Toast] Addressee ID: \(addresseeIdString)")
+        
+        guard addresseeIdString == currentUserId.uuidString else {
+            print("📝 [Toast] Not for current user (addressee: \(addresseeIdString), current: \(currentUserId.uuidString))")
+            return
+        }
+        
+        guard let requesterIdString = record["requester_id"]?.stringValue else {
+            print("❌ [Toast] Failed to get requester_id")
+            return
+        }
+        print("📝 [Toast] Requester ID: \(requesterIdString)")
+        
+        guard let requesterId = UUID(uuidString: requesterIdString) else {
+            print("❌ [Toast] Failed to parse requester UUID")
+            return
+        }
+        
+        guard let friendshipIdString = record["id"]?.stringValue else {
+            print("❌ [Toast] Failed to get friendship id")
+            return
+        }
+        
+        guard let friendshipId = UUID(uuidString: friendshipIdString) else {
+            print("❌ [Toast] Failed to parse friendship UUID")
+            return
+        }
+        
+        print("📝 [Toast] Fetching user data for requester: \(requesterId)")
         
         // Fetch requester's data
         do {
@@ -187,7 +219,12 @@ class FriendsService: ObservableObject {
                 .execute()
                 .value
             
-            guard let requester = users.first else { return }
+            guard let requester = users.first else {
+                print("❌ [Toast] No user found for requester")
+                return
+            }
+            
+            print("✅ [Toast] Creating toast for: \(requester.displayName)")
             
             let toast = FriendRequestToast(
                 type: .requestReceived,
@@ -195,7 +232,10 @@ class FriendsService: ObservableObject {
                 message: "New friend request from \(requester.displayName)",
                 friendshipId: friendshipId
             )
-            FriendRequestToastManager.shared.showToast(toast)
+            
+            print("✅ [Toast] Showing toast")
+            await FriendRequestToastManager.shared.showToast(toast)
+            print("✅ [Toast] Toast shown successfully")
         } catch {
             print("❌ [Realtime] Failed to fetch user data for toast: \(error)")
         }
@@ -203,14 +243,43 @@ class FriendsService: ObservableObject {
     
     /// Handle toast for UPDATE action (friend request accepted)
     private func handleUpdateToast(record: [String: AnyJSON], currentUserId: UUID) async {
-        guard let statusString = record["status"]?.stringValue,
-              statusString == "accepted",
-              let requesterIdString = record["requester_id"]?.stringValue,
-              requesterIdString == currentUserId.uuidString,
-              let addresseeIdString = record["addressee_id"]?.stringValue,
-              let addresseeId = UUID(uuidString: addresseeIdString) else {
+        print("📝 [Toast] handleUpdateToast called")
+        print("📝 [Toast] Record: \(record)")
+        print("📝 [Toast] Current user: \(currentUserId)")
+        
+        guard let statusString = record["status"]?.stringValue else {
+            print("❌ [Toast] Failed to get status")
             return
         }
+        print("📝 [Toast] Status: \(statusString)")
+        
+        guard statusString == "accepted" else {
+            print("📝 [Toast] Status is not 'accepted', skipping toast")
+            return
+        }
+        
+        guard let requesterIdString = record["requester_id"]?.stringValue else {
+            print("❌ [Toast] Failed to get requester_id")
+            return
+        }
+        print("📝 [Toast] Requester ID: \(requesterIdString)")
+        
+        guard requesterIdString == currentUserId.uuidString else {
+            print("📝 [Toast] Not for current user (requester: \(requesterIdString), current: \(currentUserId.uuidString))")
+            return
+        }
+        
+        guard let addresseeIdString = record["addressee_id"]?.stringValue else {
+            print("❌ [Toast] Failed to get addressee_id")
+            return
+        }
+        
+        guard let addresseeId = UUID(uuidString: addresseeIdString) else {
+            print("❌ [Toast] Failed to parse addressee UUID")
+            return
+        }
+        
+        print("📝 [Toast] Fetching user data for addressee: \(addresseeId)")
         
         // Fetch addressee's data (the person who accepted)
         do {
@@ -221,7 +290,12 @@ class FriendsService: ObservableObject {
                 .execute()
                 .value
             
-            guard let addressee = users.first else { return }
+            guard let addressee = users.first else {
+                print("❌ [Toast] No user found for addressee")
+                return
+            }
+            
+            print("✅ [Toast] Creating toast for: \(addressee.displayName)")
             
             let toast = FriendRequestToast(
                 type: .requestAccepted,
@@ -229,7 +303,10 @@ class FriendsService: ObservableObject {
                 message: "\(addressee.displayName) accepted your friend request",
                 friendshipId: nil
             )
-            FriendRequestToastManager.shared.showToast(toast)
+            
+            print("✅ [Toast] Showing toast")
+            await FriendRequestToastManager.shared.showToast(toast)
+            print("✅ [Toast] Toast shown successfully")
         } catch {
             print("❌ [Realtime] Failed to fetch user data for toast: \(error)")
         }
@@ -267,6 +344,65 @@ class FriendsService: ObservableObject {
         }
     }
     
+    /// Check for pending friend requests when user returns to app
+    /// Shows toast for most recent pending request if any exist
+    func checkForPendingRequestsOnReturn(userId: UUID) async {
+        print("🔍 [Toast] Checking for pending requests on return")
+        print("🔍 [Toast] User ID: \(userId.uuidString)")
+        
+        do {
+            // Query for pending received requests
+            let friendships: [Friendship] = try await supabaseService.client
+                .from("friendships")
+                .select()
+                .eq("addressee_id", value: userId.uuidString)
+                .eq("status", value: "pending")
+                .order("created_at", ascending: false)
+                .limit(1)
+                .execute()
+                .value
+            
+            print("📝 [Toast] Query returned \(friendships.count) pending requests")
+            
+            guard let mostRecent = friendships.first else {
+                print("📝 [Toast] No pending requests found for user \(userId.uuidString)")
+                return
+            }
+            
+            print("📝 [Toast] Found pending request from: \(mostRecent.requesterId)")
+            
+            // Fetch requester's data
+            let users: [User] = try await supabaseService.client
+                .from("users")
+                .select()
+                .eq("id", value: mostRecent.requesterId.uuidString)
+                .execute()
+                .value
+            
+            guard let requester = users.first else {
+                print("❌ [Toast] No user found for requester")
+                return
+            }
+            
+            print("✅ [Toast] Creating catch-up toast for: \(requester.displayName)")
+            
+            let toast = FriendRequestToast(
+                type: .requestReceived,
+                user: requester,
+                message: "New friend request from \(requester.displayName)",
+                friendshipId: mostRecent.id
+            )
+            
+            // Show toast with delay for smooth app launch/return experience
+            let config = FriendRequestToastManager.shared.animationConfig
+            print("✅ [Toast] Showing catch-up toast with \(config.initialDelay)s delay")
+            await FriendRequestToastManager.shared.showToast(toast, delay: config.initialDelay)
+            print("✅ [Toast] Catch-up toast shown successfully")
+        } catch {
+            print("❌ [Toast] Failed to check for pending requests: \(error)")
+        }
+    }
+    
     // MARK: - Friend Search
     
     /// Search for users by display name or nickname
@@ -300,6 +436,10 @@ class FriendsService: ObservableObject {
     ///   - userId: Current user's ID (requester)
     ///   - friendId: Friend's user ID (addressee)
     func sendFriendRequest(userId: UUID, friendId: UUID) async throws {
+        print("📤 [SendRequest] Sending friend request:")
+        print("   From (requester): \(userId.uuidString)")
+        print("   To (addressee): \(friendId.uuidString)")
+        
         // Check if any relationship already exists (in either direction)
         let existing: [Friendship] = try await supabaseService.client
             .from("friendships")
@@ -308,8 +448,14 @@ class FriendsService: ObservableObject {
             .execute()
             .value
         
+        print("📝 [SendRequest] Found \(existing.count) existing relationship(s)")
+        for (index, friendship) in existing.enumerated() {
+            print("   Record \(index + 1): requester=\(friendship.requesterId), addressee=\(friendship.addresseeId), status=\(friendship.status)")
+        }
+        
         // Check for existing relationships
         if let existingRelationship = existing.first {
+            print("⚠️ [SendRequest] Existing relationship found with status: \(existingRelationship.status)")
             switch existingRelationship.status {
             case "accepted":
                 throw FriendsError.alreadyFriends
@@ -321,6 +467,8 @@ class FriendsService: ObservableObject {
                 break
             }
         }
+        
+        print("✅ [SendRequest] No conflicts, creating new friend request")
         
         // Create new friend request with pending status
         let friendship = Friendship(
@@ -337,6 +485,8 @@ class FriendsService: ObservableObject {
             .from("friendships")
             .insert(friendship)
             .execute()
+        
+        print("✅ [SendRequest] Friend request created successfully")
         
         // Log friend request sent event
         analytics.logFriendRequestSent()
@@ -395,12 +545,31 @@ class FriendsService: ObservableObject {
     ///   - userId: Current user's ID
     ///   - friendId: Friend's user ID
     func removeFriend(userId: UUID, friendId: UUID) async throws {
+        print("🗑️ [RemoveFriend] Removing friendship between users:")
+        print("   User 1: \(userId.uuidString)")
+        print("   User 2: \(friendId.uuidString)")
+        
+        // First, check what records exist before deletion
+        let existing: [Friendship] = try await supabaseService.client
+            .from("friendships")
+            .select()
+            .or("and(requester_id.eq.\(userId.uuidString),addressee_id.eq.\(friendId.uuidString)),and(requester_id.eq.\(friendId.uuidString),addressee_id.eq.\(userId.uuidString))")
+            .execute()
+            .value
+        
+        print("📝 [RemoveFriend] Found \(existing.count) existing friendship record(s)")
+        for (index, friendship) in existing.enumerated() {
+            print("   Record \(index + 1): requester=\(friendship.requesterId), addressee=\(friendship.addresseeId), status=\(friendship.status)")
+        }
+        
         // Delete friendship where users are in EITHER direction (bidirectional)
         try await supabaseService.client
             .from("friendships")
             .delete()
             .or("and(requester_id.eq.\(userId.uuidString),addressee_id.eq.\(friendId.uuidString)),and(requester_id.eq.\(friendId.uuidString),addressee_id.eq.\(userId.uuidString))")
             .execute()
+        
+        print("✅ [RemoveFriend] Deletion complete")
     }
     
     // MARK: - Friend Requests (Task 302)

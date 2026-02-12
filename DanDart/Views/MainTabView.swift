@@ -10,9 +10,11 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var friendsService = FriendsService()
+    @ObservedObject private var toastManager = FriendRequestToastManager.shared
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     @State private var selectedTab: Int = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     private struct InviteTokenToClaim: Identifiable {
         let id: String
@@ -24,61 +26,68 @@ struct MainTabView: View {
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-            // Games Tab
-            GamesTabView(showProfile: $showProfile)
-                .tabItem {
-                    Image(systemName: "target")
-                        .font(.system(size: 17, weight: .semibold))
-                    //Text("Games")
+                // Games Tab
+                GamesTabView(showProfile: $showProfile)
+                    .tabItem {
+                        Image(systemName: "target")
+                            .font(.system(size: 17, weight: .semibold))
+                        //Text("Games")
+                    }
+                    .tag(0)
+                
+                // Friends Tab
+                Group {
+                    if pendingRequestCount > 0 {
+                        FriendsTabView(showProfile: $showProfile)
+                            .tabItem {
+                                Image(systemName: "person.2.fill")
+                                    .font(.system(size: 22, weight: .semibold))
+                                //Text("Friends")
+                            }
+                            .badge(pendingRequestCount)
+                            .tag(1)
+                    } else {
+                        FriendsTabView(showProfile: $showProfile)
+                            .tabItem {
+                                Image(systemName: "person.2.fill")
+                                    .font(.system(size: 22, weight: .semibold))
+                                //Text("Friends")
+                            }
+                            .tag(1)
+                    }
                 }
-                .tag(0)
-            
-            // Friends Tab
-            Group {
-                if pendingRequestCount > 0 {
-                    FriendsTabView(showProfile: $showProfile)
-                        .tabItem {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                            //Text("Friends")
-                        }
-                        .badge(pendingRequestCount)
-                        .tag(1)
-                } else {
-                    FriendsTabView(showProfile: $showProfile)
-                        .tabItem {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                            //Text("Friends")
-                        }
-                        .tag(1)
-                }
-            }
-            
-            // History Tab
-            HistoryTabView(showProfile: $showProfile)
-                .tabItem {
-                    Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        .fontWeight(.bold)
-                    //Text("History")
-                }
-                .tag(2)
+                
+                // History Tab
+                HistoryTabView(showProfile: $showProfile)
+                    .tabItem {
+                        Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                            .fontWeight(.bold)
+                        //Text("History")
+                    }
+                    .tag(2)
             }
             .background(AppColor.backgroundPrimary)
             .accentColor(AppColor.interactivePrimaryBackground)
             
-            // Toast Overlay
-            FriendRequestToastContainer(
-                onNavigate: { toast in
-                    handleToastNavigation(toast)
-                },
-                onAccept: { friendshipId in
-                    handleAcceptRequest(friendshipId)
-                },
-                onDeny: { friendshipId in
-                    handleDenyRequest(friendshipId)
-                }
-            )
+            // Toast Overlay - appears above all tabs
+            VStack {
+                FriendRequestToastContainer(
+                    onNavigate: { toast in
+                        handleToastNavigation(toast)
+                    },
+                    onAccept: { friendshipId in
+                        handleAcceptRequest(friendshipId)
+                    },
+                    onDeny: { friendshipId in
+                        handleDenyRequest(friendshipId)
+                    }
+                )
+                .padding(.top, 60) // Below status bar
+                
+                Spacer()
+            }
+            .id(toastManager.currentToast?.id) // Force re-render when toast changes
+            .zIndex(999) // Ensure toast appears above all other content
         }
         .sheet(item: $inviteTokenToClaim, onDismiss: {
             PendingInviteStore.shared.clearToken()
@@ -96,6 +105,13 @@ struct MainTabView: View {
 
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
+            }
+            
+            // Setup realtime subscription on app launch if user is authenticated
+            if let userId = authService.currentUser?.id {
+                Task {
+                    await friendsService.setupRealtimeSubscription(userId: userId)
+                }
             }
             
             // Listen for friend request changes
@@ -117,11 +133,35 @@ struct MainTabView: View {
                 }
             }
         }
-        .onChange(of: authService.currentUser?.id) { _, _ in
+        .onChange(of: authService.currentUser?.id) { oldValue, newValue in
             loadPendingRequestCount()
 
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
+            }
+            
+            // Setup or remove realtime subscription based on user state
+            if let userId = newValue {
+                // User logged in - setup subscription
+                Task {
+                    await friendsService.setupRealtimeSubscription(userId: userId)
+                }
+            } else if oldValue != nil {
+                // User logged out - remove subscription
+                Task {
+                    await friendsService.removeRealtimeSubscription()
+                }
+            }
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Check for pending requests when app returns to foreground
+            if newPhase == .active && oldPhase == .background {
+                print("🔄 [App] App returned to foreground")
+                if let userId = authService.currentUser?.id {
+                    Task {
+                        await friendsService.checkForPendingRequestsOnReturn(userId: userId)
+                    }
+                }
             }
         }
     }
