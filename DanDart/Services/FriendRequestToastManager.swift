@@ -24,7 +24,7 @@ class FriendRequestToastManager: ObservableObject {
     
     private var dismissTask: Task<Void, Never>?
     
-    private init(animationConfig: ToastAnimationConfig = .default) {
+    private init(animationConfig: ToastAnimationConfig = .bouncy) {
         self.animationConfig = animationConfig
     }
     

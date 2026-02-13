@@ -92,9 +92,10 @@ struct FriendSearchView: View {
                 VStack(spacing: 16) {
                     Spacer()
 
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundColor(AppColor.textSecondary)
+                    Image("DartHeadOnly")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 80, height: 80)
 
                     VStack(spacing: 8) {
                         Text("Find Friends")
@@ -133,49 +134,17 @@ struct FriendSearchView: View {
                 }
                 .padding(.horizontal, 32)
             } else {
-                // Search Results List - Mixed (Friends + New People)
+                // Search Results List - Non-Friends Only
                 ScrollView {
-                    VStack(spacing: 16) {
-                        // Existing Friends Section
-                        if !friendResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Friends")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(AppColor.textSecondary)
-
-                                ForEach(friendResults) { user in
-                                    FriendSearchResultCard(
-                                        user: user,
-                                        isFriend: true,
-                                        isLoading: false,
-                                        showSuccess: false,
-                                        requestSent: false,
-                                        onAction: {}
-                                    )
-                                }
-                            }
-                        }
-
-                        // New People Section
-                        if !nonFriendResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                if !friendResults.isEmpty {
-                                    Text("Add Friends")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(AppColor.textSecondary)
-                                }
-
-                                ForEach(nonFriendResults) { user in
-                                    FriendSearchResultCard(
-                                        user: user,
-                                        isFriend: false,
-                                        isLoading: isAddingFriend && sentRequestUserId == user.id,
-                                        showSuccess: showSuccessMessage && sentRequestUserId == user.id,
-                                        requestSent: sentRequestUserId == user.id,
-                                        onAction: { sendFriendRequest(user) }
-                                    )
-                                }
-                            }
+                    VStack(spacing: 12) {
+                        ForEach(nonFriendResults) { user in
+                            FriendSearchResultCard(
+                                user: user,
+                                isLoading: isAddingFriend && sentRequestUserId == user.id,
+                                showSuccess: showSuccessMessage && sentRequestUserId == user.id,
+                                requestSent: sentRequestUserId == user.id,
+                                onAction: { sendFriendRequest(user) }
+                            )
                         }
                     }
                     .padding(.bottom, 16)
@@ -326,11 +295,13 @@ struct FriendSearchView: View {
 
 struct FriendSearchResultCard: View {
     let user: User
-    let isFriend: Bool
     let isLoading: Bool
     let showSuccess: Bool
     let requestSent: Bool
     let onAction: () -> Void
+    
+    // Calculate button width based on "Friends" text (longest) + 16px padding (8px each side)
+    private let buttonWidth: CGFloat = 72
     
     var body: some View {
         HStack(spacing: 16) {
@@ -339,59 +310,47 @@ struct FriendSearchResultCard: View {
             
             Spacer()
             
-            // Action Button
-            if isFriend {
-                // Already Friends Badge
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.green)
-                    Text("Friends")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(AppColor.textSecondary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AppColor.textSecondary.opacity(0.1))
-                .cornerRadius(20)
-            } else {
-                // Invite Icon Button
-                Button(action: onAction) {
-                    ZStack {
-                        if isLoading {
-                            ProgressView()
-                                .scaleEffect(0.9)
-                                .tint(AppColor.interactivePrimaryBackground)
-                        } else if showSuccess {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.green)
-                        } else if requestSent {
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(AppColor.textSecondary)
-                        } else {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
-                        }
+            // Action Button with AppButton
+            ZStack {
+                if isLoading {
+                    AppButton(role: .primary, controlSize: .small, isDisabled: true, compact: true, action: {}) {
+                        ProgressView()
+                            .tint(.white)
                     }
-                    .frame(width: 44, height: 44)
-                    .background(
-                        Circle()
-                            .fill(
-                                requestSent
-                                ? AppColor.textSecondary.opacity(0.15)
-                                : AppColor.interactivePrimaryBackground.opacity(0.15)
-                            )
-                    )
+                    .frame(width: buttonWidth)
+                    .transition(.scale.combined(with: .opacity))
+                } else if showSuccess {
+                    // Brief success state before showing "Sent"
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.green)
+                        .frame(width: buttonWidth, height: 36)
+                        .transition(.scale.combined(with: .opacity))
+                } else if requestSent {
+                    AppButton(role: .secondary, controlSize: .small, isDisabled: true, compact: true, action: {}) {
+                        Text("Sent")
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: buttonWidth)
+                    .transition(.scale.combined(with: .opacity))
+                } else {
+                    AppButton(role: .primary, controlSize: .small, compact: true, action: onAction) {
+                        Text("Add")
+                    }
+                    .frame(width: buttonWidth)
+                    .transition(.scale.combined(with: .opacity))
                 }
-                .disabled(isLoading || requestSent)
             }
+            .animation(.easeInOut(duration: 0.25), value: isLoading)
+            .animation(.easeInOut(duration: 0.25), value: requestSent)
+            .animation(.easeInOut(duration: 0.25), value: showSuccess)
         }
         .padding(16)  // 16px padding all around
-        .background(AppColor.surfacePrimary)
-        .cornerRadius(12)
+        .background(
+            Capsule()
+                .fill(AppColor.inputBackground)
+        )
+        
     }
 }
 
@@ -507,7 +466,6 @@ private struct FriendSearchResultsPreview: View {
                             ForEach(searchResults) { user in
                                 FriendSearchResultCard(
                                     user: user,
-                                    isFriend: false,
                                     isLoading: false,
                                     showSuccess: false,
                                     requestSent: sentRequestUserId == user.id,

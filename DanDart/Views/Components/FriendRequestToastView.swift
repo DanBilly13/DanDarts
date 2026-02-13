@@ -44,10 +44,9 @@ struct FriendRequestToastView: View {
                 Text(toast.message)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(AppColor.justBlack)
-                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                
-                Spacer(minLength: 0)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Dismiss Button
                 Button(action: onDismiss) {
@@ -102,6 +101,7 @@ struct FriendRequestToastView: View {
                 .padding(.bottom, 12)
             }
         }
+        .frame(maxWidth: 320)  // Control toast width here (try 280, 320, 360, 400)
         .background(AppColor.justWhite)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
@@ -143,7 +143,7 @@ struct FriendRequestToastContainer: View {
                     },
                     isProcessing: isProcessing
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 48)    // Edge padding (adjust for width)
                 .padding(.top, 8)
                 .transition(transition.entry)
                 .animation(transition.slideIn, value: toastManager.currentToast?.id)
