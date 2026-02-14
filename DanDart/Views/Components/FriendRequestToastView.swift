@@ -101,7 +101,6 @@ struct FriendRequestToastView: View {
                 .padding(.bottom, 12)
             }
         }
-        .frame(maxWidth: 320)  // Control toast width here (try 280, 320, 360, 400)
         .background(AppColor.justWhite)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
@@ -119,7 +118,7 @@ struct FriendRequestToastContainer: View {
     @State private var isProcessing = false
     
     // Animation configuration
-    private let transition = ToastTransition()
+    private let transition = ToastTransition(config: .bouncy)
     
     var body: some View {
         VStack {
@@ -143,10 +142,9 @@ struct FriendRequestToastContainer: View {
                     },
                     isProcessing: isProcessing
                 )
-                .padding(.horizontal, 48)    // Edge padding (adjust for width)
+                .padding(.horizontal, 16)    // Edge padding
                 .padding(.top, 8)
                 .transition(transition.entry)
-                .animation(transition.slideIn, value: toastManager.currentToast?.id)
             }
             
             Spacer()

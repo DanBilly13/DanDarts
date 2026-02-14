@@ -5,7 +5,17 @@ struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        
+        controller.excludedActivityTypes = [
+            .addToReadingList,
+            .assignToContact,
+            .print,
+            .saveToCameraRoll,
+            .openInIBooks
+        ]
+        
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

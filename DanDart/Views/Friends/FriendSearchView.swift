@@ -2,15 +2,17 @@
 //  FriendSearchView.swift
 //  Dart Freak
 //
-//  Sheet view for searching and adding friends
+//  Overlay view for searching and adding friends (matches History search pattern)
 //
 
 import SwiftUI
 
 struct FriendSearchView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Binding var isPresented: Bool
     @EnvironmentObject private var authService: AuthService
     let onFriendAdded: (Player) -> Void
+    
+    @FocusState private var isSearchFieldFocused: Bool
     
     @StateObject private var friendsService = FriendsService()
     @State private var searchQuery: String = ""
@@ -36,139 +38,188 @@ struct FriendSearchView: View {
         }
     }
     
-    // Shared content for both header styles
-    private var contentBody: some View {
-        VStack(spacing: 0) {
-            // Search Bar (fixed at top)
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppColor.textSecondary)
-
-                TextField("Search by name or @handle", text: $searchQuery)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppColor.textPrimary)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .onChange(of: searchQuery) { oldValue, newValue in
-                        performSearch(query: newValue)
-                    }
-
-                if !searchQuery.isEmpty {
-                    Button(action: {
-                        searchQuery = ""
-                        searchResults = []
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
-                    }
+    // Search overlay (Liquid Glass pattern - matches MatchHistoryView)
+    private var searchOverlay: some View {
+        ZStack {
+            // Dim background (covers everything including tab bar)
+            AppColor.justBlack.opacity(0.4)
+                .ignoresSafeArea(edges: .all)
+                .onTapGesture {
+                    stopSearch()
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(AppColor.inputBackground)
-            .cornerRadius(12)
-            .padding(.bottom, 16)
-
-            // Content Area
-            if isSearching {
-                // Loading State
+            
+            // Solid background for content area
+            AppColor.backgroundPrimary
+                .ignoresSafeArea(edges: .all)
+            
+            // Results area (full height, scrolls behind search bar)
+            if searchQuery.isEmpty {
+                // Empty state
                 VStack(spacing: 16) {
                     Spacer()
-
-                    ProgressView()
-                        .scaleEffect(1.2)
-                        .tint(AppColor.interactivePrimaryBackground)
-
-                    Text("Searching...")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-
-                    Spacer()
-                }
-            } else if searchQuery.isEmpty {
-                // Empty State - No Search Yet
-                VStack(spacing: 16) {
-                    Spacer()
-
+                    
                     Image("DartHeadOnly")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 80, height: 80)
-
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
+                    
                     VStack(spacing: 8) {
                         Text("Find Friends")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.headline)
                             .foregroundColor(AppColor.textPrimary)
-
-                        Text("Search by name or @handle to add friends")
-                            .font(.system(size: 16, weight: .medium))
+                        
+                        Text("Search by name or @handle")
+                            .font(.subheadline)
                             .foregroundColor(AppColor.textSecondary)
                             .multilineTextAlignment(.center)
                     }
-
+                    
                     Spacer()
                 }
-                .padding(.horizontal, 32)
-            } else if searchResults.isEmpty {
-                // No Results State
-                VStack(spacing: 16) {
-                    Spacer()
-
-                    Image(systemName: "person.fill.questionmark")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundColor(AppColor.textSecondary)
-
-                    VStack(spacing: 8) {
-                        Text("No results found")
-                            .font(.system(size: 20, weight: .semibold))
+            } else {
+                if isSearching {
+                    // Loading state
+                    VStack(spacing: 16) {
+                        Spacer()
+                        
+                        ProgressView()
+                            .scaleEffect(1.2)
+                            .tint(AppColor.interactivePrimaryBackground)
+                        
+                        Text("Searching...")
+                            .font(.headline)
                             .foregroundColor(AppColor.textPrimary)
-
-                        Text("Try a different name or @handle")
+                        
+                        Spacer()
+                    }
+                } else if nonFriendResults.isEmpty {
+                    // No results
+                    VStack(spacing: 16) {
+                        Spacer()
+                        
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.system(size: 48, weight: .light))
+                            .foregroundColor(AppColor.textSecondary)
+                        
+                        Text("No users found")
+                            .font(.headline)
+                            .foregroundColor(AppColor.textPrimary)
+                        
+                        Text("Try a different search term")
+                            .font(.subheadline)
+                            .foregroundColor(AppColor.textSecondary)
+                        
+                        Spacer()
+                    }
+                } else {
+                    // Results list
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(nonFriendResults) { user in
+                                FriendSearchResultCard(
+                                    user: user,
+                                    isLoading: isAddingFriend && sentRequestUserId == user.id,
+                                    showSuccess: showSuccessMessage && sentRequestUserId == user.id,
+                                    requestSent: sentRequestUserId == user.id,
+                                    onAction: { sendFriendRequest(user) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 120)
+                    }
+                }
+            }
+            
+            // Search bar pinned to bottom (overlays results in outer ZStack)
+            VStack {
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppColor.textSecondary)
-                    }
-
-                    Spacer()
-                }
-                .padding(.horizontal, 32)
-            } else {
-                // Search Results List - Non-Friends Only
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(nonFriendResults) { user in
-                            FriendSearchResultCard(
-                                user: user,
-                                isLoading: isAddingFriend && sentRequestUserId == user.id,
-                                showSuccess: showSuccessMessage && sentRequestUserId == user.id,
-                                requestSent: sentRequestUserId == user.id,
-                                onAction: { sendFriendRequest(user) }
-                            )
+                        
+                        TextField("Search by name or @handle", text: $searchQuery)
+                            .font(.system(size: 17))
+                            .foregroundColor(AppColor.textPrimary)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .focused($isSearchFieldFocused)
+                            .submitLabel(.search)
+                        
+                        if !searchQuery.isEmpty {
+                            Button(action: {
+                                searchQuery = ""
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(AppColor.textSecondary)
+                            }
                         }
                     }
-                    .padding(.bottom, 16)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            )
+                    )
+                    
+                    Button(action: { stopSearch() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                    )
+                            )
+                            .accessibilityLabel("Close search")
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
         }
     }
 
     var body: some View {
-        contentBody
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-        .alert("Error", isPresented: .constant(addFriendError != nil)) {
-            Button("OK") {
-                addFriendError = nil
+        searchOverlay
+            .alert("Error", isPresented: .constant(addFriendError != nil)) {
+                Button("OK") {
+                    addFriendError = nil
+                }
+            } message: {
+                if let error = addFriendError {
+                    Text(error)
+                }
             }
-        } message: {
-            if let error = addFriendError {
-                Text(error)
+            .onAppear {
+                loadExistingFriends()
+                // Auto-focus search field with slight delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isSearchFieldFocused = true
+                }
             }
-        }
-        .onAppear {
-            loadExistingFriends()
-        }
+            .onChange(of: searchQuery) { oldValue, newValue in
+                performSearch(query: newValue)
+            }
+    }
+    
+    private func stopSearch() {
+        isSearchFieldFocused = false
+        isPresented = false
+        searchQuery = ""
     }
     
     // MARK: - Helper Methods
@@ -247,6 +298,10 @@ struct FriendSearchView: View {
                 showSuccessMessage = false
                 isAddingFriend = false
                 // sentRequestUserId remains set to show "Request Sent" state
+                
+                // Wait briefly to show "Sent" state, then auto-dismiss
+                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                stopSearch() // Dismiss overlay and return to friends list
                 
             } catch let error as FriendsError {
                 // Handle specific friend errors
@@ -357,10 +412,27 @@ struct FriendSearchResultCard: View {
 // MARK: - Preview
 
 #Preview("Empty State") {
-    FriendSearchView { player in
-        print("Added friend: \(player.displayName)")
+    struct PreviewWrapper: View {
+        @State private var isPresented = true
+        
+        var body: some View {
+            ZStack {
+                Color.black
+                
+                if isPresented {
+                    FriendSearchView(
+                        isPresented: $isPresented,
+                        onFriendAdded: { player in
+                            print("Added friend: \(player.displayName)")
+                        }
+                    )
+                    .environmentObject(AuthService.mockAuthenticated)
+                }
+            }
+        }
     }
-    .environmentObject(AuthService.mockAuthenticated)
+    
+    return PreviewWrapper()
 }
 
 #Preview("Search Results") {

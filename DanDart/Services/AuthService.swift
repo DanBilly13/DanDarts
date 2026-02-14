@@ -294,6 +294,44 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Send password reset email
+    /// - Parameter email: User's email address
+    func resetPassword(email: String) async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        // Validate email format
+        guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AuthError.invalidEmail
+        }
+        
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        do {
+            print("📧 Sending password reset email to: \(trimmedEmail)")
+            
+            // Send password reset email via Supabase
+            try await supabaseService.client.auth.resetPasswordForEmail(
+                trimmedEmail,
+                redirectTo: nil  // Use Supabase's default hosted page
+            )
+            
+            print("✅ Password reset email sent successfully")
+            
+        } catch {
+            print("❌ Failed to send password reset email: \(error)")
+            
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("network") || errorMessage.contains("connection") || errorMessage.contains("timeout") {
+                throw AuthError.networkError
+            } else {
+                // Don't reveal if email exists or not (security best practice)
+                // Just throw a generic error
+                throw AuthError.networkError
+            }
+        }
+    }
+    
     /// Sign in with Google OAuth (Native iOS)
     func signInWithGoogle() async throws -> Bool {
         isLoading = true

@@ -20,6 +20,7 @@ struct SignInView: View {
     @State private var isLoadingApple = false
     @State private var showTerms = false
     @State private var showPrivacy = false
+    @State private var showForgotPassword = false
     
     // Computed property for any loading state
     private var isAnyLoading: Bool {
@@ -175,7 +176,7 @@ struct SignInView: View {
                         HStack {
                             Spacer()
                             Button("Forgot Password?") {
-                                // TODO: Implement forgot password
+                                showForgotPassword = true
                             }
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(AppColor.justWhite)
@@ -249,6 +250,9 @@ struct SignInView: View {
                     PrivacyPolicy()
                 }
                 .background(AppColor.surfacePrimary)
+            }
+            .sheet(isPresented: $showForgotPassword) {
+                ForgotPasswordView()
             }
         }
     }

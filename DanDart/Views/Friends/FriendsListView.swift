@@ -19,6 +19,7 @@ struct FriendsListView: View {
     @State private var isCreatingInvite: Bool = false
     @State private var inviteURLToShare: URL? = nil
     @State private var inviteErrorMessage: String? = nil
+    @State private var showInviteError: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var friendToDelete: Player? = nil
     
@@ -36,6 +37,200 @@ struct FriendsListView: View {
     @State private var showDeleteGuestConfirmation: Bool = false
     @State private var guestToDelete: Player? = nil
 
+    // MARK: - Computed Views
+    
+    private var listContent: some View {
+        List {
+            // Received Requests Section (only show if any exist)
+            if !receivedRequests.isEmpty {
+                Section {
+                    ForEach(receivedRequests) { request in
+                        ReceivedRequestCard(
+                            request: request,
+                            isProcessing: processingRequestId == request.id,
+                            onAccept: { acceptRequest(request) },
+                            onDeny: { denyRequest(request) }
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    }
+                } header: {
+                    Text("Friend Requests")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColor.textPrimary)
+                        .textCase(nil)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+            
+            // Sent Requests Section (only show if any exist)
+            if !sentRequests.isEmpty {
+                Section {
+                    ForEach(sentRequests) { request in
+                        SentRequestCard(
+                            request: request,
+                            isProcessing: processingRequestId == request.id
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button {
+                                withdrawRequest(request)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .tint(.clear)
+                            
+                            Button {
+                                sendAgainRequest(request)
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                                    .foregroundColor(Color("AccentSecondary"))
+                            }
+                            .tint(.clear)
+                        }
+                    }
+                } header: {
+                    Text("Requests Sent")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColor.textPrimary)
+                        .textCase(nil)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+            
+            // Friends Section
+            if !friends.isEmpty {
+                Section {
+                    ForEach(friends) { friend in
+                        ZStack {
+                            NavigationLink(destination: FriendProfileView(friend: friend)) {
+                                EmptyView()
+                            }
+                            .opacity(0)
+                            
+                            PlayerCard(player: friend)
+                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button {
+                                friendToDelete = friend
+                                showDeleteConfirmation = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .tint(.clear)
+                        }
+                    }
+                } header: {
+                    Text("Friends")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColor.textPrimary)
+                        .textCase(nil)
+                }
+            } else if !isLoadingFriends && !isLoadingRequests && sentRequests.isEmpty && receivedRequests.isEmpty && guests.isEmpty {
+                // Empty State - No friends, no requests, and no guests
+                Section {
+                    emptyStateContent
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+            
+            // Guests Section
+            if !guests.isEmpty {
+                Section {
+                    ForEach(guests) { guest in
+                        PlayerCard(player: guest)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    guestToDelete = guest
+                                    showDeleteGuestConfirmation = true
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                                .tint(.clear)
+                            }
+                    }
+                } header: {
+                    Text("Guests")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColor.textPrimary)
+                        .textCase(nil)
+                }
+            }
+            
+            // Loading State
+            if isLoadingFriends || isLoadingRequests {
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(AppColor.interactivePrimaryBackground)
+                        Spacer()
+                    }
+                    .padding(.vertical, 32)
+                    .listRowInsets(EdgeInsets())
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(AppColor.backgroundPrimary)
+    }
+    
+    private var emptyStateContent: some View {
+        VStack(spacing: 24) {
+            Spacer()
+                .frame(height: 100)
+            
+            Image("DartHeadOnly")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 80, height: 80)
+
+            VStack(spacing: 8) {
+                Text("No friends yet")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(AppColor.textPrimary)
+
+                Text("Search for friends to add them")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            emptyStateFindButton
+            
+            Spacer()
+                .frame(height: 100)
+        }
+        .frame(maxWidth: .infinity)
+        .listRowInsets(EdgeInsets())
+    }
+    
+    private var emptyStateFindButton: some View {
+        AppButton(role: .primary, controlSize: .regular) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showSearch = true
+            }
+        } label: {
+            Label("Find Friends", systemImage: "magnifyingglass")
+        }
+        .frame(maxWidth: 280)
+        .padding(.top, 8)
+    }
+    
     // iOS 26+ can show a navigation subtitle without affecting layout
     private var navigationSubtitleText: String? {
         if isLoadingFriends || isLoadingRequests {
@@ -54,179 +249,7 @@ struct FriendsListView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                // Received Requests Section (only show if any exist)
-                if !receivedRequests.isEmpty {
-                    Section {
-                        ForEach(receivedRequests) { request in
-                            ReceivedRequestCard(
-                                request: request,
-                                isProcessing: processingRequestId == request.id,
-                                onAccept: { acceptRequest(request) },
-                                onDeny: { denyRequest(request) }
-                            )
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                        }
-                    } header: {
-                        Text("Friend Requests")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(AppColor.textPrimary)
-                            .textCase(nil)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                }
-                
-                // Sent Requests Section (only show if any exist)
-                if !sentRequests.isEmpty {
-                    Section {
-                        ForEach(sentRequests) { request in
-                            SentRequestCard(
-                                request: request,
-                                isProcessing: processingRequestId == request.id
-                            )
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button {
-                                    withdrawRequest(request)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(.red)
-                                }
-                                .tint(.clear)
-                                
-                                Button {
-                                    sendAgainRequest(request)
-                                } label: {
-                                    Image(systemName: "arrow.clockwise")
-                                        .foregroundColor(Color("AccentSecondary"))
-                                }
-                                .tint(.clear)
-                            }
-                        }
-                    } header: {
-                        Text("Requests Sent")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(AppColor.textPrimary)
-                            .textCase(nil)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                }
-                
-                // Friends Section
-                if !friends.isEmpty {
-                    Section {
-                        ForEach(friends) { friend in
-                            ZStack {
-                                NavigationLink(destination: FriendProfileView(friend: friend)) {
-                                    EmptyView()
-                                }
-                                .opacity(0)
-                                
-                                PlayerCard(player: friend)
-                            }
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button {
-                                    friendToDelete = friend
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(.red)
-                                }
-                                .tint(.clear)
-                            }
-                        }
-                    } header: {
-                        Text("Friends")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(AppColor.textPrimary)
-                            .textCase(nil)
-                    }
-                } else if !isLoadingFriends && !isLoadingRequests && guests.isEmpty {
-                    // Empty State - No friends and no guests
-                    Section {
-                        VStack(spacing: 16) {
-                            Image(systemName: "person.2.slash")
-                                .font(.system(size: 48, weight: .light))
-                                .foregroundColor(AppColor.textSecondary)
-                            
-                            VStack(spacing: 8) {
-                                Text("No friends yet")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(AppColor.textPrimary)
-                                
-                                Text("Search for friends to add them")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(AppColor.textSecondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            
-                            AppButton(role: .primary, controlSize: .regular) {
-                                showSearch = true
-                            } label: {
-                                Label("Find Friends", systemImage: "magnifyingglass")
-                            }
-                            .frame(maxWidth: 280)
-                            .padding(.top, 8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
-                        .listRowInsets(EdgeInsets())
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                }
-                
-                // Guests Section
-                if !guests.isEmpty {
-                    Section {
-                        ForEach(guests) { guest in
-                            PlayerCard(player: guest)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button {
-                                        guestToDelete = guest
-                                        showDeleteGuestConfirmation = true
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
-                                    }
-                                    .tint(.clear)
-                                }
-                        }
-                    } header: {
-                        Text("Guests")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(AppColor.textPrimary)
-                            .textCase(nil)
-                    }
-                }
-                
-                // Loading State
-                if isLoadingFriends || isLoadingRequests {
-                    Section {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .tint(AppColor.interactivePrimaryBackground)
-                            Spacer()
-                        }
-                        .padding(.vertical, 32)
-                        .listRowInsets(EdgeInsets())
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(AppColor.backgroundPrimary)
+            listContent
             .navigationTitle("Friends")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarRole(.editor)
@@ -260,7 +283,9 @@ struct FriendsListView: View {
 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        showSearch = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showSearch = true
+                        }
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 17, weight: .semibold))
@@ -291,31 +316,27 @@ struct FriendsListView: View {
                 )
             }
         }
-        // MARK: Sheet
-        .sheet(isPresented: $showSearch) {
-            FriendSearchView { player in
-                // Reload after adding friend
-                loadFriends()
-                loadRequests()
-                successMessage = "Friend request sent to \(player.displayName)!"
-                showSuccessAlert = true
+        // MARK: Search Overlay
+        .overlay {
+            if showSearch {
+                FriendSearchView(
+                    isPresented: $showSearch,
+                    onFriendAdded: { player in
+                        // Reload after adding friend
+                        loadFriends()
+                        loadRequests()
+                        successMessage = "Friend request sent to \(player.displayName)!"
+                        showSuccessAlert = true
+                    }
+                )
+                .environmentObject(authService)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .modernSheet(
-                title: "Find Friends",
-                detents: [.medium, .large],
-                background: AppColor.surfacePrimary
-            )
         }
-        .alert("Invite Error", isPresented: Binding(
-            get: { inviteErrorMessage != nil },
-            set: { newValue in
-                if !newValue {
-                    inviteErrorMessage = nil
-                }
-            }
-        )) {
+        .alert("Invite Error", isPresented: $showInviteError) {
             Button("OK", role: .cancel) {
                 inviteErrorMessage = nil
+                showInviteError = false
             }
         } message: {
             Text(inviteErrorMessage ?? "")
@@ -367,6 +388,7 @@ struct FriendsListView: View {
             } catch {
                 isCreatingInvite = false
                 inviteErrorMessage = "Failed to create invite link. Please try again."
+                showInviteError = true
                 print("❌ Create invite link error: \(error)")
             }
         }

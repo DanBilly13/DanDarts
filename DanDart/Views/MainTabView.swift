@@ -86,7 +86,7 @@ struct MainTabView: View {
                 
                 Spacer()
             }
-            .id(toastManager.currentToast?.id) // Force re-render when toast changes
+            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: toastManager.currentToast?.id)
             .zIndex(999) // Ensure toast appears above all other content
         }
         .sheet(item: $inviteTokenToClaim, onDismiss: {
