@@ -17,6 +17,14 @@ class FriendsService: ObservableObject {
     
     private var realtimeChannel: RealtimeChannelV2?
     @Published var friendshipChanged: Bool = false
+    // Debug: retain broadcast subscription token so the callback stays alive
+    private var pingSubscription: RealtimeSubscription?
+    
+    // Retain Postgres-change subscriptions (otherwise callbacks may be dropped)
+    private var insertSubscription: RealtimeSubscription?
+    private var updateSubscription: RealtimeSubscription?
+    private var deleteSubscription: RealtimeSubscription?
+    private var statusSubscription: RealtimeSubscription?
     
     /// Setup realtime subscription for friendship changes
     func setupRealtimeSubscription(userId: UUID) async {
@@ -32,12 +40,14 @@ class FriendsService: ObservableObject {
         // Use shared channel name so all users receive broadcasts
         let channelName = "public:friendships"
         print("🔵 [Realtime] Creating channel: \(channelName)")
-        let channel = supabaseService.client.realtimeV2.channel(channelName)
+        let channel = supabaseService.client.realtimeV2.channel(channelName) {
+            $0.broadcast.receiveOwnBroadcasts = true
+        }
         print("🔵 [Realtime] Channel created")
         
         // Listen for INSERT events (no server-side filter - client-side filtering is more reliable)
         print("🔵 [Realtime] Registering INSERT callback (client-side filtering)")
-        channel.onPostgresChange(
+        insertSubscription = channel.onPostgresChange(
             InsertAction.self,
             schema: "public",
             table: "friendships"
@@ -49,18 +59,20 @@ class FriendsService: ObservableObject {
             print("🚨🚨🚨 [Realtime] Thread: \(Thread.current)")
             print("🚨🚨🚨 [Realtime] Timestamp: \(Date())")
             print("🚨🚨🚨 [Realtime] ========================================")
-            
+
             // Client-side filter: only process if user is requester or addressee
-            guard let record = action.record as? [String: Any],
-                  let requesterIdString = record["requester_id"] as? String,
-                  let addresseeIdString = record["addressee_id"] as? String,
-                  let requesterId = UUID(uuidString: requesterIdString),
-                  let addresseeId = UUID(uuidString: addresseeIdString),
-                  requesterId == userId || addresseeId == userId else {
+            let record = action.record
+            guard
+                let requesterIdString = record["requester_id"]?.stringValue,
+                let addresseeIdString = record["addressee_id"]?.stringValue,
+                let requesterId = UUID(uuidString: requesterIdString),
+                let addresseeId = UUID(uuidString: addresseeIdString),
+                requesterId == userId || addresseeId == userId
+            else {
                 print("🚨 [Realtime] Skipping - not for user \(userId)")
                 return
             }
-            
+
             print("🚨 [Realtime] Processing - event is for current user!")
             Task { @MainActor in
                 self?.handleFriendshipInsert(action, userId: userId)
@@ -69,21 +81,23 @@ class FriendsService: ObservableObject {
         
         // Listen for UPDATE events (client-side filtering)
         print("🔵 [Realtime] Registering UPDATE callback (client-side filtering)")
-        channel.onPostgresChange(
+        updateSubscription = channel.onPostgresChange(
             UpdateAction.self,
             schema: "public",
             table: "friendships"
         ) { [weak self] action in
             // Client-side filter: only process if user is requester or addressee
-            guard let record = action.record as? [String: Any],
-                  let requesterIdString = record["requester_id"] as? String,
-                  let addresseeIdString = record["addressee_id"] as? String,
-                  let requesterId = UUID(uuidString: requesterIdString),
-                  let addresseeId = UUID(uuidString: addresseeIdString),
-                  requesterId == userId || addresseeId == userId else {
+            let record = action.record
+            guard
+                let requesterIdString = record["requester_id"]?.stringValue,
+                let addresseeIdString = record["addressee_id"]?.stringValue,
+                let requesterId = UUID(uuidString: requesterIdString),
+                let addresseeId = UUID(uuidString: addresseeIdString),
+                requesterId == userId || addresseeId == userId
+            else {
                 return
             }
-            
+
             Task { @MainActor in
                 self?.handleFriendshipUpdate(action, userId: userId)
             }
@@ -91,21 +105,23 @@ class FriendsService: ObservableObject {
         
         // Listen for DELETE events (client-side filtering)
         print("� [Realtime] Registering DELETE callback (client-side filtering)")
-        channel.onPostgresChange(
+        deleteSubscription = channel.onPostgresChange(
             DeleteAction.self,
             schema: "public",
             table: "friendships"
         ) { [weak self] action in
             // Client-side filter: only process if user is requester or addressee
-            guard let record = action.oldRecord as? [String: Any],
-                  let requesterIdString = record["requester_id"] as? String,
-                  let addresseeIdString = record["addressee_id"] as? String,
-                  let requesterId = UUID(uuidString: requesterIdString),
-                  let addresseeId = UUID(uuidString: addresseeIdString),
-                  requesterId == userId || addresseeId == userId else {
+            let record = action.oldRecord
+            guard
+                let requesterIdString = record["requester_id"]?.stringValue,
+                let addresseeIdString = record["addressee_id"]?.stringValue,
+                let requesterId = UUID(uuidString: requesterIdString),
+                let addresseeId = UUID(uuidString: addresseeIdString),
+                requesterId == userId || addresseeId == userId
+            else {
                 return
             }
-            
+
             Task { @MainActor in
                 self?.handleFriendshipDelete(action, userId: userId)
             }
@@ -113,7 +129,7 @@ class FriendsService: ObservableObject {
         
         // Monitor channel status changes
         print("🔵 [Realtime] Setting up status change monitoring...")
-        channel.onStatusChange { status in
+        statusSubscription = channel.onStatusChange { status in
             print("🔔 [Realtime] ========================================")
             print("🔔 [Realtime] CHANNEL STATUS CHANGED: \(status)")
             print("🔔 [Realtime] Timestamp: \(Date())")
@@ -121,15 +137,30 @@ class FriendsService: ObservableObject {
         }
         
         print("🔵 [Realtime] All callbacks registered, calling subscribe()...")
-        
+
+        // Retain the channel before subscribing (prevents accidental deallocation during async subscribe)
+        realtimeChannel = channel
+        print("🔵 [Realtime] Channel stored in realtimeChannel property (pre-subscribe)")
+
         // Subscribe to the channel
         do {
-            try await channel.subscribe()
+            // Register broadcast handler BEFORE subscribing, and retain the subscription token
+            pingSubscription = channel.onBroadcast(event: "ping") { message in
+                print("📡 [Realtime] broadcast ping received:", message)
+            }
+
+            // Use the newer subscribe API
+            try await channel.subscribeWithError()
+
+            // 🔎 Debug: prove the socket can receive *anything*
+            struct PingMessage: Codable { let hello: String }
+            try? await channel.broadcast(event: "ping", message: PingMessage(hello: "world"))
+            print("📡 [Realtime] broadcast ping sent")
+
             print("✅ [Realtime] SUBSCRIPTION ACTIVE")
             print("✅ [Realtime] Channel status: \(channel.status)")
             print("✅ [Realtime] ========================================")
-            
-            // Check for existing pending requests and show toast for most recent
+
             await checkForPendingRequestsOnReturn(userId: userId)
         } catch {
             print("❌ [Realtime] SUBSCRIPTION FAILED")
@@ -137,9 +168,6 @@ class FriendsService: ObservableObject {
             print("❌ [Realtime] Error details: \(error.localizedDescription)")
             print("❌ [Realtime] ========================================")
         }
-        
-        realtimeChannel = channel
-        print("🔵 [Realtime] Channel stored in realtimeChannel property")
     }
     
     /// Remove realtime subscription
@@ -148,6 +176,11 @@ class FriendsService: ObservableObject {
             print("🔵 [Realtime] Removing subscription")
             await channel.unsubscribe()
             realtimeChannel = nil
+            pingSubscription = nil
+            insertSubscription = nil
+            updateSubscription = nil
+            deleteSubscription = nil
+            statusSubscription = nil
         }
     }
     
