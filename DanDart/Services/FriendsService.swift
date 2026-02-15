@@ -246,16 +246,14 @@ class FriendsService: ObservableObject {
         print("📝 [Toast] Record: \(record)")
         print("📝 [Toast] Current user: \(currentUserId)")
         
-        guard let addresseeIdString = record["addressee_id"]?.stringValue else {
-            print("❌ [Toast] Failed to get addressee_id")
+        // Compare UUIDs instead of strings to avoid case-sensitivity issues
+        guard let addresseeIdString = record["addressee_id"]?.stringValue,
+              let addresseeId = UUID(uuidString: addresseeIdString),
+              addresseeId == currentUserId else {
+            print("📝 [Toast] Not for current user (addressee: \(record["addressee_id"]?.stringValue ?? "nil"), current: \(currentUserId))")
             return
         }
-        print("📝 [Toast] Addressee ID: \(addresseeIdString)")
-        
-        guard addresseeIdString == currentUserId.uuidString else {
-            print("📝 [Toast] Not for current user (addressee: \(addresseeIdString), current: \(currentUserId.uuidString))")
-            return
-        }
+        print("📝 [Toast] Addressee ID matches current user: \(addresseeId)")
         
         guard let requesterIdString = record["requester_id"]?.stringValue else {
             print("❌ [Toast] Failed to get requester_id")
