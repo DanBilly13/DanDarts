@@ -20,17 +20,23 @@ class FriendsService: ObservableObject {
     
     /// Setup realtime subscription for friendship changes
     func setupRealtimeSubscription(userId: UUID) async {
-        print("🔵 [Realtime] Setting up subscription for user: \(userId)")
+        print("🔵 [Realtime] ========================================")
+        print("🔵 [Realtime] SETUP START for user: \(userId)")
+        print("🔵 [Realtime] Current channel exists: \(realtimeChannel != nil)")
         
         // Remove existing subscription first
         await removeRealtimeSubscription()
+        print("🔵 [Realtime] Old subscription removed")
         
         // Create channel for friendships table
         let channelName = "friendships:\(userId.uuidString)"
+        print("🔵 [Realtime] Creating channel: \(channelName)")
         let channel = supabaseService.client.realtimeV2.channel(channelName)
+        print("🔵 [Realtime] Channel created")
         
         // Listen for changes where user is requester
         let requesterFilter = "requester_id=eq.\(userId.uuidString)"
+        print("🔵 [Realtime] Registering callbacks for requester filter: \(requesterFilter)")
         channel.onPostgresChange(
             InsertAction.self,
             schema: "public",
@@ -66,14 +72,23 @@ class FriendsService: ObservableObject {
         
         // Listen for changes where user is addressee
         let addresseeFilter = "addressee_id=eq.\(userId.uuidString)"
+        print("🔵 [Realtime] Registering callbacks for addressee filter: \(addresseeFilter)")
         channel.onPostgresChange(
             InsertAction.self,
             schema: "public",
             table: "friendships",
             filter: addresseeFilter
         ) { [weak self] action in
+            print("🔔 [Realtime] ========================================")
+            print("🔔 [Realtime] INSERT CALLBACK FIRED!")
+            print("🔔 [Realtime] Filter: \(addresseeFilter)")
+            print("🔔 [Realtime] Record: \(action.record)")
+            print("🔔 [Realtime] ========================================")
+            
             Task { @MainActor in
+                print("🔔 [Realtime] Calling handleFriendshipInsert on MainActor")
                 self?.handleFriendshipInsert(action, userId: userId)
+                print("🔔 [Realtime] handleFriendshipInsert completed")
             }
         }
         
@@ -83,6 +98,8 @@ class FriendsService: ObservableObject {
             table: "friendships",
             filter: addresseeFilter
         ) { [weak self] action in
+            print("🔔 [Realtime] UPDATE CALLBACK FIRED!")
+            print("🔔 [Realtime] Filter: \(addresseeFilter)")
             Task { @MainActor in
                 self?.handleFriendshipUpdate(action, userId: userId)
             }
@@ -99,18 +116,26 @@ class FriendsService: ObservableObject {
             }
         }
         
+        print("🔵 [Realtime] All callbacks registered, calling subscribe()...")
+        
         // Subscribe to the channel
         do {
             try await channel.subscribe()
-            print("✅ [Realtime] Subscription active for user: \(userId)")
+            print("✅ [Realtime] SUBSCRIPTION ACTIVE")
+            print("✅ [Realtime] Channel status: \(channel.status)")
+            print("✅ [Realtime] ========================================")
             
             // Check for existing pending requests and show toast for most recent
             await checkForPendingRequestsOnReturn(userId: userId)
         } catch {
-            print("❌ [Realtime] Subscription failed: \(error)")
+            print("❌ [Realtime] SUBSCRIPTION FAILED")
+            print("❌ [Realtime] Error: \(error)")
+            print("❌ [Realtime] Error details: \(error.localizedDescription)")
+            print("❌ [Realtime] ========================================")
         }
         
         realtimeChannel = channel
+        print("🔵 [Realtime] Channel stored in realtimeChannel property")
     }
     
     /// Remove realtime subscription
@@ -124,18 +149,26 @@ class FriendsService: ObservableObject {
     
     /// Handle INSERT events (new friend request)
     private func handleFriendshipInsert(_ action: InsertAction, userId: UUID) {
-        print("🔔 [Realtime] Friendship INSERT detected")
+        print("� [Handler] ========================================")
+        print("📝 [Handler] handleFriendshipInsert CALLED")
+        print("📝 [Handler] Current user: \(userId)")
+        print("📝 [Handler] Thread: \(Thread.current)")
         
         // Toggle the published property to trigger view updates
         friendshipChanged.toggle()
+        print("📝 [Handler] friendshipChanged toggled to: \(friendshipChanged)")
         
         // Post notification for badge updates
         NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+        print("📝 [Handler] Posted FriendRequestsChanged notification")
         
         // Handle toast for new request received
         Task {
+            print("📝 [Handler] Starting toast task...")
             await handleInsertToast(record: action.record, currentUserId: userId)
+            print("📝 [Handler] Toast task completed")
         }
+        print("📝 [Handler] ========================================")
     }
     
     /// Handle UPDATE events (request accepted)

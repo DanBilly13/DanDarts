@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var authService = AuthService()
+    @EnvironmentObject private var authService: AuthService
     
     var body: some View {
         ZStack {
@@ -16,7 +16,11 @@ struct ContentView: View {
                 .ignoresSafeArea()
 
             Group {
-                if authService.isAuthenticated {
+                if authService.isInRecoveryMode {
+                    // User is in password reset flow - show password change screen
+                    ChangePasswordView()
+                        .environmentObject(authService)
+                } else if authService.isAuthenticated {
                     // User is authenticated - show main app
                     MainTabView()
                         .environmentObject(authService)

@@ -14,6 +14,7 @@ struct MainTabView: View {
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     @State private var selectedTab: Int = 0
+    @State private var showPasswordChangeAlert = false
     @Environment(\.scenePhase) private var scenePhase
 
     private struct InviteTokenToClaim: Identifiable {
@@ -109,9 +110,13 @@ struct MainTabView: View {
             
             // Setup realtime subscription on app launch if user is authenticated
             if let userId = authService.currentUser?.id {
+                print("🔵 [MainTabView] User authenticated, setting up realtime subscription")
+                print("🔵 [MainTabView] User ID: \(userId)")
                 Task {
                     await friendsService.setupRealtimeSubscription(userId: userId)
                 }
+            } else {
+                print("⚠️ [MainTabView] No authenticated user, skipping realtime subscription")
             }
             
             // Listen for friend request changes

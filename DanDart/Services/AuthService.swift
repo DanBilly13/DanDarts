@@ -57,6 +57,7 @@ class AuthService: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = false
     @Published var needsProfileSetup: Bool = false // Track if new user needs profile setup
+    @Published var isInRecoveryMode: Bool = false // Track if user is in password reset flow
     
     // MARK: - Private Properties
     private let supabaseService = SupabaseService.shared
@@ -313,7 +314,7 @@ class AuthService: ObservableObject {
             // Send password reset email via Supabase
             try await supabaseService.client.auth.resetPasswordForEmail(
                 trimmedEmail,
-                redirectTo: nil  // Use Supabase's default hosted page
+                redirectTo: URL(string: "dandarts://reset-password")
             )
             
             print("✅ Password reset email sent successfully")
@@ -329,6 +330,49 @@ class AuthService: ObservableObject {
                 // Just throw a generic error
                 throw AuthError.networkError
             }
+        }
+    }
+    
+    /// Set session from password reset tokens
+    /// - Parameters:
+    ///   - accessToken: Access token from reset link
+    ///   - refreshToken: Refresh token from reset link
+    func setPasswordResetSession(accessToken: String, refreshToken: String) async throws {
+        do {
+            print("🔐 Setting password reset session...")
+            
+            // Set the session with the tokens
+            try await supabaseService.client.auth.setSession(
+                accessToken: accessToken,
+                refreshToken: refreshToken
+            )
+            
+            // Check session to update auth state
+            await checkSession()
+            
+            print("✅ Password reset session established")
+            
+        } catch {
+            print("❌ Failed to set password reset session: \(error)")
+            throw error
+        }
+    }
+    
+    /// Update user's password (used during password reset flow)
+    /// - Parameter newPassword: The new password to set
+    func updatePassword(newPassword: String) async throws {
+        do {
+            print("🔐 Updating password...")
+            
+            try await supabaseService.client.auth.update(
+                user: UserAttributes(password: newPassword)
+            )
+            
+            print("✅ Password updated successfully")
+            
+        } catch {
+            print("❌ Failed to update password: \(error)")
+            throw error
         }
     }
     

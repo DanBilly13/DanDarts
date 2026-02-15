@@ -173,13 +173,15 @@ struct SignInView: View {
                         )
                         
                         // Forgot Password Link
-                        HStack {
-                            Spacer()
-                            Button("Forgot Password?") {
-                                showForgotPassword = true
-                            }
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppColor.justWhite)
+                        Button {
+                            showForgotPassword = true
+                        } label: {
+                            Text("Forgot Password?")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(AppColor.justWhite)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         
                         // Sign In with Email Button (Primary Outline)

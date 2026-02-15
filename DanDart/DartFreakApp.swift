@@ -65,6 +65,38 @@ struct DartFreakApp: App {
                             }
                             return
                         }
+                        
+                        // Handle password reset deep link
+                        if url.scheme == "dandarts" && url.host == "reset-password" {
+                            // Extract tokens from URL fragment
+                            if let fragment = url.fragment {
+                                // Supabase sends: #access_token=...&refresh_token=...&type=recovery
+                                let components = URLComponents(string: "?" + fragment)
+                                
+                                if let accessToken = components?.queryItems?.first(where: { $0.name == "access_token" })?.value,
+                                   let refreshToken = components?.queryItems?.first(where: { $0.name == "refresh_token" })?.value {
+                                    
+                                    Task {
+                                        do {
+                                            // Set the session with the tokens
+                                            try await authService.setPasswordResetSession(
+                                                accessToken: accessToken,
+                                                refreshToken: refreshToken
+                                            )
+                                            
+                                            // Mark as recovery mode to show password change screen
+                                            await MainActor.run {
+                                                authService.isInRecoveryMode = true
+                                            }
+                                            
+                                        } catch {
+                                            print("❌ Failed to set session from reset link: \(error)")
+                                        }
+                                    }
+                                }
+                            }
+                            return
+                        }
 
                         // Handle universal links that arrive via onOpenURL
                         if url.scheme == "https",
