@@ -29,91 +29,95 @@ class FriendsService: ObservableObject {
         print("🔵 [Realtime] Old subscription removed")
         
         // Create channel for friendships table
-        let channelName = "friendships:\(userId.uuidString)"
+        // Use shared channel name so all users receive broadcasts
+        let channelName = "public:friendships"
         print("🔵 [Realtime] Creating channel: \(channelName)")
         let channel = supabaseService.client.realtimeV2.channel(channelName)
         print("🔵 [Realtime] Channel created")
         
-        // Listen for changes where user is requester
-        let requesterFilter = "requester_id=eq.\(userId.uuidString)"
-        print("🔵 [Realtime] Registering callbacks for requester filter: \(requesterFilter)")
+        // Listen for INSERT events (no server-side filter - client-side filtering is more reliable)
+        print("🔵 [Realtime] Registering INSERT callback (client-side filtering)")
         channel.onPostgresChange(
             InsertAction.self,
             schema: "public",
-            table: "friendships",
-            filter: requesterFilter
+            table: "friendships"
         ) { [weak self] action in
+            // CRITICAL: Log INSIDE callback to prove events are arriving
+            print("🚨🚨🚨 [Realtime] ========================================")
+            print("🚨🚨🚨 [Realtime] INSERT CALLBACK FIRED!!!")
+            print("🚨🚨🚨 [Realtime] Payload: \(action.record)")
+            print("🚨🚨🚨 [Realtime] Thread: \(Thread.current)")
+            print("🚨🚨🚨 [Realtime] Timestamp: \(Date())")
+            print("🚨🚨🚨 [Realtime] ========================================")
+            
+            // Client-side filter: only process if user is requester or addressee
+            guard let record = action.record as? [String: Any],
+                  let requesterIdString = record["requester_id"] as? String,
+                  let addresseeIdString = record["addressee_id"] as? String,
+                  let requesterId = UUID(uuidString: requesterIdString),
+                  let addresseeId = UUID(uuidString: addresseeIdString),
+                  requesterId == userId || addresseeId == userId else {
+                print("🚨 [Realtime] Skipping - not for user \(userId)")
+                return
+            }
+            
+            print("🚨 [Realtime] Processing - event is for current user!")
             Task { @MainActor in
                 self?.handleFriendshipInsert(action, userId: userId)
             }
         }
         
+        // Listen for UPDATE events (client-side filtering)
+        print("🔵 [Realtime] Registering UPDATE callback (client-side filtering)")
         channel.onPostgresChange(
             UpdateAction.self,
             schema: "public",
-            table: "friendships",
-            filter: requesterFilter
+            table: "friendships"
         ) { [weak self] action in
-            Task { @MainActor in
-                self?.handleFriendshipUpdate(action, userId: userId)
+            // Client-side filter: only process if user is requester or addressee
+            guard let record = action.record as? [String: Any],
+                  let requesterIdString = record["requester_id"] as? String,
+                  let addresseeIdString = record["addressee_id"] as? String,
+                  let requesterId = UUID(uuidString: requesterIdString),
+                  let addresseeId = UUID(uuidString: addresseeIdString),
+                  requesterId == userId || addresseeId == userId else {
+                return
             }
-        }
-        
-        channel.onPostgresChange(
-            DeleteAction.self,
-            schema: "public",
-            table: "friendships",
-            filter: requesterFilter
-        ) { [weak self] action in
-            Task { @MainActor in
-                self?.handleFriendshipDelete(action, userId: userId)
-            }
-        }
-        
-        // Listen for changes where user is addressee
-        let addresseeFilter = "addressee_id=eq.\(userId.uuidString)"
-        print("🔵 [Realtime] Registering callbacks for addressee filter: \(addresseeFilter)")
-        channel.onPostgresChange(
-            InsertAction.self,
-            schema: "public",
-            table: "friendships",
-            filter: addresseeFilter
-        ) { [weak self] action in
-            print("🔔 [Realtime] ========================================")
-            print("🔔 [Realtime] INSERT CALLBACK FIRED!")
-            print("🔔 [Realtime] Filter: \(addresseeFilter)")
-            print("🔔 [Realtime] Record: \(action.record)")
-            print("🔔 [Realtime] ========================================")
             
             Task { @MainActor in
-                print("🔔 [Realtime] Calling handleFriendshipInsert on MainActor")
-                self?.handleFriendshipInsert(action, userId: userId)
-                print("🔔 [Realtime] handleFriendshipInsert completed")
-            }
-        }
-        
-        channel.onPostgresChange(
-            UpdateAction.self,
-            schema: "public",
-            table: "friendships",
-            filter: addresseeFilter
-        ) { [weak self] action in
-            print("🔔 [Realtime] UPDATE CALLBACK FIRED!")
-            print("🔔 [Realtime] Filter: \(addresseeFilter)")
-            Task { @MainActor in
                 self?.handleFriendshipUpdate(action, userId: userId)
             }
         }
         
+        // Listen for DELETE events (client-side filtering)
+        print("� [Realtime] Registering DELETE callback (client-side filtering)")
         channel.onPostgresChange(
             DeleteAction.self,
             schema: "public",
-            table: "friendships",
-            filter: addresseeFilter
+            table: "friendships"
         ) { [weak self] action in
+            // Client-side filter: only process if user is requester or addressee
+            guard let record = action.oldRecord as? [String: Any],
+                  let requesterIdString = record["requester_id"] as? String,
+                  let addresseeIdString = record["addressee_id"] as? String,
+                  let requesterId = UUID(uuidString: requesterIdString),
+                  let addresseeId = UUID(uuidString: addresseeIdString),
+                  requesterId == userId || addresseeId == userId else {
+                return
+            }
+            
             Task { @MainActor in
                 self?.handleFriendshipDelete(action, userId: userId)
             }
+        }
+        
+        // Monitor channel status changes
+        print("🔵 [Realtime] Setting up status change monitoring...")
+        channel.onStatusChange { status in
+            print("🔔 [Realtime] ========================================")
+            print("🔔 [Realtime] CHANNEL STATUS CHANGED: \(status)")
+            print("🔔 [Realtime] Timestamp: \(Date())")
+            print("🔔 [Realtime] ========================================")
         }
         
         print("🔵 [Realtime] All callbacks registered, calling subscribe()...")
@@ -505,8 +509,6 @@ class FriendsService: ObservableObject {
         
         // Create new friend request with pending status
         let friendship = Friendship(
-            userId: userId, // Legacy field
-            friendId: friendId, // Legacy field
             requesterId: userId,
             addresseeId: friendId,
             status: "pending",
@@ -758,8 +760,6 @@ class FriendsService: ObservableObject {
         } else {
             // Create new friendship record with 'blocked' status
             let friendship = Friendship(
-                userId: userId, // Legacy field
-                friendId: blockedUserId, // Legacy field
                 requesterId: userId,
                 addresseeId: blockedUserId,
                 status: "blocked",
@@ -842,8 +842,6 @@ class FriendsService: ObservableObject {
 /// Friendship relationship model
 struct Friendship: Codable, Identifiable {
     let id: UUID
-    let userId: UUID // Legacy field
-    let friendId: UUID // Legacy field
     let requesterId: UUID // Who sent the request
     let addresseeId: UUID // Who received the request
     let status: String // "pending", "accepted", "rejected", "blocked"
@@ -852,8 +850,6 @@ struct Friendship: Codable, Identifiable {
     
     enum CodingKeys: String, CodingKey {
         case id
-        case userId = "user_id"
-        case friendId = "friend_id"
         case requesterId = "requester_id"
         case addresseeId = "addressee_id"
         case status
@@ -861,10 +857,8 @@ struct Friendship: Codable, Identifiable {
         case updatedAt = "updated_at"
     }
     
-    init(id: UUID = UUID(), userId: UUID, friendId: UUID, requesterId: UUID, addresseeId: UUID, status: String, createdAt: Date, updatedAt: Date? = nil) {
+    init(id: UUID = UUID(), requesterId: UUID, addresseeId: UUID, status: String, createdAt: Date, updatedAt: Date? = nil) {
         self.id = id
-        self.userId = userId
-        self.friendId = friendId
         self.requesterId = requesterId
         self.addresseeId = addresseeId
         self.status = status

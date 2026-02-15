@@ -125,6 +125,11 @@ struct MainTabView: View {
                 object: nil,
                 queue: .main
             ) { _ in
+                print("🎯 [MainTabView] ========================================")
+                print("🎯 [MainTabView] Received FriendRequestsChanged notification")
+                print("🎯 [MainTabView] Current badge count: \(pendingRequestCount)")
+                print("🎯 [MainTabView] Thread: \(Thread.current)")
+                print("🎯 [MainTabView] ========================================")
                 loadPendingRequestCount()
             }
 
@@ -172,19 +177,27 @@ struct MainTabView: View {
     }
     
     private func loadPendingRequestCount() {
+        print("🎯 [MainTabView] loadPendingRequestCount() called")
+        print("🎯 [MainTabView] Current user: \(authService.currentUser?.id.uuidString ?? "nil")")
+        
         guard let currentUser = authService.currentUser else {
+            print("⚠️ [MainTabView] No current user, setting badge to 0")
             pendingRequestCount = 0
             return
         }
         
         Task {
             do {
+                print("🎯 [MainTabView] Querying pending requests for user: \(currentUser.id)")
                 let count = try await friendsService.getPendingRequestCount(userId: currentUser.id)
+                print("✅ [MainTabView] Query returned count: \(count)")
                 await MainActor.run {
+                    print("🎯 [MainTabView] Updating badge count from \(pendingRequestCount) to \(count)")
                     pendingRequestCount = count
+                    print("✅ [MainTabView] Badge count updated successfully")
                 }
             } catch {
-                print("❌ Failed to load pending request count: \(error)")
+                print("❌ [MainTabView] Failed to load pending request count: \(error)")
                 await MainActor.run {
                     pendingRequestCount = 0
                 }
