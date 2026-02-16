@@ -18,6 +18,7 @@ class FriendRequestToastManager: ObservableObject {
     
     @Published var currentToast: FriendRequestToast?
     @Published var toastQueue: [FriendRequestToast] = []
+    @Published var suppressRequestReceivedToasts: Bool = false
     
     /// Animation configuration for toast transitions
     let animationConfig: ToastAnimationConfig
@@ -53,6 +54,13 @@ class FriendRequestToastManager: ObservableObject {
             if delaySeconds > 0 {
                 print("🎯 [ToastManager] Waiting \(delaySeconds)s before showing toast")
                 try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+            }
+            
+            // ✅ CRITICAL: Check suppression AFTER delay, at display moment
+            // This ensures if user switches to Friends tab during delay, toast is still suppressed
+            if suppressRequestReceivedToasts && toast.type == .requestReceived {
+                print("🔕 [ToastManager] Suppressing requestReceived toast (Friends tab active)")
+                return
             }
             
             print("🎯 [ToastManager] Setting currentToast")

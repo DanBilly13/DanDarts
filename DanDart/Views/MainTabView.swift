@@ -104,6 +104,9 @@ struct MainTabView: View {
         .onAppear {
             configureTabBarAppearance()
             loadPendingRequestCount()
+            
+            // Set toast suppression based on current tab
+            toastManager.suppressRequestReceivedToasts = (selectedTab == 1)
 
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
@@ -143,6 +146,11 @@ struct MainTabView: View {
                     inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
                 }
             }
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            // Update toast suppression based on selected tab
+            // Tab 1 = Friends tab, suppress requestReceived toasts there
+            toastManager.suppressRequestReceivedToasts = (newValue == 1)
         }
         .onChange(of: authService.currentUser?.id) { oldValue, newValue in
             loadPendingRequestCount()
