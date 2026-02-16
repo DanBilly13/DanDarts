@@ -11,7 +11,7 @@ import SwiftUI
 struct BlockedUsersView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
+    @EnvironmentObject private var friendsService: FriendsService
     
     @State private var blockedUsers: [User] = []
     @State private var isLoading: Bool = false
@@ -202,14 +202,17 @@ struct BlockedUserCard: View {
 #Preview("Empty State") {
     BlockedUsersView()
         .environmentObject(AuthService.mockAuthenticated)
+        .environmentObject(FriendsService())
 }
 
 #Preview("With Blocked Users") {
     BlockedUsersViewPreview()
+        .environmentObject(FriendsService())
 }
 
 #Preview("Loading State") {
     BlockedUsersViewLoadingPreview()
+        .environmentObject(FriendsService())
 }
 
 // Preview wrapper with mock data

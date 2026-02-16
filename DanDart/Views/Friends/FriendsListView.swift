@@ -9,7 +9,7 @@ import SwiftUI
 
 struct FriendsListView: View {
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
+    @EnvironmentObject private var friendsService: FriendsService
     @StateObject private var inviteService = InviteService()
     
     @State private var showSearch: Bool = false
@@ -661,12 +661,13 @@ struct FriendsListViewPreview: View {
     var body: some View {
         FriendsListViewWithMockData()
             .environmentObject(authService)
+            .environmentObject(FriendsService())
     }
 }
 
 struct FriendsListViewWithMockData: View {
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
+    @EnvironmentObject private var friendsService: FriendsService
     
     @State private var searchText: String = ""
     @State private var showAddFriend: Bool = false

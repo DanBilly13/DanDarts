@@ -69,6 +69,7 @@ struct MainTabView: View {
             }
             .background(AppColor.backgroundPrimary)
             .accentColor(AppColor.interactivePrimaryBackground)
+            .environmentObject(friendsService)
             
             // Toast Overlay - appears above all tabs
             VStack {
@@ -83,7 +84,7 @@ struct MainTabView: View {
                         handleDenyRequest(friendshipId)
                     }
                 )
-                .padding(.top, 60) // Below status bar
+                .padding(.top, 16) // Just below status bar
                 
                 Spacer()
             }
@@ -222,7 +223,6 @@ struct MainTabView: View {
     private func handleAcceptRequest(_ friendshipId: UUID) {
         Task {
             do {
-                let friendsService = FriendsService()
                 try await friendsService.acceptFriendRequest(requestId: friendshipId)
                 
                 // Success haptic feedback
@@ -253,7 +253,6 @@ struct MainTabView: View {
     private func handleDenyRequest(_ friendshipId: UUID) {
         Task {
             do {
-                let friendsService = FriendsService()
                 try await friendsService.denyFriendRequest(requestId: friendshipId)
                 
                 // Light haptic feedback (subtle)

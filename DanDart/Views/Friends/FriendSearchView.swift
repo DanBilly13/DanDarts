@@ -14,7 +14,7 @@ struct FriendSearchView: View {
     
     @FocusState private var isSearchFieldFocused: Bool
     
-    @StateObject private var friendsService = FriendsService()
+    @EnvironmentObject private var friendsService: FriendsService
     @State private var searchQuery: String = ""
     @State private var searchResults: [User] = []
     @State private var existingFriends: [User] = [] // Current friends
@@ -427,6 +427,7 @@ struct FriendSearchResultCard: View {
                         }
                     )
                     .environmentObject(AuthService.mockAuthenticated)
+                    .environmentObject(FriendsService())
                 }
             }
         }
@@ -442,6 +443,7 @@ struct FriendSearchResultCard: View {
         var body: some View {
             FriendSearchResultsPreview()
                 .environmentObject(authService)
+                .environmentObject(FriendsService())
         }
     }
     

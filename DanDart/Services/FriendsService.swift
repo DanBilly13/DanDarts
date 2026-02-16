@@ -103,27 +103,64 @@ class FriendsService: ObservableObject {
             }
         }
         
-        // Listen for DELETE events (client-side filtering)
-        print("� [Realtime] Registering DELETE callback (client-side filtering)")
+        // Listen for DELETE events (client-side filtering with fallback)
+        print("🔵 [Realtime] Registering DELETE callback (client-side filtering with fallback)")
         deleteSubscription = channel.onPostgresChange(
             DeleteAction.self,
             schema: "public",
             table: "friendships"
         ) { [weak self] action in
-            // Client-side filter: only process if user is requester or addressee
+            guard let self else { return }
+            
+            // CRITICAL: Log INSIDE callback to prove events are arriving
+            print("🚨🚨🚨 [Realtime] ========================================")
+            print("🚨🚨🚨 [Realtime] DELETE CALLBACK FIRED!!!")
+            print("🚨🚨🚨 [Realtime] Payload: \(action.oldRecord)")
+            print("🚨🚨🚨 [Realtime] Thread: \(Thread.current)")
+            print("🚨🚨🚨 [Realtime] Timestamp: \(Date())")
+            print("🚨🚨🚨 [Realtime] ========================================")
+            
             let record = action.oldRecord
-            guard
-                let requesterIdString = record["requester_id"]?.stringValue,
-                let addresseeIdString = record["addressee_id"]?.stringValue,
-                let requesterId = UUID(uuidString: requesterIdString),
-                let addresseeId = UUID(uuidString: addresseeIdString),
-                requesterId == userId || addresseeId == userId
-            else {
+            print("🔍 [Realtime] oldRecord keys: \(record.keys.sorted())")
+            
+            // Try to filter if we have the data
+            if let requesterIdString = record["requester_id"]?.stringValue,
+               let addresseeIdString = record["addressee_id"]?.stringValue,
+               let requesterId = UUID(uuidString: requesterIdString),
+               let addresseeId = UUID(uuidString: addresseeIdString) {
+                
+                print("🔍 [Realtime] Parsed requester: \(requesterId)")
+                print("🔍 [Realtime] Parsed addressee: \(addresseeId)")
+                print("🔍 [Realtime] Current user: \(userId)")
+                
+                // Only refresh if I'm involved
+                if requesterId == userId || addresseeId == userId {
+                    print("� [Realtime] Processing - event is for current user!")
+                    Task { @MainActor in
+                        self.handleFriendshipDelete(action, userId: userId)
+                    }
+                } else {
+                    print("🧹 [Realtime] DELETE ignored (not for current user)")
+                }
                 return
             }
-
+            
+            // ✅ Fallback: oldRecord missing IDs (often only contains PK)
+            let deleteId = record["id"]?.stringValue ?? "unknown"
+            print("⚠️ [Realtime] DELETE oldRecord missing requester/addressee; forcing refresh")
+            print("⚠️ [Realtime] Deleted record ID: \(deleteId)")
+            
             Task { @MainActor in
-                self?.handleFriendshipDelete(action, userId: userId)
+                // Directly toggle and post without calling handler (avoid toast logic)
+                // Don't call handleFriendshipDelete - we don't know who was deleted
+                self.friendshipChanged.toggle()
+                print("� [Realtime] friendshipChanged toggled (fallback)")
+                
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("FriendRequestsChanged"), 
+                    object: nil
+                )
+                print("🔔 [Realtime] FriendRequestsChanged posted (fallback)")
             }
         }
         
@@ -226,13 +263,19 @@ class FriendsService: ObservableObject {
     
     /// Handle DELETE events (request denied/withdrawn)
     private func handleFriendshipDelete(_ action: DeleteAction, userId: UUID) {
+        print("🔔 [Realtime] ========================================")
         print("🔔 [Realtime] Friendship DELETE detected")
+        print("🔔 [Realtime] User ID: \(userId)")
+        print("🔔 [Realtime] Old Record: \(action.oldRecord)")
+        print("🔔 [Realtime] ========================================")
         
         // Toggle the published property to trigger view updates
         friendshipChanged.toggle()
+        print("🔔 [Realtime] friendshipChanged toggled")
         
         // Post notification for badge updates
         NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+        print("🔔 [Realtime] FriendRequestsChanged notification posted")
         
         // Handle toast for request denied
         Task {
@@ -383,7 +426,8 @@ class FriendsService: ObservableObject {
     /// Handle toast for DELETE action (friend request denied)
     private func handleDeleteToast(record: [String: AnyJSON], currentUserId: UUID) async {
         guard let requesterIdString = record["requester_id"]?.stringValue,
-              requesterIdString == currentUserId.uuidString,
+              let requesterId = UUID(uuidString: requesterIdString),
+              requesterId == currentUserId,
               let addresseeIdString = record["addressee_id"]?.stringValue,
               let addresseeId = UUID(uuidString: addresseeIdString) else {
             return

@@ -11,7 +11,7 @@ import SwiftUI
 struct FriendRequestsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
+    @EnvironmentObject private var friendsService: FriendsService
     
     @State private var receivedRequests: [FriendRequest] = []
     @State private var sentRequests: [FriendRequest] = []
@@ -490,10 +490,12 @@ struct SentRequestCard: View {
 #Preview("Empty State") {
     FriendRequestsView()
         .environmentObject(AuthService.mockAuthenticated)
+        .environmentObject(FriendsService())
 }
 
 #Preview("With Requests") {
     FriendRequestsViewPreview()
+        .environmentObject(FriendsService())
 }
 
 // Preview wrapper with mock data

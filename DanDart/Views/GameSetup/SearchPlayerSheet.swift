@@ -12,7 +12,7 @@ struct SearchPlayerSheet: View {
     @ObservedObject var friendsCache: FriendsCache // Injected from parent
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
+    @EnvironmentObject private var friendsService: FriendsService
     @State private var isLoadingFriends = false
     @State private var showAddGuestPlayer = false
     @State private var guestPlayers: [Player] = []
@@ -239,4 +239,5 @@ struct SearchPlayerSheet: View {
         friendsCache: FriendsCache()
     )
     .environmentObject(AuthService())
+    .environmentObject(FriendsService())
 }

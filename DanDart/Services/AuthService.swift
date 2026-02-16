@@ -774,19 +774,15 @@ class AuthService: ObservableObject {
         defer { isLoading = false }
         
         do {
-            // 1. Remove realtime subscriptions
-            let friendsService = FriendsService()
-            await friendsService.removeRealtimeSubscription()
-            
-            // 2. Clear toast notifications
+            // 1. Clear toast notifications
             await FriendRequestToastManager.shared.clearAll()
             
-            // 3. Call Supabase sign out
+            // 2. Call Supabase sign out
             try await supabaseService.client.auth.signOut()
             
-            // 4. Clear Keychain session (handled by Supabase SDK automatically)
+            // 3. Clear Keychain session (handled by Supabase SDK automatically)
             
-            // 5. Reset currentUser to nil and set isAuthenticated to false
+            // 4. Reset currentUser to nil and set isAuthenticated to false
             clearAuthenticationState()
             
         } catch {
