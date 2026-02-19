@@ -51,10 +51,12 @@ struct RemoteGamesTab: View {
             }
             .confirmationDialog("Choose a game", isPresented: $showGameSelection) {
                 Button("301") {
-                    router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
+                    let opponent: User? = nil
+                    router.push(.remoteGameSetup(game: Game.remote301, opponent: opponent))
                 }
                 Button("501") {
-                    router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
+                    let opponent: User? = nil
+                    router.push(.remoteGameSetup(game: Game.remote501, opponent: opponent))
                 }
                 Button("Cancel", role: .cancel) {}
             }

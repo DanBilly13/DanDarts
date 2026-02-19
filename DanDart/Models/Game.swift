@@ -97,6 +97,28 @@ extension Game {
     }
 }
 
+// MARK: - Remote Game Types
+
+extension Game {
+    static var remote301: Game {
+        Game(
+            title: "Remote 301",
+            subtitle: "Play together. Apart.",
+            players: "2",
+            instructions: "Challenge a friend to a live, head-to-head 301 match from different locations.\n\nYou start with a score of 301. On your turn (called a visit), throw three darts and subtract the total from your score.\n\nYour goal is to reach exactly zero, finishing on a double.\n\nIf your score drops below zero, or you're left on 1, the turn is a bust and your score returns to what it was before you threw.\n\nThe first player to check out on zero wins."
+        )
+    }
+    
+    static var remote501: Game {
+        Game(
+            title: "Remote 501",
+            subtitle: "Play together. Apart.",
+            players: "2",
+            instructions: "Challenge a friend to a live, head-to-head 501 match from different locations.\n\nPlayers start with 501 points and take turns throwing three darts. The objective is to reach exactly zero, with the final dart landing on a double.\n\nTake turns in real-time as you compete to be the first to checkout."
+        )
+    }
+}
+
 // MARK: - Preview Helpers
 
 #if DEBUG
