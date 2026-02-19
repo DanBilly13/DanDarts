@@ -10,10 +10,12 @@ import SwiftUI
 struct RemoteGamesTab: View {
     @StateObject private var remoteMatchService = RemoteMatchService()
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var router: Router
     
     @State private var processingMatchId: UUID?
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var showGameSelection = false
     
     var body: some View {
         NavigationStack {
@@ -46,6 +48,15 @@ struct RemoteGamesTab: View {
                 if let errorMessage = errorMessage {
                     Text(errorMessage)
                 }
+            }
+            .confirmationDialog("Choose a game", isPresented: $showGameSelection) {
+                Button("301") {
+                    router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
+                }
+                Button("501") {
+                    router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
+                }
+                Button("Cancel", role: .cancel) {}
             }
         }
     }
@@ -190,8 +201,7 @@ struct RemoteGamesTab: View {
             }
             
             AppButton(role: .primary, controlSize: .large) {
-                // TODO: Navigate to friend selection
-                print("Challenge a friend tapped")
+                showGameSelection = true
             } label: {
                 Text("Challenge a Friend")
             }
