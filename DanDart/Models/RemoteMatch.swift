@@ -234,33 +234,20 @@ struct RemoteMatchWithPlayers: Identifiable {
 
 // MARK: - Remote Match Error
 
-enum RemoteMatchError: LocalizedError {
-    case alreadyHasActiveMatch
-    case matchNotFound
+enum RemoteMatchError: Error {
     case notAuthorized
-    case matchExpired
     case invalidStatus
-    case notYourTurn
-    case invalidThrows
-    
-    var errorDescription: String? {
-        switch self {
-        case .alreadyHasActiveMatch:
-            return "You already have a match ready. Join or cancel it first."
-        case .matchNotFound:
-            return "Match not found."
-        case .notAuthorized:
-            return "You are not authorized to perform this action."
-        case .matchExpired:
-            return "This match has expired."
-        case .invalidStatus:
-            return "Invalid match status for this action."
-        case .notYourTurn:
-            return "It's not your turn."
-        case .invalidThrows:
-            return "Invalid dart throws."
-        }
-    }
+    case matchExpired
+    case alreadyHasActiveMatch
+    case lockCreationFailed
+    case databaseError(String)
+    case edgeFunctionError(String)
+}
+
+// MARK: - Edge Function Response Types
+
+struct EmptyResponse: Decodable {
+    // Empty response for Edge Functions that don't return data
 }
 
 // MARK: - Mock Data

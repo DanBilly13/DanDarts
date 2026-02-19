@@ -11,6 +11,10 @@ struct RemoteGamesTab: View {
     @StateObject private var remoteMatchService = RemoteMatchService()
     @EnvironmentObject var authService: AuthService
     
+    @State private var processingMatchId: UUID?
+    @State private var errorMessage: String?
+    @State private var showError = false
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -32,6 +36,16 @@ struct RemoteGamesTab: View {
             }
             .refreshable {
                 await loadMatches()
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {
+                    showError = false
+                    errorMessage = nil
+                }
+            } message: {
+                if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                }
             }
         }
     }
@@ -69,7 +83,10 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .ready
+                                state: .ready,
+                                isProcessing: processingMatchId == matchWithPlayers.match.id,
+                                onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
+                                onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
                             )
                         }
                     }
@@ -111,7 +128,10 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .pending
+                                state: .pending,
+                                isProcessing: processingMatchId == matchWithPlayers.match.id,
+                                onAccept: { acceptChallenge(matchId: matchWithPlayers.match.id) },
+                                onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
                             )
                         }
                     }
@@ -133,7 +153,9 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .pending
+                                state: .pending,
+                                isProcessing: processingMatchId == matchWithPlayers.match.id,
+                                onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
                             )
                         }
                     }
@@ -219,6 +241,138 @@ struct RemoteGamesTab: View {
             await remoteMatchService.setupRealtimeSubscription(userId: userId)
         } catch {
             print("❌ Failed to load remote matches: \(error)")
+        }
+    }
+    
+    // MARK: - Button Actions
+    
+    private func acceptChallenge(matchId: UUID) {
+        processingMatchId = matchId
+        
+        Task {
+            do {
+                try await remoteMatchService.acceptChallenge(matchId: matchId)
+                
+                // Success haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                #endif
+                
+                await MainActor.run {
+                    processingMatchId = nil
+                }
+            } catch {
+                await MainActor.run {
+                    processingMatchId = nil
+                    errorMessage = "Failed to accept challenge: \(error.localizedDescription)"
+                    showError = true
+                }
+                
+                // Error haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
+            }
+        }
+    }
+    
+    private func declineChallenge(matchId: UUID) {
+        processingMatchId = matchId
+        
+        Task {
+            do {
+                try await remoteMatchService.cancelChallenge(matchId: matchId)
+                
+                // Light haptic
+                #if canImport(UIKit)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                #endif
+                
+                await MainActor.run {
+                    processingMatchId = nil
+                }
+            } catch {
+                await MainActor.run {
+                    processingMatchId = nil
+                    errorMessage = "Failed to decline challenge: \(error.localizedDescription)"
+                    showError = true
+                }
+                
+                // Error haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
+            }
+        }
+    }
+    
+    private func cancelMatch(matchId: UUID) {
+        processingMatchId = matchId
+        
+        Task {
+            do {
+                try await remoteMatchService.cancelChallenge(matchId: matchId)
+                
+                // Light haptic
+                #if canImport(UIKit)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                #endif
+                
+                await MainActor.run {
+                    processingMatchId = nil
+                }
+            } catch {
+                await MainActor.run {
+                    processingMatchId = nil
+                    errorMessage = "Failed to cancel match: \(error.localizedDescription)"
+                    showError = true
+                }
+                
+                // Error haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
+            }
+        }
+    }
+    
+    private func joinMatch(matchId: UUID) {
+        processingMatchId = matchId
+        
+        Task {
+            do {
+                try await remoteMatchService.joinMatch(matchId: matchId)
+                
+                // Success haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                #endif
+                
+                await MainActor.run {
+                    processingMatchId = nil
+                }
+                
+                // TODO: Navigate to gameplay
+            } catch {
+                await MainActor.run {
+                    processingMatchId = nil
+                    errorMessage = "Failed to join match: \(error.localizedDescription)"
+                    showError = true
+                }
+                
+                // Error haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
+            }
         }
     }
 }

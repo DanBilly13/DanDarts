@@ -174,8 +174,62 @@ class RemoteMatchService: ObservableObject {
     
     // MARK: - Accept Challenge
     
-    /// Accept a challenge and transition to ready
-    func acceptChallenge(matchId: UUID, currentUserId: UUID) async throws {
+    /// Accept a challenge and transition to ready (calls Edge Function)
+    func acceptChallenge(matchId: UUID) async throws {
+        struct AcceptRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = AcceptRequest(match_id: matchId.uuidString)
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("accept-challenge", options: FunctionInvokeOptions(
+                body: request
+            ))
+        
+        print("✅ Challenge accepted: \(matchId)")
+    }
+    
+    // MARK: - Decline/Cancel Challenge
+    
+    /// Decline a received challenge or cancel a sent challenge (calls Edge Function)
+    func cancelChallenge(matchId: UUID) async throws {
+        struct CancelRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = CancelRequest(match_id: matchId.uuidString)
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("cancel-match", options: FunctionInvokeOptions(
+                body: request
+            ))
+        
+        print("✅ Challenge cancelled: \(matchId)")
+    }
+    
+    // MARK: - Join Match
+    
+    /// Join a ready match and start gameplay (calls Edge Function)
+    func joinMatch(matchId: UUID) async throws {
+        struct JoinRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = JoinRequest(match_id: matchId.uuidString)
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("join-match", options: FunctionInvokeOptions(
+                body: request
+            ))
+        
+        print("✅ Match joined: \(matchId)")
+    }
+    
+    // MARK: - Legacy Accept Challenge (kept for reference, use acceptChallenge instead)
+    
+    /// Legacy: Accept a challenge and transition to ready (direct DB access)
+    private func acceptChallengeLegacy(matchId: UUID, currentUserId: UUID) async throws {
         // Check if user already has an active match
         let hasActiveLock = try await checkUserHasLock(userId: currentUserId)
         if hasActiveLock {

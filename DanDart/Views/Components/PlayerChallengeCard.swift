@@ -13,6 +13,26 @@ struct PlayerChallengeCard: View {
     
     let player: Player
     let state: RemoteMatchStatus
+    let isProcessing: Bool
+    let onAccept: (() -> Void)?
+    let onDecline: (() -> Void)?
+    let onJoin: (() -> Void)?
+    
+    init(
+        player: Player,
+        state: RemoteMatchStatus,
+        isProcessing: Bool = false,
+        onAccept: (() -> Void)? = nil,
+        onDecline: (() -> Void)? = nil,
+        onJoin: (() -> Void)? = nil
+    ) {
+        self.player = player
+        self.state = state
+        self.isProcessing = isProcessing
+        self.onAccept = onAccept
+        self.onDecline = onDecline
+        self.onJoin = onJoin
+    }
     
     var body: some View {
         VStack (alignment: .leading, spacing:0 ){
@@ -41,7 +61,13 @@ struct PlayerChallengeCard: View {
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 0)
-            PlayerChallengeCardFoot(state: state)
+            PlayerChallengeCardFoot(
+                state: state,
+                isProcessing: isProcessing,
+                onAccept: onAccept,
+                onDecline: onDecline,
+                onJoin: onJoin
+            )
             
         }
         .frame(maxWidth: .infinity)
@@ -53,6 +79,10 @@ struct PlayerChallengeCard: View {
 
 struct PlayerChallengeCardFoot: View {
     let state: RemoteMatchStatus
+    let isProcessing: Bool
+    let onAccept: (() -> Void)?
+    let onDecline: (() -> Void)?
+    let onJoin: (() -> Void)?
     
     var body: some View {
         Group {
@@ -63,16 +93,30 @@ struct PlayerChallengeCardFoot: View {
                     AppButton(role: .tertiaryOutline,
                               controlSize: .small,
                               compact: true) {
+                        onDecline?()
                     } label: {
-                        Text("Decline")
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Decline")
+                        }
                     }
+                    .disabled(isProcessing)
                     
                     AppButton(role: .primary,
                               controlSize: .small,
                               compact: true) {
+                        onAccept?()
                     } label: {
-                        Text("Accept")
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Accept")
+                        }
                     }
+                    .disabled(isProcessing)
                 }
                 
             case .ready:
@@ -80,15 +124,30 @@ struct PlayerChallengeCardFoot: View {
                     AppButton(role: .primary,
                               controlSize: .small,
                               compact: true) {
+                        onJoin?()
                     } label: {
-                        Text("Join Match")
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Join Match")
+                        }
                     }
+                    .disabled(isProcessing)
+                    
                     AppButton(role: .tertiaryOutline,
                               controlSize: .small,
                               compact: true) {
+                        onDecline?()
                     } label: {
-                        Text("Cancel")
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Cancel")
+                        }
                     }
+                    .disabled(isProcessing)
                 }
                 
             case .lobby:
