@@ -67,7 +67,7 @@ COMMENT ON COLUMN matches.challenge_expires_at IS 'When the challenge expires (2
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS last_visit_payload JSONB;
 COMMENT ON COLUMN matches.last_visit_payload IS 'Last visit data for 1-2s reveal animation';
 
-RAISE NOTICE 'Extended matches table with remote columns';
+DO $$ BEGIN RAISE NOTICE 'Extended matches table with remote columns'; END $$;
 
 -- ============================================
 -- STEP 3: CREATE INDEXES FOR REMOTE QUERIES
@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS matches_challenge_expiry_idx
 CREATE INDEX IF NOT EXISTS matches_match_mode_idx 
     ON matches(match_mode);
 
-RAISE NOTICE 'Created indexes for remote match queries';
+DO $$ BEGIN RAISE NOTICE 'Created indexes for remote match queries'; END $$;
 
 -- ============================================
 -- STEP 4: CREATE REMOTE MATCH LOCKS TABLE
@@ -140,7 +140,7 @@ CREATE POLICY "Server can manage locks"
 
 GRANT ALL ON remote_match_locks TO authenticated;
 
-RAISE NOTICE 'Created remote_match_locks table';
+DO $$ BEGIN RAISE NOTICE 'Created remote_match_locks table'; END $$;
 
 -- ============================================
 -- STEP 5: CREATE USER PUSH TOKENS TABLE
@@ -178,7 +178,7 @@ CREATE POLICY "Users can manage their own tokens"
 
 GRANT ALL ON user_push_tokens TO authenticated;
 
-RAISE NOTICE 'Created user_push_tokens table';
+DO $$ BEGIN RAISE NOTICE 'Created user_push_tokens table'; END $$;
 
 -- ============================================
 -- STEP 6: UPDATE RLS POLICIES FOR MATCHES
@@ -195,7 +195,7 @@ CREATE POLICY "Users can view remote matches they participate in"
         AND (challenger_id = auth.uid() OR receiver_id = auth.uid())
     );
 
-RAISE NOTICE 'Updated RLS policies for remote matches';
+DO $$ BEGIN RAISE NOTICE 'Updated RLS policies for remote matches'; END $$;
 
 -- ============================================
 -- STEP 7: VERIFICATION
