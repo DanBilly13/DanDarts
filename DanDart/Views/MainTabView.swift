@@ -58,6 +58,15 @@ struct MainTabView: View {
                     }
                 }
                 
+                // Remote Tab
+                RemoteGamesTab()
+                    .tabItem {
+                        Image(systemName: "network")
+                            .font(.system(size: 17, weight: .semibold))
+                        //Text("Remote")
+                    }
+                    .tag(2)
+                
                 // History Tab
                 HistoryTabView(showProfile: $showProfile)
                     .tabItem {
@@ -65,7 +74,7 @@ struct MainTabView: View {
                             .fontWeight(.bold)
                         //Text("History")
                     }
-                    .tag(2)
+                    .tag(3)
             }
             .background(AppColor.backgroundPrimary)
             .accentColor(AppColor.interactivePrimaryBackground)

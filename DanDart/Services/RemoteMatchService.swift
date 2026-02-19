@@ -82,7 +82,10 @@ class RemoteMatchService: ObservableObject {
                 currentUserId: userId
             )
             
-            switch match.status {
+            // Handle optional status
+            guard let status = match.status else { continue }
+            
+            switch status {
             case .pending:
                 if match.receiverId == userId {
                     pending.append(matchWithPlayers)
@@ -194,7 +197,7 @@ class RemoteMatchService: ObservableObject {
         }
         
         // Validate status is pending
-        guard match.status == .pending else {
+        guard match.status == RemoteMatchStatus.pending else {
             throw RemoteMatchError.invalidStatus
         }
         
@@ -298,7 +301,7 @@ class RemoteMatchService: ObservableObject {
         }
         
         // Validate status is ready
-        guard match.status == .ready else {
+        guard match.status == RemoteMatchStatus.ready else {
             throw RemoteMatchError.invalidStatus
         }
         

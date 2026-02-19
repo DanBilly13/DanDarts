@@ -4,14 +4,10 @@
 //
 //  Created by Billingham Daniel on 2026-02-19.
 //
+//  Challenge card component for remote matches
+//  Uses RemoteMatchStatus from RemoteMatch.swift
 
 import SwiftUI
-
-enum RemoteMatchStatus {
-    case pending
-    case ready
-    case expired
-}
 
 struct PlayerChallengeCard: View {
     
@@ -81,20 +77,48 @@ struct PlayerChallengeCardFoot: View {
                 
             case .ready:
                 VStack (spacing: 16) {
-                    
-                    
                     AppButton(role: .primary,
                               controlSize: .small,
                               compact: true) {
                     } label: {
-                        Text("Accept")
+                        Text("Join Match")
                     }
                     AppButton(role: .tertiaryOutline,
                               controlSize: .small,
                               compact: true) {
                     } label: {
-                        Text("Decline")
+                        Text("Cancel")
                     }
+                }
+                
+            case .lobby:
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(AppColor.interactivePrimaryBackground)
+                        Text("Waiting for opponent...")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppColor.textPrimary)
+                    }
+                }
+                
+            case .inProgress:
+                AppButton(role: .primary,
+                          controlSize: .small,
+                          compact: true) {
+                } label: {
+                    Text("Resume Match")
+                }
+                
+            case .completed:
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Match completed")
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.textPrimary)
                 }
                 
             case .expired:
@@ -110,6 +134,16 @@ struct PlayerChallengeCardFoot: View {
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundStyle(.red)
+                }
+                
+            case .cancelled:
+                HStack(spacing: 8) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.gray)
+                    Text("Match cancelled")
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.textSecondary)
                 }
             }
         }

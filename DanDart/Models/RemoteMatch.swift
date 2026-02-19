@@ -59,7 +59,7 @@ struct RemoteMatch: Identifiable, Codable {
     // Remote-specific fields
     let challengerId: UUID
     let receiverId: UUID
-    var status: RemoteMatchStatus
+    var status: RemoteMatchStatus?
     var currentPlayerId: UUID?
     
     // Expiry timestamps
@@ -100,10 +100,10 @@ struct RemoteMatch: Identifiable, Codable {
     }
     
     var timeRemaining: TimeInterval? {
-        if let expiresAt = joinWindowExpiresAt, status == .ready || status == .lobby {
+        if let expiresAt = joinWindowExpiresAt, status == RemoteMatchStatus.ready || status == RemoteMatchStatus.lobby {
             return max(0, expiresAt.timeIntervalSinceNow)
         }
-        if let expiresAt = challengeExpiresAt, status == .pending {
+        if let expiresAt = challengeExpiresAt, status == RemoteMatchStatus.pending {
             return max(0, expiresAt.timeIntervalSinceNow)
         }
         return nil
