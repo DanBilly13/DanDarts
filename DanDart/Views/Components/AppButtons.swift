@@ -141,7 +141,7 @@ private struct AppButtonStyle: ButtonStyle {
         case .tertiaryOutline:
             Capsule()
                 .strokeBorder(
-                    AppColor.interactivePrimaryBackground.opacity(isEnabled ? 1 : 0.5),
+                    AppColor.justWhite.opacity(isEnabled ? 1 : 0.5),
                     lineWidth: 1
                 )
         default:

@@ -56,7 +56,18 @@ class KillerViewModel: ObservableObject {
     }
     
     var canSave: Bool {
-        currentThrow.count == 3 && phase == .playing
+        if phase != .playing { return false }
+        
+        // Allow save if 3 darts thrown
+        if currentThrow.count == 3 { return true }
+        
+        // Allow save if current player eliminated themselves (even with < 3 darts)
+        let currentPlayerLives = displayPlayerLives[currentPlayer.id] ?? 0
+        if currentPlayerLives == 0 && !currentThrow.isEmpty {
+            return true
+        }
+        
+        return false
     }
     
     // Services (optional for Supabase sync)
@@ -136,6 +147,16 @@ class KillerViewModel: ObservableObject {
         // Process throw and get metadata
         let metadata = processThrow(dart)
         currentThrowMetadata.append(metadata)
+        
+        // Check if current player eliminated themselves
+        let currentPlayerLives = displayPlayerLives[currentPlayer.id] ?? 0
+        if currentPlayerLives == 0 {
+            print("💀 [Killer] Current player \(currentPlayer.displayName) eliminated themselves!")
+            
+            // Complete turn immediately (with fewer than 3 darts)
+            completeTurn()
+            return
+        }
         
         // Move highlight to next dart position (or stay on last if all 3 thrown)
         selectedDartIndex = min(currentThrow.count, 2)
