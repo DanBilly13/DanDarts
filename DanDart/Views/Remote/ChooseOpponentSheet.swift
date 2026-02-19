@@ -9,9 +9,10 @@ import SwiftUI
 
 struct ChooseOpponentSheet: View {
     @Binding var selectedOpponent: User?
-    @ObservedObject var friendsCache: FriendsCache
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var friendsService: FriendsService
+    @State private var friendUsers: [User] = []
     @State private var isLoadingFriends = false
     
     var body: some View {
@@ -21,7 +22,7 @@ struct ChooseOpponentSheet: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
-                } else if friendsCache.friends.isEmpty {
+                } else if friendUsers.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "person.2.slash")
                             .font(.system(size: 48))
@@ -38,9 +39,9 @@ struct ChooseOpponentSheet: View {
                     }
                     .padding(.vertical, 40)
                 } else {
-                    ForEach(friendsCache.friends, id: \.id) { friend in
+                    ForEach(friendUsers, id: \.id) { friend in
                         Button {
-                            selectedOpponent = friend.toUser()
+                            selectedOpponent = friend
                             
                             // Success haptic
                             #if canImport(UIKit)
@@ -70,7 +71,7 @@ struct ChooseOpponentSheet: View {
                                 Spacer()
                                 
                                 // Show checkmark if selected
-                                if selectedOpponent?.id == friend.toUser().id {
+                                if selectedOpponent?.id == friend.id {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: 24))
                                         .foregroundColor(AppColor.interactivePrimaryBackground)
@@ -92,24 +93,15 @@ struct ChooseOpponentSheet: View {
     }
     
     private func loadFriends() async {
-        guard friendsCache.friends.isEmpty else { return }
+        guard let currentUser = authService.currentUser else { return }
+        guard friendUsers.isEmpty else { return }
         
         isLoadingFriends = true
-        await friendsCache.loadFriends()
+        do {
+            friendUsers = try await friendsService.loadFriends(userId: currentUser.id)
+        } catch {
+            print("❌ Error loading friends: \(error)")
+        }
         isLoadingFriends = false
-    }
-}
-
-// Extension to convert Player to User (if needed)
-extension Player {
-    func toUser() -> User {
-        User(
-            id: userId ?? UUID(),
-            displayName: displayName,
-            nickname: nickname,
-            avatarURL: avatarURL,
-            totalWins: totalWins,
-            totalLosses: totalLosses
-        )
     }
 }

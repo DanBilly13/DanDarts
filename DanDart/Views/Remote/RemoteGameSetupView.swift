@@ -24,7 +24,6 @@ struct RemoteGameSetupView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
     @StateObject private var remoteMatchService = RemoteMatchService()
-    @StateObject private var friendsCache = FriendsCache()
     
     private var config: RemoteGameSetupConfig {
         RemoteGameSetupConfig(game: game)
@@ -131,19 +130,24 @@ struct RemoteGameSetupView: View {
                         }
                         
                         if let opponent = selectedOpponent {
-                            // Show selected opponent
-                            PlayerCard(
-                                player: Player(
-                                    displayName: opponent.displayName,
-                                    nickname: opponent.nickname,
-                                    avatarURL: opponent.avatarURL,
-                                    isGuest: false,
-                                    totalWins: opponent.totalWins,
-                                    totalLosses: opponent.totalLosses,
-                                    userId: opponent.id
-                                ),
-                                playerNumber: 2
-                            )
+                            // Show selected opponent (tappable to change)
+                            Button {
+                                showSearchPlayer = true
+                            } label: {
+                                PlayerCard(
+                                    player: Player(
+                                        displayName: opponent.displayName,
+                                        nickname: opponent.nickname,
+                                        avatarURL: opponent.avatarURL,
+                                        isGuest: false,
+                                        totalWins: opponent.totalWins,
+                                        totalLosses: opponent.totalLosses,
+                                        userId: opponent.id
+                                    ),
+                                    playerNumber: 2
+                                )
+                            }
+                            .buttonStyle(.plain)
                             .customSwipeAction(
                                 title: "Remove",
                                 systemImage: "xmark.circle",
@@ -223,37 +227,19 @@ struct RemoteGameSetupView: View {
                 Spacer()
             }
             
-            // Bottom action bar
+            // Bottom action bar - only show Send Challenge when opponent selected
             VStack {
                 Spacer()
                 BottomActionContainer {
-                    if selectedOpponent == nil {
-                        GeometryReader { geo in
-                            AppButton(role: .secondary, controlSize: .extraLarge) {
-                                showSearchPlayer = true
-                            } label: {
-                                Label("Choose opponent", systemImage: "person.badge.plus")
-                            }
-                            .halfWidth(in: geo)
-                        }
-                        .frame(height: 80)
-                    } else {
-                        HStack(spacing: 12) {
-                            AppButton(role: .secondary, controlSize: .extraLarge) {
-                                showSearchPlayer = true
-                            } label: {
-                                Label("Change opponent", systemImage: "person.2")
-                            }
-
-                            AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canSendChallenge) {
-                                sendChallenge()
-                            } label: {
-                                if isCreating {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Text("Send challenge")
-                                }
+                    if selectedOpponent != nil {
+                        AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canSendChallenge) {
+                            sendChallenge()
+                        } label: {
+                            if isCreating {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Text("Send challenge")
                             }
                         }
                     }
@@ -264,16 +250,13 @@ struct RemoteGameSetupView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showSearchPlayer) {
-            ChooseOpponentSheet(
-                selectedOpponent: $selectedOpponent,
-                friendsCache: friendsCache
-            )
-            .modernSheet(
-                title: "Choose Opponent",
-                subtitle: "Select a friend to challenge",
-                detents: [.large],
-                background: AppColor.surfacePrimary
-            )
+            ChooseOpponentSheet(selectedOpponent: $selectedOpponent)
+                .modernSheet(
+                    title: "Choose Opponent",
+                    subtitle: "Select a friend to challenge",
+                    detents: [.large],
+                    background: AppColor.surfacePrimary
+                )
         }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) {
@@ -321,8 +304,6 @@ struct RemoteGameSetupView: View {
                 await MainActor.run {
                     isCreating = false
                     dismiss()
-                    // Navigate to Remote tab
-                    router.selectedTab = 2 // Remote tab index
                 }
                 
                 print("✅ Challenge created: \(matchId)")
@@ -347,6 +328,6 @@ struct RemoteGameSetupView: View {
 
 #Preview {
     RemoteGameSetupView(game: Game.remote301)
-        .environmentObject(Router())
+        .environmentObject(Router.shared)
         .environmentObject(AuthService.shared)
 }

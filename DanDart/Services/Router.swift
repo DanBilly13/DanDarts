@@ -27,6 +27,9 @@ enum Destination: Hashable {
     case suddenDeathGameplay(game: Game, players: [Player], startingLives: Int)
     case killerGameplay(game: Game, players: [Player], startingLives: Int)
     
+    // Remote games flow
+    case remoteGameSetup(game: Game, opponent: User?)
+    
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?)
     
@@ -47,6 +50,8 @@ enum Destination: Hashable {
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.killerGameplay(let g1, let p1, let l1), .killerGameplay(let g2, let p2, let l2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
+        case (.remoteGameSetup(let g1, let o1), .remoteGameSetup(let g2, let o2)):
+            return g1.id == g2.id && o1?.id == o2?.id
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
         default:
@@ -89,6 +94,10 @@ enum Destination: Hashable {
             hasher.combine(game.id)
             hasher.combine(players.map(\.id))
             hasher.combine(startingLives)
+        case .remoteGameSetup(let game, let opponent):
+            hasher.combine("remoteGameSetup")
+            hasher.combine(game.id)
+            hasher.combine(opponent?.id)
         case .gameEnd:
             hasher.combine("gameEnd")
         }
@@ -183,6 +192,9 @@ class Router: ObservableObject {
             
         case .killerGameplay(let game, let players, let startingLives):
             KillerGameplayView(game: game, players: players, startingLives: startingLives)
+            
+        case .remoteGameSetup(let game, let opponent):
+            RemoteGameSetupView(game: game, preselectedOpponent: opponent)
             
         case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
             GameEndView(

@@ -13,6 +13,7 @@ import Foundation
 
 enum RemoteMatchStatus: String, Codable, CaseIterable {
     case pending
+    case sent
     case ready
     case lobby
     case inProgress = "in_progress"
@@ -23,6 +24,7 @@ enum RemoteMatchStatus: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .pending: return "Pending"
+        case .sent: return "Sent"
         case .ready: return "Ready"
         case .lobby: return "Lobby"
         case .inProgress: return "In Progress"
@@ -35,14 +37,14 @@ enum RemoteMatchStatus: String, Codable, CaseIterable {
     var isActive: Bool {
         switch self {
         case .ready, .lobby, .inProgress: return true
-        case .pending, .completed, .expired, .cancelled: return false
+        case .pending, .sent, .completed, .expired, .cancelled: return false
         }
     }
     
     var isFinished: Bool {
         switch self {
         case .completed, .expired, .cancelled: return true
-        case .pending, .ready, .lobby, .inProgress: return false
+        case .pending, .sent, .ready, .lobby, .inProgress: return false
         }
     }
 }
@@ -90,20 +92,22 @@ struct RemoteMatch: Identifiable, Codable {
     }
     
     var isExpired: Bool {
-        if let expiresAt = joinWindowExpiresAt {
+        // If we have a join window, it applies to states where we're waiting on something time-bound
+        if let expiresAt = joinWindowExpiresAt, status == .ready || status == .lobby || status == .sent {
             return Date() > expiresAt
         }
-        if let expiresAt = challengeExpiresAt {
+        // Otherwise fall back to the broader challenge expiry (typically for pending inbound)
+        if let expiresAt = challengeExpiresAt, status == .pending {
             return Date() > expiresAt
         }
         return false
     }
     
     var timeRemaining: TimeInterval? {
-        if let expiresAt = joinWindowExpiresAt, status == RemoteMatchStatus.ready || status == RemoteMatchStatus.lobby {
+        if let expiresAt = joinWindowExpiresAt, status == .ready || status == .lobby || status == .sent {
             return max(0, expiresAt.timeIntervalSinceNow)
         }
-        if let expiresAt = challengeExpiresAt, status == RemoteMatchStatus.pending {
+        if let expiresAt = challengeExpiresAt, status == .pending {
             return max(0, expiresAt.timeIntervalSinceNow)
         }
         return nil
@@ -235,6 +239,7 @@ struct RemoteMatchWithPlayers: Identifiable {
 // MARK: - Remote Match Error
 
 enum RemoteMatchError: Error {
+    case notAuthenticated
     case notAuthorized
     case invalidStatus
     case matchExpired

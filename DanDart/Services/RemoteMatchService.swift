@@ -11,6 +11,7 @@ import Supabase
 @MainActor
 class RemoteMatchService: ObservableObject {
     private let supabaseService = SupabaseService.shared
+    private let authService = AuthService.shared
     
     // MARK: - Configuration Constants
     
@@ -92,6 +93,9 @@ class RemoteMatchService: ObservableObject {
                 } else {
                     sent.append(matchWithPlayers)
                 }
+            case .sent:
+                // Outgoing challenge awaiting response (if ever represented explicitly)
+                sent.append(matchWithPlayers)
             case .ready:
                 ready.append(matchWithPlayers)
             case .lobby, .inProgress:
@@ -131,6 +135,11 @@ class RemoteMatchService: ObservableObject {
         let matchId = UUID()
         let now = Date()
         let expiresAt = now.addingTimeInterval(challengeExpirySeconds)
+        let joinWindowExpiresAt = now.addingTimeInterval(300) // 5 minutes
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            throw RemoteMatchError.notAuthenticated
+        }
         
         struct CreateMatchRecord: Encodable {
             let id: String
@@ -142,6 +151,7 @@ class RemoteMatchService: ObservableObject {
             let receiver_id: String
             let remote_status: String
             let challenge_expires_at: String
+            let join_window_expires_at: String
             let created_at: String
             let updated_at: String
         }
@@ -156,6 +166,7 @@ class RemoteMatchService: ObservableObject {
             receiver_id: receiverId.uuidString,
             remote_status: "pending",
             challenge_expires_at: ISO8601DateFormatter().string(from: expiresAt),
+            join_window_expires_at: ISO8601DateFormatter().string(from: joinWindowExpiresAt),
             created_at: ISO8601DateFormatter().string(from: now),
             updated_at: ISO8601DateFormatter().string(from: now)
         )

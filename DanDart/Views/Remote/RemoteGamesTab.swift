@@ -9,8 +9,8 @@ import SwiftUI
 
 struct RemoteGamesTab: View {
     @StateObject private var remoteMatchService = RemoteMatchService()
+    @StateObject private var router = Router.shared
     @EnvironmentObject var authService: AuthService
-    @EnvironmentObject var router: Router
     
     @State private var processingMatchId: UUID?
     @State private var errorMessage: String?
@@ -18,7 +18,7 @@ struct RemoteGamesTab: View {
     @State private var showGameSelection = false
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.path) {
             ZStack {
                 AppColor.backgroundPrimary
                     .ignoresSafeArea()
@@ -31,8 +31,26 @@ struct RemoteGamesTab: View {
                     emptyStateView
                 }
             }
-            .navigationTitle("Remote Games")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("Remote matches")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarRole(.editor)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    ToolbarTitle(title: "Remote matches")
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showGameSelection = true
+                    } label: {
+                        Text("Challenge")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                    .frame(minWidth: 44)
+                }
+            }
+            .customNavBar(title: "Remote matches", subtitle: nil)
             .task {
                 await loadMatches()
             }
@@ -60,7 +78,13 @@ struct RemoteGamesTab: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
+            .navigationDestination(for: Route.self) { route in
+                router.view(for: route)
+                    .background(AppColor.backgroundPrimary)
+            }
         }
+        .environmentObject(router)
+        .background(AppColor.backgroundPrimary).ignoresSafeArea()
     }
     
     // MARK: - Loading View
@@ -80,7 +104,7 @@ struct RemoteGamesTab: View {
     private var matchListView: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Match Ready section (priority)
+                // Match Ready section (highest priority)
                 if !remoteMatchService.readyMatches.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Match Ready", systemImage: "checkmark.circle.fill", color: .green)
@@ -98,6 +122,7 @@ struct RemoteGamesTab: View {
                                 ),
                                 state: .ready,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
+                                expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
                                 onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
                                 onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
                             )
@@ -105,27 +130,7 @@ struct RemoteGamesTab: View {
                     }
                 }
                 
-                // Active match (in progress)
-                if let activeMatch = remoteMatchService.activeMatch {
-                    VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
-                        
-                        PlayerChallengeCard(
-                            player: Player(
-                                displayName: activeMatch.opponent.displayName,
-                                nickname: activeMatch.opponent.nickname,
-                                avatarURL: activeMatch.opponent.avatarURL,
-                                isGuest: false,
-                                totalWins: activeMatch.opponent.totalWins,
-                                totalLosses: activeMatch.opponent.totalLosses,
-                                userId: activeMatch.opponent.id
-                            ),
-                            state: activeMatch.match.status ?? .inProgress
-                        )
-                    }
-                }
-                
-                // Received challenges
+                // Received challenges (dimmed when match ready)
                 if !remoteMatchService.pendingChallenges.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
@@ -143,14 +148,16 @@ struct RemoteGamesTab: View {
                                 ),
                                 state: .pending,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
+                                expiresAt: nil,
                                 onAccept: { acceptChallenge(matchId: matchWithPlayers.match.id) },
                                 onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
                             )
                         }
                     }
+                    .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
                 }
                 
-                // Sent challenges
+                // Sent challenges (dimmed when match ready)
                 if !remoteMatchService.sentChallenges.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Sent challenges", systemImage: "paperplane.fill", color: .gray)
@@ -166,12 +173,36 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .pending,
+                                state: .sent,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
+                                expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
                                 onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
                             )
                         }
                     }
+                    .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
+                }
+                
+                // Active match (in progress, dimmed when match ready)
+                if let activeMatch = remoteMatchService.activeMatch {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
+                        
+                        PlayerChallengeCard(
+                            player: Player(
+                                displayName: activeMatch.opponent.displayName,
+                                nickname: activeMatch.opponent.nickname,
+                                avatarURL: activeMatch.opponent.avatarURL,
+                                isGuest: false,
+                                totalWins: activeMatch.opponent.totalWins,
+                                totalLosses: activeMatch.opponent.totalLosses,
+                                userId: activeMatch.opponent.id
+                            ),
+                            state: activeMatch.match.status ?? .inProgress,
+                            expiresAt: nil
+                        )
+                    }
+                    .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
                 }
             }
             .padding(.horizontal, 16)
@@ -187,27 +218,15 @@ struct RemoteGamesTab: View {
             Spacer()
             
             Image(systemName: "network")
-                .font(.system(size: 64))
-                .foregroundStyle(AppColor.textSecondary)
+                .font(.system(size: 80))
+                .foregroundStyle(AppColor.textSecondary.opacity(0.5))
             
             VStack(spacing: 8) {
-                Text("No Remote Matches")
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundStyle(AppColor.textPrimary)
-                
-                Text("Challenge a friend to start playing")
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(AppColor.textSecondary)
+                Text("You have no\nremote matches")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(AppColor.textPrimary)
                     .multilineTextAlignment(.center)
             }
-            
-            AppButton(role: .primary, controlSize: .large) {
-                showGameSelection = true
-            } label: {
-                Text("Challenge a Friend")
-            }
-            .padding(.horizontal, 32)
             
             Spacer()
         }

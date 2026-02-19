@@ -14,14 +14,24 @@ struct PlayerChallengeCard: View {
     let player: Player
     let state: RemoteMatchStatus
     let isProcessing: Bool
+    let expiresAt: Date?
     let onAccept: (() -> Void)?
     let onDecline: (() -> Void)?
     let onJoin: (() -> Void)?
+    
+    @State private var currentTime = Date()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    private var timeRemaining: TimeInterval? {
+        guard let expiresAt else { return nil }
+        return max(0, expiresAt.timeIntervalSince(currentTime))
+    }
     
     init(
         player: Player,
         state: RemoteMatchStatus,
         isProcessing: Bool = false,
+        expiresAt: Date? = nil,
         onAccept: (() -> Void)? = nil,
         onDecline: (() -> Void)? = nil,
         onJoin: (() -> Void)? = nil
@@ -29,6 +39,7 @@ struct PlayerChallengeCard: View {
         self.player = player
         self.state = state
         self.isProcessing = isProcessing
+        self.expiresAt = expiresAt
         self.onAccept = onAccept
         self.onDecline = onDecline
         self.onJoin = onJoin
@@ -64,6 +75,7 @@ struct PlayerChallengeCard: View {
             PlayerChallengeCardFoot(
                 state: state,
                 isProcessing: isProcessing,
+                timeRemaining: timeRemaining,
                 onAccept: onAccept,
                 onDecline: onDecline,
                 onJoin: onJoin
@@ -73,6 +85,9 @@ struct PlayerChallengeCard: View {
         .frame(maxWidth: .infinity)
         .background(AppColor.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .onReceive(timer) { time in
+            currentTime = time
+        }
     }
 }
 
@@ -80,9 +95,18 @@ struct PlayerChallengeCard: View {
 struct PlayerChallengeCardFoot: View {
     let state: RemoteMatchStatus
     let isProcessing: Bool
+    let timeRemaining: TimeInterval?
     let onAccept: (() -> Void)?
     let onDecline: (() -> Void)?
     let onJoin: (() -> Void)?
+    
+    private var formattedTimeRemaining: String {
+        guard let timeRemaining else { return "" }
+        let totalSeconds = max(0, Int(timeRemaining.rounded(.down)))
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
     
     var body: some View {
         Group {
@@ -117,6 +141,21 @@ struct PlayerChallengeCardFoot: View {
                         }
                     }
                     .disabled(isProcessing)
+                }
+                
+            case .sent:
+                HStack(spacing: 8) {
+                    Image(systemName: "clock")
+                        .foregroundStyle(AppColor.textSecondary)
+                    Text("Waiting for response")
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.textPrimary)
+                    Spacer()
+                    Text(formattedTimeRemaining.isEmpty ? "—" : formattedTimeRemaining)
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.textPrimary)
                 }
                 
             case .ready:
@@ -223,7 +262,8 @@ struct PlayerChallengeCardFoot: View {
             totalWins: 15,
             totalLosses: 8
         ),
-        state: .ready
+        state: .ready,
+        expiresAt: Date().addingTimeInterval(300)
     )
     .padding()
     .background(AppColor.backgroundPrimary)
