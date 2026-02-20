@@ -56,7 +56,7 @@ Explicitly out of scope for v1:
 
 ### Challenges & Concurrency
 - A user may **receive multiple** incoming challenges (**Pending**).
-- A user may **send multiple** outgoing challenges (**Pending**).
+- A user may **send multiple** outgoing challenges (**Sent**).
 - A user may have **only one Ready match** at a time.
 - A user may have **only one In Progress match** at a time.
 
@@ -70,7 +70,8 @@ When a match becomes **Ready** (i.e., both sides have accepted and it’s joinab
 > This preserves clarity (“what just happened?”) without a toast, by visually showing other items are temporarily locked.
 
 ### Expiry Window
-- Challenges **auto-expire** after a configured window (e.g., **24h**)  
+- Incoming challenges (**Pending**) auto-expire after a configured window (e.g., **24h**).
+- Outgoing challenges (**Sent**) may use a shorter response/join window depending on configuration (e.g., debug builds).
 - Ready join window (see below) is separate from “challenge expiry”.
 
 ### Join Window (Live requirement)
@@ -84,7 +85,9 @@ Once the match is **Ready**, players must join within the join window:
 ## 5. Match Lifecycle
 
 ### States
-- **Pending** (challenge exists; awaiting accept)
+- **Pending** (incoming challenge; awaiting receiver accept)
+- **Sent** (outgoing challenge created by challenger; awaiting receiver accept)
+  > Note: The Sent state was introduced after implementation began to clearly distinguish outgoing challenges from incoming Pending challenges. This simplifies expiry logic and UI rendering.
 - **Ready** (both accepted; joinable within join window)
 - **Lobby** (one player joined; waiting for the other)
 - **In Progress**
@@ -93,7 +96,8 @@ Once the match is **Ready**, players must join within the join window:
 - **Cancelled**
 
 ### Allowed Transitions (server-controlled)
-- Pending → Ready
+- Pending → Ready (receiver accepts)
+- Sent → Ready (receiver accepts)
 - Ready → Lobby
 - Lobby → In Progress
 - Ready → Expired
@@ -220,7 +224,7 @@ These colors persist across:
 - Network delay during Save → UI waits for server confirmation
 - Duplicate Save attempts prevented server-side
 - Race conditions:
-  - First acceptance that produces “Ready” wins; other pending challenges become disabled (not deleted)
+  - First acceptance that produces “Ready” wins; other Pending (incoming) and Sent (outgoing) challenges become disabled (not deleted)
 - User manually closes a Ready card:
   - v1 assumption: **no penalty**
   - match can still expire naturally or be cancelled (explicitly)
@@ -264,7 +268,8 @@ Used to drive challenge card presentation and footer actions:
 
 ```swift
 enum RemoteMatchStatus {
-    case pending
+    case pending   // incoming
+    case sent      // outgoing
     case ready
     case expired
 }

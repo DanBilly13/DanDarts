@@ -224,21 +224,41 @@ struct CreateChallengeView: View {
     // MARK: - Create Challenge
     
     private func createChallenge() {
-        guard let friend = selectedFriend,
-              let currentUserId = authService.currentUser?.id else {
+        print("🚀 Send challenge tapped")
+        print("   - selectedFriend: \(selectedFriend?.displayName ?? "nil")")
+        print("   - selectedGameType: \(selectedGameType)")
+        print("   - selectedMatchFormat: \(selectedMatchFormat)")
+        print("   - currentUser: \(authService.currentUser?.id.uuidString ?? "nil")")
+        
+        guard let friend = selectedFriend else {
+            print("❌ Guard failed: selectedFriend is nil")
             return
         }
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            print("❌ Guard failed: currentUser.id is nil")
+            return
+        }
+        
+        print("✅ All guards passed")
+        print("   - receiverId: \(friend.id)")
+        print("   - gameType: \(selectedGameType)")
+        print("   - matchFormat: \(selectedMatchFormat)")
+        print("   - currentUserId: \(currentUserId)")
         
         isCreating = true
         
         Task {
             do {
+                print("📤 About to call remoteMatchService.createChallenge")
                 let matchId = try await remoteMatchService.createChallenge(
                     receiverId: friend.id,
                     gameType: selectedGameType,
                     matchFormat: selectedMatchFormat,
                     currentUserId: currentUserId
                 )
+                
+                print("✅ createChallenge returned successfully: \(matchId)")
                 
                 // Success haptic
                 #if canImport(UIKit)
@@ -253,6 +273,15 @@ struct CreateChallengeView: View {
                 
                 print("✅ Challenge created: \(matchId)")
             } catch {
+                print("❌ createChallenge threw error:")
+                print("   - Error: \(error)")
+                print("   - Type: \(type(of: error))")
+                print("   - LocalizedDescription: \(error.localizedDescription)")
+                
+                if let remoteError = error as? RemoteMatchError {
+                    print("   - RemoteMatchError: \(remoteError)")
+                }
+                
                 await MainActor.run {
                     isCreating = false
                     errorMessage = "Failed to create challenge: \(error.localizedDescription)"

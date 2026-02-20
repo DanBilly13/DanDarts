@@ -13,7 +13,7 @@ import Foundation
 
 enum RemoteMatchStatus: String, Codable, CaseIterable {
     case pending
-    case sent
+    case sent // UI-only state for outgoing pending challenges (not in database)
     case ready
     case lobby
     case inProgress = "in_progress"
@@ -92,19 +92,34 @@ struct RemoteMatch: Identifiable, Codable {
     }
     
     var isExpired: Bool {
+        let now = Date()
+        
+        // For sent challenges, use join_window_expires_at (30 seconds for testing)
+        if let expiresAt = joinWindowExpiresAt, status == .sent {
+            let expired = now > expiresAt
+            print("🔍 isExpired check - status: sent, joinWindowExpiresAt: \(expiresAt), now: \(now), expired: \(expired)")
+            return expired
+        }
+        
         // If we have a join window, it applies to states where we're waiting on something time-bound
-        if let expiresAt = joinWindowExpiresAt, status == .ready || status == .lobby || status == .sent {
-            return Date() > expiresAt
+        if let expiresAt = joinWindowExpiresAt, status == .ready || status == .lobby {
+            let expired = now > expiresAt
+            print("🔍 isExpired check - status: \(status?.rawValue ?? "nil"), joinWindowExpiresAt: \(expiresAt), now: \(now), expired: \(expired)")
+            return expired
         }
         // Otherwise fall back to the broader challenge expiry (typically for pending inbound)
         if let expiresAt = challengeExpiresAt, status == .pending {
-            return Date() > expiresAt
+            let expired = now > expiresAt
+            print("🔍 isExpired check - status: pending, challengeExpiresAt: \(expiresAt), now: \(now), expired: \(expired)")
+            return expired
         }
+        
+        print("🔍 isExpired check - no expiry date found, status: \(status?.rawValue ?? "nil")")
         return false
     }
     
     var timeRemaining: TimeInterval? {
-        if let expiresAt = joinWindowExpiresAt, status == .ready || status == .lobby || status == .sent {
+        if let expiresAt = joinWindowExpiresAt, status == .sent || status == .ready || status == .lobby {
             return max(0, expiresAt.timeIntervalSinceNow)
         }
         if let expiresAt = challengeExpiresAt, status == .pending {
@@ -232,6 +247,69 @@ struct RemoteMatchWithPlayers: Identifiable {
             case .challenger: return "Challenger"
             case .receiver: return "Receiver"
             }
+        }
+    }
+    
+    // MARK: - Expiration Logic with User Context
+    
+    var isExpired: Bool {
+        let now = Date()
+        
+        // For pending challenges, check if incoming or outgoing
+        if match.status == .pending {
+            // Outgoing challenge (I'm the challenger) - use join window (30s for testing)
+            if match.challengerId == currentUserId {
+                if let expiresAt = match.joinWindowExpiresAt {
+                    let expired = now > expiresAt
+                    print("🔍 isExpired check - OUTGOING pending (sent), joinWindowExpiresAt: \(expiresAt), now: \(now), expired: \(expired)")
+                    return expired
+                }
+            }
+            // Incoming challenge (I'm the receiver) - use challenge expiry (24h)
+            else {
+                if let expiresAt = match.challengeExpiresAt {
+                    let expired = now > expiresAt
+                    print("🔍 isExpired check - INCOMING pending, challengeExpiresAt: \(expiresAt), now: \(now), expired: \(expired)")
+                    return expired
+                }
+            }
+        }
+        
+        // For other statuses, delegate to match's isExpired
+        return match.isExpired
+    }
+    
+    var timeRemaining: TimeInterval? {
+        // For pending challenges, check if incoming or outgoing
+        if match.status == .pending {
+            // Outgoing (I'm challenger) - use join window
+            if match.challengerId == currentUserId {
+                if let expiresAt = match.joinWindowExpiresAt {
+                    return max(0, expiresAt.timeIntervalSinceNow)
+                }
+            }
+            // Incoming (I'm receiver) - use challenge expiry
+            else {
+                if let expiresAt = match.challengeExpiresAt {
+                    return max(0, expiresAt.timeIntervalSinceNow)
+                }
+            }
+        }
+        
+        // For other statuses, delegate to match's timeRemaining
+        return match.timeRemaining
+    }
+    
+    var formattedTimeRemaining: String {
+        guard let remaining = timeRemaining else { return "" }
+        
+        let minutes = Int(remaining) / 60
+        let seconds = Int(remaining) % 60
+        
+        if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
+        } else {
+            return String(format: "0:%02d", seconds)
         }
     }
 }

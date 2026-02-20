@@ -19,14 +19,6 @@ struct PlayerChallengeCard: View {
     let onDecline: (() -> Void)?
     let onJoin: (() -> Void)?
     
-    @State private var currentTime = Date()
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    
-    private var timeRemaining: TimeInterval? {
-        guard let expiresAt else { return nil }
-        return max(0, expiresAt.timeIntervalSince(currentTime))
-    }
-    
     init(
         player: Player,
         state: RemoteMatchStatus,
@@ -75,7 +67,7 @@ struct PlayerChallengeCard: View {
             PlayerChallengeCardFoot(
                 state: state,
                 isProcessing: isProcessing,
-                timeRemaining: timeRemaining,
+                expiresAt: expiresAt,
                 onAccept: onAccept,
                 onDecline: onDecline,
                 onJoin: onJoin
@@ -85,9 +77,6 @@ struct PlayerChallengeCard: View {
         .frame(maxWidth: .infinity)
         .background(AppColor.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .onReceive(timer) { time in
-            currentTime = time
-        }
     }
 }
 
@@ -95,13 +84,13 @@ struct PlayerChallengeCard: View {
 struct PlayerChallengeCardFoot: View {
     let state: RemoteMatchStatus
     let isProcessing: Bool
-    let timeRemaining: TimeInterval?
+    let expiresAt: Date?
     let onAccept: (() -> Void)?
     let onDecline: (() -> Void)?
     let onJoin: (() -> Void)?
     
-    private var formattedTimeRemaining: String {
-        guard let timeRemaining else { return "" }
+    private func formatTimeRemaining(from expiresAt: Date) -> String {
+        let timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
         let totalSeconds = max(0, Int(timeRemaining.rounded(.down)))
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
@@ -152,10 +141,23 @@ struct PlayerChallengeCardFoot: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(AppColor.textPrimary)
                     Spacer()
-                    Text(formattedTimeRemaining.isEmpty ? "—" : formattedTimeRemaining)
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(AppColor.textPrimary)
+                    
+                    if let expiresAt = expiresAt {
+                        TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                            let timeString = formatTimeRemaining(from: expiresAt)
+                            let _ = print("⏱️ TimelineView tick - expiresAt: \(expiresAt), now: \(context.date), timeRemaining: \(timeString)")
+                            
+                            Text(timeString)
+                                .font(.system(.subheadline, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppColor.textPrimary)
+                        }
+                    } else {
+                        Text("—")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppColor.textPrimary)
+                    }
                 }
                 
             case .ready:

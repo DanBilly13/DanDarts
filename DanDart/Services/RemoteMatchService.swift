@@ -16,7 +16,7 @@ class RemoteMatchService: ObservableObject {
     // MARK: - Configuration Constants
     
     private let challengeExpirySeconds: TimeInterval = 86400 // 24 hours
-    private let joinWindowSeconds: TimeInterval = 300 // 5 minutes
+    private let joinWindowSeconds: TimeInterval = 30 // 30 seconds (DEBUG: was 300/5min)
     
     // MARK: - Published State
     
@@ -26,6 +26,25 @@ class RemoteMatchService: ObservableObject {
     @Published var activeMatch: RemoteMatchWithPlayers?
     @Published var isLoading = false
     @Published var error: RemoteMatchError?
+    
+    // MARK: - Helper Methods
+    
+    /// Get headers required for Edge Function calls (apikey + auth token)
+    private func getEdgeFunctionHeaders() async throws -> [String: String] {
+        // Get current session
+        guard let session = try? await supabaseService.client.auth.session else {
+            print("❌ No session found")
+            throw RemoteMatchError.notAuthenticated
+        }
+        
+        // Debug log
+        print("🔑 Session token: \(session.accessToken.prefix(12))...")
+        
+        return [
+            "apikey": supabaseService.supabaseAnonKey,
+            "Authorization": "Bearer \(session.accessToken)"
+        ]
+    }
     
     // MARK: - Realtime Subscription
     
@@ -94,7 +113,8 @@ class RemoteMatchService: ObservableObject {
                     sent.append(matchWithPlayers)
                 }
             case .sent:
-                // Outgoing challenge awaiting response (if ever represented explicitly)
+                // This should never come from database, but handle it for completeness
+                // .sent is UI-only state, database always uses .pending
                 sent.append(matchWithPlayers)
             case .ready:
                 ready.append(matchWithPlayers)
@@ -114,7 +134,7 @@ class RemoteMatchService: ObservableObject {
     
     // MARK: - Create Challenge
     
-    /// Create a new challenge
+    /// Create a new challenge (calls Edge Function)
     func createChallenge(
         receiverId: UUID,
         gameType: String,
@@ -132,55 +152,63 @@ class RemoteMatchService: ObservableObject {
             throw RemoteMatchError.alreadyHasActiveMatch
         }
         
-        let matchId = UUID()
-        let now = Date()
-        let expiresAt = now.addingTimeInterval(challengeExpirySeconds)
-        let joinWindowExpiresAt = now.addingTimeInterval(300) // 5 minutes
-        
-        guard let currentUserId = authService.currentUser?.id else {
-            throw RemoteMatchError.notAuthenticated
-        }
-        
-        struct CreateMatchRecord: Encodable {
-            let id: String
-            let match_mode: String
-            let game_type: String
-            let game_name: String
-            let match_format: Int
-            let challenger_id: String
+        struct CreateChallengeRequest: Encodable {
             let receiver_id: String
-            let remote_status: String
-            let challenge_expires_at: String
-            let join_window_expires_at: String
-            let created_at: String
-            let updated_at: String
+            let game_type: String
+            let match_format: Int
         }
         
-        let record = CreateMatchRecord(
-            id: matchId.uuidString,
-            match_mode: "remote",
-            game_type: gameType,
-            game_name: gameType,
-            match_format: matchFormat,
-            challenger_id: currentUserId.uuidString,
+        struct CreateChallengeResponse: Decodable {
+            let success: Bool
+            let data: MatchData
+            let message: String
+            
+            struct MatchData: Decodable {
+                let id: String
+            }
+        }
+        
+        let request = CreateChallengeRequest(
             receiver_id: receiverId.uuidString,
-            remote_status: "pending",
-            challenge_expires_at: ISO8601DateFormatter().string(from: expiresAt),
-            join_window_expires_at: ISO8601DateFormatter().string(from: joinWindowExpiresAt),
-            created_at: ISO8601DateFormatter().string(from: now),
-            updated_at: ISO8601DateFormatter().string(from: now)
+            game_type: gameType,
+            match_format: matchFormat
         )
         
-        try await supabaseService.client
-            .from("matches")
-            .insert(record)
-            .execute()
+        let headers = try await getEdgeFunctionHeaders()
         
-        print("✅ Challenge created: \(matchId)")
+        print("🚀 Calling create-challenge Edge Function...")
+        print("   - receiver_id: \(receiverId)")
+        print("   - game_type: \(gameType)")
+        print("   - match_format: \(matchFormat)")
         
-        // TODO: Trigger push notification to receiver
-        
-        return matchId
+        do {
+            let response: CreateChallengeResponse = try await supabaseService.client.functions
+                .invoke("create-challenge", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: request
+                ))
+            
+            guard let matchId = UUID(uuidString: response.data.id) else {
+                throw RemoteMatchError.databaseError("Invalid match ID returned from server")
+            }
+            
+            print("✅ Challenge created: \(matchId)")
+            
+            return matchId
+        } catch {
+            print("❌ create-challenge Edge Function failed:")
+            print("   - Error: \(error)")
+            print("   - Error type: \(type(of: error))")
+            print("   - Localized description: \(error.localizedDescription)")
+            
+            // Try to extract more details from the error
+            if let functionError = error as? FunctionsError {
+                print("   - FunctionsError details: \(functionError)")
+            }
+            
+            // Re-throw as database error with details
+            throw RemoteMatchError.databaseError("Edge Function error: \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Accept Challenge
@@ -193,8 +221,17 @@ class RemoteMatchService: ObservableObject {
         
         let request = AcceptRequest(match_id: matchId.uuidString)
         
+        print("🔍 Getting headers for accept-challenge...")
+        let headers = try await getEdgeFunctionHeaders()
+        print("📋 Headers to send:")
+        print("   - apikey: \(String(headers["apikey"]?.prefix(20) ?? "MISSING"))...")
+        print("   - Authorization: \(String(headers["Authorization"]?.prefix(30) ?? "MISSING"))...")
+        
+        print("🚀 Calling accept-challenge with match_id: \(matchId)")
+        
         let _: EmptyResponse = try await supabaseService.client.functions
             .invoke("accept-challenge", options: FunctionInvokeOptions(
+                headers: headers,
                 body: request
             ))
         
@@ -210,9 +247,11 @@ class RemoteMatchService: ObservableObject {
         }
         
         let request = CancelRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
         
         let _: EmptyResponse = try await supabaseService.client.functions
             .invoke("cancel-match", options: FunctionInvokeOptions(
+                headers: headers,
                 body: request
             ))
         
@@ -228,9 +267,11 @@ class RemoteMatchService: ObservableObject {
         }
         
         let request = JoinRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
         
         let _: EmptyResponse = try await supabaseService.client.functions
             .invoke("join-match", options: FunctionInvokeOptions(
+                headers: headers,
                 body: request
             ))
         
@@ -413,12 +454,16 @@ class RemoteMatchService: ObservableObject {
     // MARK: - Lock Management
     
     private func checkUserHasLock(userId: UUID) async throws -> Bool {
+        // Simple approach: just check if user has any locks
+        // The expired challenge cleanup should happen elsewhere
         let locks: [RemoteMatchLock] = try await supabaseService.client
             .from("remote_match_locks")
             .select()
             .eq("user_id", value: userId.uuidString)
             .execute()
             .value
+        
+        print("🔍 Found \(locks.count) locks for user \(userId)")
         
         return !locks.isEmpty
     }

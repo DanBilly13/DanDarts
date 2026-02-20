@@ -3,9 +3,9 @@ trigger: manual
 ---
 
 # Dart Freak — Remote Matches
-## Full Implementation Task List (Gated Execution Plan) v1.1
+## Full Implementation Task List (Gated Execution Plan) v2
 
-> **Aligned with:** FRD v1.2 (includes implemented UI components + disabled/dimmed pending rule)
+> **Aligned with:** FRD v2 (includes implemented UI components + disabled/dimmed pending rule)
 
 ---
 
@@ -21,9 +21,8 @@ trigger: manual
 
 # Completed / Already Built (UI Foundations)
 
-These exist and should be used (not rebuilt):
-
-- `enum RemoteMatchStatus { case pending, ready, expired }`
+- `enum RemoteMatchStatus { case pending, sent, ready, expired }`
+  > Note: The `sent` state was introduced after implementation began to distinguish outgoing challenges from incoming `pending` challenges.
 - `PlayerChallengeCard` (footer driven by `RemoteMatchStatus`)
 - `GameCardRemote` (Remote 301 / Remote 501 entry cards; enum-driven content)
 
@@ -70,9 +69,7 @@ Define Match table schema, status enum, turn fields, expiry fields, and enforcem
 - Basic queries are performant
 
 ## Task 2 — Create Server Functions (Edge Functions / RPC)
-Implement server-authoritative operations:
-
-- Create challenge (Pending)
+- Create challenge (Sent)
 - Accept challenge (Pending → Ready)
 - Cancel challenge (Pending/Ready/Lobby → Cancelled)
 - Join match (Ready → Lobby; if both joined → In Progress)
@@ -107,7 +104,7 @@ Build the Remote bottom-tab view composed of existing components:
 Sections:
 - **Match Ready** (priority)
 - **You’ve been challenged** (incoming Pending)
-- **Sent challenges** (outgoing Pending)
+- **Sent challenges** (outgoing Sent)
 
 Use:
 - `PlayerChallengeCard` for each row
@@ -117,8 +114,7 @@ Use:
 - Remote tab displays server-backed lists for incoming/outgoing/ready
 
 ## Task 5 — Disabled/Dimmed Pending Rule in UI
-When a match becomes **Ready** for the user:
-- All other pending challenges are shown but **disabled/dimmed**
+- All other Pending (incoming) and Sent (outgoing) challenges are shown but **disabled/dimmed**
 - They are not actionable (buttons disabled)
 - If Ready match is cancelled/expired:
   - Pending challenges that are still within expiry become actionable again
@@ -170,7 +166,7 @@ Duplicate existing 301/501 setup screen and adapt for remote:
 - Confirm styling matches local setup screen
 
 ### Acceptance Criteria
-- User can configure format + pick opponent + send challenge (server create Pending)
+- User can configure format + pick opponent + send challenge (server create Sent)
 
 ## Task 9 — Choose Opponent Sheet
 - Single selection
@@ -354,7 +350,7 @@ Duplicate existing local 301/501 GameView and adapt:
 - Push notifications working (challenge received + accepted)
 - Server-authoritative turn control
 - Single Ready + single In Progress match per user
-- Disabled/dimmed pending challenges while Ready exists
+- Disabled/dimmed Pending (incoming) and Sent (outgoing) challenges while Ready exists
 - Deterministic match lifecycle
 - Challenger = Red, Receiver = Green throughout
 

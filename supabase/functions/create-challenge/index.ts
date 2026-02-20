@@ -3,10 +3,24 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import type { RemoteMatch, ErrorResponse, SuccessResponse } from '../_shared/types.ts'
 
-const CHALLENGE_EXPIRY_SECONDS = 86400 // 24 hours
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface ErrorResponse {
+  error: string
+  details?: any
+}
+
+interface SuccessResponse {
+  success: boolean
+  message: string
+  data?: any
+}
+
+const CHALLENGE_EXPIRY_SECONDS = 30 // 30 seconds (DEBUG: was 86400/24h)
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -15,26 +29,44 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization')
+    
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Extract JWT token from Bearer header
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Get Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader }
         },
       }
     )
 
-    // Get current user
+    // Get current user using JWT token
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' } as ErrorResponse),
+        JSON.stringify({ error: 'Unauthorized', details: userError } as ErrorResponse),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

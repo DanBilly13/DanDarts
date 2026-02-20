@@ -16,6 +16,9 @@ struct RemoteGamesTab: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showGameSelection = false
+    @State private var currentTime = Date()
+    @State private var expiredMatchIds: Set<UUID> = []
+    @State private var fadingMatchIds: Set<UUID> = []
     
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -57,6 +60,9 @@ struct RemoteGamesTab: View {
             .refreshable {
                 await loadMatches()
             }
+            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
+                currentTime = time
+            }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) {
                     showError = false
@@ -67,7 +73,7 @@ struct RemoteGamesTab: View {
                     Text(errorMessage)
                 }
             }
-            .confirmationDialog("Choose a game", isPresented: $showGameSelection) {
+            .alert("Choose a game", isPresented: $showGameSelection) {
                 Button("301") {
                     let opponent: User? = nil
                     router.push(.remoteGameSetup(game: Game.remote301, opponent: opponent))
@@ -77,6 +83,8 @@ struct RemoteGamesTab: View {
                     router.push(.remoteGameSetup(game: Game.remote501, opponent: opponent))
                 }
                 Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Select which game type you'd like to play")
             }
             .navigationDestination(for: Route.self) { route in
                 router.view(for: route)
@@ -109,7 +117,11 @@ struct RemoteGamesTab: View {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Match Ready", systemImage: "checkmark.circle.fill", color: .green)
                         
-                        ForEach(remoteMatchService.readyMatches) { matchWithPlayers in
+                        ForEach(remoteMatchService.readyMatches.filter { !expiredMatchIds.contains($0.id) }) { matchWithPlayers in
+                            let _ = currentTime // Force re-evaluation when currentTime changes
+                            let isExpired = matchWithPlayers.isExpired
+                            let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                            
                             PlayerChallengeCard(
                                 player: Player(
                                     displayName: matchWithPlayers.opponent.displayName,
@@ -120,12 +132,19 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .ready,
+                                state: isExpired ? .expired : .ready,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
                                 onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
                                 onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
                             )
+                            .opacity(isFading ? 0 : 1)
+                            .animation(.easeOut(duration: 0.5), value: isFading)
+                            .onChange(of: isExpired) { _, newValue in
+                                if newValue {
+                                    handleExpiration(matchId: matchWithPlayers.id)
+                                }
+                            }
                         }
                     }
                 }
@@ -135,7 +154,11 @@ struct RemoteGamesTab: View {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
                         
-                        ForEach(remoteMatchService.pendingChallenges) { matchWithPlayers in
+                        ForEach(remoteMatchService.pendingChallenges.filter { !expiredMatchIds.contains($0.id) }) { matchWithPlayers in
+                            let _ = currentTime // Force re-evaluation when currentTime changes
+                            let isExpired = matchWithPlayers.isExpired
+                            let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                            
                             PlayerChallengeCard(
                                 player: Player(
                                     displayName: matchWithPlayers.opponent.displayName,
@@ -146,12 +169,19 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .pending,
+                                state: isExpired ? .expired : .pending,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: nil,
                                 onAccept: { acceptChallenge(matchId: matchWithPlayers.match.id) },
                                 onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
                             )
+                            .opacity(isFading ? 0 : 1)
+                            .animation(.easeOut(duration: 0.5), value: isFading)
+                            .onChange(of: isExpired) { _, newValue in
+                                if newValue {
+                                    handleExpiration(matchId: matchWithPlayers.id)
+                                }
+                            }
                         }
                     }
                     .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
@@ -162,7 +192,12 @@ struct RemoteGamesTab: View {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Sent challenges", systemImage: "paperplane.fill", color: .gray)
                         
-                        ForEach(remoteMatchService.sentChallenges) { matchWithPlayers in
+                        ForEach(remoteMatchService.sentChallenges.filter { !expiredMatchIds.contains($0.id) }) { matchWithPlayers in
+                            let _ = currentTime // Force re-evaluation when currentTime changes
+                            let isExpired = matchWithPlayers.isExpired
+                            let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                            let _ = print("🎯 RemoteGamesTab - Rendering sent challenge: opponent=\(matchWithPlayers.opponent.displayName), isExpired=\(isExpired), isFading=\(isFading), status=\(matchWithPlayers.match.status?.rawValue ?? "nil")")
+                            
                             PlayerChallengeCard(
                                 player: Player(
                                     displayName: matchWithPlayers.opponent.displayName,
@@ -173,11 +208,18 @@ struct RemoteGamesTab: View {
                                     totalLosses: matchWithPlayers.opponent.totalLosses,
                                     userId: matchWithPlayers.opponent.id
                                 ),
-                                state: .sent,
+                                state: isExpired ? .expired : .sent,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
                                 onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
                             )
+                            .opacity(isFading ? 0 : 1)
+                            .animation(.easeOut(duration: 0.5), value: isFading)
+                            .onChange(of: isExpired) { _, newValue in
+                                if newValue {
+                                    handleExpiration(matchId: matchWithPlayers.id)
+                                }
+                            }
                         }
                     }
                     .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
@@ -255,9 +297,9 @@ struct RemoteGamesTab: View {
     // MARK: - Helpers
     
     private var hasAnyMatches: Bool {
-        !remoteMatchService.readyMatches.isEmpty ||
         !remoteMatchService.pendingChallenges.isEmpty ||
         !remoteMatchService.sentChallenges.isEmpty ||
+        !remoteMatchService.readyMatches.isEmpty ||
         remoteMatchService.activeMatch != nil
     }
     
@@ -403,6 +445,29 @@ struct RemoteGamesTab: View {
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.error)
                 #endif
+            }
+        }
+    }
+    
+    private func handleExpiration(matchId: UUID) {
+        // Prevent duplicate handling
+        guard !fadingMatchIds.contains(matchId) && !expiredMatchIds.contains(matchId) else {
+            return
+        }
+        
+        print("⏰ Starting expiration timer for match: \(matchId)")
+        
+        // Wait 5 seconds after expiration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            print("🌫️ Starting fade animation for match: \(matchId)")
+            // Start fade animation
+            fadingMatchIds.insert(matchId)
+            
+            // Remove after fade completes (0.5s)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("🗑️ Removing expired match: \(matchId)")
+                expiredMatchIds.insert(matchId)
+                fadingMatchIds.remove(matchId)
             }
         }
     }
