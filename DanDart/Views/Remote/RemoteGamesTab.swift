@@ -171,7 +171,7 @@ struct RemoteGamesTab: View {
                                 ),
                                 state: isExpired ? .expired : .pending,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
-                                expiresAt: nil,
+                                expiresAt: matchWithPlayers.match.challengeExpiresAt,
                                 onAccept: { acceptChallenge(matchId: matchWithPlayers.match.id) },
                                 onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
                             )
@@ -465,9 +465,18 @@ struct RemoteGamesTab: View {
             
             // Remove after fade completes (0.5s)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("🗑️ Removing expired match: \(matchId)")
+                print("🗑️ Removing expired match from UI: \(matchId)")
                 expiredMatchIds.insert(matchId)
                 fadingMatchIds.remove(matchId)
+                
+                // Delete from database
+                Task {
+                    do {
+                        try await remoteMatchService.deleteExpiredMatch(matchId: matchId)
+                    } catch {
+                        print("⚠️ Failed to delete expired match from database: \(error)")
+                    }
+                }
             }
         }
     }

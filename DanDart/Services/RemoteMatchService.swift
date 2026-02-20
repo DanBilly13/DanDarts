@@ -258,6 +258,17 @@ class RemoteMatchService: ObservableObject {
         print("✅ Challenge cancelled: \(matchId)")
     }
     
+    /// Delete an expired match from the database
+    func deleteExpiredMatch(matchId: UUID) async throws {
+        try await supabaseService.client
+            .from("matches")
+            .delete()
+            .eq("id", value: matchId.uuidString)
+            .execute()
+        
+        print("🗑️ Deleted expired match from database: \(matchId)")
+    }
+    
     // MARK: - Join Match
     
     /// Join a ready match and start gameplay (calls Edge Function)

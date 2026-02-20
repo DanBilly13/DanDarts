@@ -3,8 +3,21 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import type { ErrorResponse, SuccessResponse } from '../_shared/types.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface ErrorResponse {
+  error: string
+  details?: any
+}
+
+interface SuccessResponse {
+  success: boolean
+  message: string
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,6 +30,15 @@ serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Extract JWT token from Bearer header
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid Authorization header' } as ErrorResponse),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -34,7 +56,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     if (userError || !user) {
       return new Response(
@@ -74,10 +96,14 @@ serve(async (req) => {
       )
     }
 
-    // Validate status is pending or ready (can't cancel in-progress matches)
-    if (match.remote_status !== 'pending' && match.remote_status !== 'ready') {
+    // Validate status is sent, pending, or ready (can't cancel in-progress matches)
+    if (
+      match.remote_status !== 'sent' &&
+      match.remote_status !== 'pending' &&
+      match.remote_status !== 'ready'
+    ) {
       return new Response(
-        JSON.stringify({ error: 'Can only cancel pending or ready matches' } as ErrorResponse),
+        JSON.stringify({ error: 'Can only cancel sent, pending, or ready matches' } as ErrorResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

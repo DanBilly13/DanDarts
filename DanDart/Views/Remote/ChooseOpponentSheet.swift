@@ -54,33 +54,19 @@ struct ChooseOpponentSheet: View {
                                 dismiss()
                             }
                         } label: {
-                            HStack(spacing: 12) {
-                                PlayerAvatarView(avatarURL: friend.avatarURL, size: 44)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(friend.displayName)
-                                        .font(.system(.body, design: .rounded))
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(AppColor.textPrimary)
-                                    
-                                    Text("@\(friend.nickname)")
-                                        .font(.system(.subheadline, design: .rounded))
-                                        .foregroundColor(AppColor.textSecondary)
-                                }
-                                
-                                Spacer()
-                                
-                                // Show checkmark if selected
-                                if selectedOpponent?.id == friend.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(AppColor.interactivePrimaryBackground)
-                                }
-                            }
-                            .padding(12)
-                            .background(AppColor.inputBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            PlayerCard(
+                                player: Player(
+                                    displayName: friend.displayName,
+                                    nickname: friend.nickname,
+                                    avatarURL: friend.avatarURL,
+                                    isGuest: false,
+                                    totalWins: friend.totalWins,
+                                    totalLosses: friend.totalLosses,
+                                    userId: friend.id
+                                )
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }

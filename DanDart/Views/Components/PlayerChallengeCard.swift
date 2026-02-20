@@ -49,13 +49,15 @@ struct PlayerChallengeCard: View {
                     Text("301 First to 3")
                         .font(.system(.title2, design: .rounded))
                         .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.brandPrimary)
                     Text("VS \(player.displayName)")
                         .font(.system(.title2, design: .rounded))
                         .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.justWhite)
                     Text("@\(player.nickname)")
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.medium)
-                        .foregroundStyle(AppColor.textSecondary)
+                        .foregroundStyle(AppColor.justWhite)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading) // 👈 keep content pinned left
                 
@@ -126,7 +128,16 @@ struct PlayerChallengeCardFoot: View {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Text("Accept")
+                            HStack(spacing: 8) {
+                                Text("Accept")
+                                
+                                if let expiresAt = expiresAt {
+                                    TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                                        Text(formatTimeRemaining(from: expiresAt))
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                            }
                         }
                     }
                     .disabled(isProcessing)

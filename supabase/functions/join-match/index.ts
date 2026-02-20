@@ -3,8 +3,22 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import type { ErrorResponse, SuccessResponse } from '../_shared/types.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface ErrorResponse {
+  error: string
+  details?: any
+}
+
+interface SuccessResponse {
+  success: boolean
+  message: string
+  data?: any
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,6 +31,15 @@ serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Extract JWT token from Bearer header
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid Authorization header' } as ErrorResponse),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -34,7 +57,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     if (userError || !user) {
       return new Response(
