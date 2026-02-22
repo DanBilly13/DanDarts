@@ -20,6 +20,7 @@ enum RemoteMatchStatus: String, Codable, CaseIterable {
     case completed
     case expired
     case cancelled
+    case declined // UI-only state for when opponent declines (challenger sees this)
     
     var displayName: String {
         switch self {
@@ -31,19 +32,20 @@ enum RemoteMatchStatus: String, Codable, CaseIterable {
         case .completed: return "Completed"
         case .expired: return "Expired"
         case .cancelled: return "Cancelled"
+        case .declined: return "Declined"
         }
     }
     
     var isActive: Bool {
         switch self {
         case .ready, .lobby, .inProgress: return true
-        case .pending, .sent, .completed, .expired, .cancelled: return false
+        case .pending, .sent, .completed, .expired, .cancelled, .declined: return false
         }
     }
     
     var isFinished: Bool {
         switch self {
-        case .completed, .expired, .cancelled: return true
+        case .completed, .expired, .cancelled, .declined: return true
         case .pending, .sent, .ready, .lobby, .inProgress: return false
         }
     }

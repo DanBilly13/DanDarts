@@ -435,8 +435,21 @@ struct RemoteGamesTab: View {
     
     private func declineChallenge(matchId: UUID) {
         print("🟠 [DEBUG] declineChallenge called with matchId: \(matchId)")
-        print("🟠 [DEBUG] processingMatchId: \(String(describing: processingMatchId))")
         
+        // Guard 1: Not already processing
+        guard processingMatchId == nil else {
+            print("🟠 [DEBUG] Already processing another match")
+            return
+        }
+        
+        // Guard 2: Match exists in pending challenges
+        guard remoteMatchService.pendingChallenges
+            .contains(where: { $0.match.id == matchId }) else {
+            print("🟠 [DEBUG] Match not found in pendingChallenges")
+            return
+        }
+        
+        print("🟠 [DEBUG] Guards passed, setting processingMatchId")
         processingMatchId = matchId
         
         Task {

@@ -315,6 +315,31 @@ struct PlayerChallengeCardFoot: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(AppColor.textSecondary)
                 }
+                
+            case .declined:
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                    Text("Match Declined")
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColor.justWhite)
+                    Spacer()
+                    
+                    if let expiresAt = expiresAt {
+                        TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                            Text(formatTimeRemaining(from: expiresAt))
+                                .font(.system(.subheadline, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.yellow)
+                        }
+                    } else {
+                        Text("00:00")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.yellow)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 36)

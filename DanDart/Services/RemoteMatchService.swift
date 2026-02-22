@@ -141,8 +141,20 @@ class RemoteMatchService: ObservableObject {
                 }
             case .inProgress:
                 active = matchWithPlayers
-            case .completed, .expired, .cancelled:
+            case .cancelled:
+                // Map cancelled sent challenges to .declined for challenger
+                if match.challengerId == userId {
+                    // Challenger's sent challenge was declined by receiver
+                    var declinedMatch = matchWithPlayers
+                    declinedMatch.match.status = .declined
+                    sent.append(declinedMatch)
+                }
+                // Don't show cancelled matches for receiver (they declined it)
+            case .completed, .expired:
                 // Don't show finished matches in active lists
+                break
+            case .declined:
+                // UI-only state, should not come from database
                 break
             }
         }
