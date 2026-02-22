@@ -90,7 +90,49 @@ serve(async (req) => {
       )
     }
 
-    // Check if user already has an active lock
+    // Clean up any locks for expired matches before checking
+    const { data: userLocks } = await supabaseClient
+      .from('remote_match_locks')
+      .select('match_id')
+      .eq('user_id', user.id)
+
+    if (userLocks && userLocks.length > 0) {
+      // Check each lock's match to see if it's expired
+      const lockMatchIds = userLocks.map((lock: any) => lock.match_id)
+      
+      const { data: lockMatches } = await supabaseClient
+        .from('matches')
+        .select('id, remote_status, challenge_expires_at, join_window_expires_at')
+        .in('id', lockMatchIds)
+      
+      const now = new Date()
+      const expiredMatchIds: string[] = []
+      
+      lockMatches?.forEach((match: any) => {
+        const isExpired = 
+          (match.challenge_expires_at && new Date(match.challenge_expires_at) < now) ||
+          (match.join_window_expires_at && new Date(match.join_window_expires_at) < now) ||
+          match.remote_status === 'expired' ||
+          match.remote_status === 'cancelled' ||
+          match.remote_status === 'completed'
+        
+        if (isExpired) {
+          expiredMatchIds.push(match.id)
+        }
+      })
+      
+      // Delete locks for expired/finished matches
+      if (expiredMatchIds.length > 0) {
+        await supabaseClient
+          .from('remote_match_locks')
+          .delete()
+          .in('match_id', expiredMatchIds)
+        
+        console.log(`🧹 Cleaned up ${expiredMatchIds.length} expired locks for user ${user.id}`)
+      }
+    }
+
+    // Now check if user has any remaining active locks
     const { data: existingLock, error: lockCheckError } = await supabaseClient
       .from('remote_match_locks')
       .select('*')

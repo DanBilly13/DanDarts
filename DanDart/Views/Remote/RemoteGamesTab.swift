@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct RemoteGamesTab: View {
-    @StateObject private var remoteMatchService = RemoteMatchService()
+    @EnvironmentObject var remoteMatchService: RemoteMatchService
     @StateObject private var router = Router.shared
     @EnvironmentObject var authService: AuthService
     
@@ -55,6 +55,8 @@ struct RemoteGamesTab: View {
             }
             .customNavBar(title: "Remote matches", subtitle: nil)
             .task {
+                // Load matches when tab appears
+                // Note: Realtime subscription is now set up in MainTabView on app launch
                 await loadMatches()
             }
             .refreshable {
@@ -112,12 +114,15 @@ struct RemoteGamesTab: View {
     private var matchListView: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Match Ready section (highest priority)
+                // Ready matches
                 if !remoteMatchService.readyMatches.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("Match Ready", systemImage: "checkmark.circle.fill", color: .green)
+                        sectionHeader("Ready to join", systemImage: "checkmark.circle.fill", color: .green)
                         
-                        ForEach(remoteMatchService.readyMatches.filter { !expiredMatchIds.contains($0.id) }) { matchWithPlayers in
+                        ForEach(remoteMatchService.readyMatches.filter { 
+                            !expiredMatchIds.contains($0.id) && 
+                            $0.id != remoteMatchService.activeMatch?.id 
+                        }) { matchWithPlayers in
                             let _ = currentTime // Force re-evaluation when currentTime changes
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
@@ -154,7 +159,10 @@ struct RemoteGamesTab: View {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
                         
-                        ForEach(remoteMatchService.pendingChallenges.filter { !expiredMatchIds.contains($0.id) }) { matchWithPlayers in
+                        ForEach(remoteMatchService.pendingChallenges.filter { 
+                            !expiredMatchIds.contains($0.id) && 
+                            $0.id != remoteMatchService.activeMatch?.id 
+                        }) { matchWithPlayers in
                             let _ = currentTime // Force re-evaluation when currentTime changes
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
@@ -172,7 +180,10 @@ struct RemoteGamesTab: View {
                                 state: isExpired ? .expired : .pending,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.challengeExpiresAt,
-                                onAccept: { acceptChallenge(matchId: matchWithPlayers.match.id) },
+                                onAccept: {
+                                    print("🔴 [DEBUG] onAccept closure called from RemoteGamesTab for matchId: \(matchWithPlayers.match.id)")
+                                    acceptChallenge(matchId: matchWithPlayers.match.id)
+                                },
                                 onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
                             )
                             .opacity(isFading ? 0 : 1)
@@ -190,9 +201,12 @@ struct RemoteGamesTab: View {
                 // Sent challenges (dimmed when match ready)
                 if !remoteMatchService.sentChallenges.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("Sent challenges", systemImage: "paperplane.fill", color: .gray)
+                        sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
                         
-                        ForEach(remoteMatchService.sentChallenges.filter { !expiredMatchIds.contains($0.id) }) { matchWithPlayers in
+                        ForEach(remoteMatchService.sentChallenges.filter { 
+                            !expiredMatchIds.contains($0.id) && 
+                            $0.id != remoteMatchService.activeMatch?.id 
+                        }) { matchWithPlayers in
                             let _ = currentTime // Force re-evaluation when currentTime changes
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
@@ -226,7 +240,9 @@ struct RemoteGamesTab: View {
                 }
                 
                 // Active match (in progress, dimmed when match ready)
-                if let activeMatch = remoteMatchService.activeMatch {
+                if let activeMatch = remoteMatchService.activeMatch,
+                   processingMatchId == nil {
+                    let _ = print("🎯 [RENDER] Active Match section rendering - matchId: \(activeMatch.id), processingMatchId: \(String(describing: processingMatchId))")
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
                         
@@ -311,7 +327,6 @@ struct RemoteGamesTab: View {
         
         do {
             try await remoteMatchService.loadMatches(userId: userId)
-            await remoteMatchService.setupRealtimeSubscription(userId: userId)
         } catch {
             print("❌ Failed to load remote matches: \(error)")
         }
@@ -320,11 +335,44 @@ struct RemoteGamesTab: View {
     // MARK: - Button Actions
     
     private func acceptChallenge(matchId: UUID) {
+        print("🔵 [DEBUG] acceptChallenge called with matchId: \(matchId)")
+        print("🔵 [DEBUG] processingMatchId: \(String(describing: processingMatchId))")
+        
+        // Prevent double-accept
+        guard processingMatchId == nil else {
+            print("❌ [DEBUG] Blocked by processingMatchId guard")
+            return
+        }
+        
+        // CRITICAL: Capture opponent data NOW before state changes
+        guard let matchWithPlayers = remoteMatchService.pendingChallenges.first(where: { $0.match.id == matchId }) else {
+            print("❌ [DEBUG] Cannot find match in pendingChallenges")
+            return
+        }
+        let opponent = matchWithPlayers.opponent
+        print("✅ [DEBUG] Opponent captured: \(opponent.displayName)")
+        
+        print("✅ [DEBUG] Guard passed, setting processingMatchId to \(matchId)")
         processingMatchId = matchId
         
         Task {
             do {
+                guard let currentUser = authService.currentUser else {
+                    throw RemoteMatchError.notAuthenticated
+                }
+                
+                // Step 1: Accept challenge (pending → ready)
                 try await remoteMatchService.acceptChallenge(matchId: matchId)
+                
+                // Step 2: Auto-join match (ready → lobby)
+                try await remoteMatchService.joinMatch(matchId: matchId, currentUserId: currentUser.id)
+                
+                // Step 2.5: Fetch updated match with joinWindowExpiresAt
+                print("🔍 [DEBUG] Fetching updated match data...")
+                guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
+                    throw RemoteMatchError.databaseError("Failed to fetch updated match")
+                }
+                print("✅ [DEBUG] Updated match fetched")
                 
                 // Success haptic
                 #if canImport(UIKit)
@@ -332,8 +380,42 @@ struct RemoteGamesTab: View {
                 generator.notificationOccurred(.success)
                 #endif
                 
+                // Step 3: Navigate to lobby with fresh match data (receiver flow)
                 await MainActor.run {
+                    print("🔵 [TIMING] MainActor.run START - processingMatchId: \(String(describing: processingMatchId))")
+                    print("🔵 [TIMING] About to call router.push - processingMatchId: \(String(describing: processingMatchId))")
+                    print("✅ [DEBUG] Navigating to lobby with updated match (receiver)")
+                    
+                    router.push(.remoteLobby(
+                        match: updatedMatch,
+                        opponent: opponent,
+                        currentUser: currentUser,
+                        onCancel: {
+                            Task {
+                                do {
+                                    try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                    router.pop()
+                                } catch {
+                                    print("❌ Failed to cancel match: \(error)")
+                                }
+                            }
+                        }
+                    ))
+                    
+                    print("🔵 [TIMING] router.push called - processingMatchId: \(String(describing: processingMatchId))")
+                    
+                    // Clear processingMatchId AFTER navigation is initiated
                     processingMatchId = nil
+                    print("🔵 [TIMING] processingMatchId set to nil")
+                    print("🔵 [TIMING] MainActor.run END")
+                }
+                
+                // Reload matches in background to update UI state after navigation
+                // This ensures the card state is consistent when realtime updates arrive
+                Task {
+                    guard let userId = authService.currentUser?.id else { return }
+                    try? await remoteMatchService.loadMatches(userId: userId)
+                    print("✅ [DEBUG] Background reload complete after receiver navigation")
                 }
             } catch {
                 await MainActor.run {
@@ -352,6 +434,9 @@ struct RemoteGamesTab: View {
     }
     
     private func declineChallenge(matchId: UUID) {
+        print("🟠 [DEBUG] declineChallenge called with matchId: \(matchId)")
+        print("🟠 [DEBUG] processingMatchId: \(String(describing: processingMatchId))")
+        
         processingMatchId = matchId
         
         Task {
@@ -420,7 +505,11 @@ struct RemoteGamesTab: View {
         
         Task {
             do {
-                try await remoteMatchService.joinMatch(matchId: matchId)
+                guard let currentUser = authService.currentUser else {
+                    throw RemoteMatchError.notAuthenticated
+                }
+                
+                try await remoteMatchService.joinMatch(matchId: matchId, currentUserId: currentUser.id)
                 
                 // Success haptic
                 #if canImport(UIKit)
@@ -430,9 +519,31 @@ struct RemoteGamesTab: View {
                 
                 await MainActor.run {
                     processingMatchId = nil
+                    
+                    // Navigate to lobby
+                    // Find the match in either ready or lobby state
+                    let match = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId })
+                        ?? remoteMatchService.activeMatch
+                    
+                    if let matchWithPlayers = match,
+                       let currentUser = authService.currentUser {
+                        router.push(.remoteLobby(
+                            match: matchWithPlayers.match,
+                            opponent: matchWithPlayers.opponent,
+                            currentUser: currentUser,
+                            onCancel: {
+                                Task {
+                                    do {
+                                        try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                        router.pop()
+                                    } catch {
+                                        print("❌ Failed to cancel match: \(error)")
+                                    }
+                                }
+                            }
+                        ))
+                    }
                 }
-                
-                // TODO: Navigate to gameplay
             } catch {
                 await MainActor.run {
                     processingMatchId = nil

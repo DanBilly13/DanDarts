@@ -67,6 +67,7 @@ struct PlayerChallengeCard: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 0)
             PlayerChallengeCardFoot(
+                player: player,
                 state: state,
                 isProcessing: isProcessing,
                 expiresAt: expiresAt,
@@ -84,6 +85,7 @@ struct PlayerChallengeCard: View {
 
 
 struct PlayerChallengeCardFoot: View {
+    let player: Player
     let state: RemoteMatchStatus
     let isProcessing: Bool
     let expiresAt: Date?
@@ -108,6 +110,9 @@ struct PlayerChallengeCardFoot: View {
                     AppButton(role: .tertiaryOutline,
                               controlSize: .small,
                               compact: true) {
+                        print("🟡 [DEBUG] Decline button tapped!")
+                        print("🟡 [DEBUG] isProcessing: \(isProcessing)")
+                        print("🟡 [DEBUG] onDecline closure exists: \(onDecline != nil)")
                         onDecline?()
                     } label: {
                         if isProcessing {
@@ -122,6 +127,9 @@ struct PlayerChallengeCardFoot: View {
                     AppButton(role: .primary,
                               controlSize: .small,
                               compact: true) {
+                        print("🟢 [DEBUG] Accept button tapped!")
+                        print("🟢 [DEBUG] isProcessing: \(isProcessing)")
+                        print("🟢 [DEBUG] onAccept closure exists: \(onAccept != nil)")
                         onAccept?()
                     } label: {
                         if isProcessing {
@@ -141,6 +149,9 @@ struct PlayerChallengeCardFoot: View {
                         }
                     }
                     .disabled(isProcessing)
+                    .onAppear {
+                        print("🟢 [DEBUG] Accept button appeared - isProcessing: \(isProcessing), onAccept exists: \(onAccept != nil)")
+                    }
                 }
                 
             case .sent:
@@ -173,6 +184,20 @@ struct PlayerChallengeCardFoot: View {
                 
             case .ready:
                 VStack (spacing: 16) {
+                    HStack(spacing: 8) {
+                        // Green dot indicator
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        
+                        Text("Match ready - \(player.displayName) accepted")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppColor.textPrimary)
+                        
+                        Spacer()
+                    }
+                    
                     AppButton(role: .primary,
                               controlSize: .small,
                               compact: true) {
@@ -182,7 +207,16 @@ struct PlayerChallengeCardFoot: View {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Text("Join Match")
+                            HStack(spacing: 8) {
+                                Text("Join now")
+                                
+                                if let expiresAt = expiresAt {
+                                    TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                                        Text(formatTimeRemaining(from: expiresAt))
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                            }
                         }
                     }
                     .disabled(isProcessing)
@@ -196,22 +230,47 @@ struct PlayerChallengeCardFoot: View {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Text("Cancel")
+                            Text("Cancel Match")
                         }
                     }
                     .disabled(isProcessing)
                 }
                 
             case .lobby:
-                VStack(spacing: 8) {
+                VStack(spacing: 16) {
                     HStack(spacing: 8) {
                         ProgressView()
                             .tint(AppColor.interactivePrimaryBackground)
-                        Text("Waiting for opponent...")
+                        Text("Opponent is ready!")
                             .font(.system(.subheadline, design: .rounded))
                             .fontWeight(.semibold)
                             .foregroundStyle(AppColor.textPrimary)
+                        
+                        Spacer()
+                        
+                        if let expiresAt = expiresAt {
+                            TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                                Text(formatTimeRemaining(from: expiresAt))
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(AppColor.interactivePrimaryBackground)
+                            }
+                        }
                     }
+                    
+                    AppButton(role: .primary,
+                              controlSize: .small,
+                              compact: true) {
+                        onJoin?()
+                    } label: {
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Join Match")
+                        }
+                    }
+                    .disabled(isProcessing)
                 }
                 
             case .inProgress:

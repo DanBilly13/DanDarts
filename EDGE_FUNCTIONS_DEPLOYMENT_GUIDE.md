@@ -135,6 +135,14 @@ serve(async (req) => {
       )
     }
 
+    const { data: updatedMatch } = await supabaseClient
+      .from('matches')
+      .select('id, remote_status')
+      .eq('id', match_id)
+      .maybeSingle()
+
+    console.log('accept-challenge updated remote_status:', updatedMatch?.remote_status)
+
     const locks = [
       {
         user_id: match.challenger_id,
@@ -510,12 +518,23 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization')
+    
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const jwt = authHeader.replace('Bearer ', '').trim()
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: `Bearer ${jwt}` }
         },
       }
     )
@@ -523,7 +542,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     if (userError || !user) {
       return new Response(
@@ -561,9 +580,9 @@ serve(async (req) => {
       )
     }
 
-    if (match.remote_status !== 'ready') {
+    if (match.remote_status !== 'ready' && match.remote_status !== 'lobby') {
       return new Response(
-        JSON.stringify({ error: 'Match is not in ready state' } as ErrorResponse),
+        JSON.stringify({ error: `Match is not joinable (status: ${match.remote_status})` } as ErrorResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -576,15 +595,36 @@ serve(async (req) => {
     }
 
     const now = new Date()
-    const currentPlayerId = match.challenger_id
+
+    let newStatus: string
+    let currentPlayerId = null
+
+    if (match.remote_status === 'ready') {
+      newStatus = 'lobby'
+      console.log('First player joining - transitioning to lobby')
+    } else if (match.remote_status === 'lobby') {
+      newStatus = 'in_progress'
+      currentPlayerId = match.challenger_id
+      console.log('Second player joining - transitioning to in_progress')
+    } else {
+      return new Response(
+        JSON.stringify({ error: `Cannot join match in ${match.remote_status} state` } as ErrorResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const updateData: any = {
+      remote_status: newStatus,
+      updated_at: now.toISOString(),
+    }
+
+    if (currentPlayerId) {
+      updateData.current_player_id = currentPlayerId
+    }
 
     const { error: updateError } = await supabaseClient
       .from('matches')
-      .update({
-        remote_status: 'in_progress',
-        current_player_id: currentPlayerId,
-        updated_at: now.toISOString(),
-      })
+      .update(updateData)
       .eq('id', match_id)
 
     if (updateError) {
@@ -595,21 +635,42 @@ serve(async (req) => {
       )
     }
 
-    const { error: lockError } = await supabaseClient
-      .from('remote_match_locks')
-      .update({ lock_status: 'in_progress' })
-      .eq('match_id', match_id)
+    const playerOrder = user.id === match.challenger_id ? 0 : 1
+    const { error: playerInsertError } = await supabaseClient
+      .from('match_players')
+      .upsert({
+        match_id: match_id,
+        player_user_id: user.id,
+        player_order: playerOrder,
+      }, {
+        onConflict: 'match_id,player_user_id',
+        ignoreDuplicates: true
+      })
 
-    if (lockError) {
-      console.error('Lock update error:', lockError)
+    if (playerInsertError) {
+      console.error('Player insert error:', playerInsertError)
     }
 
-    console.log(`✅ Match joined: ${match_id}`)
+    if (newStatus === 'in_progress') {
+      const { error: lockError } = await supabaseClient
+        .from('remote_match_locks')
+        .update({ lock_status: 'in_progress' })
+        .eq('match_id', match_id)
+
+      if (lockError) {
+        console.error('Lock update error:', lockError)
+      }
+    }
+
+    console.log(`✅ Match joined: ${match_id}, status: ${newStatus}`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: { current_player_id: currentPlayerId },
+        data: { 
+          status: newStatus,
+          current_player_id: currentPlayerId 
+        },
         message: 'Match joined successfully',
       } as SuccessResponse),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -35,21 +35,14 @@ serve(async (req) => {
       )
     }
 
-    // Extract JWT token from Bearer header
-    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-    if (!jwt) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid Authorization header' } as ErrorResponse),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const jwt = authHeader.replace('Bearer ', '').trim()
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader }
+          headers: { Authorization: `Bearer ${jwt}` }
         },
       }
     )
@@ -97,10 +90,10 @@ serve(async (req) => {
       )
     }
 
-    // Validate status is ready
-    if (match.remote_status !== 'ready') {
+    // Validate status is ready or lobby
+    if (match.remote_status !== 'ready' && match.remote_status !== 'lobby') {
       return new Response(
-        JSON.stringify({ error: 'Match is not in ready state' } as ErrorResponse),
+        JSON.stringify({ error: `Match is not joinable (status: ${match.remote_status})` } as ErrorResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -115,17 +108,42 @@ serve(async (req) => {
 
     const now = new Date()
 
-    // Determine starting player (challenger goes first)
-    const currentPlayerId = match.challenger_id
+    // Determine new status based on current status
+    // ready → lobby (first player joins)
+    // lobby → in_progress (second player joins)
+    let newStatus: string
+    let currentPlayerId = null
 
-    // Update match to in_progress
+    if (match.remote_status === 'ready') {
+      // First player joining - transition to lobby
+      newStatus = 'lobby'
+      console.log('First player joining - transitioning to lobby')
+    } else if (match.remote_status === 'lobby') {
+      // Second player joining - transition to in_progress
+      newStatus = 'in_progress'
+      currentPlayerId = match.challenger_id // Challenger goes first
+      console.log('Second player joining - transitioning to in_progress')
+    } else {
+      // Invalid state
+      return new Response(
+        JSON.stringify({ error: `Cannot join match in ${match.remote_status} state` } as ErrorResponse),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Update match status
+    const updateData: any = {
+      remote_status: newStatus,
+      updated_at: now.toISOString(),
+    }
+
+    if (currentPlayerId) {
+      updateData.current_player_id = currentPlayerId
+    }
+
     const { error: updateError } = await supabaseClient
       .from('matches')
-      .update({
-        remote_status: 'in_progress',
-        current_player_id: currentPlayerId,
-        updated_at: now.toISOString(),
-      })
+      .update(updateData)
       .eq('id', match_id)
 
     if (updateError) {
@@ -136,23 +154,46 @@ serve(async (req) => {
       )
     }
 
-    // Update locks to in_progress
-    const { error: lockError } = await supabaseClient
-      .from('remote_match_locks')
-      .update({ lock_status: 'in_progress' })
-      .eq('match_id', match_id)
+    // Create match_player record for this user if not exists
+    const playerOrder = user.id === match.challenger_id ? 0 : 1
+    const { error: playerInsertError } = await supabaseClient
+      .from('match_players')
+      .upsert({
+        match_id: match_id,
+        player_user_id: user.id,
+        player_order: playerOrder,
+      }, {
+        onConflict: 'match_id,player_user_id',
+        ignoreDuplicates: true
+      })
 
-    if (lockError) {
-      console.error('Lock update error:', lockError)
-      // Non-fatal - match is already in_progress
+    if (playerInsertError) {
+      console.error('Player insert error:', playerInsertError)
+      // Non-fatal
     }
 
-    console.log(`✅ Match joined: ${match_id}`)
+    // Update locks if transitioning to in_progress
+    if (newStatus === 'in_progress') {
+      const { error: lockError } = await supabaseClient
+        .from('remote_match_locks')
+        .update({ lock_status: 'in_progress' })
+        .eq('match_id', match_id)
+
+      if (lockError) {
+        console.error('Lock update error:', lockError)
+        // Non-fatal - match is already in_progress
+      }
+    }
+
+    console.log(`✅ Match joined: ${match_id}, status: ${newStatus}`)
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: { current_player_id: currentPlayerId },
+        data: { 
+          status: newStatus,
+          current_player_id: currentPlayerId 
+        },
         message: 'Match joined successfully',
       } as SuccessResponse),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

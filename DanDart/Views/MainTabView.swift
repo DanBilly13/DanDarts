@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var friendsService = FriendsService()
+    @StateObject private var remoteMatchService = RemoteMatchService()
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
@@ -79,6 +80,7 @@ struct MainTabView: View {
             .background(AppColor.backgroundPrimary)
             .accentColor(AppColor.interactivePrimaryBackground)
             .environmentObject(friendsService)
+            .environmentObject(remoteMatchService)
             
             // Toast Overlay - appears above all tabs
             VStack {
@@ -121,15 +123,16 @@ struct MainTabView: View {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
             }
             
-            // Setup realtime subscription on app launch if user is authenticated
+            // Setup realtime subscriptions on app launch if user is authenticated
             if let userId = authService.currentUser?.id {
-                print("🔵 [MainTabView] User authenticated, setting up realtime subscription")
+                print("🔵 [MainTabView] User authenticated, setting up realtime subscriptions")
                 print("🔵 [MainTabView] User ID: \(userId)")
                 Task {
                     await friendsService.setupRealtimeSubscription(userId: userId)
+                    await remoteMatchService.setupRealtimeSubscription(userId: userId)
                 }
             } else {
-                print("⚠️ [MainTabView] No authenticated user, skipping realtime subscription")
+                print("⚠️ [MainTabView] No authenticated user, skipping realtime subscriptions")
             }
             
             // Listen for friend request changes
@@ -168,16 +171,18 @@ struct MainTabView: View {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
             }
             
-            // Setup or remove realtime subscription based on user state
+            // Setup or remove realtime subscriptions based on user state
             if let userId = newValue {
-                // User logged in - setup subscription
+                // User logged in - setup subscriptions
                 Task {
                     await friendsService.setupRealtimeSubscription(userId: userId)
+                    await remoteMatchService.setupRealtimeSubscription(userId: userId)
                 }
             } else if oldValue != nil {
-                // User logged out - remove subscription
+                // User logged out - remove subscriptions
                 Task {
                     await friendsService.removeRealtimeSubscription()
+                    await remoteMatchService.removeRealtimeSubscription()
                 }
             }
         }
