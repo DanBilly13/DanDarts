@@ -394,9 +394,29 @@ struct RemoteGamesTab: View {
                             Task {
                                 do {
                                     try await remoteMatchService.cancelChallenge(matchId: matchId)
-                                    router.pop()
+                                    
+                                    // Success haptic
+                                    #if canImport(UIKit)
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                    #endif
+                                    
+                                    await MainActor.run {
+                                        router.popToRoot()
+                                    }
                                 } catch {
                                     print("❌ Failed to cancel match: \(error)")
+                                    
+                                    // Error haptic
+                                    #if canImport(UIKit)
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.error)
+                                    #endif
+                                    
+                                    // Still navigate back even on error
+                                    await MainActor.run {
+                                        router.popToRoot()
+                                    }
                                 }
                             }
                         }
@@ -482,6 +502,22 @@ struct RemoteGamesTab: View {
     }
     
     private func cancelMatch(matchId: UUID) {
+        print("🟠 [DEBUG] cancelMatch called with matchId: \(matchId)")
+        
+        // Guard 1: Not already processing
+        guard processingMatchId == nil else {
+            print("🟠 [DEBUG] Already processing another match")
+            return
+        }
+        
+        // Guard 2: Match exists in ready matches
+        guard remoteMatchService.readyMatches
+            .contains(where: { $0.match.id == matchId }) else {
+            print("🟠 [DEBUG] Match not found in readyMatches")
+            return
+        }
+        
+        print("🟠 [DEBUG] Guards passed, setting processingMatchId")
         processingMatchId = matchId
         
         Task {
@@ -548,9 +584,29 @@ struct RemoteGamesTab: View {
                                 Task {
                                     do {
                                         try await remoteMatchService.cancelChallenge(matchId: matchId)
-                                        router.pop()
+                                        
+                                        // Success haptic
+                                        #if canImport(UIKit)
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
+                                        #endif
+                                        
+                                        await MainActor.run {
+                                            router.popToRoot()
+                                        }
                                     } catch {
                                         print("❌ Failed to cancel match: \(error)")
+                                        
+                                        // Error haptic
+                                        #if canImport(UIKit)
+                                        let generator = UINotificationFeedbackGenerator()
+                                        generator.notificationOccurred(.error)
+                                        #endif
+                                        
+                                        // Still navigate back even on error
+                                        await MainActor.run {
+                                            router.popToRoot()
+                                        }
                                     }
                                 }
                             }

@@ -141,23 +141,18 @@ class RemoteMatchService: ObservableObject {
                 }
             case .inProgress:
                 active = matchWithPlayers
-            case .cancelled:
-                // Map cancelled sent challenges to .declined for challenger
-                if match.challengerId == userId {
-                    // Challenger's sent challenge was declined by receiver
-                    var declinedMatch = matchWithPlayers
-                    declinedMatch.match.status = .declined
-                    sent.append(declinedMatch)
-                }
-                // Don't show cancelled matches for receiver (they declined it)
-            case .completed, .expired:
-                // Don't show finished matches in active lists
-                break
-            case .declined:
-                // UI-only state, should not come from database
+            case .cancelled, .completed, .expired:
+                // Terminal states - don't show in any list
+                // Cancelled: receiver declined it, or user cancelled their own challenge
+                // Completed/Expired: match is finished
+                // Either way, exclude from active lists
                 break
             }
         }
+        
+        // Debug logging to confirm filtering
+        print("🧹 Filtered lists - Pending: \(pending.count), Sent: \(sent.count), Ready: \(ready.count)")
+        print("🧹 Sent challenges:", sent.map { "\($0.match.id.uuidString.prefix(8))... status=\($0.match.status?.rawValue ?? "nil")" })
         
         self.pendingChallenges = pending
         self.sentChallenges = sent

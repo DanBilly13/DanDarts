@@ -173,11 +173,30 @@ struct RemoteLobbyView: View {
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
+            
+            // Check if match still exists in service
+            let matchExists = remoteMatchService.activeMatch?.match.id == match.id ||
+                             remoteMatchService.readyMatches.contains(where: { $0.match.id == match.id })
+            
+            if !matchExists && !hasNavigated {
+                // Match was removed (cancelled or expired)
+                print("🚨 Match no longer exists in service, navigating back")
+                dismiss()
+                router.popToRoot()
+            }
         }
         .onChange(of: matchStatus) { oldStatus, newStatus in
+            // Navigate to gameplay when both players ready
             if newStatus == .inProgress && !hasNavigated {
                 hasNavigated = true
                 startMatchStartingSequence()
+            }
+            
+            // Navigate back if match cancelled
+            if newStatus == .cancelled {
+                print("🚨 Match cancelled, navigating back to Remote tab")
+                dismiss()
+                router.popToRoot()
             }
         }
         .background(AppColor.backgroundPrimary)
