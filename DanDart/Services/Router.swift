@@ -29,7 +29,7 @@ enum Destination: Hashable {
     
     // Remote games flow
     case remoteGameSetup(game: Game, opponent: User?)
-    case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, onCancel: () -> Void)
+    case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, cancelledMatchIds: Binding<Set<UUID>>, onCancel: () -> Void)
     case remoteGameplay(match: RemoteMatch, opponent: User, currentUser: User)
     
     // End game
@@ -54,7 +54,7 @@ enum Destination: Hashable {
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.remoteGameSetup(let g1, let o1), .remoteGameSetup(let g2, let o2)):
             return g1.id == g2.id && o1?.id == o2?.id
-        case (.remoteLobby(let m1, let o1, let c1, _), .remoteLobby(let m2, let o2, let c2, _)):
+        case (.remoteLobby(let m1, let o1, let c1, _, _), .remoteLobby(let m2, let o2, let c2, _, _)):
             return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
         case (.remoteGameplay(let m1, let o1, let c1), .remoteGameplay(let m2, let o2, let c2)):
             return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
@@ -104,7 +104,7 @@ enum Destination: Hashable {
             hasher.combine("remoteGameSetup")
             hasher.combine(game.id)
             hasher.combine(opponent?.id)
-        case .remoteLobby(let match, let opponent, let currentUser, _):
+        case .remoteLobby(let match, let opponent, let currentUser, _, _):
             hasher.combine("remoteLobby")
             hasher.combine(match.id)
             hasher.combine(opponent.id)
@@ -212,8 +212,8 @@ class Router: ObservableObject {
         case .remoteGameSetup(let game, let opponent):
             RemoteGameSetupView(game: game, preselectedOpponent: opponent)
             
-        case .remoteLobby(let match, let opponent, let currentUser, let onCancel):
-            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel)
+        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
+            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
             
         case .remoteGameplay(let match, let opponent, let currentUser):
             RemoteGameplayPlaceholderView(match: match, opponent: opponent, currentUser: currentUser)

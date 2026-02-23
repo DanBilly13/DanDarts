@@ -248,13 +248,15 @@ class RemoteMatchService: ObservableObject {
             let match_mode: String
             let game_type: String
             let match_format: Int?
-            let status: String?
+            let remote_status: String?
             let challenger_id: UUID
             let receiver_id: UUID
             let challenge_expires_at: String?
             let join_window_expires_at: String?
             let created_at: String
             let updated_at: String
+            let ended_by: UUID?
+            let ended_reason: String?
         }
         
         print("🔍 [DEBUG] Fetching match: \(matchId)")
@@ -282,13 +284,15 @@ class RemoteMatchService: ObservableObject {
             matchFormat: matchData.match_format ?? 1,
             challengerId: matchData.challenger_id,
             receiverId: matchData.receiver_id,
-            status: RemoteMatchStatus(rawValue: matchData.status ?? ""),
+            status: RemoteMatchStatus(rawValue: matchData.remote_status ?? ""),
             currentPlayerId: nil,
             challengeExpiresAt: matchData.challenge_expires_at.flatMap { formatter.date(from: $0) },
             joinWindowExpiresAt: matchData.join_window_expires_at.flatMap { formatter.date(from: $0) },
             lastVisitPayload: nil,
             createdAt: formatter.date(from: matchData.created_at) ?? Date(),
-            updatedAt: formatter.date(from: matchData.updated_at) ?? Date()
+            updatedAt: formatter.date(from: matchData.updated_at) ?? Date(),
+            endedBy: matchData.ended_by,
+            endedReason: matchData.ended_reason
         )
         
         print("✅ [DEBUG] Match fetched - status: \(match.status?.rawValue ?? "nil"), joinWindowExpiresAt: \(match.joinWindowExpiresAt?.description ?? "nil")")
@@ -334,13 +338,100 @@ class RemoteMatchService: ObservableObject {
         let request = CancelRequest(match_id: matchId.uuidString)
         let headers = try await getEdgeFunctionHeaders()
         
-        let _: EmptyResponse = try await supabaseService.client.functions
-            .invoke("cancel-match", options: FunctionInvokeOptions(
-                headers: headers,
-                body: request
-            ))
+        // Log request details
+        print("🔍 [CancelChallenge] ========================================")
+        print("🔍 [CancelChallenge] Calling cancel-match Edge Function")
+        print("🔍 [CancelChallenge] Match ID: \(matchId)")
+        print("🔍 [CancelChallenge] Request payload: match_id=\(request.match_id)")
+        print("🔍 [CancelChallenge] Headers: apikey=\(headers["apikey"]?.prefix(20) ?? "nil")...")
+        print("🔍 [CancelChallenge] Auth token: \(headers["Authorization"]?.prefix(30) ?? "nil")...")
         
-        print("✅ Challenge cancelled: \(matchId)")
+        do {
+            let _: EmptyResponse = try await supabaseService.client.functions
+                .invoke("cancel-match", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: request
+                ))
+            
+            print("✅ [CancelChallenge] Challenge cancelled: \(matchId)")
+            print("🔍 [CancelChallenge] ========================================")
+        } catch let error as FunctionsError {
+            // Detailed error logging
+            print("❌ [CancelChallenge] Edge Function error:")
+            print("❌ [CancelChallenge] Error type: \(error)")
+            
+            // Try to extract response body
+            if case .httpError(let code, let data) = error {
+                print("❌ [CancelChallenge] HTTP Code: \(code)")
+                print("❌ [CancelChallenge] Response data size: \(data.count) bytes")
+                
+                // Decode response body as string
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("❌ [CancelChallenge] Response body: \(responseString)")
+                } else {
+                    print("❌ [CancelChallenge] Response body (hex): \(data.map { String(format: "%02x", $0) }.joined())")
+                }
+            }
+            
+            print("🔍 [CancelChallenge] ========================================")
+            throw error
+        } catch {
+            print("❌ [CancelChallenge] Unexpected error: \(error)")
+            throw error
+        }
+    }
+    
+    /// Abort a match in lobby or in_progress state (calls Edge Function)
+    func abortMatch(matchId: UUID) async throws {
+        struct AbortRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = AbortRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        // Log request details
+        print("🟠 [AbortMatch] ========================================")
+        print("🟠 [AbortMatch] Calling abort-match Edge Function")
+        print("🟠 [AbortMatch] Match ID: \(matchId)")
+        print("🟠 [AbortMatch] Request payload: match_id=\(request.match_id)")
+        print("🟠 [AbortMatch] Headers: apikey=\(headers["apikey"]?.prefix(20) ?? "nil")...")
+        print("🟠 [AbortMatch] Auth token: \(headers["Authorization"]?.prefix(30) ?? "nil")...")
+        
+        do {
+            let _: EmptyResponse = try await supabaseService.client.functions
+                .invoke("abort-match", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: request
+                ))
+            
+            print("✅ [AbortMatch] Match aborted: \(matchId)")
+            print("🟠 [AbortMatch] ========================================")
+        } catch let error as FunctionsError {
+            // Detailed error logging
+            print("❌ [AbortMatch] Edge Function error:")
+            print("❌ [AbortMatch] Error type: \(error)")
+            
+            // Try to extract response body
+            if case .httpError(let code, let data) = error {
+                print("❌ [AbortMatch] HTTP Code: \(code)")
+                print("❌ [AbortMatch] Response data size: \(data.count) bytes")
+                
+                // Decode response body as string
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("❌ [AbortMatch] Response body: \(responseString)")
+                } else {
+                    print("❌ [AbortMatch] Response body (hex): \(data.map { String(format: "%02x", $0) }.joined())")
+                }
+            }
+            
+            print("🟠 [AbortMatch] ========================================")
+            throw error
+        } catch {
+            print("❌ [AbortMatch] Unexpected error: \(error)")
+            print("🟠 [AbortMatch] ========================================")
+            throw error
+        }
     }
     
     /// Delete an expired match from the database

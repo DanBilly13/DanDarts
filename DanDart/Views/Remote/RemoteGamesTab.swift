@@ -19,6 +19,7 @@ struct RemoteGamesTab: View {
     @State private var currentTime = Date()
     @State private var expiredMatchIds: Set<UUID> = []
     @State private var fadingMatchIds: Set<UUID> = []
+    @State private var cancelledMatchIds: Set<UUID> = []
     
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -58,6 +59,15 @@ struct RemoteGamesTab: View {
                 // Load matches when tab appears
                 // Note: Realtime subscription is now set up in MainTabView on app launch
                 await loadMatches()
+                
+                // Clean up cancelled IDs for matches that no longer exist
+                let allMatchIds = Set(
+                    remoteMatchService.pendingChallenges.map { $0.match.id } +
+                    remoteMatchService.sentChallenges.map { $0.match.id } +
+                    remoteMatchService.readyMatches.map { $0.match.id } +
+                    (remoteMatchService.activeMatch.map { [$0.match.id] } ?? [])
+                )
+                cancelledMatchIds = cancelledMatchIds.intersection(allMatchIds)
             }
             .refreshable {
                 await loadMatches()
@@ -241,7 +251,8 @@ struct RemoteGamesTab: View {
                 
                 // Active match (in progress, dimmed when match ready)
                 if let activeMatch = remoteMatchService.activeMatch,
-                   processingMatchId == nil {
+                   processingMatchId == nil,
+                   !cancelledMatchIds.contains(activeMatch.match.id) {
                     let _ = print("🎯 [RENDER] Active Match section rendering - matchId: \(activeMatch.id), processingMatchId: \(String(describing: processingMatchId))")
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
@@ -365,6 +376,15 @@ struct RemoteGamesTab: View {
                 try await remoteMatchService.acceptChallenge(matchId: matchId)
                 
                 // Step 2: Auto-join match (ready → lobby)
+                // Guard: Skip auto-join if match was cancelled
+                let isCancelled = await MainActor.run { cancelledMatchIds.contains(matchId) }
+                guard !isCancelled else {
+                    print("🚫 [DEBUG] Skipping auto-join - match was cancelled")
+                    await MainActor.run {
+                        processingMatchId = nil
+                    }
+                    return
+                }
                 try await remoteMatchService.joinMatch(matchId: matchId, currentUserId: currentUser.id)
                 
                 // Step 2.5: Fetch updated match with joinWindowExpiresAt
@@ -383,6 +403,14 @@ struct RemoteGamesTab: View {
                 // Step 3: Navigate to lobby with fresh match data (receiver flow)
                 await MainActor.run {
                     print("🔵 [TIMING] MainActor.run START - processingMatchId: \(String(describing: processingMatchId))")
+                    
+                    // Guard: Don't navigate if match was cancelled
+                    guard !cancelledMatchIds.contains(matchId) else {
+                        print("🚫 [DEBUG] Skipping navigation - match was cancelled")
+                        processingMatchId = nil
+                        return
+                    }
+                    
                     print("🔵 [TIMING] About to call router.push - processingMatchId: \(String(describing: processingMatchId))")
                     print("✅ [DEBUG] Navigating to lobby with updated match (receiver)")
                     
@@ -390,10 +418,34 @@ struct RemoteGamesTab: View {
                         match: updatedMatch,
                         opponent: opponent,
                         currentUser: currentUser,
+                        cancelledMatchIds: $cancelledMatchIds,
                         onCancel: {
                             Task {
                                 do {
-                                    try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                    print("🟠 [RemoteTab] onCancel closure called (receiver flow)")
+                                    
+                                    // Fetch current match to determine status
+                                    guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
+                                        print("❌ [RemoteTab] Match not found, navigating back")
+                                        await MainActor.run {
+                                            router.popToRoot()
+                                        }
+                                        return
+                                    }
+                                    
+                                    let matchStatus = currentMatch.status
+                                    print("🟠 [RemoteTab] Current match status: \(matchStatus?.rawValue ?? "nil")")
+                                    
+                                    // Route to correct endpoint based on status
+                                    if matchStatus == .lobby || matchStatus == .inProgress {
+                                        print("🟠 [RemoteTab] Calling abortMatch")
+                                        try await remoteMatchService.abortMatch(matchId: matchId)
+                                    } else {
+                                        print("🟠 [RemoteTab] Calling cancelChallenge")
+                                        try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                    }
+                                    
+                                    print("✅ [RemoteTab] Cancel/abort successful")
                                     
                                     // Success haptic
                                     #if canImport(UIKit)
@@ -405,7 +457,7 @@ struct RemoteGamesTab: View {
                                         router.popToRoot()
                                     }
                                 } catch {
-                                    print("❌ Failed to cancel match: \(error)")
+                                    print("❌ [RemoteTab] Failed to cancel match: \(error)")
                                     
                                     // Error haptic
                                     #if canImport(UIKit)
@@ -502,27 +554,51 @@ struct RemoteGamesTab: View {
     }
     
     private func cancelMatch(matchId: UUID) {
-        print("🟠 [DEBUG] cancelMatch called with matchId: \(matchId)")
+        print("🟠 [RemoteTab] cancelMatch called with matchId: \(matchId)")
         
         // Guard 1: Not already processing
         guard processingMatchId == nil else {
-            print("🟠 [DEBUG] Already processing another match")
+            print("🟠 [RemoteTab] Already processing another match")
             return
         }
         
-        // Guard 2: Match exists in ready matches
-        guard remoteMatchService.readyMatches
-            .contains(where: { $0.match.id == matchId }) else {
-            print("🟠 [DEBUG] Match not found in readyMatches")
+        // Guard 2: Match exists in ready matches - CAPTURE DATA EARLY
+        guard let matchWithPlayers = remoteMatchService.readyMatches
+            .first(where: { $0.match.id == matchId }) else {
+            print("🟠 [RemoteTab] Match not found in readyMatches")
             return
         }
         
-        print("🟠 [DEBUG] Guards passed, setting processingMatchId")
+        // CRITICAL: Capture status BEFORE any state changes
+        let matchStatus = matchWithPlayers.match.status
+        print("🟠 [RemoteTab] Match status: \(matchStatus?.rawValue ?? "nil")")
+        
+        // Log user context
+        print("🔍 [CancelMatch] ========================================")
+        print("🔍 [CancelMatch] User cancelling: \(authService.currentUser?.id.uuidString ?? "unknown")")
+        print("🔍 [CancelMatch] Match ID: \(matchId)")
+        print("🔍 [CancelMatch] Challenger ID: \(matchWithPlayers.match.challengerId)")
+        print("🔍 [CancelMatch] Receiver ID: \(matchWithPlayers.match.receiverId)")
+        print("🔍 [CancelMatch] ========================================")
+        
+        print("🟠 [RemoteTab] Guards passed, setting cancellation guard")
+        
+        // IMMEDIATELY mark as cancelled (before async call)
+        cancelledMatchIds.insert(matchId)
         processingMatchId = matchId
         
         Task {
             do {
-                try await remoteMatchService.cancelChallenge(matchId: matchId)
+                // Route to correct endpoint based on status
+                if matchStatus == .lobby || matchStatus == .inProgress {
+                    print("🟠 [RemoteTab] Calling abortMatch")
+                    try await remoteMatchService.abortMatch(matchId: matchId)
+                } else {
+                    print("🟠 [RemoteTab] Calling cancelChallenge")
+                    try await remoteMatchService.cancelChallenge(matchId: matchId)
+                }
+                
+                print("✅ [RemoteTab] Cancel/abort successful")
                 
                 // Light haptic
                 #if canImport(UIKit)
@@ -534,7 +610,11 @@ struct RemoteGamesTab: View {
                     processingMatchId = nil
                 }
             } catch {
+                print("❌ [RemoteTab] Failed to cancel/abort: \(error)")
+                
                 await MainActor.run {
+                    // On error, remove from cancelled set to allow retry
+                    cancelledMatchIds.remove(matchId)
                     processingMatchId = nil
                     errorMessage = "Failed to cancel match: \(error.localizedDescription)"
                     showError = true
@@ -550,6 +630,12 @@ struct RemoteGamesTab: View {
     }
     
     private func joinMatch(matchId: UUID) {
+        // Guard: Don't join if match was cancelled
+        guard !cancelledMatchIds.contains(matchId) else {
+            print("🚫 [DEBUG] Ignoring join - match was cancelled")
+            return
+        }
+        
         processingMatchId = matchId
         
         Task {
@@ -569,6 +655,12 @@ struct RemoteGamesTab: View {
                 await MainActor.run {
                     processingMatchId = nil
                     
+                    // Guard: Don't navigate if match was cancelled
+                    guard !cancelledMatchIds.contains(matchId) else {
+                        print("🚫 [DEBUG] Skipping navigation - match was cancelled")
+                        return
+                    }
+                    
                     // Navigate to lobby
                     // Find the match in either ready or lobby state
                     let match = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId })
@@ -580,10 +672,34 @@ struct RemoteGamesTab: View {
                             match: matchWithPlayers.match,
                             opponent: matchWithPlayers.opponent,
                             currentUser: currentUser,
+                            cancelledMatchIds: $cancelledMatchIds,
                             onCancel: {
                                 Task {
                                     do {
-                                        try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                        print("🟠 [RemoteTab] onCancel closure called (challenger flow)")
+                                        
+                                        // Fetch current match to determine status
+                                        guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
+                                            print("❌ [RemoteTab] Match not found, navigating back")
+                                            await MainActor.run {
+                                                router.popToRoot()
+                                            }
+                                            return
+                                        }
+                                        
+                                        let matchStatus = currentMatch.status
+                                        print("🟠 [RemoteTab] Current match status: \(matchStatus?.rawValue ?? "nil")")
+                                        
+                                        // Route to correct endpoint based on status
+                                        if matchStatus == .lobby || matchStatus == .inProgress {
+                                            print("🟠 [RemoteTab] Calling abortMatch")
+                                            try await remoteMatchService.abortMatch(matchId: matchId)
+                                        } else {
+                                            print("🟠 [RemoteTab] Calling cancelChallenge")
+                                            try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                        }
+                                        
+                                        print("✅ [RemoteTab] Cancel/abort successful")
                                         
                                         // Success haptic
                                         #if canImport(UIKit)
@@ -595,7 +711,7 @@ struct RemoteGamesTab: View {
                                             router.popToRoot()
                                         }
                                     } catch {
-                                        print("❌ Failed to cancel match: \(error)")
+                                        print("❌ [RemoteTab] Failed to cancel match: \(error)")
                                         
                                         // Error haptic
                                         #if canImport(UIKit)

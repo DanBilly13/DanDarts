@@ -13,15 +13,23 @@ struct RemoteLobbyView: View {
     let opponent: User
     let currentUser: User
     let onCancel: () -> Void
+    @Binding var cancelledMatchIds: Set<UUID>
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var remoteMatchService: RemoteMatchService
     
+    private let instanceId = UUID()
+    
+    // Static set to track matches being started across ALL instances
+    private static var matchesBeingStarted = Set<UUID>()
+    private static let matchesLock = NSLock()
+    
     @State private var currentTime = Date()
     @State private var showContent = false
     @State private var showMatchStarting = false
-    @State private var hasNavigated = false
+    @State private var isViewActive = false
+    @State private var navigationTask: Task<Void, Never>?
     
     private var timeRemaining: TimeInterval {
         guard let expiresAt = match.joinWindowExpiresAt else { return 0 }
@@ -152,9 +160,57 @@ struct RemoteLobbyView: View {
                     
                     // Cancel button
                     AppButton(role: .tertiaryOutline, controlSize: .regular) {
-                        onCancel()
+                        print("🟠 [Lobby] Cancel button tapped - matchId: \(match.id)")
+                        
+                        // CRITICAL: Capture status BEFORE any state changes
+                        let currentStatus = matchStatus
+                        print("🟠 [Lobby] Current status: \(currentStatus.rawValue)")
+                        
+                        // CRITICAL: Set cancellation flag FIRST (synchronous)
+                        cancelledMatchIds.insert(match.id)
+                        
+                        // Cancel any pending navigation
+                        navigationTask?.cancel()
+                        navigationTask = nil
+                        
+                        // Call appropriate cancel method based on status
+                        Task {
+                            do {
+                                if currentStatus == .lobby || currentStatus == .inProgress {
+                                    print("🟠 [Lobby] Calling abortMatch")
+                                    try await remoteMatchService.abortMatch(matchId: match.id)
+                                } else {
+                                    print("🟠 [Lobby] Calling cancelChallenge")
+                                    try await remoteMatchService.cancelChallenge(matchId: match.id)
+                                }
+                                
+                                print("✅ [Lobby] Cancel/abort successful")
+                                
+                                // Light haptic
+                                #if canImport(UIKit)
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.impactOccurred()
+                                #endif
+                                
+                                await MainActor.run {
+                                    router.popToRoot()
+                                }
+                            } catch {
+                                print("❌ [Lobby] Failed to cancel/abort match: \(error)")
+                                
+                                // Error haptic
+                                #if canImport(UIKit)
+                                let generator = UINotificationFeedbackGenerator()
+                                generator.notificationOccurred(.error)
+                                #endif
+                                
+                                await MainActor.run {
+                                    router.popToRoot() // Still navigate back on error
+                                }
+                            }
+                        }
                     } label: {
-                        Text("Cancel Match")
+                        Text("Abort Game")
                     }
                     .frame(maxWidth: 280)
                 }
@@ -166,10 +222,21 @@ struct RemoteLobbyView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
+            print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
+            isViewActive = true
+            
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                 showContent = true
             }
             SoundManager.shared.playBoxingSound()
+        }
+        .onDisappear {
+            print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
+            Self.matchesLock.lock()
+            Self.matchesBeingStarted.remove(match.id)
+            Self.matchesLock.unlock()
+            isViewActive = false
+            navigationTask?.cancel()
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
@@ -178,50 +245,195 @@ struct RemoteLobbyView: View {
             let matchExists = remoteMatchService.activeMatch?.match.id == match.id ||
                              remoteMatchService.readyMatches.contains(where: { $0.match.id == match.id })
             
-            if !matchExists && !hasNavigated {
+            // Check if match is being started (thread-safe)
+            Self.matchesLock.lock()
+            let isStarting = Self.matchesBeingStarted.contains(match.id)
+            Self.matchesLock.unlock()
+            
+            if !matchExists && !isStarting {
                 // Match was removed (cancelled or expired)
                 print("🚨 Match no longer exists in service, navigating back")
-                dismiss()
                 router.popToRoot()
             }
         }
         .onChange(of: matchStatus) { oldStatus, newStatus in
-            // Navigate to gameplay when both players ready
-            if newStatus == .inProgress && !hasNavigated {
-                hasNavigated = true
-                startMatchStartingSequence()
+            print("🧩 [Lobby] instance=\(instanceId) match=\(match.id)")
+            print("🔔 [Lobby] onChange fired - old: \(oldStatus.rawValue), new: \(newStatus.rawValue)")
+            
+            // Guard 0: Cheap dedupe - filter identical transitions
+            guard oldStatus != newStatus else {
+                print("🚫 [Lobby] Guard 0: Duplicate transition, ignoring")
+                return
             }
             
-            // Navigate back if match cancelled
-            if newStatus == .cancelled {
-                print("🚨 Match cancelled, navigating back to Remote tab")
-                dismiss()
-                router.popToRoot()
+            // Guard 1: Cancelled match
+            guard !cancelledMatchIds.contains(match.id) else {
+                print("🚫 [Lobby] Guard 1: Match in cancelled set")
+                return
             }
+            
+            // BRANCH 1: Handle cancelled status (mutually exclusive with start)
+            if newStatus == .cancelled {
+                print("🚨 [Lobby] Status is CANCELLED")
+                abortAndNavigateBack()
+                return
+            }
+            
+            // BRANCH 2: Handle non-inProgress status (reset and exit)
+            guard newStatus == .inProgress else {
+                print("⚠️ [Lobby] Status not inProgress (\(newStatus.rawValue)), resetting")
+                resetMatchStart()
+                return
+            }
+            
+            // BRANCH 3: Handle inProgress - ATOMIC latch across ALL instances
+            Self.matchesLock.lock()
+            let alreadyStarting = Self.matchesBeingStarted.contains(match.id)
+            if !alreadyStarting {
+                Self.matchesBeingStarted.insert(match.id)
+            }
+            Self.matchesLock.unlock()
+            
+            guard !alreadyStarting else {
+                print("🚫 [Lobby] instance=\(instanceId) Match already being started by another instance, ignoring")
+                return
+            }
+            
+            print("🔒 [Lobby] instance=\(instanceId) Acquired GLOBAL latch, starting match sequence")
+            
+            // Cancel any existing task (defensive)
+            navigationTask?.cancel()
+            
+            // Start sequence
+            startMatchStartingSequence()
         }
         .background(AppColor.backgroundPrimary)
         .preferredColorScheme(.dark)
     }
     
+    // MARK: - Helper Methods
+    
+    private func resetMatchStart() {
+        Self.matchesLock.lock()
+        Self.matchesBeingStarted.remove(match.id)
+        Self.matchesLock.unlock()
+        navigationTask?.cancel()
+        navigationTask = nil
+    }
+    
+    private func abortAndNavigateBack() {
+        cancelledMatchIds.insert(match.id)
+        resetMatchStart()
+        router.popToRoot()
+    }
+    
     // MARK: - Animation Sequence
     
     private func startMatchStartingSequence() {
+        // Guard: Don't start if match cancelled
+        guard !cancelledMatchIds.contains(match.id) else {
+            print("🚫 [Lobby] Match cancelled before sequence start")
+            resetMatchStart()
+            return
+        }
+        
         // Start flashing animation immediately
         withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
             showMatchStarting = true
         }
         
-        // Navigate to gameplay after 3 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            // Play sound before navigation
-            SoundManager.shared.playBoxingSound()
-            
-            // Navigate to placeholder gameplay
-            router.push(.remoteGameplay(
-                match: currentMatch ?? match,
-                opponent: opponent,
-                currentUser: currentUser
-            ))
+        // Create cancellable Task for navigation with authoritative checks
+        navigationTask = Task { @MainActor in
+            do {
+                // CRITICAL: Fetch fresh match status from database BEFORE scheduling delay
+                print("🔍 [Lobby] Fetching authoritative match status before scheduling navigation...")
+                guard let freshMatch = try await remoteMatchService.fetchMatch(matchId: match.id) else {
+                    print("🚫 [Lobby] Match not found")
+                    await MainActor.run {
+                        abortAndNavigateBack()
+                    }
+                    return
+                }
+                
+                // Guard: Check authoritative status is inProgress
+                guard freshMatch.status == .inProgress else {
+                    print("🚫 [Lobby] Status not inProgress: \(freshMatch.status?.rawValue ?? "nil")")
+                    await MainActor.run {
+                        abortAndNavigateBack()
+                    }
+                    return
+                }
+                
+                print("✅ [Lobby] Authoritative check 1 passed")
+                
+                // Wait 3 seconds (cancellable)
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                
+                // Check if task was cancelled during sleep
+                guard !Task.isCancelled else {
+                    print("🚫 [Lobby] Task cancelled during countdown")
+                    await MainActor.run {
+                        resetMatchStart()
+                    }
+                    return
+                }
+                
+                // Check if match was cancelled (local set)
+                guard !cancelledMatchIds.contains(match.id) else {
+                    print("🚫 [Lobby] Match in cancelled set")
+                    await MainActor.run {
+                        resetMatchStart()
+                    }
+                    return
+                }
+                
+                // SECOND authoritative check - verify status still inProgress
+                print("🔍 [Lobby] Authoritative check 2: Re-fetching match...")
+                guard let finalMatch = try await remoteMatchService.fetchMatch(matchId: match.id) else {
+                    print("🚫 [Lobby] Match not found after countdown")
+                    await MainActor.run {
+                        abortAndNavigateBack()
+                    }
+                    return
+                }
+                
+                guard finalMatch.status == .inProgress else {
+                    print("🚫 [Lobby] Status changed after countdown: \(finalMatch.status?.rawValue ?? "nil")")
+                    await MainActor.run {
+                        abortAndNavigateBack()
+                    }
+                    return
+                }
+                
+                // Final check: Not cancelled
+                guard !Task.isCancelled else {
+                    print("🚫 [Lobby] Task cancelled before navigation")
+                    await MainActor.run {
+                        resetMatchStart()
+                    }
+                    return
+                }
+                
+                // All checks passed - navigate
+                print("✅ [Lobby] All checks passed, navigating to gameplay")
+                SoundManager.shared.playBoxingSound()
+                
+                router.push(.remoteGameplay(
+                    match: finalMatch,
+                    opponent: opponent,
+                    currentUser: currentUser
+                ))
+            } catch is CancellationError {
+                print("🚫 [Lobby] Task cancelled (CancellationError)")
+                await MainActor.run {
+                    resetMatchStart()
+                }
+            } catch {
+                print("❌ [Lobby] Error in match sequence: \(error)")
+                await MainActor.run {
+                    resetMatchStart()
+                }
+            }
         }
     }
     
@@ -272,10 +484,19 @@ struct RemoteLobbyView: View {
 // MARK: - Preview
 
 #Preview {
-    RemoteLobbyView(
-        match: RemoteMatch.mockReady,
-        opponent: User.mockUsers[0],
-        currentUser: User.mockUsers[1],
-        onCancel: {}
-    )
+    struct PreviewWrapper: View {
+        @State private var cancelledMatchIds: Set<UUID> = []
+        
+        var body: some View {
+            RemoteLobbyView(
+                match: RemoteMatch.mockReady,
+                opponent: User.mockUsers[0],
+                currentUser: User.mockUsers[1],
+                onCancel: {},
+                cancelledMatchIds: $cancelledMatchIds
+            )
+        }
+    }
+    
+    return PreviewWrapper()
 }

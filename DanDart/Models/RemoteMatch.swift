@@ -75,6 +75,10 @@ struct RemoteMatch: Identifiable, Codable {
     let createdAt: Date
     let updatedAt: Date
     
+    // Termination tracking (optional)
+    let endedBy: UUID?
+    let endedReason: String?
+    
     // Computed properties
     var isChallenger: Bool {
         // Will be set by service when loading
@@ -156,6 +160,8 @@ struct RemoteMatch: Identifiable, Codable {
         case lastVisitPayload = "last_visit_payload"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case endedBy = "ended_by"
+        case endedReason = "ended_reason"
     }
 }
 
@@ -350,7 +356,9 @@ extension RemoteMatch {
         joinWindowExpiresAt: nil,
         lastVisitPayload: nil,
         createdAt: Date(),
-        updatedAt: Date()
+        updatedAt: Date(),
+        endedBy: nil,
+        endedReason: nil
     )
     
     static let mockReady = RemoteMatch(
@@ -367,7 +375,9 @@ extension RemoteMatch {
         joinWindowExpiresAt: Date().addingTimeInterval(300), // 5 minutes
         lastVisitPayload: nil,
         createdAt: Date(),
-        updatedAt: Date()
+        updatedAt: Date(),
+        endedBy: nil,
+        endedReason: nil
     )
     
     static let mockInProgress = RemoteMatch(
@@ -384,6 +394,8 @@ extension RemoteMatch {
         joinWindowExpiresAt: nil,
         lastVisitPayload: nil,
         createdAt: Date(),
-        updatedAt: Date()
+        updatedAt: Date(),
+        endedBy: nil,
+        endedReason: nil
     )
 }
