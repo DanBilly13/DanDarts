@@ -148,6 +148,8 @@ struct RemoteGamesTab: View {
                                     userId: matchWithPlayers.opponent.id
                                 ),
                                 state: isExpired ? .expired : .ready,
+                                gameType: matchWithPlayers.match.gameType,
+                                matchFormat: matchWithPlayers.match.matchFormat,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
                                 onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
@@ -188,6 +190,8 @@ struct RemoteGamesTab: View {
                                     userId: matchWithPlayers.opponent.id
                                 ),
                                 state: isExpired ? .expired : .pending,
+                                gameType: matchWithPlayers.match.gameType,
+                                matchFormat: matchWithPlayers.match.matchFormat,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.challengeExpiresAt,
                                 onAccept: {
@@ -233,6 +237,8 @@ struct RemoteGamesTab: View {
                                     userId: matchWithPlayers.opponent.id
                                 ),
                                 state: isExpired ? .expired : .sent,
+                                gameType: matchWithPlayers.match.gameType,
+                                matchFormat: matchWithPlayers.match.matchFormat,
                                 isProcessing: processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
                                 onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
@@ -268,6 +274,8 @@ struct RemoteGamesTab: View {
                                 userId: activeMatch.opponent.id
                             ),
                             state: activeMatch.match.status ?? .inProgress,
+                            gameType: activeMatch.match.gameType,
+                            matchFormat: activeMatch.match.matchFormat,
                             expiresAt: nil
                         )
                     }

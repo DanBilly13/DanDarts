@@ -402,15 +402,49 @@ struct GamesTabView: View {
 
                 // Games List Content
                 ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(games) { game in
-                            GameCard(game: game) {
-                                router.push(.gameSetup(game: game))
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Remote games section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Remote games")
+                                .font(.system(.title3, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppColor.textPrimary)
+                                .padding(.horizontal, 16)
+                            
+                            VStack(spacing: 12) {
+                                GameCardRemote(game: Game.remote301) {
+                                    router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
+                                }
+                                .modifier(GameHeroSourceModifier(game: Game.remote301, namespace: gameHeroNamespace))
+                                
+                                GameCardRemote(game: Game.remote501) {
+                                    router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
+                                }
+                                .modifier(GameHeroSourceModifier(game: Game.remote501, namespace: gameHeroNamespace))
                             }
-                            .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
+                            .padding(.horizontal, 16)
+                        }
+                        
+                        // Local games section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Local games")
+                                .font(.system(.title3, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppColor.textPrimary)
+                                .padding(.horizontal, 16)
+                            
+                            LazyVStack(spacing: 16) {
+                                ForEach(games) { game in
+                                    GameCard(game: game) {
+                                        router.push(.gameSetup(game: game))
+                                    }
+                                    .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
+                                }
+                            }
+                            .padding(.horizontal, 16)
                         }
                     }
-                    .padding()
+                    .padding(.vertical, 16)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppColor.backgroundPrimary)
@@ -444,6 +478,20 @@ struct GamesTabView: View {
                         view
                             .background(AppColor.backgroundPrimary)
                     }
+                
+                case .remoteGameSetup(let game, let opponent):
+                    let view = RemoteGameSetupView(game: game, preselectedOpponent: opponent)
+                    if #available(iOS 18.0, *) {
+                        view
+                            .navigationTransition(
+                                .zoom(sourceID: game.id, in: gameHeroNamespace)
+                            )
+                            .background(AppColor.backgroundPrimary)
+                    } else {
+                        view
+                            .background(AppColor.backgroundPrimary)
+                    }
+                
                 default:
                     router.view(for: route)
                         .background(AppColor.backgroundPrimary)
@@ -476,10 +524,17 @@ private struct GameHeroSourceModifier: ViewModifier {
 }
 
 struct FriendsTabView: View {
+    @StateObject private var router = Router.shared
     @Binding var showProfile: Bool
     
     var body: some View {
-        FriendsListView()
+        NavigationStack(path: $router.path) {
+            FriendsListView()
+                .navigationDestination(for: Route.self) { route in
+                    router.view(for: route)
+                }
+        }
+        .environmentObject(router)
     }
 }
 

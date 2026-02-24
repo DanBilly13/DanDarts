@@ -11,9 +11,11 @@ struct FriendProfileView: View {
     let friend: Player
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
+    @EnvironmentObject private var router: Router
     @StateObject private var matchesService = MatchesService()
     
     @State private var showRemoveConfirmation: Bool = false
+    @State private var showGameSelection: Bool = false
     @State private var headToHeadMatches: [MatchResult] = []
     @State private var isLoadingMatches: Bool = false
     
@@ -23,6 +25,20 @@ struct FriendProfileView: View {
                 // Profile Header (Reusable Component)
                 ProfileHeaderView(player: friend)
                     .padding(.top, 24)
+                
+                // Challenge Button
+                AppButton(role: .primary, controlSize: .large) {
+                    showGameSelection = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "network")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Challenge to a remote match")
+                            .font(.system(.body, design: .rounded))
+                            .fontWeight(.semibold)
+                    }
+                }
+                .padding(.horizontal, 16)
                 
                 // Head-to-Head Section
                 VStack(alignment: .leading, spacing: 16) {
@@ -109,6 +125,39 @@ struct FriendProfileView: View {
             }
         } message: {
             Text("Are you sure you want to remove \(friend.displayName) from your friends?")
+        }
+        .alert("Choose a game", isPresented: $showGameSelection) {
+            Button("301") {
+                router.push(.remoteGameSetup(
+                    game: Game.remote301,
+                    opponent: User(
+                        id: friend.userId ?? friend.id,
+                        displayName: friend.displayName,
+                        nickname: friend.nickname,
+                        avatarURL: friend.avatarURL,
+                        createdAt: Date(),
+                        totalWins: friend.totalWins,
+                        totalLosses: friend.totalLosses
+                    )
+                ))
+            }
+            Button("501") {
+                router.push(.remoteGameSetup(
+                    game: Game.remote501,
+                    opponent: User(
+                        id: friend.userId ?? friend.id,
+                        displayName: friend.displayName,
+                        nickname: friend.nickname,
+                        avatarURL: friend.avatarURL,
+                        createdAt: Date(),
+                        totalWins: friend.totalWins,
+                        totalLosses: friend.totalLosses
+                    )
+                ))
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Head-to-head with \(friend.displayName)")
         }
         .onAppear {
             let friendId = friend.userId ?? friend.id

@@ -13,6 +13,8 @@ struct PlayerChallengeCard: View {
     
     let player: Player
     let state: RemoteMatchStatus
+    let gameType: String
+    let matchFormat: Int
     let isProcessing: Bool
     let expiresAt: Date?
     let onAccept: (() -> Void)?
@@ -22,6 +24,8 @@ struct PlayerChallengeCard: View {
     init(
         player: Player,
         state: RemoteMatchStatus,
+        gameType: String,
+        matchFormat: Int,
         isProcessing: Bool = false,
         expiresAt: Date? = nil,
         onAccept: (() -> Void)? = nil,
@@ -30,11 +34,20 @@ struct PlayerChallengeCard: View {
     ) {
         self.player = player
         self.state = state
+        self.gameType = gameType
+        self.matchFormat = matchFormat
         self.isProcessing = isProcessing
         self.expiresAt = expiresAt
         self.onAccept = onAccept
         self.onDecline = onDecline
         self.onJoin = onJoin
+    }
+    
+    private var gameInfoText: String {
+        // Extract just the number from gameType (handles "301", "Remote 301", etc.)
+        let gameNumber = gameType.components(separatedBy: " ").last ?? gameType
+        
+        return "\(gameNumber) Best of \(matchFormat)"
     }
     
     var body: some View {
@@ -46,7 +59,7 @@ struct PlayerChallengeCard: View {
                 )
                 .padding(.leading, 16)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("301 First to 3")
+                    Text(gameInfoText)
                         .font(.system(.title2, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundStyle(AppColor.brandPrimary)
@@ -335,6 +348,8 @@ struct PlayerChallengeCardFoot: View {
             totalLosses: 8
         ),
         state: .ready,
+        gameType: "Remote 501",
+        matchFormat: 3,
         expiresAt: Date().addingTimeInterval(300)
     )
     .padding()
