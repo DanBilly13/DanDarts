@@ -30,7 +30,7 @@ struct MainTabView: View {
         ZStack {
             TabView(selection: $selectedTab) {
                 // Games Tab
-                GamesTabView(showProfile: $showProfile)
+                GamesTabView(showProfile: $showProfile, selectedTab: $selectedTab)
                     .tabItem {
                         Image(systemName: "target")
                             .font(.system(size: 17, weight: .semibold))
@@ -41,7 +41,7 @@ struct MainTabView: View {
                 // Friends Tab
                 Group {
                     if pendingRequestCount > 0 {
-                        FriendsTabView(showProfile: $showProfile)
+                        FriendsTabView(showProfile: $showProfile, selectedTab: $selectedTab)
                             .tabItem {
                                 Image(systemName: "person.2.fill")
                                     .font(.system(size: 22, weight: .semibold))
@@ -50,7 +50,7 @@ struct MainTabView: View {
                             .badge(pendingRequestCount)
                             .tag(1)
                     } else {
-                        FriendsTabView(showProfile: $showProfile)
+                        FriendsTabView(showProfile: $showProfile, selectedTab: $selectedTab)
                             .tabItem {
                                 Image(systemName: "person.2.fill")
                                     .font(.system(size: 22, weight: .semibold))
@@ -391,6 +391,7 @@ struct GamesTabView: View {
     @StateObject private var router = Router.shared
     @EnvironmentObject private var authService: AuthService
     @Binding var showProfile: Bool
+    @Binding var selectedTab: Int
     @Namespace private var gameHeroNamespace
     
     var body: some View {
@@ -480,7 +481,7 @@ struct GamesTabView: View {
                     }
                 
                 case .remoteGameSetup(let game, let opponent):
-                    let view = RemoteGameSetupView(game: game, preselectedOpponent: opponent)
+                    let view = RemoteGameSetupView(game: game, preselectedOpponent: opponent, selectedTab: $selectedTab)
                     if #available(iOS 18.0, *) {
                         view
                             .navigationTransition(
@@ -526,12 +527,13 @@ private struct GameHeroSourceModifier: ViewModifier {
 struct FriendsTabView: View {
     @StateObject private var router = Router.shared
     @Binding var showProfile: Bool
+    @Binding var selectedTab: Int
     
     var body: some View {
         NavigationStack(path: $router.path) {
             FriendsListView()
                 .navigationDestination(for: Route.self) { route in
-                    router.view(for: route)
+                    router.view(for: route, selectedTab: $selectedTab)
                 }
         }
         .environmentObject(router)

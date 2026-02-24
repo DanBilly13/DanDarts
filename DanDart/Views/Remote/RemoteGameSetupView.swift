@@ -24,6 +24,7 @@ struct RemoteGameSetupView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
     @StateObject private var remoteMatchService = RemoteMatchService()
+    @Binding var selectedTab: Int
     
     private var config: RemoteGameSetupConfig {
         RemoteGameSetupConfig(game: game)
@@ -33,9 +34,10 @@ struct RemoteGameSetupView: View {
         selectedOpponent != nil && !isCreating
     }
     
-    init(game: Game, preselectedOpponent: User? = nil) {
+    init(game: Game, preselectedOpponent: User? = nil, selectedTab: Binding<Int>) {
         self.game = game
         self.preselectedOpponent = preselectedOpponent
+        self._selectedTab = selectedTab
     }
     
     var body: some View {
@@ -323,6 +325,7 @@ struct RemoteGameSetupView: View {
                 
                 await MainActor.run {
                     isCreating = false
+                    selectedTab = 2 // Switch to Remote tab
                     dismiss()
                 }
                 

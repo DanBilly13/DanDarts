@@ -209,8 +209,8 @@ class Router: ObservableObject {
         case .killerGameplay(let game, let players, let startingLives):
             KillerGameplayView(game: game, players: players, startingLives: startingLives)
             
-        case .remoteGameSetup(let game, let opponent):
-            RemoteGameSetupView(game: game, preselectedOpponent: opponent)
+        case .remoteGameSetup:
+            EmptyView() // Requires selectedTab binding - use view(for:selectedTab:) instead
             
         case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
             RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
@@ -231,6 +231,18 @@ class Router: ObservableObject {
                 matchId: matchId,
                 matchResult: nil // Router doesn't have access to savedMatchResult
             )
+        }
+    }
+    
+    /// Build the appropriate view for a given route with selectedTab binding (for remote game setup)
+    @ViewBuilder
+    func view(for route: Route, selectedTab: Binding<Int>) -> some View {
+        switch route.destination {
+        case .remoteGameSetup(let game, let opponent):
+            RemoteGameSetupView(game: game, preselectedOpponent: opponent, selectedTab: selectedTab)
+            
+        default:
+            view(for: route) // Fallback to regular view method
         }
     }
 }
