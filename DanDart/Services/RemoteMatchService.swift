@@ -764,6 +764,13 @@ class RemoteMatchService: ObservableObject {
                 print("🟢 [RemoteMatch Realtime] Reloading matches for user: \(userId)")
                 try? await self?.loadMatches(userId: userId)
                 print("🟢 [RemoteMatch Realtime] Reload complete")
+                
+                // Post notification for badge updates
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("RemoteChallengesChanged"),
+                    object: nil
+                )
+                print("🟢 [RemoteMatch Realtime] RemoteChallengesChanged notification posted")
             }
         }
         
@@ -802,6 +809,13 @@ class RemoteMatchService: ObservableObject {
                 print("🚨 [RemoteMatch Realtime] Reloading matches for user: \(userId)")
                 try? await self?.loadMatches(userId: userId)
                 print("🚨 [RemoteMatch Realtime] Reload complete")
+                
+                // Post notification for badge updates
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("RemoteChallengesChanged"),
+                    object: nil
+                )
+                print("🚨 [RemoteMatch Realtime] RemoteChallengesChanged notification posted")
             }
         }
         
@@ -850,5 +864,24 @@ class RemoteMatchService: ObservableObject {
             self.realtimeChannel = nil
             print("🔵 [RemoteMatch Realtime] Subscription removed")
         }
+    }
+    
+    // MARK: - Badge Count
+    
+    /// Get count of pending incoming challenges
+    /// - Parameter userId: Current user's ID
+    /// - Returns: Count of pending incoming challenges
+    func getPendingChallengeCount(userId: UUID) async throws -> Int {
+        // Query matches where user is receiver and status is pending
+        let matches: [RemoteMatch] = try await supabaseService.client
+            .from("matches")
+            .select()
+            .eq("match_mode", value: "remote")
+            .eq("receiver_id", value: userId.uuidString)
+            .eq("remote_status", value: "pending")
+            .execute()
+            .value
+        
+        return matches.count
     }
 }

@@ -14,6 +14,7 @@ struct MainTabView: View {
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
+    @State private var pendingChallengeCount: Int = 0
     @State private var selectedTab: Int = 0
     @State private var showPasswordChangeAlert = false
     @Environment(\.scenePhase) private var scenePhase
@@ -60,13 +61,26 @@ struct MainTabView: View {
                 }
                 
                 // Remote Tab
-                RemoteGamesTab()
-                    .tabItem {
-                        Image(systemName: "network")
-                            .font(.system(size: 17, weight: .semibold))
-                        //Text("Remote")
+                Group {
+                    if pendingChallengeCount > 0 {
+                        RemoteGamesTab()
+                            .tabItem {
+                                Image(systemName: "network")
+                                    .font(.system(size: 17, weight: .semibold))
+                                //Text("Remote")
+                            }
+                            .badge(pendingChallengeCount)
+                            .tag(2)
+                    } else {
+                        RemoteGamesTab()
+                            .tabItem {
+                                Image(systemName: "network")
+                                    .font(.system(size: 17, weight: .semibold))
+                                //Text("Remote")
+                            }
+                            .tag(2)
                     }
-                    .tag(2)
+                }
                 
                 // History Tab
                 HistoryTabView(showProfile: $showProfile)
@@ -115,6 +129,7 @@ struct MainTabView: View {
         .onAppear {
             configureTabBarAppearance()
             loadPendingRequestCount()
+            loadPendingChallengeCount()
             
             // Set toast suppression based on current tab
             toastManager.suppressRequestReceivedToasts = (selectedTab == 1)
@@ -148,6 +163,20 @@ struct MainTabView: View {
                 print("🎯 [MainTabView] ========================================")
                 loadPendingRequestCount()
             }
+            
+            // Listen for remote challenge changes
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("RemoteChallengesChanged"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                print("🎯 [MainTabView] ========================================")
+                print("🎯 [MainTabView] Received RemoteChallengesChanged notification")
+                print("🎯 [MainTabView] Current challenge badge count: \(pendingChallengeCount)")
+                print("🎯 [MainTabView] Thread: \(Thread.current)")
+                print("🎯 [MainTabView] ========================================")
+                loadPendingChallengeCount()
+            }
 
             NotificationCenter.default.addObserver(
                 forName: NSNotification.Name("InviteLinkReceived"),
@@ -166,6 +195,7 @@ struct MainTabView: View {
         }
         .onChange(of: authService.currentUser?.id) { oldValue, newValue in
             loadPendingRequestCount()
+            loadPendingChallengeCount()
 
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
@@ -223,6 +253,35 @@ struct MainTabView: View {
                 print("❌ [MainTabView] Failed to load pending request count: \(error)")
                 await MainActor.run {
                     pendingRequestCount = 0
+                }
+            }
+        }
+    }
+    
+    private func loadPendingChallengeCount() {
+        print("🎯 [MainTabView] loadPendingChallengeCount() called")
+        print("🎯 [MainTabView] Current user: \(authService.currentUser?.id.uuidString ?? "nil")")
+        
+        guard let currentUser = authService.currentUser else {
+            print("⚠️ [MainTabView] No current user, setting challenge badge to 0")
+            pendingChallengeCount = 0
+            return
+        }
+        
+        Task {
+            do {
+                print("🎯 [MainTabView] Querying pending challenges for user: \(currentUser.id)")
+                let count = try await remoteMatchService.getPendingChallengeCount(userId: currentUser.id)
+                print("✅ [MainTabView] Query returned count: \(count)")
+                await MainActor.run {
+                    print("🎯 [MainTabView] Updating challenge badge count from \(pendingChallengeCount) to \(count)")
+                    pendingChallengeCount = count
+                    print("✅ [MainTabView] Challenge badge count updated successfully")
+                }
+            } catch {
+                print("❌ [MainTabView] Failed to load pending challenge count: \(error)")
+                await MainActor.run {
+                    pendingChallengeCount = 0
                 }
             }
         }
