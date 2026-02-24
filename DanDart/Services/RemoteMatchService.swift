@@ -575,6 +575,30 @@ class RemoteMatchService: ObservableObject {
         print("✅ Match cancelled: \(matchId)")
     }
     
+    // MARK: - Expire Match
+    
+    /// Expire a match (calls Edge Function for client-triggered expiration)
+    func expireMatch(matchId: UUID) async throws {
+        let headers = try await getEdgeFunctionHeaders()
+        
+        struct ExpireRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = ExpireRequest(match_id: matchId.uuidString)
+        let data = try JSONEncoder().encode(request)
+        
+        struct EmptyResponse: Decodable {}
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("expire-match", options: FunctionInvokeOptions(
+                headers: headers,
+                body: data
+            ))
+        
+        print("✅ Match expired via client: \(matchId)")
+    }
+    
     // MARK: - Join Match
     
     /// Join a ready match (calls Edge Function)

@@ -761,6 +761,17 @@ struct RemoteGamesTab: View {
         
         print("⏰ Starting expiration timer for match: \(matchId)")
         
+        // Fire-and-forget: Call API to update status to expired
+        // Don't await - let it happen in background
+        Task {
+            do {
+                try await remoteMatchService.expireMatch(matchId: matchId)
+                print("✅ Match expired via client: \(matchId)")
+            } catch {
+                print("⚠️ Failed to expire match (server will handle): \(error)")
+            }
+        }
+        
         // Wait 5 seconds after expiration
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
             print("🌫️ Starting fade animation for match: \(matchId)")
@@ -768,19 +779,11 @@ struct RemoteGamesTab: View {
             fadingMatchIds.insert(matchId)
             
             // Remove after fade completes (0.5s)
+            // Note: No manual reload needed - realtime subscription will handle updates
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 print("🗑️ Removing expired match from UI: \(matchId)")
                 expiredMatchIds.insert(matchId)
                 fadingMatchIds.remove(matchId)
-                
-                // Delete from database
-                Task {
-                    do {
-                        try await remoteMatchService.deleteExpiredMatch(matchId: matchId)
-                    } catch {
-                        print("⚠️ Failed to delete expired match from database: \(error)")
-                    }
-                }
             }
         }
     }

@@ -133,9 +133,10 @@ serve(async (req) => {
     }
 
     // Now check if user has any remaining active locks
+    // Only block on ACTIVE statuses (not terminal ones)
     const { data: existingLock, error: lockCheckError } = await supabaseClient
       .from('remote_match_locks')
-      .select('*')
+      .select('match_id')
       .eq('user_id', user.id)
       .maybeSingle()
 
@@ -148,10 +149,32 @@ serve(async (req) => {
     }
 
     if (existingLock) {
-      return new Response(
-        JSON.stringify({ error: 'You already have a match ready. Join or cancel it first.' } as ErrorResponse),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      // Verify the match is actually in an active state
+      const { data: lockMatch } = await supabaseClient
+        .from('matches')
+        .select('remote_status')
+        .eq('id', existingLock.match_id)
+        .maybeSingle()
+      
+      // Only block if match is in active state
+      const activeStatuses = ['pending', 'ready', 'lobby', 'in_progress']
+      if (lockMatch && activeStatuses.includes(lockMatch.remote_status)) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'You already have an active match. Cancel/Abort or wait for it to expire.',
+            match_id: existingLock.match_id
+          } as ErrorResponse),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        // Lock exists but match is terminal - clean up the stale lock
+        await supabaseClient
+          .from('remote_match_locks')
+          .delete()
+          .eq('match_id', existingLock.match_id)
+        
+        console.log(`🧹 Cleaned up stale lock for terminal match ${existingLock.match_id}`)
+      }
     }
 
     // Verify receiver exists
