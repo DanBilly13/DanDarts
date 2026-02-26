@@ -34,6 +34,7 @@ class CountdownViewModel: ObservableObject {
     @Published var matchFormat: Int // Total legs in match (1, 3, 5, or 7)
     @Published var legWinner: Player? = nil // Winner of current leg (before match winner)
     @Published var isMatchWon: Bool = false // True when match is won (not just leg)
+    @Published var currentVisit: Int = 1 // Current visit number (increments after all players complete turn)
     
     // Services
     private var authService: AuthService?
@@ -357,6 +358,12 @@ class CountdownViewModel: ObservableObject {
             isTransitioningPlayers = true
             switchPlayer()
             
+            // Increment visit counter after all players complete their turn
+            // Visit increments when turnHistory count is divisible by player count
+            if turnHistory.count % players.count == 0 {
+                currentVisit += 1
+            }
+            
             // Update checkout for new player
             updateCheckoutSuggestion()
             
@@ -460,6 +467,13 @@ class CountdownViewModel: ObservableObject {
             // Pause before rotating cards
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds pause
             switchPlayer()
+            
+            // Increment visit counter after all players complete their turn
+            // Visit increments when turnHistory count is divisible by player count
+            if turnHistory.count % players.count == 0 {
+                currentVisit += 1
+            }
+            
             updateCheckoutSuggestion()
             
             // Clear transition flag after player switch completes
@@ -543,6 +557,7 @@ class CountdownViewModel: ObservableObject {
         lastTurn = nil
         turnHistory.removeAll()
         currentLeg = 1
+        currentVisit = 1
         
         SoundManager.shared.resetMissCounter()
     }
@@ -567,6 +582,7 @@ class CountdownViewModel: ObservableObject {
         legWinner = nil
         lastTurn = nil
         turnHistory.removeAll()
+        currentVisit = 1
         
         // Update checkout for first player
         updateCheckoutSuggestion()

@@ -40,12 +40,17 @@ struct CountdownGameplayView: View {
     
     // Computed property for navigation title
     private var navigationTitle: String {
+        let gameTitle = game.title // "301" or "501"
+        
         if players.count == 1 {
-            return "\(game.title) • Practice"
+            // Practice mode
+            return "\(gameTitle) • Practice"
         } else if gameViewModel.matchFormat > 1 {
-            return "Leg \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)"
+            // Multi-leg match
+            return "\(gameTitle)  LEG \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)  VISIT \(gameViewModel.currentVisit)"
         } else {
-            return game.title
+            // Single game (best of 1)
+            return "\(gameTitle)  VISIT \(gameViewModel.currentVisit)"
         }
     }
     
