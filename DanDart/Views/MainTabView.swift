@@ -18,6 +18,17 @@ struct MainTabView: View {
     @State private var selectedTab: Int = 0
     @State private var showPasswordChangeAlert = false
     @Environment(\.scenePhase) private var scenePhase
+    
+    // Navigation bar state for tabs
+    @State private var friendsShowSearch: Bool = false
+    @State private var friendsIsCreatingInvite: Bool = false
+    @State private var remoteShowGameSelection: Bool = false
+    @State private var historyIsSearchPresented: Bool = false
+    @State private var historyShowLocalMatches: Bool = true
+    
+    // Single global navigation state
+    @Namespace private var gameHeroNamespace
+    @StateObject private var router = Router.shared
 
     private struct InviteTokenToClaim: Identifiable {
         let id: String
@@ -26,96 +37,233 @@ struct MainTabView: View {
 
     @State private var inviteTokenToClaim: InviteTokenToClaim? = nil
     
+    private var rootNavTitle: String {
+        switch selectedTab {
+        case 0: return "Games"
+        case 1: return "Friends"
+        case 2: return "Remote matches"
+        case 3: return "History"
+        default: return ""
+        }
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if router.path.isEmpty {
+            ToolbarItem(placement: .principal) {
+                HStack {
+                    Text(rootNavTitle)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppColor.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .allowsTightening(true)
+                    Spacer(minLength: 0)
+                }
+                // Force the principal area to behave like a full-width container
+                // and left-align the title inside it.
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // Nudge to match your previous custom nav spacing
+                .padding(.leading, 2)
+            }
+            switch selectedTab {
+            case 0:
+                // Games tab
+                ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarAvatarButton(avatarURL: authService.currentUser?.avatarURL) {
+                        showProfile = true
+                    }
+                }
+            case 1:
+                // Friends tab
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        friendsIsCreatingInvite = true
+                    } label: {
+                        ZStack {
+                            Text("Invite")
+                                .font(.system(size: 17, weight: .regular))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .opacity(friendsIsCreatingInvite ? 0 : 1)
+                            
+                            if friendsIsCreatingInvite {
+                                ProgressView()
+                                    .tint(AppColor.interactivePrimaryBackground)
+                            }
+                        }
+                        .frame(minWidth: 44)
+                    }
+                    .disabled(friendsIsCreatingInvite)
+                    
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            friendsShowSearch = true
+                        }
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                }
+            case 2:
+                // Remote tab
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        remoteShowGameSelection = true
+                    } label: {
+                        Text("Challenge")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                    .frame(minWidth: 44)
+                }
+            case 3:
+                // History tab
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        historyShowLocalMatches.toggle()
+                    } label: {
+                        Image(systemName: historyShowLocalMatches ? "iphone" : "iphone.slash")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(historyShowLocalMatches ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
+                    }
+                    
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            historyIsSearchPresented = true
+                        }
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                }
+            default:
+                ToolbarItem(placement: .topBarTrailing) {
+                    EmptyView()
+                }
+            }
+        }
+    }
+    
     var body: some View {
-        ZStack {
-            TabView(selection: $selectedTab) {
-                // Games Tab
-                GamesTabView(showProfile: $showProfile, selectedTab: $selectedTab)
+        NavigationStack(path: $router.path) {
+            ZStack {
+                TabView(selection: $selectedTab) {
+                    // Games Tab
+                    GamesTabView(
+                        gameHeroNamespace: gameHeroNamespace,
+                        showProfile: $showProfile,
+                        selectedTab: $selectedTab
+                    )
                     .tabItem {
                         Image(systemName: "target")
                             .font(.system(size: 17, weight: .semibold))
                         //Text("Games")
                     }
                     .tag(0)
-                
-                // Friends Tab
-                Group {
-                    if pendingRequestCount > 0 {
-                        FriendsTabView(showProfile: $showProfile, selectedTab: $selectedTab)
-                            .tabItem {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 22, weight: .semibold))
-                                //Text("Friends")
-                            }
-                            .badge(pendingRequestCount)
-                            .tag(1)
-                    } else {
-                        FriendsTabView(showProfile: $showProfile, selectedTab: $selectedTab)
-                            .tabItem {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 22, weight: .semibold))
-                                //Text("Friends")
-                            }
-                            .tag(1)
+                    
+                    // Friends Tab
+                    Group {
+                        if pendingRequestCount > 0 {
+                            FriendsTabView(
+                                showProfile: $showProfile,
+                                selectedTab: $selectedTab,
+                                showSearch: $friendsShowSearch,
+                                isCreatingInvite: $friendsIsCreatingInvite
+                            )
+                                .tabItem {
+                                    Image(systemName: "person.2.fill")
+                                        .font(.system(size: 22, weight: .semibold))
+                                    //Text("Friends")
+                                }
+                                .badge(pendingRequestCount)
+                                .tag(1)
+                        } else {
+                            FriendsTabView(
+                                showProfile: $showProfile,
+                                selectedTab: $selectedTab,
+                                showSearch: $friendsShowSearch,
+                                isCreatingInvite: $friendsIsCreatingInvite
+                            )
+                                .tabItem {
+                                    Image(systemName: "person.2.fill")
+                                        .font(.system(size: 22, weight: .semibold))
+                                    //Text("Friends")
+                                }
+                                .tag(1)
+                        }
                     }
+                    
+                    // Remote Tab
+                    Group {
+                        if pendingChallengeCount > 0 {
+                            RemoteGamesTab(showGameSelection: $remoteShowGameSelection)
+                                .tabItem {
+                                    Image(systemName: "network")
+                                        .font(.system(size: 17, weight: .semibold))
+                                    //Text("Remote")
+                                }
+                                .badge(pendingChallengeCount)
+                                .tag(2)
+                        } else {
+                            RemoteGamesTab(showGameSelection: $remoteShowGameSelection)
+                                .tabItem {
+                                    Image(systemName: "network")
+                                        .font(.system(size: 17, weight: .semibold))
+                                    //Text("Remote")
+                                }
+                                .tag(2)
+                        }
+                    }
+                    
+                    // History Tab
+                    HistoryTabView(
+                        showProfile: $showProfile,
+                        isSearchPresented: $historyIsSearchPresented,
+                        showLocalMatches: $historyShowLocalMatches
+                    )
+                        .tabItem {
+                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                                .fontWeight(.bold)
+                            //Text("History")
+                        }
+                        .tag(3)
                 }
+                .background(AppColor.backgroundPrimary)
+                .accentColor(AppColor.interactivePrimaryBackground)
                 
-                // Remote Tab
-                Group {
-                    if pendingChallengeCount > 0 {
-                        RemoteGamesTab()
-                            .tabItem {
-                                Image(systemName: "network")
-                                    .font(.system(size: 17, weight: .semibold))
-                                //Text("Remote")
-                            }
-                            .badge(pendingChallengeCount)
-                            .tag(2)
-                    } else {
-                        RemoteGamesTab()
-                            .tabItem {
-                                Image(systemName: "network")
-                                    .font(.system(size: 17, weight: .semibold))
-                                //Text("Remote")
-                            }
-                            .tag(2)
-                    }
+                // Toast Overlay - appears above all tabs
+                VStack {
+                    FriendRequestToastContainer(
+                        onNavigate: { toast in
+                            handleToastNavigation(toast)
+                        },
+                        onAccept: { friendshipId in
+                            handleAcceptRequest(friendshipId)
+                        },
+                        onDeny: { friendshipId in
+                            handleDenyRequest(friendshipId)
+                        }
+                    )
+                    .padding(.top, 16) // Just below status bar
+                    
+                    Spacer()
                 }
-                
-                // History Tab
-                HistoryTabView(showProfile: $showProfile)
-                    .tabItem {
-                        Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                            .fontWeight(.bold)
-                        //Text("History")
-                    }
-                    .tag(3)
+                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: toastManager.currentToast?.id)
+                .zIndex(999) // Ensure toast appears above all other content
             }
-            .background(AppColor.backgroundPrimary)
-            .accentColor(AppColor.interactivePrimaryBackground)
-            .environmentObject(friendsService)
-            .environmentObject(remoteMatchService)
-            
-            // Toast Overlay - appears above all tabs
-            VStack {
-                FriendRequestToastContainer(
-                    onNavigate: { toast in
-                        handleToastNavigation(toast)
-                    },
-                    onAccept: { friendshipId in
-                        handleAcceptRequest(friendshipId)
-                    },
-                    onDeny: { friendshipId in
-                        handleDenyRequest(friendshipId)
-                    }
-                )
-                .padding(.top, 16) // Just below status bar
-                
-                Spacer()
+            .toolbar {
+                toolbarContent
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: toastManager.currentToast?.id)
-            .zIndex(999) // Ensure toast appears above all other content
+            .navigationDestination(for: Route.self) { route in
+                destinationView(for: route)
+            }
         }
+        .environmentObject(router)
+        .environmentObject(authService)
+        .environmentObject(friendsService)
+        .environmentObject(remoteMatchService)
         .sheet(item: $inviteTokenToClaim, onDismiss: {
             PendingInviteStore.shared.clearToken()
         }) { token in
@@ -382,129 +530,117 @@ struct MainTabView: View {
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
     }
+    
+    // MARK: - Destination View Builder
+    
+    @ViewBuilder
+    private func destinationView(for route: Route) -> some View {
+        switch route.destination {
+        case .gameSetup(let game):
+            let view = GameSetupView(game: game)
+            if #available(iOS 18.0, *) {
+                view
+                    .navigationTransition(.zoom(sourceID: game.id, in: gameHeroNamespace))
+                    .background(AppColor.backgroundPrimary)
+            } else {
+                view.background(AppColor.backgroundPrimary)
+            }
+        
+        case .remoteGameSetup(let game, let opponent):
+            let view = RemoteGameSetupView(game: game, preselectedOpponent: opponent, selectedTab: $selectedTab)
+            if #available(iOS 18.0, *) {
+                view
+                    .navigationTransition(.zoom(sourceID: game.id, in: gameHeroNamespace))
+                    .background(AppColor.backgroundPrimary)
+            } else {
+                view.background(AppColor.backgroundPrimary)
+            }
+        
+        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
+            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
+                .background(AppColor.backgroundPrimary)
+        
+        case .remoteGameplay(let match, let opponent, let currentUser):
+            RemoteGameplayPlaceholderView(match: match, opponent: opponent, currentUser: currentUser)
+                .background(AppColor.backgroundPrimary)
+        
+        default:
+            router.view(for: route, selectedTab: $selectedTab)
+                .background(AppColor.backgroundPrimary)
+        }
+    }
 }
 
 // MARK: - Tab Views
 
 struct GamesTabView: View {
     let games = Game.loadGames()
-    @StateObject private var router = Router.shared
+    let gameHeroNamespace: Namespace.ID
+    @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
     @Binding var showProfile: Bool
     @Binding var selectedTab: Int
-    @Namespace private var gameHeroNamespace
     
     var body: some View {
-        NavigationStack(path: $router.path) {
-            ZStack {
-                AppColor.backgroundPrimary
-                    .padding(-60)
-                    .ignoresSafeArea()
+        ZStack {
+            AppColor.backgroundPrimary
+                .padding(-60)
+                .ignoresSafeArea()
 
-                // Games List Content
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        // Remote games section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Remote games")
-                                .font(.system(.title3, design: .rounded))
-                                .fontWeight(.semibold)
-                                .foregroundStyle(AppColor.textPrimary)
-                                .padding(.horizontal, 16)
-                            
-                            VStack(spacing: 12) {
-                                GameCardRemote(game: Game.remote301) {
-                                    router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
-                                }
-                                .modifier(GameHeroSourceModifier(game: Game.remote301, namespace: gameHeroNamespace))
-                                
-                                GameCardRemote(game: Game.remote501) {
-                                    router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
-                                }
-                                .modifier(GameHeroSourceModifier(game: Game.remote501, namespace: gameHeroNamespace))
-                            }
+            // Games List Content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Remote games section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Remote games")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppColor.textPrimary)
                             .padding(.horizontal, 16)
-                        }
                         
-                        // Local games section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Local games")
-                                .font(.system(.title3, design: .rounded))
-                                .fontWeight(.semibold)
-                                .foregroundStyle(AppColor.textPrimary)
-                                .padding(.horizontal, 16)
-                            
-                            LazyVStack(spacing: 16) {
-                                ForEach(games) { game in
-                                    GameCard(game: game) {
-                                        router.push(.gameSetup(game: game))
-                                    }
-                                    .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
-                                }
+                        VStack(spacing: 12) {
+                            GameCardRemote(game: Game.remote301) {
+                                router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
                             }
-                            .padding(.horizontal, 16)
+                            .modifier(GameHeroSourceModifier(game: Game.remote301, namespace: gameHeroNamespace))
+                            
+                            GameCardRemote(game: Game.remote501) {
+                                router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
+                            }
+                            .modifier(GameHeroSourceModifier(game: Game.remote501, namespace: gameHeroNamespace))
                         }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.vertical, 16)
+                    
+                    // Local games section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Local games")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppColor.textPrimary)
+                            .padding(.horizontal, 16)
+                        
+                        LazyVStack(spacing: 16) {
+                            ForEach(games) { game in
+                                GameCard(game: game) {
+                                    router.push(.gameSetup(game: game))
+                                }
+                                .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppColor.backgroundPrimary)
+                .padding(.vertical, 16)
             }
-            .navigationTitle("Games")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarRole(.editor)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    ToolbarTitle(title: "Games")
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    ToolbarAvatarButton(avatarURL: authService.currentUser?.avatarURL) {
-                        showProfile = true
-                    }
-                }
-            }
-            .customNavBar(title: "Games")
-            .navigationDestination(for: Route.self) { route in
-                switch route.destination {
-                case .gameSetup(let game):
-                    let view = GameSetupView(game: game)
-                    if #available(iOS 18.0, *) {
-                        view
-                            .navigationTransition(
-                                .zoom(sourceID: game.id, in: gameHeroNamespace)
-                            )
-                            .background(AppColor.backgroundPrimary)
-                    } else {
-                        view
-                            .background(AppColor.backgroundPrimary)
-                    }
-                
-                case .remoteGameSetup(let game, let opponent):
-                    let view = RemoteGameSetupView(game: game, preselectedOpponent: opponent, selectedTab: $selectedTab)
-                    if #available(iOS 18.0, *) {
-                        view
-                            .navigationTransition(
-                                .zoom(sourceID: game.id, in: gameHeroNamespace)
-                            )
-                            .background(AppColor.backgroundPrimary)
-                    } else {
-                        view
-                            .background(AppColor.backgroundPrimary)
-                    }
-                
-                default:
-                    router.view(for: route)
-                        .background(AppColor.backgroundPrimary)
-                }
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppColor.backgroundPrimary)
         }
         .background(
             AppColor.backgroundPrimary
                 .padding(-60)
                 .ignoresSafeArea()
         )
-        .environmentObject(router)
     }
 }
 
@@ -525,26 +661,30 @@ private struct GameHeroSourceModifier: ViewModifier {
 }
 
 struct FriendsTabView: View {
-    @StateObject private var router = Router.shared
+    @EnvironmentObject private var router: Router
     @Binding var showProfile: Bool
     @Binding var selectedTab: Int
+    @Binding var showSearch: Bool
+    @Binding var isCreatingInvite: Bool
     
     var body: some View {
-        NavigationStack(path: $router.path) {
-            FriendsListView()
-                .navigationDestination(for: Route.self) { route in
-                    router.view(for: route, selectedTab: $selectedTab)
-                }
-        }
-        .environmentObject(router)
+        FriendsListView(
+            showSearch: $showSearch,
+            isCreatingInvite: $isCreatingInvite
+        )
     }
 }
 
 struct HistoryTabView: View {
     @Binding var showProfile: Bool
+    @Binding var isSearchPresented: Bool
+    @Binding var showLocalMatches: Bool
     
     var body: some View {
-        MatchHistoryView()
+        MatchHistoryView(
+            isSearchPresented: $isSearchPresented,
+            showLocalMatches: $showLocalMatches
+        )
     }
 }
 

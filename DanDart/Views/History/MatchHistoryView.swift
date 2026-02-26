@@ -12,14 +12,13 @@ struct MatchHistoryView: View {
     @StateObject private var historyService = MatchHistoryService.shared
     private let analytics = AnalyticsService.shared
     
+    @Binding var isSearchPresented: Bool
+    @Binding var showLocalMatches: Bool
+    
     @State private var selectedFilter: GameFilter = .all
     @State private var searchText: String = ""
     @State private var filteredMatches: [MatchResult] = []
-    @State private var isSearchPresented: Bool = false
     @FocusState private var isSearchFieldFocused: Bool
-    
-    // TEMPORARY: Toggle to hide local matches for testing
-    @State private var showLocalMatches: Bool = true
     @State private var supabaseMatchIds: Set<UUID> = [] // Track which matches came from Supabase
     
     // Update status tracking
@@ -100,9 +99,21 @@ struct MatchHistoryView: View {
     }
     
     var body: some View {
-        navigationStackView
+        mainContentZStack
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.backgroundPrimary)
-            .ignoresSafeArea()
+            .onChange(of: searchText) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: selectedFilter) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: isSearchPresented) { _, _ in
+                updateFilteredMatches()
+            }
+            .onChange(of: showLocalMatches) { _, _ in
+                updateFilteredMatches()
+            }
             .onAppear {
                 // Check if data is stale and refresh if needed
                 if historyService.isStale {
@@ -122,52 +133,6 @@ struct MatchHistoryView: View {
             .onChange(of: historyService.lastLoadedTime) { _, _ in
                 updateStatusText = formatUpdateStatus()
             }
-    }
-    
-    private var navigationStackView: some View {
-        NavigationStack {
-            mainContentZStack
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppColor.backgroundPrimary)
-                .navigationTitle("History")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarRole(.editor)
-                .toolbar {
-                    toolbarContent
-                }
-                .toolbar {
-                    if #available(iOS 18.0, *) {
-                        ToolbarItem(placement: .principal) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("History")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(AppColor.textPrimary)
-                                if !updateStatusText.isEmpty {
-                                    Text(updateStatusText)
-                                        .font(.caption2)
-                                        .foregroundColor(AppColor.textSecondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
-                .onChange(of: searchText) { _, _ in
-                    updateFilteredMatches()
-                }
-                .onChange(of: selectedFilter) { _, _ in
-                    updateFilteredMatches()
-                }
-                .onChange(of: isSearchPresented) { _, _ in
-                    updateFilteredMatches()
-                }
-                .onChange(of: showLocalMatches) { _, _ in
-                    updateFilteredMatches()
-                }
-                .navigationDestination(for: MatchResult.self) { match in
-                    MatchDetailView(match: match)
-                }
-        }
     }
     
     private var mainContentZStack: some View {
@@ -547,11 +512,35 @@ struct FilterButton: View {
 // MARK: - Preview
 
 #Preview {
-    MatchHistoryView()
-        .environmentObject(AuthService.mockAuthenticated)
+    struct PreviewWrapper: View {
+        @State private var isSearchPresented = false
+        @State private var showLocalMatches = true
+        
+        var body: some View {
+            MatchHistoryView(
+                isSearchPresented: $isSearchPresented,
+                showLocalMatches: $showLocalMatches
+            )
+            .environmentObject(AuthService.mockAuthenticated)
+        }
+    }
+    
+    return PreviewWrapper()
 }
 
 #Preview("With Matches") {
-    MatchHistoryView()
-        .environmentObject(AuthService.mockAuthenticated)
+    struct PreviewWrapper: View {
+        @State private var isSearchPresented = false
+        @State private var showLocalMatches = true
+        
+        var body: some View {
+            MatchHistoryView(
+                isSearchPresented: $isSearchPresented,
+                showLocalMatches: $showLocalMatches
+            )
+            .environmentObject(AuthService.mockAuthenticated)
+        }
+    }
+    
+    return PreviewWrapper()
 }

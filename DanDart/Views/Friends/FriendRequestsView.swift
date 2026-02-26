@@ -22,8 +22,7 @@ struct FriendRequestsView: View {
     @State private var showSuccessMessage: String? = nil
     
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 // Received Requests Section
                 Section {
                     if isLoading && receivedRequests.isEmpty {
@@ -182,7 +181,6 @@ struct FriendRequestsView: View {
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showSuccessMessage)
             )
-        }
     }
     
     // MARK: - Helper Methods

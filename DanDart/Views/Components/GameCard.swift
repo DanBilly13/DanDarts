@@ -37,20 +37,7 @@ struct GameCard: View {
                 }
                 
                 // Bottom-left angled readability gradient (lighter)
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color.black.opacity(0.45), location: 0.0),
-                        .init(color: Color.black.opacity(0.30), location: 0.25),
-                        .init(color: Color.black.opacity(0.15), location: 0.5),
-                        .init(color: Color.clear, location: 0.7)
-                    ]),
-                    startPoint: .bottomLeading,
-                    endPoint: .topTrailing
-                )
-                .frame(height: 188)
-                .frame(maxWidth: .infinity, alignment: .bottomLeading)
-                .clipped()
-                .allowsHitTesting(false)
+           
                 
                 // Title overlay for a bit of App Store feel
                 VStack(alignment: .leading, spacing: 4) {

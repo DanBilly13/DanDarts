@@ -19,84 +19,82 @@ struct BlockedUsersView: View {
     @State private var unblockingUserId: UUID? = nil
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColor.backgroundPrimary
-                    .ignoresSafeArea()
-                
-                if isLoading && blockedUsers.isEmpty {
-                    // Loading State
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                            .tint(AppColor.interactivePrimaryBackground)
+        ZStack {
+            AppColor.backgroundPrimary
+                .ignoresSafeArea()
+            
+            if isLoading && blockedUsers.isEmpty {
+                // Loading State
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(AppColor.interactivePrimaryBackground)
+                    
+                    Text("Loading...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                }
+            } else if blockedUsers.isEmpty {
+                // Empty State
+                VStack(spacing: 16) {
+                    Image(systemName: "hand.raised.slash")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    VStack(spacing: 8) {
+                        Text("No blocked users")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(AppColor.textPrimary)
                         
-                        Text("Loading...")
+                        Text("Users you block will appear here")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppColor.textSecondary)
-                    }
-                } else if blockedUsers.isEmpty {
-                    // Empty State
-                    VStack(spacing: 16) {
-                        Image(systemName: "hand.raised.slash")
-                            .font(.system(size: 64, weight: .light))
-                            .foregroundColor(AppColor.textSecondary)
-                        
-                        VStack(spacing: 8) {
-                            Text("No blocked users")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(AppColor.textPrimary)
-                            
-                            Text("Users you block will appear here")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(AppColor.textSecondary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(.horizontal, 32)
-                } else {
-                    // Blocked Users List
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(blockedUsers) { user in
-                                BlockedUserCard(
-                                    user: user,
-                                    isUnblocking: unblockingUserId == user.id,
-                                    onUnblock: { unblockUser(user) }
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 16)
+                            .multilineTextAlignment(.center)
                     }
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Blocked Users")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(AppColor.textPrimary)
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Back")
-                                .font(.system(size: 16, weight: .medium))
+                .padding(.horizontal, 32)
+            } else {
+                // Blocked Users List
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(blockedUsers) { user in
+                            BlockedUserCard(
+                                user: user,
+                                isUnblocking: unblockingUserId == user.id,
+                                onUnblock: { unblockUser(user) }
+                            )
                         }
-                        .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
                 }
             }
-            .onAppear {
-                loadBlockedUsers()
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Blocked Users")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(AppColor.textPrimary)
             }
+            
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    dismiss()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Back")
+                            .font(.system(size: 16, weight: .medium))
+                    }
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                }
+            }
+        }
+        .onAppear {
+            loadBlockedUsers()
         }
     }
     

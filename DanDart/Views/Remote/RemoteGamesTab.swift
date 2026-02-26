@@ -9,101 +9,75 @@ import SwiftUI
 
 struct RemoteGamesTab: View {
     @EnvironmentObject var remoteMatchService: RemoteMatchService
-    @StateObject private var router = Router.shared
+    @EnvironmentObject private var router: Router
     @EnvironmentObject var authService: AuthService
+    
+    @Binding var showGameSelection: Bool
     
     @State private var processingMatchId: UUID?
     @State private var errorMessage: String?
     @State private var showError = false
-    @State private var showGameSelection = false
     @State private var currentTime = Date()
     @State private var expiredMatchIds: Set<UUID> = []
     @State private var fadingMatchIds: Set<UUID> = []
     @State private var cancelledMatchIds: Set<UUID> = []
     
     var body: some View {
-        NavigationStack(path: $router.path) {
-            ZStack {
-                AppColor.backgroundPrimary
-                    .ignoresSafeArea()
-                
-                if remoteMatchService.isLoading {
-                    loadingView
-                } else if hasAnyMatches {
-                    matchListView
-                } else {
-                    emptyStateView
-                }
-            }
-            .navigationTitle("Remote matches")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarRole(.editor)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    ToolbarTitle(title: "Remote matches")
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showGameSelection = true
-                    } label: {
-                        Text("Challenge")
-                            .font(.system(size: 17, weight: .regular))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                    }
-                    .frame(minWidth: 44)
-                }
-            }
-            .customNavBar(title: "Remote matches", subtitle: nil)
-            .task {
-                // Load matches when tab appears
-                // Note: Realtime subscription is now set up in MainTabView on app launch
-                await loadMatches()
-                
-                // Clean up cancelled IDs for matches that no longer exist
-                let allMatchIds = Set(
-                    remoteMatchService.pendingChallenges.map { $0.match.id } +
-                    remoteMatchService.sentChallenges.map { $0.match.id } +
-                    remoteMatchService.readyMatches.map { $0.match.id } +
-                    (remoteMatchService.activeMatch.map { [$0.match.id] } ?? [])
-                )
-                cancelledMatchIds = cancelledMatchIds.intersection(allMatchIds)
-            }
-            .refreshable {
-                await loadMatches()
-            }
-            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
-                currentTime = time
-            }
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {
-                    showError = false
-                    errorMessage = nil
-                }
-            } message: {
-                if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                }
-            }
-            .alert("Choose a game", isPresented: $showGameSelection) {
-                Button("301") {
-                    let opponent: User? = nil
-                    router.push(.remoteGameSetup(game: Game.remote301, opponent: opponent))
-                }
-                Button("501") {
-                    let opponent: User? = nil
-                    router.push(.remoteGameSetup(game: Game.remote501, opponent: opponent))
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Select which game type you'd like to play")
-            }
-            .navigationDestination(for: Route.self) { route in
-                router.view(for: route)
-                    .background(AppColor.backgroundPrimary)
+        ZStack {
+            AppColor.backgroundPrimary
+                .ignoresSafeArea()
+            
+            if remoteMatchService.isLoading {
+                loadingView
+            } else if hasAnyMatches {
+                matchListView
+            } else {
+                emptyStateView
             }
         }
-        .environmentObject(router)
+        .task {
+            // Load matches when tab appears
+            // Note: Realtime subscription is now set up in MainTabView on app launch
+            await loadMatches()
+            
+            // Clean up cancelled IDs for matches that no longer exist
+            let allMatchIds = Set(
+                remoteMatchService.pendingChallenges.map { $0.match.id } +
+                remoteMatchService.sentChallenges.map { $0.match.id } +
+                remoteMatchService.readyMatches.map { $0.match.id } +
+                (remoteMatchService.activeMatch.map { [$0.match.id] } ?? [])
+            )
+            cancelledMatchIds = cancelledMatchIds.intersection(allMatchIds)
+        }
+        .refreshable {
+            await loadMatches()
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
+            currentTime = time
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {
+                showError = false
+                errorMessage = nil
+            }
+        } message: {
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+            }
+        }
+        .alert("Choose a game", isPresented: $showGameSelection) {
+            Button("301") {
+                let opponent: User? = nil
+                router.push(.remoteGameSetup(game: Game.remote301, opponent: opponent))
+            }
+            Button("501") {
+                let opponent: User? = nil
+                router.push(.remoteGameSetup(game: Game.remote501, opponent: opponent))
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Select which game type you'd like to play")
+        }
         .background(AppColor.backgroundPrimary).ignoresSafeArea()
     }
     
@@ -792,6 +766,16 @@ struct RemoteGamesTab: View {
 // MARK: - Preview
 
 #Preview {
-    RemoteGamesTab()
-        .environmentObject(AuthService.shared)
+    struct PreviewWrapper: View {
+        @State private var showGameSelection = false
+        
+        var body: some View {
+            RemoteGamesTab(showGameSelection: $showGameSelection)
+                .environmentObject(AuthService.shared)
+                .environmentObject(RemoteMatchService())
+                .environmentObject(Router.shared)
+        }
+    }
+    
+    return PreviewWrapper()
 }

@@ -12,11 +12,11 @@ struct FriendsListView: View {
     @EnvironmentObject private var friendsService: FriendsService
     @StateObject private var inviteService = InviteService()
     
-    @State private var showSearch: Bool = false
+    @Binding var showSearch: Bool
     @State private var showSuccessAlert: Bool = false
     @State private var successMessage: String = ""
     @State private var showInviteShareSheet: Bool = false
-    @State private var isCreatingInvite: Bool = false
+    @Binding var isCreatingInvite: Bool
     @State private var inviteURLToShare: URL? = nil
     @State private var inviteErrorMessage: String? = nil
     @State private var showInviteError: Bool = false
@@ -248,54 +248,13 @@ struct FriendsListView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            listContent
-            .navigationTitle("Friends")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarRole(.editor)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    ToolbarTitle(title: "Friends")
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        createInviteLink()
-                    } label: {
-                        ZStack {
-                            Text("Invite")
-                                .font(.system(size: 17, weight: .regular))
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
-                                .opacity(isCreatingInvite ? 0 : 1)
-
-                            if isCreatingInvite {
-                                ProgressView()
-                                    .tint(AppColor.interactivePrimaryBackground)
-                            }
-                        }
-                        // Keep the tappable/visual width stable
-                        .frame(minWidth: 44)
-                    }
-                    .disabled(isCreatingInvite)
-                }
-                
-                ToolbarSpacer(placement: .navigationBarTrailing)
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showSearch = true
-                        }
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                    }
+        listContent
+            .background(AppColor.backgroundPrimary).ignoresSafeArea()
+            .onChange(of: isCreatingInvite) { _, newValue in
+                if newValue {
+                    createInviteLink()
                 }
             }
-            .customNavBar(title: "Friends", subtitle: navigationSubtitleText)
-        }
-        .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .onAppear {
             loadFriends()
             loadRequests()
@@ -373,10 +332,10 @@ struct FriendsListView: View {
     private func createInviteLink() {
         guard let currentUserId = authService.currentUser?.id else {
             inviteErrorMessage = "You must be signed in to invite friends"
+            isCreatingInvite = false
             return
         }
 
-        isCreatingInvite = true
         inviteErrorMessage = nil
 
         Task {
@@ -646,8 +605,21 @@ struct FriendsListView: View {
 // MARK: - Preview
 
 #Preview("Empty State") {
-    FriendsListView()
-        .environmentObject(AuthService.mockAuthenticated)
+    struct PreviewWrapper: View {
+        @State private var showSearch = false
+        @State private var isCreatingInvite = false
+        
+        var body: some View {
+            FriendsListView(
+                showSearch: $showSearch,
+                isCreatingInvite: $isCreatingInvite
+            )
+            .environmentObject(AuthService.mockAuthenticated)
+            .environmentObject(FriendsService())
+        }
+    }
+    
+    return PreviewWrapper()
 }
 
 #Preview("With Friends") {
@@ -657,11 +629,16 @@ struct FriendsListView: View {
 // Preview wrapper with mock data
 struct FriendsListViewPreview: View {
     @StateObject private var authService = AuthService.mockAuthenticated
+    @State private var showSearch = false
+    @State private var isCreatingInvite = false
     
     var body: some View {
-        FriendsListViewWithMockData()
-            .environmentObject(authService)
-            .environmentObject(FriendsService())
+        FriendsListView(
+            showSearch: $showSearch,
+            isCreatingInvite: $isCreatingInvite
+        )
+        .environmentObject(authService)
+        .environmentObject(FriendsService())
     }
 }
 
@@ -693,78 +670,76 @@ struct FriendsListViewWithMockData: View {
     }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Search Bar
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-                    
-                    TextField("Search friends", text: $searchText)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textPrimary)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                    
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            searchText = ""
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(AppColor.textSecondary)
-                        }
+        VStack(spacing: 0) {
+            // Search Bar
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+                
+                TextField("Search friends", text: $searchText)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppColor.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                
+                if !searchText.isEmpty {
+                    Button(action: {
+                        searchText = ""
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(AppColor.inputBackground)
-                .cornerRadius(12)
-                .padding(.top, 12)
-                .padding(.bottom, 16)
-            
-                // Friends List
-                List {
-                    ForEach(filteredFriends) { friend in
-                        PlayerCard(player: friend)
-                            .listRowBackground(AppColor.backgroundPrimary)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button {
-                                    friendToDelete = friend
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(.red)
-                                }
-                                .tint(.clear)
-                            }
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(AppColor.backgroundPrimary)
             }
             .padding(.horizontal, 16)
-            .background(AppColor.backgroundPrimary)
-            .navigationTitle("Friends")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showAddFriend = true
-                    }) {
-                        Image(systemName: "person.badge.plus")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                    }
+            .padding(.vertical, 12)
+            .background(AppColor.inputBackground)
+            .cornerRadius(12)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+        
+            // Friends List
+            List {
+                ForEach(filteredFriends) { friend in
+                    PlayerCard(player: friend)
+                        .listRowBackground(AppColor.backgroundPrimary)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button {
+                                friendToDelete = friend
+                                showDeleteConfirmation = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .tint(.clear)
+                        }
                 }
             }
-            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(AppColor.backgroundPrimary)
         }
+        .padding(.horizontal, 16)
+        .background(AppColor.backgroundPrimary)
+        .navigationTitle("Friends")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showAddFriend = true
+                }) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                }
+            }
+        }
+        .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .background(AppColor.backgroundPrimary).ignoresSafeArea()
         .alert("Remove Friend?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
