@@ -27,10 +27,10 @@ enum Destination: Hashable {
     case suddenDeathGameplay(game: Game, players: [Player], startingLives: Int)
     case killerGameplay(game: Game, players: [Player], startingLives: Int)
     
-    // Remote games flow
+    // Remote games flow (ID-based)
     case remoteGameSetup(game: Game, opponent: User?)
-    case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, cancelledMatchIds: Binding<Set<UUID>>, onCancel: () -> Void)
-    case remoteGameplay(match: RemoteMatch, opponent: User, currentUser: User)
+    case remoteLobby(matchId: UUID)
+    case remoteGameplay(matchId: UUID)
     
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?)
@@ -54,10 +54,10 @@ enum Destination: Hashable {
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.remoteGameSetup(let g1, let o1), .remoteGameSetup(let g2, let o2)):
             return g1.id == g2.id && o1?.id == o2?.id
-        case (.remoteLobby(let m1, let o1, let c1, _, _), .remoteLobby(let m2, let o2, let c2, _, _)):
-            return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
-        case (.remoteGameplay(let m1, let o1, let c1), .remoteGameplay(let m2, let o2, let c2)):
-            return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
+        case (.remoteLobby(let m1), .remoteLobby(let m2)):
+            return m1 == m2
+        case (.remoteGameplay(let m1), .remoteGameplay(let m2)):
+            return m1 == m2
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
         default:
@@ -104,16 +104,12 @@ enum Destination: Hashable {
             hasher.combine("remoteGameSetup")
             hasher.combine(game.id)
             hasher.combine(opponent?.id)
-        case .remoteLobby(let match, let opponent, let currentUser, _, _):
+        case .remoteLobby(let matchId):
             hasher.combine("remoteLobby")
-            hasher.combine(match.id)
-            hasher.combine(opponent.id)
-            hasher.combine(currentUser.id)
-        case .remoteGameplay(let match, let opponent, let currentUser):
+            hasher.combine(matchId)
+        case .remoteGameplay(let matchId):
             hasher.combine("remoteGameplay")
-            hasher.combine(match.id)
-            hasher.combine(opponent.id)
-            hasher.combine(currentUser.id)
+            hasher.combine(matchId)
         case .gameEnd:
             hasher.combine("gameEnd")
         }
@@ -139,6 +135,7 @@ class Router: ObservableObject {
     static let shared = Router()
     
     @Published var path = NavigationPath()
+    private var lastPushedDestination: Destination?
     
     private init() {}
     
@@ -146,6 +143,14 @@ class Router: ObservableObject {
     
     /// Push a new destination onto the navigation stack
     func push(_ destination: Destination) {
+        // Deduplicate: don't push if same as last destination
+        if let last = lastPushedDestination, last == destination {
+            print("🚫 [Router] Duplicate push prevented - destination already on stack")
+            return
+        }
+        
+        print("✅ [Router] Pushing destination to navigation stack")
+        lastPushedDestination = destination
         path.append(Route(destination))
     }
     
@@ -153,6 +158,7 @@ class Router: ObservableObject {
     func pop() {
         guard !path.isEmpty else { return }
         path.removeLast()
+        lastPushedDestination = nil // Clear on pop
     }
     
     /// Pop multiple destinations
@@ -160,18 +166,21 @@ class Router: ObservableObject {
         let actualCount = min(count, path.count)
         guard actualCount > 0 else { return }
         path.removeLast(actualCount)
+        lastPushedDestination = nil // Clear on pop
     }
     
     /// Pop to root (clear entire stack)
     func popToRoot() {
         withAnimation {
             path = NavigationPath()
+            lastPushedDestination = nil // Clear on root
         }
     }
     
     /// Reset navigation to a specific destination
     func reset(to destination: Destination) {
         path = NavigationPath()
+        lastPushedDestination = destination
         path.append(Route(destination))
     }
     
@@ -212,11 +221,11 @@ class Router: ObservableObject {
         case .remoteGameSetup:
             EmptyView() // Requires selectedTab binding - use view(for:selectedTab:) instead
             
-        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
-            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
+        case .remoteLobby(let matchId):
+            RemoteLobbyView(matchId: matchId)
             
-        case .remoteGameplay(let match, let opponent, let currentUser):
-            RemoteGameplayPlaceholderView(match: match, opponent: opponent, currentUser: currentUser)
+        case .remoteGameplay(let matchId):
+            RemoteGameplayView(matchId: matchId)
             
         case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
             GameEndView(

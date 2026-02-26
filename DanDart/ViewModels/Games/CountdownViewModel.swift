@@ -173,6 +173,12 @@ class CountdownViewModel: ObservableObject {
         return matchFormat > 1
     }
     
+    /// Current visit number (1-based)
+    /// A visit = one complete round where all players have played
+    var currentVisit: Int {
+        return (turnHistory.count / players.count) + 1
+    }
+    
     /// Check if undo is available
     var canUndo: Bool {
         return lastVisit != nil && winner == nil

@@ -19,7 +19,6 @@ struct RemoteGamesTab: View {
     @State private var currentTime = Date()
     @State private var expiredMatchIds: Set<UUID> = []
     @State private var fadingMatchIds: Set<UUID> = []
-    @State private var cancelledMatchIds: Set<UUID> = []
     
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -67,7 +66,7 @@ struct RemoteGamesTab: View {
                     remoteMatchService.readyMatches.map { $0.match.id } +
                     (remoteMatchService.activeMatch.map { [$0.match.id] } ?? [])
                 )
-                cancelledMatchIds = cancelledMatchIds.intersection(allMatchIds)
+                remoteMatchService.cancelledMatchIds = remoteMatchService.cancelledMatchIds.intersection(allMatchIds)
             }
             .refreshable {
                 await loadMatches()
@@ -258,7 +257,7 @@ struct RemoteGamesTab: View {
                 // Active match (in progress, dimmed when match ready)
                 if let activeMatch = remoteMatchService.activeMatch,
                    processingMatchId == nil,
-                   !cancelledMatchIds.contains(activeMatch.match.id) {
+                   !remoteMatchService.cancelledMatchIds.contains(activeMatch.match.id) {
                     let _ = print("🎯 [RENDER] Active Match section rendering - matchId: \(activeMatch.id), processingMatchId: \(String(describing: processingMatchId))")
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
@@ -385,7 +384,7 @@ struct RemoteGamesTab: View {
                 
                 // Step 2: Auto-join match (ready → lobby)
                 // Guard: Skip auto-join if match was cancelled
-                let isCancelled = await MainActor.run { cancelledMatchIds.contains(matchId) }
+                let isCancelled = await MainActor.run { remoteMatchService.cancelledMatchIds.contains(matchId) }
                 guard !isCancelled else {
                     print("🚫 [DEBUG] Skipping auto-join - match was cancelled")
                     await MainActor.run {
@@ -413,74 +412,16 @@ struct RemoteGamesTab: View {
                     print("🔵 [TIMING] MainActor.run START - processingMatchId: \(String(describing: processingMatchId))")
                     
                     // Guard: Don't navigate if match was cancelled
-                    guard !cancelledMatchIds.contains(matchId) else {
+                    guard !remoteMatchService.cancelledMatchIds.contains(matchId) else {
                         print("🚫 [DEBUG] Skipping navigation - match was cancelled")
                         processingMatchId = nil
                         return
                     }
                     
                     print("🔵 [TIMING] About to call router.push - processingMatchId: \(String(describing: processingMatchId))")
-                    print("✅ [DEBUG] Navigating to lobby with updated match (receiver)")
+                    print("✅ [DEBUG] Navigating to lobby with ID-based routing (receiver)")
                     
-                    router.push(.remoteLobby(
-                        match: updatedMatch,
-                        opponent: opponent,
-                        currentUser: currentUser,
-                        cancelledMatchIds: $cancelledMatchIds,
-                        onCancel: {
-                            Task {
-                                do {
-                                    print("🟠 [RemoteTab] onCancel closure called (receiver flow)")
-                                    
-                                    // Fetch current match to determine status
-                                    guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
-                                        print("❌ [RemoteTab] Match not found, navigating back")
-                                        await MainActor.run {
-                                            router.popToRoot()
-                                        }
-                                        return
-                                    }
-                                    
-                                    let matchStatus = currentMatch.status
-                                    print("🟠 [RemoteTab] Current match status: \(matchStatus?.rawValue ?? "nil")")
-                                    
-                                    // Route to correct endpoint based on status
-                                    if matchStatus == .lobby || matchStatus == .inProgress {
-                                        print("🟠 [RemoteTab] Calling abortMatch")
-                                        try await remoteMatchService.abortMatch(matchId: matchId)
-                                    } else {
-                                        print("🟠 [RemoteTab] Calling cancelChallenge")
-                                        try await remoteMatchService.cancelChallenge(matchId: matchId)
-                                    }
-                                    
-                                    print("✅ [RemoteTab] Cancel/abort successful")
-                                    
-                                    // Success haptic
-                                    #if canImport(UIKit)
-                                    let generator = UIImpactFeedbackGenerator(style: .light)
-                                    generator.impactOccurred()
-                                    #endif
-                                    
-                                    await MainActor.run {
-                                        router.popToRoot()
-                                    }
-                                } catch {
-                                    print("❌ [RemoteTab] Failed to cancel match: \(error)")
-                                    
-                                    // Error haptic
-                                    #if canImport(UIKit)
-                                    let generator = UINotificationFeedbackGenerator()
-                                    generator.notificationOccurred(.error)
-                                    #endif
-                                    
-                                    // Still navigate back even on error
-                                    await MainActor.run {
-                                        router.popToRoot()
-                                    }
-                                }
-                            }
-                        }
-                    ))
+                    router.push(.remoteLobby(matchId: matchId))
                     
                     print("🔵 [TIMING] router.push called - processingMatchId: \(String(describing: processingMatchId))")
                     
@@ -592,7 +533,7 @@ struct RemoteGamesTab: View {
         print("🟠 [RemoteTab] Guards passed, setting cancellation guard")
         
         // IMMEDIATELY mark as cancelled (before async call)
-        cancelledMatchIds.insert(matchId)
+        remoteMatchService.cancelledMatchIds.insert(matchId)
         processingMatchId = matchId
         
         Task {
@@ -622,7 +563,7 @@ struct RemoteGamesTab: View {
                 
                 await MainActor.run {
                     // On error, remove from cancelled set to allow retry
-                    cancelledMatchIds.remove(matchId)
+                    remoteMatchService.cancelledMatchIds.remove(matchId)
                     processingMatchId = nil
                     errorMessage = "Failed to cancel match: \(error.localizedDescription)"
                     showError = true
@@ -639,7 +580,7 @@ struct RemoteGamesTab: View {
     
     private func joinMatch(matchId: UUID) {
         // Guard: Don't join if match was cancelled
-        guard !cancelledMatchIds.contains(matchId) else {
+        guard !remoteMatchService.cancelledMatchIds.contains(matchId) else {
             print("🚫 [DEBUG] Ignoring join - match was cancelled")
             return
         }
@@ -664,78 +605,12 @@ struct RemoteGamesTab: View {
                     processingMatchId = nil
                     
                     // Guard: Don't navigate if match was cancelled
-                    guard !cancelledMatchIds.contains(matchId) else {
+                    guard !remoteMatchService.cancelledMatchIds.contains(matchId) else {
                         print("🚫 [DEBUG] Skipping navigation - match was cancelled")
                         return
                     }
                     
-                    // Navigate to lobby
-                    // Find the match in either ready or lobby state
-                    let match = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId })
-                        ?? remoteMatchService.activeMatch
-                    
-                    if let matchWithPlayers = match,
-                       let currentUser = authService.currentUser {
-                        router.push(.remoteLobby(
-                            match: matchWithPlayers.match,
-                            opponent: matchWithPlayers.opponent,
-                            currentUser: currentUser,
-                            cancelledMatchIds: $cancelledMatchIds,
-                            onCancel: {
-                                Task {
-                                    do {
-                                        print("🟠 [RemoteTab] onCancel closure called (challenger flow)")
-                                        
-                                        // Fetch current match to determine status
-                                        guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
-                                            print("❌ [RemoteTab] Match not found, navigating back")
-                                            await MainActor.run {
-                                                router.popToRoot()
-                                            }
-                                            return
-                                        }
-                                        
-                                        let matchStatus = currentMatch.status
-                                        print("🟠 [RemoteTab] Current match status: \(matchStatus?.rawValue ?? "nil")")
-                                        
-                                        // Route to correct endpoint based on status
-                                        if matchStatus == .lobby || matchStatus == .inProgress {
-                                            print("🟠 [RemoteTab] Calling abortMatch")
-                                            try await remoteMatchService.abortMatch(matchId: matchId)
-                                        } else {
-                                            print("🟠 [RemoteTab] Calling cancelChallenge")
-                                            try await remoteMatchService.cancelChallenge(matchId: matchId)
-                                        }
-                                        
-                                        print("✅ [RemoteTab] Cancel/abort successful")
-                                        
-                                        // Success haptic
-                                        #if canImport(UIKit)
-                                        let generator = UIImpactFeedbackGenerator(style: .light)
-                                        generator.impactOccurred()
-                                        #endif
-                                        
-                                        await MainActor.run {
-                                            router.popToRoot()
-                                        }
-                                    } catch {
-                                        print("❌ [RemoteTab] Failed to cancel match: \(error)")
-                                        
-                                        // Error haptic
-                                        #if canImport(UIKit)
-                                        let generator = UINotificationFeedbackGenerator()
-                                        generator.notificationOccurred(.error)
-                                        #endif
-                                        
-                                        // Still navigate back even on error
-                                        await MainActor.run {
-                                            router.popToRoot()
-                                        }
-                                    }
-                                }
-                            }
-                        ))
-                    }
+                    router.push(.remoteLobby(matchId: matchId))
                 }
             } catch {
                 await MainActor.run {

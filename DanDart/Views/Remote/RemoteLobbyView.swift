@@ -9,15 +9,12 @@
 import SwiftUI
 
 struct RemoteLobbyView: View {
-    let match: RemoteMatch
-    let opponent: User
-    let currentUser: User
-    let onCancel: () -> Void
-    @Binding var cancelledMatchIds: Set<UUID>
+    let matchId: UUID
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var remoteMatchService: RemoteMatchService
+    @EnvironmentObject private var authService: AuthService
     
     private let instanceId = UUID()
     
@@ -30,9 +27,22 @@ struct RemoteLobbyView: View {
     @State private var showMatchStarting = false
     @State private var isViewActive = false
     @State private var navigationTask: Task<Void, Never>?
+    @State private var hasAttemptedInitialLoad = false
+    
+    // Computed from service's published state (DO NOT store in @State)
+    private var matchWithPlayers: RemoteMatchWithPlayers? {
+        if let active = remoteMatchService.activeMatch, active.match.id == matchId {
+            return active
+        }
+        return remoteMatchService.readyMatches.first(where: { $0.match.id == matchId })
+    }
+    
+    private var match: RemoteMatch? { matchWithPlayers?.match }
+    private var opponent: User? { matchWithPlayers?.opponent }
+    private var currentUser: User? { authService.currentUser }
     
     private var timeRemaining: TimeInterval {
-        guard let expiresAt = match.joinWindowExpiresAt else { return 0 }
+        guard let expiresAt = match?.joinWindowExpiresAt else { return 0 }
         return max(0, expiresAt.timeIntervalSinceNow)
     }
     
@@ -42,14 +52,14 @@ struct RemoteLobbyView: View {
     
     // Get current match status from service
     private var currentMatch: RemoteMatch? {
-        if let activeMatch = remoteMatchService.activeMatch, activeMatch.match.id == match.id {
+        if let activeMatch = remoteMatchService.activeMatch, activeMatch.match.id == matchId {
             return activeMatch.match
         }
         return nil
     }
     
     private var matchStatus: RemoteMatchStatus {
-        currentMatch?.status ?? match.status ?? .lobby
+        currentMatch?.status ?? match?.status ?? .lobby
     }
     
     private var isBothPlayersReady: Bool {
@@ -64,6 +74,35 @@ struct RemoteLobbyView: View {
     }
     
     var body: some View {
+        Group {
+            if let match = match, let opponent = opponent, let currentUser = currentUser {
+                lobbyContent(match: match, opponent: opponent, currentUser: currentUser)
+            } else {
+                loadingView
+            }
+        }
+        .task {
+            guard !hasAttemptedInitialLoad else { return }
+            hasAttemptedInitialLoad = true
+            
+            if matchWithPlayers == nil, let userId = authService.currentUser?.id {
+                try? await remoteMatchService.loadMatches(userId: userId)
+            }
+        }
+    }
+    
+    private var loadingView: some View {
+        ZStack {
+            AppColor.backgroundPrimary
+                .ignoresSafeArea()
+            
+            ProgressView("Loading match...")
+                .foregroundColor(AppColor.textPrimary)
+        }
+    }
+    
+    @ViewBuilder
+    private func lobbyContent(match matchParam: RemoteMatch, opponent opponentParam: User, currentUser currentUserParam: User) -> some View {
         ZStack {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
@@ -71,7 +110,7 @@ struct RemoteLobbyView: View {
             VStack(spacing: 0) {
                 // Game name at top
                 VStack(spacing: 8) {
-                    Text(match.gameType.uppercased())
+                    Text(matchParam.gameType.uppercased())
                         .font(.system(size: 28, weight: .bold, design: .default))
                         .foregroundColor(AppColor.textPrimary)
                     
@@ -88,10 +127,10 @@ struct RemoteLobbyView: View {
                 // Players section
                 ZStack {
                     HStack(spacing: 0) {
-                        playerCard(currentUser, isCurrentUser: true)
+                        playerCard(currentUserParam, isCurrentUser: true)
                             .frame(maxWidth: .infinity)
                         
-                        playerCard(opponent, isCurrentUser: false)
+                        playerCard(opponentParam, isCurrentUser: false)
                             .frame(maxWidth: .infinity)
                     }
                     
@@ -145,7 +184,7 @@ struct RemoteLobbyView: View {
                                 .tint(AppColor.interactivePrimaryBackground)
                                 .scaleEffect(1.5)
                             
-                            Text("Waiting for \(opponent.displayName) to join...")
+                            Text("Waiting for \(opponentParam.displayName) to join...")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundColor(AppColor.textPrimary)
                             
@@ -160,14 +199,14 @@ struct RemoteLobbyView: View {
                     
                     // Cancel button
                     AppButton(role: .tertiaryOutline, controlSize: .regular) {
-                        print("🟠 [Lobby] Cancel button tapped - matchId: \(match.id)")
+                        print("🟠 [Lobby] Cancel button tapped - matchId: \(matchParam.id)")
                         
                         // CRITICAL: Capture status BEFORE any state changes
                         let currentStatus = matchStatus
                         print("🟠 [Lobby] Current status: \(currentStatus.rawValue)")
                         
                         // CRITICAL: Set cancellation flag FIRST (synchronous)
-                        cancelledMatchIds.insert(match.id)
+                        remoteMatchService.cancelledMatchIds.insert(matchParam.id)
                         
                         // Cancel any pending navigation
                         navigationTask?.cancel()
@@ -178,10 +217,10 @@ struct RemoteLobbyView: View {
                             do {
                                 if currentStatus == .lobby || currentStatus == .inProgress {
                                     print("🟠 [Lobby] Calling abortMatch")
-                                    try await remoteMatchService.abortMatch(matchId: match.id)
+                                    try await remoteMatchService.abortMatch(matchId: matchParam.id)
                                 } else {
                                     print("🟠 [Lobby] Calling cancelChallenge")
-                                    try await remoteMatchService.cancelChallenge(matchId: match.id)
+                                    try await remoteMatchService.cancelChallenge(matchId: matchParam.id)
                                 }
                                 
                                 print("✅ [Lobby] Cancel/abort successful")
@@ -222,7 +261,7 @@ struct RemoteLobbyView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
-            print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
+            print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(matchId)")
             isViewActive = true
             
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
@@ -231,9 +270,9 @@ struct RemoteLobbyView: View {
             SoundManager.shared.playBoxingSound()
         }
         .onDisappear {
-            print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
+            print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(matchId)")
             Self.matchesLock.lock()
-            Self.matchesBeingStarted.remove(match.id)
+            Self.matchesBeingStarted.remove(matchId)
             Self.matchesLock.unlock()
             isViewActive = false
             navigationTask?.cancel()
@@ -242,12 +281,12 @@ struct RemoteLobbyView: View {
             currentTime = time
             
             // Check if match still exists in service
-            let matchExists = remoteMatchService.activeMatch?.match.id == match.id ||
-                             remoteMatchService.readyMatches.contains(where: { $0.match.id == match.id })
+            let matchExists = remoteMatchService.activeMatch?.match.id == matchId ||
+                             remoteMatchService.readyMatches.contains(where: { $0.match.id == matchId })
             
             // Check if match is being started (thread-safe)
             Self.matchesLock.lock()
-            let isStarting = Self.matchesBeingStarted.contains(match.id)
+            let isStarting = Self.matchesBeingStarted.contains(matchId)
             Self.matchesLock.unlock()
             
             if !matchExists && !isStarting {
@@ -257,7 +296,7 @@ struct RemoteLobbyView: View {
             }
         }
         .onChange(of: matchStatus) { oldStatus, newStatus in
-            print("🧩 [Lobby] instance=\(instanceId) match=\(match.id)")
+            print("🧩 [Lobby] instance=\(instanceId) match=\(matchId)")
             print("🔔 [Lobby] onChange fired - old: \(oldStatus.rawValue), new: \(newStatus.rawValue)")
             
             // Guard 0: Cheap dedupe - filter identical transitions
@@ -267,7 +306,7 @@ struct RemoteLobbyView: View {
             }
             
             // Guard 1: Cancelled match
-            guard !cancelledMatchIds.contains(match.id) else {
+            guard !remoteMatchService.cancelledMatchIds.contains(matchId) else {
                 print("🚫 [Lobby] Guard 1: Match in cancelled set")
                 return
             }
@@ -288,9 +327,9 @@ struct RemoteLobbyView: View {
             
             // BRANCH 3: Handle inProgress - ATOMIC latch across ALL instances
             Self.matchesLock.lock()
-            let alreadyStarting = Self.matchesBeingStarted.contains(match.id)
+            let alreadyStarting = Self.matchesBeingStarted.contains(matchId)
             if !alreadyStarting {
-                Self.matchesBeingStarted.insert(match.id)
+                Self.matchesBeingStarted.insert(matchId)
             }
             Self.matchesLock.unlock()
             
@@ -315,14 +354,14 @@ struct RemoteLobbyView: View {
     
     private func resetMatchStart() {
         Self.matchesLock.lock()
-        Self.matchesBeingStarted.remove(match.id)
+        Self.matchesBeingStarted.remove(matchId)
         Self.matchesLock.unlock()
         navigationTask?.cancel()
         navigationTask = nil
     }
     
     private func abortAndNavigateBack() {
-        cancelledMatchIds.insert(match.id)
+        remoteMatchService.cancelledMatchIds.insert(matchId)
         resetMatchStart()
         router.popToRoot()
     }
@@ -331,7 +370,7 @@ struct RemoteLobbyView: View {
     
     private func startMatchStartingSequence() {
         // Guard: Don't start if match cancelled
-        guard !cancelledMatchIds.contains(match.id) else {
+        guard !remoteMatchService.cancelledMatchIds.contains(matchId) else {
             print("🚫 [Lobby] Match cancelled before sequence start")
             resetMatchStart()
             return
@@ -347,7 +386,7 @@ struct RemoteLobbyView: View {
             do {
                 // CRITICAL: Fetch fresh match status from database BEFORE scheduling delay
                 print("🔍 [Lobby] Fetching authoritative match status before scheduling navigation...")
-                guard let freshMatch = try await remoteMatchService.fetchMatch(matchId: match.id) else {
+                guard let freshMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     print("🚫 [Lobby] Match not found")
                     await MainActor.run {
                         abortAndNavigateBack()
@@ -379,7 +418,7 @@ struct RemoteLobbyView: View {
                 }
                 
                 // Check if match was cancelled (local set)
-                guard !cancelledMatchIds.contains(match.id) else {
+                guard !remoteMatchService.cancelledMatchIds.contains(matchId) else {
                     print("🚫 [Lobby] Match in cancelled set")
                     await MainActor.run {
                         resetMatchStart()
@@ -389,7 +428,7 @@ struct RemoteLobbyView: View {
                 
                 // SECOND authoritative check - verify status still inProgress
                 print("🔍 [Lobby] Authoritative check 2: Re-fetching match...")
-                guard let finalMatch = try await remoteMatchService.fetchMatch(matchId: match.id) else {
+                guard let finalMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     print("🚫 [Lobby] Match not found after countdown")
                     await MainActor.run {
                         abortAndNavigateBack()
@@ -416,13 +455,19 @@ struct RemoteLobbyView: View {
                 
                 // All checks passed - navigate
                 print("✅ [Lobby] All checks passed, navigating to gameplay")
+                
+                // Guard against duplicate navigation from this lobby instance
+                // Guard against duplicate navigation (global per match)
+                guard RemoteNavigationLatch.shared.tryNavigateToGameplay(matchId: matchId) else {
+                    print("🚫 [Lobby] Already navigated to gameplay for this match")
+                    return
+                }
+                
+                print("✅ [Lobby] Navigating to gameplay (first time for this match)")
+                
                 SoundManager.shared.playBoxingSound()
                 
-                router.push(.remoteGameplay(
-                    match: finalMatch,
-                    opponent: opponent,
-                    currentUser: currentUser
-                ))
+                router.push(.remoteGameplay(matchId: matchId))
             } catch is CancellationError {
                 print("🚫 [Lobby] Task cancelled (CancellationError)")
                 await MainActor.run {
@@ -484,19 +529,8 @@ struct RemoteLobbyView: View {
 // MARK: - Preview
 
 #Preview {
-    struct PreviewWrapper: View {
-        @State private var cancelledMatchIds: Set<UUID> = []
-        
-        var body: some View {
-            RemoteLobbyView(
-                match: RemoteMatch.mockReady,
-                opponent: User.mockUsers[0],
-                currentUser: User.mockUsers[1],
-                onCancel: {},
-                cancelledMatchIds: $cancelledMatchIds
-            )
-        }
-    }
-    
-    return PreviewWrapper()
+    RemoteLobbyView(matchId: RemoteMatch.mockReady.id)
+        .environmentObject(Router.shared)
+        .environmentObject(RemoteMatchService())
+        .environmentObject(AuthService.shared)
 }

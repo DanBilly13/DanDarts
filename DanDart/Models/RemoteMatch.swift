@@ -169,17 +169,89 @@ struct RemoteMatch: Identifiable, Codable {
 
 struct LastVisitPayload: Codable {
     let playerId: UUID
-    let darts: [Int] // Array of dart scores
+    let darts: [Int]
     let scoreBefore: Int
     let scoreAfter: Int
     let timestamp: Date
+    let isBust: Bool?
+    
+    // Defensive decoder that handles both camelCase and snake_case
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Try camelCase first, then snake_case fallback
+        if let id = try? container.decode(UUID.self, forKey: .playerId) {
+            playerId = id
+        } else if let id = try? container.decode(UUID.self, forKey: .player_id) {
+            playerId = id
+        } else {
+            // Fallback to empty UUID if all else fails
+            print("⚠️ [LastVisitPayload] Failed to decode playerId, using default")
+            playerId = UUID()
+        }
+        
+        // Darts array - default to empty if missing
+        darts = (try? container.decode([Int].self, forKey: .darts)) ?? []
+        
+        // Score before - try both formats
+        if let score = try? container.decode(Int.self, forKey: .scoreBefore) {
+            scoreBefore = score
+        } else if let score = try? container.decode(Int.self, forKey: .score_before) {
+            scoreBefore = score
+        } else {
+            print("⚠️ [LastVisitPayload] Failed to decode scoreBefore, using 0")
+            scoreBefore = 0
+        }
+        
+        // Score after - try both formats
+        if let score = try? container.decode(Int.self, forKey: .scoreAfter) {
+            scoreAfter = score
+        } else if let score = try? container.decode(Int.self, forKey: .score_after) {
+            scoreAfter = score
+        } else {
+            print("⚠️ [LastVisitPayload] Failed to decode scoreAfter, using 0")
+            scoreAfter = 0
+        }
+        
+        // Timestamp - handle both Date and String formats
+        if let ts = try? container.decode(Date.self, forKey: .timestamp) {
+            timestamp = ts
+        } else if let tsString = try? container.decode(String.self, forKey: .timestamp) {
+            let formatter = ISO8601DateFormatter()
+            timestamp = formatter.date(from: tsString) ?? Date()
+        } else {
+            print("⚠️ [LastVisitPayload] Failed to decode timestamp, using current date")
+            timestamp = Date()
+        }
+        
+        // isBust - optional, try both formats
+        if let bust = try? container.decode(Bool.self, forKey: .isBust) {
+            isBust = bust
+        } else if let bust = try? container.decode(Bool.self, forKey: .is_bust) {
+            isBust = bust
+        } else {
+            isBust = nil
+        }
+    }
+    
+    // Encode using snake_case (database format)
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(playerId, forKey: .player_id)
+        try container.encode(darts, forKey: .darts)
+        try container.encode(scoreBefore, forKey: .score_before)
+        try container.encode(scoreAfter, forKey: .score_after)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(isBust, forKey: .is_bust)
+    }
     
     enum CodingKeys: String, CodingKey {
-        case playerId = "player_id"
-        case darts
-        case scoreBefore = "score_before"
-        case scoreAfter = "score_after"
-        case timestamp
+        // camelCase
+        case playerId, scoreBefore, scoreAfter, isBust
+        // snake_case
+        case player_id, score_before, score_after, is_bust
+        // shared
+        case darts, timestamp
     }
 }
 

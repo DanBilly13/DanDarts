@@ -26,6 +26,7 @@ class RemoteMatchService: ObservableObject {
     @Published var activeMatch: RemoteMatchWithPlayers?
     @Published var isLoading = false
     @Published var error: RemoteMatchError?
+    @Published var cancelledMatchIds: Set<UUID> = []
     
     // MARK: - Realtime Subscription Tokens
     
@@ -251,6 +252,7 @@ class RemoteMatchService: ObservableObject {
             let remote_status: String?
             let challenger_id: UUID
             let receiver_id: UUID
+            let current_player_id: String?
             let challenge_expires_at: String?
             let join_window_expires_at: String?
             let created_at: String
@@ -285,7 +287,7 @@ class RemoteMatchService: ObservableObject {
             challengerId: matchData.challenger_id,
             receiverId: matchData.receiver_id,
             status: RemoteMatchStatus(rawValue: matchData.remote_status ?? ""),
-            currentPlayerId: nil,
+            currentPlayerId: matchData.current_player_id.flatMap { UUID(uuidString: $0) },
             challengeExpiresAt: matchData.challenge_expires_at.flatMap { formatter.date(from: $0) },
             joinWindowExpiresAt: matchData.join_window_expires_at.flatMap { formatter.date(from: $0) },
             lastVisitPayload: nil,
@@ -295,7 +297,7 @@ class RemoteMatchService: ObservableObject {
             endedReason: matchData.ended_reason
         )
         
-        print("✅ [DEBUG] Match fetched - status: \(match.status?.rawValue ?? "nil"), joinWindowExpiresAt: \(match.joinWindowExpiresAt?.description ?? "nil")")
+        print("✅ [DEBUG] Match fetched - status: \(match.status?.rawValue ?? "nil"), currentPlayerId: \(match.currentPlayerId?.uuidString ?? "nil")")
         
         return match
     }
@@ -463,6 +465,34 @@ class RemoteMatchService: ObservableObject {
             ))
         
         print("✅ Match joined: \(matchId)")
+    }
+    
+    // MARK: - Save Visit
+    
+    /// Save a visit during remote gameplay (calls Edge Function)
+    /// Server validates, updates scores, switches turn, and emits realtime update
+    func saveVisit(matchId: UUID, darts: [Int]) async throws {
+        struct SaveVisitRequest: Encodable {
+            let match_id: String
+            let darts: [Int]
+        }
+        
+        let request = SaveVisitRequest(
+            match_id: matchId.uuidString,
+            darts: darts
+        )
+        let headers = try await getEdgeFunctionHeaders()
+        
+        print("💾 [RemoteMatchService] Saving visit for match: \(matchId)")
+        print("💾 [RemoteMatchService] Darts: \(darts)")
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("save-visit", options: FunctionInvokeOptions(
+                headers: headers,
+                body: request
+            ))
+        
+        print("✅ [RemoteMatchService] Visit saved successfully")
     }
     
     // MARK: - Legacy Accept Challenge (kept for reference, use acceptChallenge instead)
