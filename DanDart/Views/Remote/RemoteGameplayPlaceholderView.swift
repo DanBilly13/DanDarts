@@ -16,6 +16,7 @@ struct RemoteGameplayPlaceholderView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var remoteMatchService: RemoteMatchService
     
+    @State private var instanceId = UUID()
     @State private var didExit = false
     
     private var currentMatch: RemoteMatch? {
@@ -24,6 +25,14 @@ struct RemoteGameplayPlaceholderView: View {
     
     private var matchStatus: RemoteMatchStatus {
         currentMatch?.status ?? .cancelled
+    }
+    
+    private var matchIdFull: String {
+        match.id.uuidString
+    }
+    
+    private var matchIdShort: String {
+        String(matchIdFull.prefix(8)) + "…"
     }
     
     var body: some View {
@@ -73,6 +82,54 @@ struct RemoteGameplayPlaceholderView: View {
                         .foregroundColor(AppColor.textSecondary)
                 }
                 
+                // Match Diagnostics
+                #if DEBUG
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Match Diagnostics")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Match")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(AppColor.textSecondary)
+                            Spacer()
+                            Text(matchIdShort)
+                                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                .foregroundColor(AppColor.textPrimary)
+                        }
+                        
+                        HStack {
+                            Text("Status")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(AppColor.textSecondary)
+                            Spacer()
+                            Text(matchStatus.displayName)
+                                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                        }
+                    }
+                    
+                    Button {
+                        UIPasteboard.general.string = matchIdFull
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.on.doc")
+                            Text("Copy Match ID")
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                }
+                .padding(16)
+                .background(AppColor.inputBackground)
+                .cornerRadius(12)
+                .padding(.horizontal, 24)
+                #endif
+                
                 Spacer()
                 
                 // Back button
@@ -92,7 +149,11 @@ struct RemoteGameplayPlaceholderView: View {
         .toolbar(.hidden, for: .tabBar)
         .preferredColorScheme(.dark)
         .onAppear {
+            print("[Gameplay] onAppear - instance: \(instanceId.uuidString.prefix(8))... match: \(match.id.uuidString.prefix(8))...")
             validateAndExitIfNeeded()
+        }
+        .onDisappear {
+            print("[Gameplay] onDisappear - instance: \(instanceId.uuidString.prefix(8))...")
         }
         .onChange(of: matchStatus) { _, _ in
             validateAndExitIfNeeded()
