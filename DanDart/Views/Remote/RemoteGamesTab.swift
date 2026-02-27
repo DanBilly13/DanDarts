@@ -78,7 +78,7 @@ struct RemoteGamesTab: View {
         } message: {
             Text("Select which game type you'd like to play")
         }
-        .background(AppColor.backgroundPrimary).ignoresSafeArea()
+        .background(AppColor.backgroundPrimary)
     }
     
     // MARK: - Loading View

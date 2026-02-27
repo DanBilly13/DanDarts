@@ -249,7 +249,7 @@ struct FriendsListView: View {
     
     var body: some View {
         listContent
-            .background(AppColor.backgroundPrimary).ignoresSafeArea()
+            .background(AppColor.backgroundPrimary)
             .onChange(of: isCreatingInvite) { _, newValue in
                 if newValue {
                     createInviteLink()
