@@ -262,7 +262,6 @@ struct GameSetupView: View {
             }
         }
         .background(AppColor.backgroundPrimary.ignoresSafeArea())
-        .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showSearchPlayer) {
             SearchPlayerSheet(

@@ -249,7 +249,6 @@ struct RemoteGameSetupView: View {
             }
         }
         .background(AppColor.backgroundPrimary.ignoresSafeArea())
-        .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .sheet(isPresented: $showSearchPlayer) {
             ChooseOpponentSheet(selectedOpponent: $selectedOpponent)

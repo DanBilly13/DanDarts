@@ -92,7 +92,7 @@ struct ChangePasswordView: View {
                 }
             }
             .background(AppColor.backgroundPrimary)
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
     

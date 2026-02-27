@@ -49,23 +49,23 @@ struct MainTabView: View {
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if router.path.isEmpty {
-            ToolbarItem(placement: .principal) {
-                HStack {
-                    Text(rootNavTitle)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColor.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .allowsTightening(true)
-                    Spacer(minLength: 0)
-                }
-                // Force the principal area to behave like a full-width container
-                // and left-align the title inside it.
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // Nudge to match your previous custom nav spacing
-                .padding(.leading, 2)
+        ToolbarItem(placement: .principal) {
+            HStack {
+                Text(rootNavTitle)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppColor.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
+                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 2)
+            .opacity(router.path.isEmpty ? 1 : 0)
+            .animation(nil, value: router.path.isEmpty)
+        }
+        
+        if router.path.isEmpty {
             switch selectedTab {
             case 0:
                 // Games tab
@@ -253,11 +253,16 @@ struct MainTabView: View {
                 .animation(.spring(response: 0.5, dampingFraction: 0.6), value: toastManager.currentToast?.id)
                 .zIndex(999) // Ensure toast appears above all other content
             }
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 toolbarContent
             }
             .navigationDestination(for: Route.self) { route in
                 destinationView(for: route)
+                    .environmentObject(router)
+                    .environmentObject(authService)
+                    .environmentObject(friendsService)
+                    .environmentObject(remoteMatchService)
             }
         }
         .environmentObject(router)
@@ -541,9 +546,16 @@ struct MainTabView: View {
             if #available(iOS 18.0, *) {
                 view
                     .navigationTransition(.zoom(sourceID: game.id, in: gameHeroNamespace))
+                    .navigationBarBackButtonHidden(true)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
                     .background(AppColor.backgroundPrimary)
             } else {
-                view.background(AppColor.backgroundPrimary)
+                view
+                    .navigationBarBackButtonHidden(true)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+                    .background(AppColor.backgroundPrimary)
             }
         
         case .remoteGameSetup(let game, let opponent):
@@ -551,9 +563,16 @@ struct MainTabView: View {
             if #available(iOS 18.0, *) {
                 view
                     .navigationTransition(.zoom(sourceID: game.id, in: gameHeroNamespace))
+                    .navigationBarBackButtonHidden(true)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
                     .background(AppColor.backgroundPrimary)
             } else {
-                view.background(AppColor.backgroundPrimary)
+                view
+                    .navigationBarBackButtonHidden(true)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+                    .background(AppColor.backgroundPrimary)
             }
         
         case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):

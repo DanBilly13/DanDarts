@@ -152,14 +152,22 @@ class Router: ObservableObject {
     /// Pop the last destination from the stack
     func pop() {
         guard !path.isEmpty else { return }
-        path.removeLast()
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            path.removeLast()
+        }
     }
     
     /// Pop multiple destinations
     func pop(count: Int) {
         let actualCount = min(count, path.count)
         guard actualCount > 0 else { return }
-        path.removeLast(actualCount)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            path.removeLast(actualCount)
+        }
     }
     
     /// Pop to root (clear entire stack)

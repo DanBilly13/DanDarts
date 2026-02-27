@@ -166,7 +166,7 @@ struct GameEndView: View {
                 .animation(.easeIn(duration: 0.3).delay(0.8), value: showCelebration)
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $showMatchDetails) {
             // Navigate to match details as a main screen
