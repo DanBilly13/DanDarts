@@ -146,17 +146,28 @@ class Router: ObservableObject {
     
     /// Push a new destination onto the navigation stack
     func push(_ destination: Destination) {
+        let beforeDepth = path.count
         path.append(Route(destination))
+        let afterDepth = path.count
+        
+        let destinationType = destinationName(for: destination)
+        print("[Router] push(.\(destinationType)) - path depth: \(beforeDepth) → \(afterDepth)")
     }
     
     /// Pop the last destination from the stack
     func pop() {
-        guard !path.isEmpty else { return }
+        guard !path.isEmpty else {
+            print("[Router] pop() - path already empty, ignoring")
+            return
+        }
+        let beforeDepth = path.count
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             path.removeLast()
         }
+        let afterDepth = path.count
+        print("[Router] pop() - path depth: \(beforeDepth) → \(afterDepth)")
     }
     
     /// Pop multiple destinations
@@ -172,9 +183,11 @@ class Router: ObservableObject {
     
     /// Pop to root (clear entire stack)
     func popToRoot() {
+        let beforeDepth = path.count
         withAnimation {
             path = NavigationPath()
         }
+        print("[Router] popToRoot() - cleared \(beforeDepth) destinations")
     }
     
     /// Reset navigation to a specific destination
@@ -251,6 +264,25 @@ class Router: ObservableObject {
             
         default:
             view(for: route) // Fallback to regular view method
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Get a human-readable name for a destination (for logging)
+    private func destinationName(for destination: Destination) -> String {
+        switch destination {
+        case .gameSetup: return "gameSetup"
+        case .preGameHype: return "preGameHype"
+        case .countdownGameplay: return "countdownGameplay"
+        case .halveItGameplay: return "halveItGameplay"
+        case .knockoutGameplay: return "knockoutGameplay"
+        case .suddenDeathGameplay: return "suddenDeathGameplay"
+        case .killerGameplay: return "killerGameplay"
+        case .remoteGameSetup: return "remoteGameSetup"
+        case .remoteLobby: return "remoteLobby"
+        case .remoteGameplay: return "remoteGameplay"
+        case .gameEnd: return "gameEnd"
         }
     }
 }

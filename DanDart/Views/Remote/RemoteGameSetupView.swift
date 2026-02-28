@@ -23,7 +23,7 @@ struct RemoteGameSetupView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
-    @StateObject private var remoteMatchService = RemoteMatchService()
+    @EnvironmentObject private var remoteMatchService: RemoteMatchService
     @Binding var selectedTab: Int
     
     private var config: RemoteGameSetupConfig {

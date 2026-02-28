@@ -22,6 +22,10 @@ struct RemoteGamesTab: View {
     @State private var fadingMatchIds: Set<UUID> = []
     @State private var cancelledMatchIds: Set<UUID> = []
     
+    // Track last rendered active match to reduce log spam
+    @State private var lastRenderedMatchId: UUID?
+    @State private var lastRenderedMatchStatus: RemoteMatchStatus?
+    
     var body: some View {
         ZStack {
             AppColor.backgroundPrimary
@@ -51,6 +55,21 @@ struct RemoteGamesTab: View {
         }
         .refreshable {
             await loadMatches()
+        }
+        .onChange(of: remoteMatchService.activeMatch?.match.id) { oldId, newId in
+            if let newId = newId, oldId != newId {
+                let status = remoteMatchService.activeMatch?.match.status
+                print("🎯 [RENDER] Active Match changed - matchId: \(newId.uuidString.prefix(8))..., status: \(status?.rawValue ?? "nil")")
+                lastRenderedMatchId = newId
+                lastRenderedMatchStatus = status
+            }
+        }
+        .onChange(of: remoteMatchService.activeMatch?.match.status) { oldStatus, newStatus in
+            if let matchId = remoteMatchService.activeMatch?.match.id,
+               oldStatus != newStatus {
+                print("🎯 [RENDER] Active Match status changed - matchId: \(matchId.uuidString.prefix(8))..., status: \(newStatus?.rawValue ?? "nil")")
+                lastRenderedMatchStatus = newStatus
+            }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
@@ -233,7 +252,6 @@ struct RemoteGamesTab: View {
                 if let activeMatch = remoteMatchService.activeMatch,
                    processingMatchId == nil,
                    !cancelledMatchIds.contains(activeMatch.match.id) {
-                    let _ = print("🎯 [RENDER] Active Match section rendering - matchId: \(activeMatch.id), processingMatchId: \(String(describing: processingMatchId))")
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
                         

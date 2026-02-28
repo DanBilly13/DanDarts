@@ -49,21 +49,16 @@ struct MainTabView: View {
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            HStack {
-                Text(rootNavTitle)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppColor.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .allowsTightening(true)
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 2)
-            .opacity(router.path.isEmpty ? 1 : 0)
-            .animation(nil, value: router.path.isEmpty)
+        ToolbarItem(placement: .topBarLeading) {
+            Text(rootNavTitle)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColor.textPrimary)
+                .lineLimit(1)
+                .fixedSize()
+                .opacity(router.path.isEmpty ? 1 : 0)
+                .animation(nil, value: router.path.isEmpty)
         }
+        .sharedBackgroundVisibility(.hidden)
         
         if router.path.isEmpty {
             switch selectedTab {
@@ -577,10 +572,12 @@ struct MainTabView: View {
         
         case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
             RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
+                .id("lobby-\(match.id.uuidString)")
                 .background(AppColor.backgroundPrimary)
         
         case .remoteGameplay(let match, let opponent, let currentUser):
             RemoteGameplayPlaceholderView(match: match, opponent: opponent, currentUser: currentUser)
+                .id("gameplay-\(match.id.uuidString)")
                 .background(AppColor.backgroundPrimary)
         
         default:

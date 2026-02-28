@@ -10,8 +10,8 @@ import SwiftUI
 struct CreateChallengeView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
-    @StateObject private var friendsService = FriendsService()
-    @StateObject private var remoteMatchService = RemoteMatchService()
+    @EnvironmentObject var friendsService: FriendsService
+    @EnvironmentObject var remoteMatchService: RemoteMatchService
     
     @State private var selectedFriend: User?
     @State private var selectedGameType: String = "301"

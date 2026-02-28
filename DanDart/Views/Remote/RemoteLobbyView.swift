@@ -19,7 +19,7 @@ struct RemoteLobbyView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var remoteMatchService: RemoteMatchService
     
-    private let instanceId = UUID()
+    @State private var instanceId = UUID()
     
     // Static set to track matches being started across ALL instances
     private static var matchesBeingStarted = Set<UUID>()
@@ -30,6 +30,10 @@ struct RemoteLobbyView: View {
     @State private var showMatchStarting = false
     @State private var isViewActive = false
     @State private var navigationTask: Task<Void, Never>?
+    
+    // Manual refresh state
+    @State private var isRefreshing = false
+    @State private var pollingTask: Task<Void, Never>?
     
     private var timeRemaining: TimeInterval {
         guard let expiresAt = match.joinWindowExpiresAt else { return 0 }
@@ -219,8 +223,25 @@ struct RemoteLobbyView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task {
+                        await refreshMatch()
+                    }
+                } label: {
+                    if isRefreshing {
+                        ProgressView()
+                            .tint(AppColor.interactivePrimaryBackground)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                }
+                .disabled(isRefreshing)
+            }
+        }
         .onAppear {
             print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
             isViewActive = true
@@ -229,6 +250,12 @@ struct RemoteLobbyView: View {
                 showContent = true
             }
             SoundManager.shared.playBoxingSound()
+            
+            // Fetch fresh match state on appear
+            Task {
+                await refreshMatch()
+                startPolling()
+            }
         }
         .onDisappear {
             print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
@@ -237,6 +264,7 @@ struct RemoteLobbyView: View {
             Self.matchesLock.unlock()
             isViewActive = false
             navigationTask?.cancel()
+            stopPolling()
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
@@ -478,6 +506,43 @@ struct RemoteLobbyView: View {
                     .foregroundColor(AppColor.interactivePrimaryBackground)
             }
         }
+    }
+    
+    // MARK: - Manual Refresh
+    
+    private func refreshMatch() async {
+        guard !isRefreshing else { return }
+        
+        isRefreshing = true
+        defer { isRefreshing = false }
+        
+        print("🔄 [Lobby] Manual refresh - matchId: \(match.id.uuidString.prefix(8))...")
+        
+        do {
+            _ = try await remoteMatchService.fetchMatch(matchId: match.id)
+            print("✅ [Lobby] Refresh complete")
+        } catch {
+            print("❌ [Lobby] Refresh failed: \(error)")
+        }
+    }
+    
+    private func startPolling() {
+        pollingTask?.cancel()
+        
+        pollingTask = Task {
+            while !Task.isCancelled && isViewActive {
+                try? await Task.sleep(for: .seconds(3))
+                
+                if !Task.isCancelled && isViewActive {
+                    await refreshMatch()
+                }
+            }
+        }
+    }
+    
+    private func stopPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
     }
 }
 
