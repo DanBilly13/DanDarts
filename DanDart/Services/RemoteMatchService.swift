@@ -257,9 +257,10 @@ class RemoteMatchService: ObservableObject {
             let updated_at: String
             let ended_by: UUID?
             let ended_reason: String?
+            let debug_counter: Int?
         }
         
-        print("🔍 [DEBUG] Fetching match: \(matchId)")
+        print("🔍 fetchMatch(matchId=\(matchId.uuidString.prefix(8))...)")
         
         let response: [MatchResponse] = try await supabaseService.client
             .from("matches")
@@ -269,7 +270,7 @@ class RemoteMatchService: ObservableObject {
             .value
         
         guard let matchData = response.first else {
-            print("❌ [DEBUG] Match not found: \(matchId)")
+            print("❌ Match not found: \(matchId.uuidString.prefix(8))...")
             return nil
         }
         
@@ -292,10 +293,27 @@ class RemoteMatchService: ObservableObject {
             createdAt: formatter.date(from: matchData.created_at) ?? Date(),
             updatedAt: formatter.date(from: matchData.updated_at) ?? Date(),
             endedBy: matchData.ended_by,
-            endedReason: matchData.ended_reason
+            endedReason: matchData.ended_reason,
+            debugCounter: matchData.debug_counter
         )
         
-        print("✅ [DEBUG] Match fetched - status: \(match.status?.rawValue ?? "nil"), joinWindowExpiresAt: \(match.joinWindowExpiresAt?.description ?? "nil")")
+        print("✅ fetched status=\(match.status?.rawValue ?? "nil")")
+        
+        // Update activeMatch if this is the active match
+        if let activeMatch = self.activeMatch, activeMatch.match.id == matchId {
+            // Reuse existing User data to avoid unnecessary fetches
+            let updatedMatch = RemoteMatchWithPlayers(
+                match: match,
+                challenger: activeMatch.challenger,
+                receiver: activeMatch.receiver,
+                currentUserId: activeMatch.currentUserId
+            )
+            
+            await MainActor.run {
+                self.activeMatch = updatedMatch
+                print("🔄 activeMatch updated with fresh data")
+            }
+        }
         
         return match
     }
@@ -908,4 +926,21 @@ class RemoteMatchService: ObservableObject {
         
         return matches.count
     }
+    
+    // MARK: - Debug Counter (Phase 2 Testing)
+    
+    #if DEBUG
+    /// Increment the debug counter for a match (Phase 2 testing only)
+    func bumpDebugCounter(matchId: UUID) async throws {
+        print("🔧 [DEBUG] Bumping debug counter - matchId: \(matchId.uuidString.prefix(8))...")
+        
+        // Use Postgres function to atomically increment the counter
+        // This ensures we don't have race conditions if both devices bump simultaneously
+        try await supabaseService.client
+            .rpc("increment_debug_counter", params: ["match_id": matchId.uuidString])
+            .execute()
+        
+        print("✅ [DEBUG] Debug counter bumped successfully")
+    }
+    #endif
 }

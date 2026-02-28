@@ -19,16 +19,45 @@ struct RemoteGameplayPlaceholderView: View {
     @State private var instanceId = UUID()
     @State private var didExit = false
     
-    private var currentMatch: RemoteMatch? {
-        remoteMatchService.activeMatch?.match
+    // Manual refresh state
+    @State private var isRefreshing = false
+    @State private var pollingTask: Task<Void, Never>?
+    
+    // Debug counter state (Phase 2 testing)
+    #if DEBUG
+    @State private var isBumping = false
+    #endif
+    
+    // Polling disabled by default (can be enabled for debugging)
+    #if DEBUG
+    private let enablePolling = false
+    #else
+    private let enablePolling = false
+    #endif
+    
+    private enum RefreshReason {
+        case initial, manual, poll
+        
+        var logPrefix: String {
+            switch self {
+            case .initial: return "Initial refresh"
+            case .manual: return "Manual refresh"
+            case .poll: return "Poll tick"
+            }
+        }
+    }
+    
+    // Use live activeMatch data, fallback to route parameter
+    private var currentMatch: RemoteMatch {
+        remoteMatchService.activeMatch?.match ?? match
     }
     
     private var matchStatus: RemoteMatchStatus {
-        currentMatch?.status ?? .cancelled
+        currentMatch.status ?? .cancelled
     }
     
     private var matchIdFull: String {
-        match.id.uuidString
+        currentMatch.id.uuidString
     }
     
     private var matchIdShort: String {
@@ -128,6 +157,67 @@ struct RemoteGameplayPlaceholderView: View {
                 .background(AppColor.inputBackground)
                 .cornerRadius(12)
                 .padding(.horizontal, 24)
+                
+                #if DEBUG
+                // Debug Counter Card (Phase 2 Testing)
+                VStack(spacing: 12) {
+                    Text("Debug Counter (Phase 2 Test)")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColor.textSecondary)
+                    
+                    let _ = print("🎯 [Gameplay] render debugCounter=\(currentMatch.debugCounter ?? -1) matchId=\(currentMatch.id.uuidString.prefix(8))...")
+                    
+                    Text("\(currentMatch.debugCounter ?? 0)")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                    
+                    Button {
+                        Task {
+                            await bumpDebugCounter()
+                        }
+                    } label: {
+                        HStack {
+                            if isBumping {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                            Text(isBumping ? "Bumping..." : "Bump Debug Counter")
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(AppColor.interactivePrimaryBackground)
+                        .cornerRadius(8)
+                    }
+                    .disabled(isBumping)
+                    
+                    Text("Write to DB • Requires manual refresh to see on other device")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColor.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(16)
+                .background(AppColor.inputBackground)
+                .cornerRadius(12)
+                .padding(.horizontal, 24)
+                #endif
+                
+                // Refresh button
+                Button {
+                    Task {
+                        await refreshMatch(reason: .manual)
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: isRefreshing ? "arrow.clockwise" : "arrow.clockwise.circle.fill")
+                        Text(isRefreshing ? "Refreshing..." : "Refresh Match")
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                }
+                .disabled(isRefreshing)
+                .padding(.top, 16)
                 #endif
                 
                 Spacer()
@@ -149,11 +239,21 @@ struct RemoteGameplayPlaceholderView: View {
         .toolbar(.hidden, for: .tabBar)
         .preferredColorScheme(.dark)
         .onAppear {
-            print("[Gameplay] onAppear - instance: \(instanceId.uuidString.prefix(8))... match: \(match.id.uuidString.prefix(8))...")
+            print("[Gameplay] onAppear - instance: \(instanceId.uuidString.prefix(8))... match: \(currentMatch.id.uuidString.prefix(8))...")
             validateAndExitIfNeeded()
+            
+            // Fetch fresh match state on appear
+            Task {
+                await refreshMatch(reason: .initial)
+                
+                if enablePolling {
+                    startPolling()
+                }
+            }
         }
         .onDisappear {
             print("[Gameplay] onDisappear - instance: \(instanceId.uuidString.prefix(8))...")
+            stopPolling()
         }
         .onChange(of: matchStatus) { _, _ in
             validateAndExitIfNeeded()
@@ -168,19 +268,18 @@ struct RemoteGameplayPlaceholderView: View {
             return
         }
         
-        // Check if match exists and ID matches
-        guard let activeMatch = currentMatch,
-              activeMatch.id == match.id else {
-            print("🚨 [Gameplay] Match not found or ID mismatch - navigating back")
+        // Check if match ID matches (currentMatch is now non-optional)
+        guard currentMatch.id == match.id else {
+            print("🚨 [Gameplay] Match ID mismatch - navigating back")
             print("🚨 [Gameplay] Expected ID: \(match.id)")
-            print("🚨 [Gameplay] Current match: \(currentMatch?.id.uuidString ?? "nil")")
+            print("🚨 [Gameplay] Current match: \(currentMatch.id.uuidString)")
             didExit = true
             router.popToRoot()
             return
         }
         
         // Check if match was cancelled or is not playable
-        if activeMatch.status == .cancelled {
+        if currentMatch.status == .cancelled {
             print("🚨 [Gameplay] Match cancelled - navigating back")
             didExit = true
             router.popToRoot()
@@ -188,16 +287,90 @@ struct RemoteGameplayPlaceholderView: View {
         }
         
         // Check if status is playable
-        guard activeMatch.status == .inProgress else {
+        guard currentMatch.status == .inProgress else {
             print("🚨 [Gameplay] Match status not playable - navigating back")
-            print("🚨 [Gameplay] Status: \(activeMatch.status?.rawValue ?? "nil")")
+            print("🚨 [Gameplay] Status: \(currentMatch.status?.rawValue ?? "nil")")
             didExit = true
             router.popToRoot()
             return
         }
         
-        print("✅ [Gameplay] Match validation passed - status: \(activeMatch.status?.rawValue ?? "nil")")
+        print("✅ [Gameplay] Match validation passed - status: \(currentMatch.status?.rawValue ?? "nil")")
     }
+    
+    // MARK: - Manual Refresh
+    
+    private func refreshMatch(reason: RefreshReason) async {
+        guard !isRefreshing else { return }
+        
+        isRefreshing = true
+        defer { isRefreshing = false }
+        
+        print("🔄 [Gameplay] \(reason.logPrefix) - matchId: \(currentMatch.id.uuidString.prefix(8))...")
+        
+        do {
+            _ = try await remoteMatchService.fetchMatch(matchId: currentMatch.id)
+            print("✅ [Gameplay] Refresh complete")
+        } catch {
+            // NSURLErrorDomain -999 is normal cancellation, not a failure
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == -999 {
+                print("🔄 [Gameplay] Refresh cancelled")
+            } else {
+                print("❌ [Gameplay] Refresh failed: \(error)")
+            }
+        }
+    }
+    
+    private func startPolling() {
+        pollingTask?.cancel()
+        
+        print("🔄 [Gameplay] Starting polling (3s interval)")
+        
+        pollingTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                
+                if !Task.isCancelled {
+                    await refreshMatch(reason: .poll)
+                }
+            }
+        }
+    }
+    
+    private func stopPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
+    }
+    
+    // MARK: - Debug Counter (Phase 2 Testing)
+    
+    #if DEBUG
+    private func bumpDebugCounter() async {
+        guard !isBumping else { return }
+        
+        isBumping = true
+        defer { isBumping = false }
+        
+        print("🔧 [DEBUG] Bumping debug counter...")
+        
+        do {
+            try await remoteMatchService.bumpDebugCounter(matchId: currentMatch.id)
+            print("✅ [DEBUG] Counter bumped successfully")
+            print("ℹ️ [DEBUG] Tap Refresh to see updated value")
+            
+            // DO NOT auto-fetch - require manual refresh for Phase 2 proof
+            
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == -999 {
+                print("🔄 [DEBUG] Bump cancelled")
+            } else {
+                print("❌ [DEBUG] Failed to bump counter: \(error)")
+            }
+        }
+    }
+    #endif
 }
 
 // MARK: - Preview

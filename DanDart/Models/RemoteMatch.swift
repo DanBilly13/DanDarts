@@ -79,6 +79,9 @@ struct RemoteMatch: Identifiable, Codable {
     let endedBy: UUID?
     let endedReason: String?
     
+    // Debug counter for Phase 2 testing (DEBUG only)
+    var debugCounter: Int?
+    
     // Computed properties
     var isChallenger: Bool {
         // Will be set by service when loading
