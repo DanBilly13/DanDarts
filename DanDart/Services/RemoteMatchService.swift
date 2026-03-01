@@ -1031,6 +1031,61 @@ class RemoteMatchService: ObservableObject {
         }
     }
     
+    // MARK: - Save Visit (Gameplay)
+    
+    /// Save a visit (3 darts) to the server
+    /// - Parameters:
+    ///   - matchId: Match ID
+    ///   - darts: Array of 3 dart scores
+    ///   - scoreBefore: Player's score before this visit
+    ///   - scoreAfter: Player's score after this visit
+    /// - Returns: Updated match state from server
+    func saveVisit(matchId: UUID, darts: [Int], scoreBefore: Int, scoreAfter: Int) async throws -> RemoteMatch {
+        print("💾 [SaveVisit] Starting - matchId: \(matchId.uuidString.prefix(8))...")
+        print("💾 [SaveVisit] Darts: \(darts), Before: \(scoreBefore), After: \(scoreAfter)")
+        
+        // Get headers with auth token
+        let headers = try await getEdgeFunctionHeaders()
+        
+        // Build payload as encodable struct
+        struct SaveVisitPayload: Encodable {
+            let match_id: String
+            let darts: [Int]
+            let score_before: Int
+            let score_after: Int
+        }
+        
+        let payload = SaveVisitPayload(
+            match_id: matchId.uuidString,
+            darts: darts,
+            score_before: scoreBefore,
+            score_after: scoreAfter
+        )
+        
+        // Call save-visit edge function
+        let _: EmptyResponse = try await supabaseService.client.functions.invoke(
+            "save-visit",
+            options: FunctionInvokeOptions(
+                headers: headers,
+                body: payload
+            )
+        )
+        
+        print("✅ [SaveVisit] RPC succeeded")
+        
+        // Fetch authoritative match state from server
+        print("🔄 [SaveVisit] Fetching authoritative match state...")
+        let match = try await fetchMatch(matchId: matchId)
+        
+        print("✅ [SaveVisit] Complete - currentPlayerId: \(match?.currentPlayerId?.uuidString.prefix(8) ?? "nil")")
+        
+        guard let match = match else {
+            throw RemoteMatchError.databaseError("Match not found after save")
+        }
+        
+        return match
+    }
+    
     // MARK: - Badge Count
     
     /// Get count of pending incoming challenges
