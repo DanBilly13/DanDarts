@@ -47,13 +47,26 @@ struct RemoteGameplayPlaceholderView: View {
         }
     }
     
-    // Use live activeMatch data, fallback to route parameter
+    // Use flowMatch for real-time updates, fallback to route parameter
+    private var effectiveMatch: RemoteMatch {
+        if remoteMatchService.isInRemoteFlow,
+           remoteMatchService.flowMatchId == match.id,
+           let fm = remoteMatchService.flowMatch {
+            return fm
+        }
+        return match
+    }
+    
     private var currentMatch: RemoteMatch {
-        remoteMatchService.activeMatch?.match ?? match
+        effectiveMatch
+    }
+    
+    private var debugCounter: Int {
+        effectiveMatch.debugCounter ?? 0
     }
     
     private var matchStatus: RemoteMatchStatus {
-        currentMatch.status ?? .cancelled
+        effectiveMatch.status ?? .cancelled
     }
     
     private var matchIdFull: String {
@@ -165,9 +178,9 @@ struct RemoteGameplayPlaceholderView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(AppColor.textSecondary)
                     
-                    let _ = print("🎯 [Gameplay] render debugCounter=\(currentMatch.debugCounter ?? -1) matchId=\(currentMatch.id.uuidString.prefix(8))...")
+                    let _ = print("🎯 [Gameplay] render debugCounter=\(debugCounter) flow=\(remoteMatchService.flowMatch?.debugCounter ?? -1) matchId=\(currentMatch.id.uuidString.prefix(8))...")
                     
-                    Text("\(currentMatch.debugCounter ?? 0)")
+                    Text("\(debugCounter)")
                         .font(.system(size: 32, weight: .bold))
                         .foregroundColor(AppColor.interactivePrimaryBackground)
                     
@@ -240,6 +253,7 @@ struct RemoteGameplayPlaceholderView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             print("[Gameplay] onAppear - instance: \(instanceId.uuidString.prefix(8))... match: \(currentMatch.id.uuidString.prefix(8))...")
+            remoteMatchService.enterRemoteFlow(matchId: currentMatch.id)
             validateAndExitIfNeeded()
             
             // Fetch fresh match state on appear
@@ -253,6 +267,7 @@ struct RemoteGameplayPlaceholderView: View {
         }
         .onDisappear {
             print("[Gameplay] onDisappear - instance: \(instanceId.uuidString.prefix(8))...")
+            remoteMatchService.exitRemoteFlow()
             stopPolling()
         }
         .onChange(of: matchStatus) { _, _ in

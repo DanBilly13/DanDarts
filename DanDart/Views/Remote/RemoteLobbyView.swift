@@ -44,16 +44,12 @@ struct RemoteLobbyView: View {
         timeRemaining <= 0
     }
     
-    // Get current match status from service
-    private var currentMatch: RemoteMatch? {
-        if let activeMatch = remoteMatchService.activeMatch, activeMatch.match.id == match.id {
-            return activeMatch.match
-        }
-        return nil
-    }
-    
+    // Get current match status from flowMatch (fixes stuck lobby bug)
     private var matchStatus: RemoteMatchStatus {
-        currentMatch?.status ?? match.status ?? .lobby
+        if remoteMatchService.flowMatchId == match.id, let status = remoteMatchService.flowMatch?.status {
+            return status
+        }
+        return match.status ?? .lobby
     }
     
     private var isBothPlayersReady: Bool {
@@ -244,6 +240,7 @@ struct RemoteLobbyView: View {
         }
         .onAppear {
             print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
+            remoteMatchService.enterRemoteFlow(matchId: match.id, initialMatch: match)
             isViewActive = true
             
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
@@ -259,6 +256,8 @@ struct RemoteLobbyView: View {
         }
         .onDisappear {
             print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
+            // DO NOT exit remote flow here - let it persist to Gameplay
+            // remoteMatchService.exitRemoteFlow()
             Self.matchesLock.lock()
             Self.matchesBeingStarted.remove(match.id)
             Self.matchesLock.unlock()

@@ -217,7 +217,6 @@ struct RemoteGamesTab: View {
                             let _ = currentTime // Force re-evaluation when currentTime changes
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            let _ = print("🎯 RemoteGamesTab - Rendering sent challenge: opponent=\(matchWithPlayers.opponent.displayName), isExpired=\(isExpired), isFading=\(isFading), status=\(matchWithPlayers.match.status?.rawValue ?? "nil")")
                             
                             PlayerChallengeCard(
                                 player: Player(

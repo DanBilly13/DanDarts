@@ -27,6 +27,13 @@ class RemoteMatchService: ObservableObject {
     @Published var isLoading = false
     @Published var error: RemoteMatchError?
     
+    // MARK: - Flow Gate (Depth-based)
+    
+    @Published private(set) var isInRemoteFlow: Bool = false
+    @Published private(set) var flowMatchId: UUID? = nil
+    @Published private(set) var flowMatch: RemoteMatch? = nil
+    private var remoteFlowDepth: Int = 0
+    
     // MARK: - Realtime Subscription Tokens
     
     // Retain subscription tokens so callbacks stay alive (critical!)
@@ -34,6 +41,13 @@ class RemoteMatchService: ObservableObject {
     private var updateSubscription: RealtimeSubscription?
     private var statusSubscription: RealtimeSubscription?
     private var pingSubscription: RealtimeSubscription?
+    
+    // MARK: - Throttling
+    
+    private var pendingReloads: [UUID: Task<Void, Never>] = [:]
+    private var pendingFlowFetches: [UUID: Task<Void, Never>] = [:]
+    private let reloadThrottleMs = 400
+    private let flowFetchThrottleMs = 250
     
     // MARK: - Helper Methods
     
@@ -52,6 +66,35 @@ class RemoteMatchService: ObservableObject {
             "apikey": supabaseService.supabaseAnonKey,
             "Authorization": "Bearer \(session.accessToken)"
         ]
+    }
+    
+    // MARK: - Flow Gate Methods
+    
+    @MainActor
+    func enterRemoteFlow(matchId: UUID, initialMatch: RemoteMatch? = nil) {
+        remoteFlowDepth += 1
+        flowMatchId = matchId
+        if let initialMatch {
+            flowMatch = initialMatch
+        }
+        if isInRemoteFlow == false {
+            isInRemoteFlow = true
+            print("🚦 [FlowGate] ENTER depth=\(remoteFlowDepth) match=\(matchId.uuidString.prefix(8))")
+        } else {
+            print("🚦 [FlowGate] ENTER depth=\(remoteFlowDepth) match=\(matchId.uuidString.prefix(8))")
+        }
+    }
+    
+    @MainActor
+    func exitRemoteFlow() {
+        remoteFlowDepth = max(0, remoteFlowDepth - 1)
+        print("🚦 [FlowGate] EXIT depth=\(remoteFlowDepth)")
+        if remoteFlowDepth == 0 {
+            isInRemoteFlow = false
+            flowMatchId = nil
+            flowMatch = nil
+            print("🚦 [FlowGate] isInRemoteFlow = false (depth=0)")
+        }
     }
     
     // MARK: - Realtime Subscription
@@ -298,6 +341,14 @@ class RemoteMatchService: ObservableObject {
         )
         
         print("✅ fetched status=\(match.status?.rawValue ?? "nil")")
+        
+        // Update flowMatch if this is the flow match (KEY FIX for Lobby UI)
+        await MainActor.run {
+            if self.flowMatchId == matchId {
+                self.flowMatch = match
+                print("🎯 [Flow] flowMatch updated status=\(match.status?.rawValue ?? "nil")")
+            }
+        }
         
         // Update activeMatch if this is the active match
         if let activeMatch = self.activeMatch, activeMatch.match.id == matchId {
@@ -752,6 +803,47 @@ class RemoteMatchService: ObservableObject {
         print("🔓 Locks cleared for match: \(matchId)")
     }
     
+    // MARK: - Throttling Methods
+    
+    @MainActor
+    private func scheduleListReload(userId: UUID) {
+        pendingReloads[userId]?.cancel()
+        let task = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(reloadThrottleMs))
+            guard !Task.isCancelled, let self else { return }
+            guard self.isInRemoteFlow == false else {
+                print("⏭️ [Realtime] Skipping loadMatches (in remote flow)")
+                return
+            }
+            print("🔄 [Realtime] loadMatches (throttled) user=\(userId.uuidString.prefix(8))")
+            try? await self.loadMatches(userId: userId)
+            print("✅ [Realtime] loadMatches complete")
+            self.pendingReloads.removeValue(forKey: userId)
+        }
+        pendingReloads[userId] = task
+    }
+    
+    @MainActor
+    private func scheduleFlowMatchFetch(matchId: UUID) {
+        pendingFlowFetches[matchId]?.cancel()
+        let task = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(flowFetchThrottleMs))
+            guard !Task.isCancelled, let self else { return }
+            
+            // Only fetch if we are in remote flow AND this signal is for the flow match
+            guard self.isInRemoteFlow, self.flowMatchId == matchId else {
+                self.pendingFlowFetches.removeValue(forKey: matchId)
+                return
+            }
+            
+            print("🔄 [Realtime] fetchMatch(flow) match=\(matchId.uuidString.prefix(8))")
+            _ = try? await self.fetchMatch(matchId: matchId)
+            print("✅ [Realtime] fetchMatch(flow) complete")
+            self.pendingFlowFetches.removeValue(forKey: matchId)
+        }
+        pendingFlowFetches[matchId] = task
+    }
+    
     // MARK: - Realtime Subscription
     
     func setupRealtimeSubscription(userId: UUID) async {
@@ -802,12 +894,22 @@ class RemoteMatchService: ObservableObject {
             }
             
             print("🟢 [RemoteMatch Realtime] Processing - event is for current user!")
+            
+            // Extract matchId for targeted updates
+            guard let matchIdString = record["id"]?.stringValue,
+                  let matchId = UUID(uuidString: matchIdString) else {
+                print("🟢 [RemoteMatch Realtime] No valid matchId in payload")
+                return
+            }
+            
             Task { @MainActor in
-                print("🟢 [RemoteMatch Realtime] Reloading matches for user: \(userId)")
-                try? await self?.loadMatches(userId: userId)
-                print("🟢 [RemoteMatch Realtime] Reload complete")
+                // Safe in flow even if activeMatch is nil (uses flowMatchId)
+                self?.scheduleFlowMatchFetch(matchId: matchId)
                 
-                // Post notification for badge updates
+                // Will no-op if in remote flow
+                self?.scheduleListReload(userId: userId)
+                
+                // Keep badge notification
                 NotificationCenter.default.post(
                     name: NSNotification.Name("RemoteChallengesChanged"),
                     object: nil
@@ -847,12 +949,22 @@ class RemoteMatchService: ObservableObject {
             }
             
             print("🚨 [RemoteMatch Realtime] Processing - event is for current user!")
+            
+            // Extract matchId for targeted updates
+            guard let matchIdString = record["id"]?.stringValue,
+                  let matchId = UUID(uuidString: matchIdString) else {
+                print("🚨 [RemoteMatch Realtime] No valid matchId in payload")
+                return
+            }
+            
             Task { @MainActor in
-                print("🚨 [RemoteMatch Realtime] Reloading matches for user: \(userId)")
-                try? await self?.loadMatches(userId: userId)
-                print("🚨 [RemoteMatch Realtime] Reload complete")
+                // Safe in flow even if activeMatch is nil (uses flowMatchId)
+                self?.scheduleFlowMatchFetch(matchId: matchId)
                 
-                // Post notification for badge updates
+                // Will no-op if in remote flow
+                self?.scheduleListReload(userId: userId)
+                
+                // Keep badge notification
                 NotificationCenter.default.post(
                     name: NSNotification.Name("RemoteChallengesChanged"),
                     object: nil
@@ -901,6 +1013,17 @@ class RemoteMatchService: ObservableObject {
     }
     
     func removeRealtimeSubscription() async {
+        // Cancel all pending throttled tasks
+        await MainActor.run {
+            print("🧹 [Realtime] Cancelling \(pendingReloads.count) pending reloads")
+            for (_, task) in pendingReloads { task.cancel() }
+            pendingReloads.removeAll()
+            
+            print("🧹 [Realtime] Cancelling \(pendingFlowFetches.count) pending flow fetches")
+            for (_, task) in pendingFlowFetches { task.cancel() }
+            pendingFlowFetches.removeAll()
+        }
+        
         if let channel = realtimeChannel {
             await channel.unsubscribe()
             self.realtimeChannel = nil
