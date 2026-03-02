@@ -296,6 +296,7 @@ class RemoteMatchService: ObservableObject {
             let receiver_id: UUID
             let current_player_id: UUID?
             let player_scores: [String: Int]?  // 🆕 STEP 1: Server-authoritative scores
+            let turn_index_in_leg: Int?  // 🆕 Server-authoritative turn counter
             let challenge_expires_at: String?
             let join_window_expires_at: String?
             let created_at: String
@@ -336,6 +337,7 @@ class RemoteMatchService: ObservableObject {
         print("🧪 [fetchMatch DECODED] challenger_id=\(matchData.challenger_id.uuidString.prefix(8))...")
         print("🧪 [fetchMatch DECODED] receiver_id=\(matchData.receiver_id.uuidString.prefix(8))...")
         print("🧪 [fetchMatch DECODED] player_scores=\(matchData.player_scores?.description ?? "nil")")
+        print("🧪 [fetchMatch DECODED] turn_index_in_leg=\(matchData.turn_index_in_leg?.description ?? "nil")")
         
         // Convert player_scores from [String: Int] to [UUID: Int]
         var playerScores: [UUID: Int]? = nil
@@ -360,6 +362,7 @@ class RemoteMatchService: ObservableObject {
             joinWindowExpiresAt: matchData.join_window_expires_at.flatMap { formatter.date(from: $0) },
             lastVisitPayload: nil,
             playerScores: playerScores,  // 🆕 STEP 1: Server-authoritative scores
+            turnIndexInLeg: matchData.turn_index_in_leg,  // 🆕 Server-authoritative turn counter
             createdAt: formatter.date(from: matchData.created_at) ?? Date(),
             updatedAt: formatter.date(from: matchData.updated_at) ?? Date(),
             endedBy: matchData.ended_by,

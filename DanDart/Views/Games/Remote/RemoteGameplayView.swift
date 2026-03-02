@@ -95,12 +95,13 @@ struct RemoteGameplayView: View {
         return adapter.playerIndex(for: playerId) ?? gameViewModel.currentPlayerIndex
     }
     
-    /// Visit number: server-authoritative (turn_index_in_leg starts at 0, display as +1)
+    /// Round number: server-authoritative (increments after both players complete their turns)
+    /// Formula: ROUND = (turn_index_in_leg / 2) + 1
     private var renderVisitNumber: Int {
-        if let turnIndex = renderMatch?.turnIndexInLeg {
-            return turnIndex + 1  // Server: 0-indexed → VISIT 1, 1 → VISIT 2, etc.
-        }
-        return gameViewModel.currentVisit  // Fallback only before server data arrives
+        let serverTurnIndex = renderMatch?.turnIndexInLeg
+        let roundNumber = serverTurnIndex != nil ? ((serverTurnIndex! / 2) + 1) : gameViewModel.currentVisit
+        print("🧮 [Round] serverTurnIndex=\(serverTurnIndex?.description ?? "nil") renderRound=\(roundNumber)")
+        return roundNumber
     }
 
     // MARK: - Derived UI State
@@ -359,9 +360,9 @@ struct RemoteGameplayView: View {
         let gameTitle = m.gameName
         
         if gameViewModel.matchFormat > 1 {
-            return "\(gameTitle)  LEG \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)  VISIT \(renderVisitNumber)"
+            return "\(gameTitle)  LEG \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)  ROUND \(renderVisitNumber)"
         } else {
-            return "\(gameTitle)  VISIT \(renderVisitNumber)"
+            return "\(gameTitle)  ROUND \(renderVisitNumber)"
         }
     }
     
@@ -371,9 +372,13 @@ struct RemoteGameplayView: View {
         let overlayState = adapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore)
         
         return gameplayContent(overlayState, using: m, adapter: adapter)
-            .navigationTitle(navigationTitle(using: m))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(navigationTitle(using: m))
+                        .font(.headline)
+                        .foregroundColor(.white)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     GameplayMenuButton(
                         onInstructions: { showInstructions = true },

@@ -3,8 +3,24 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import type { ErrorResponse, SuccessResponse } from '../_shared/types.ts'
+
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Response types
+interface ErrorResponse {
+  error: string
+  details?: any
+}
+
+interface SuccessResponse {
+  success: boolean
+  data?: any
+  message: string
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,6 +33,14 @@ serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid Authorization header' } as ErrorResponse),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -34,7 +58,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     if (userError || !user) {
       return new Response(
@@ -125,10 +149,10 @@ serve(async (req) => {
 
     // Calculate new turn_index_in_leg (increment from current value)
     const newTurnIndex = (match.turn_index_in_leg ?? 0) + 1
-    console.log(`🔢 [save-visit] Incrementing turn_index_in_leg: ${match.turn_index_in_leg ?? 0} → ${newTurnIndex}`)
+    console.log(`🧮 [save-visit] turn_index_in_leg: ${match.turn_index_in_leg ?? 0} -> ${newTurnIndex}`)
 
     // Update match with next player, last visit, player_scores, AND turn_index_in_leg
-    const { error: updateError } = await supabaseClient
+    const { data: updatedMatch, error: updateError } = await supabaseClient
       .from('matches')
       .update({
         current_player_id: nextPlayerId,
@@ -138,6 +162,8 @@ serve(async (req) => {
         updated_at: now.toISOString(),
       })
       .eq('id', match_id)
+      .select('id, current_player_id, player_scores, turn_index_in_leg, updated_at')
+      .maybeSingle()
 
     if (updateError) {
       console.error('Match update error:', updateError)
@@ -155,7 +181,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        data: { next_player_id: nextPlayerId },
+        data: { 
+          next_player_id: nextPlayerId,
+          turn_index_in_leg: updatedMatch?.turn_index_in_leg ?? newTurnIndex,
+        },
         message: 'Visit saved successfully',
       } as SuccessResponse),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
