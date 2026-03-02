@@ -555,7 +555,7 @@ Else → .none (active player, no overlay)
 ---
 
 ## Task 9: Implement Reveal Window (1-2s Display)
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Objectives
 - After server confirms save, show scored visit to both players
@@ -586,7 +586,7 @@ Else → .none (active player, no overlay)
 ---
 
 ## Task 10: Implement Card Rotation Animation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Objectives
 - **Reuse existing local 301/501 rotation animation** (do not reinvent)
@@ -619,7 +619,7 @@ Else → .none (active player, no overlay)
 ---
 
 ## Task 11: Implement Score Updates
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Objectives
 - Display updated scores after each visit
@@ -645,7 +645,7 @@ Else → .none (active player, no overlay)
 ---
 
 ## Task 12: Implement End Game Detection & Navigation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Objectives
 - Detect when match becomes `completed`
@@ -671,7 +671,7 @@ Else → .none (active player, no overlay)
 ---
 
 ## Task 13: Replace Placeholder in Router
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Objectives
 - Replace RemoteGameplayPlaceholderView with RemoteGameView
@@ -694,7 +694,7 @@ Else → .none (active player, no overlay)
 ---
 
 ## Task 14: Add Comprehensive Logging
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Objectives
 - Add debug logging at all critical points

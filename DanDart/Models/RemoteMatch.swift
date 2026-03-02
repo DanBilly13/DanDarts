@@ -70,6 +70,8 @@ struct RemoteMatch: Identifiable, Codable {
     
     // Game state
     var lastVisitPayload: LastVisitPayload?
+    var playerScores: [UUID: Int]? // Server-authoritative scores {player_id: score}
+    var turnIndexInLeg: Int? // Server-authoritative turn counter (0-indexed, display as +1)
     
     // Match metadata
     let createdAt: Date
@@ -161,6 +163,8 @@ struct RemoteMatch: Identifiable, Codable {
         case challengeExpiresAt = "challenge_expires_at"
         case joinWindowExpiresAt = "join_window_expires_at"
         case lastVisitPayload = "last_visit_payload"
+        case playerScores = "player_scores"
+        case turnIndexInLeg = "turn_index_in_leg"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case endedBy = "ended_by"

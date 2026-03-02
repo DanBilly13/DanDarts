@@ -575,10 +575,15 @@ struct MainTabView: View {
                 .id("lobby-\(match.id.uuidString)")
                 .background(AppColor.backgroundPrimary)
         
-        case .remoteGameplay(let match, let opponent, let currentUser):
-            RemoteGameplayPlaceholderView(match: match, opponent: opponent, currentUser: currentUser)
-                .id("gameplay-\(match.id.uuidString)")
-                .background(AppColor.backgroundPrimary)
+        case .remoteGameplay(let matchId, let challenger, let receiver, let currentUserId):
+            RemoteGameplayView(
+                matchId: matchId,
+                challenger: challenger,
+                receiver: receiver,
+                currentUserId: currentUserId
+            )
+            .id("gameplay-\(matchId.uuidString)")
+            .background(AppColor.backgroundPrimary)
         
         default:
             router.view(for: route, selectedTab: $selectedTab)

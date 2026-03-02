@@ -9,13 +9,13 @@
 import SwiftUI
 
 struct RemoteGameplayView: View {
-    let match: RemoteMatch
+    let matchId: UUID
     let challenger: User
     let receiver: User
     let currentUserId: UUID
     
     // Game state managed by ViewModel
-    @StateObject private var gameViewModel: CountdownViewModel
+    @StateObject private var gameViewModel: RemoteGameViewModel
     @StateObject private var menuCoordinator = MenuCoordinator.shared
     @State private var showInstructions: Bool = false
     @State private var showRestartAlert: Bool = false
@@ -31,20 +31,81 @@ struct RemoteGameplayView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var router: Router
+    @EnvironmentObject var remoteMatchService: RemoteMatchService
     
-    private var adapter: RemoteGameStateAdapter {
-        RemoteGameStateAdapter(
-            match: match,
+    // MARK: - Live Match Data
+    
+    private var liveMatch: RemoteMatch? {
+        // Prefer flowMatch if present and matches our ID
+        if let fm = remoteMatchService.flowMatch, fm.id == matchId {
+            return fm
+        }
+        // Fallback to activeMatch
+        if let am = remoteMatchService.activeMatch?.match, am.id == matchId {
+            return am
+        }
+        return nil
+    }
+    
+    private var adapter: RemoteGameStateAdapter? {
+        guard let m = liveMatch else { return nil }
+        return RemoteGameStateAdapter(
+            match: m,
             challenger: challenger,
             receiver: receiver,
             currentUserId: currentUserId
         )
     }
+    
+    // MARK: - Unified Render Source (Server-Authoritative)
+    
+    /// Server match (flowMatch from RemoteMatchService)
+    private var serverMatch: RemoteMatch? {
+        remoteMatchService.flowMatch
+    }
+    
+    /// Primary match data: prefer server, fallback to liveMatch
+    private var renderMatch: RemoteMatch? {
+        serverMatch ?? liveMatch
+    }
+    
+    /// Server-authoritative scores from renderMatch
+    private var serverScores: [UUID: Int]? {
+        renderMatch?.playerScores
+    }
+    
+    /// Scores for UI: prefer server, fallback to VM
+    private var renderScores: [UUID: Int] {
+        serverScores ?? gameViewModel.playerScores
+    }
+    
+    /// Server-authoritative current player ID
+    private var serverCurrentPlayerId: UUID? {
+        renderMatch?.currentPlayerId
+    }
+    
+    /// Current player index for UI: derive from server player ID using adapter's deterministic order
+    private var renderCurrentPlayerIndex: Int {
+        guard let playerId = serverCurrentPlayerId,
+              let adapter = adapter else {
+            return gameViewModel.currentPlayerIndex // Fallback before first turn
+        }
+        
+        // Use adapter's playerIndex method (challenger=0, receiver=1)
+        return adapter.playerIndex(for: playerId) ?? gameViewModel.currentPlayerIndex
+    }
+    
+    /// Visit number: server-authoritative (turn_index_in_leg starts at 0, display as +1)
+    private var renderVisitNumber: Int {
+        if let turnIndex = renderMatch?.turnIndexInLeg {
+            return turnIndex + 1  // Server: 0-indexed → VISIT 1, 1 → VISIT 2, etc.
+        }
+        return gameViewModel.currentVisit  // Fallback only before server data arrives
+    }
 
     // MARK: - Derived UI State
     private var flowOverlayState: RemoteGameStateAdapter.OverlayState {
-        // CountdownViewModel does not own an isSaving flag; keep this view-local for now.
-        adapter.overlayState(isSaving: isSaving)
+        adapter?.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore) ?? .none
     }
 
     // MARK: - View Extraction (helps the SwiftUI type-checker)
@@ -54,7 +115,7 @@ struct RemoteGameplayView: View {
     }
 
     @ViewBuilder
-    private func gameplayContent(_ overlayState: RemoteGameStateAdapter.OverlayState) -> some View {
+    private func gameplayContent(_ overlayState: RemoteGameStateAdapter.OverlayState, using m: RemoteMatch, adapter: RemoteGameStateAdapter) -> some View {
         // Core gameplay layout, optionally wrapped with a positioned tip overlay
         PositionedTip(
             xPercent: 0.5,
@@ -68,18 +129,18 @@ struct RemoteGameplayView: View {
                     message2: tip.message2,
                     onDismiss: {
                         showGameTip = false
-                        TipManager.shared.markTipAsSeen(for: match.gameName)
+                        TipManager.shared.markTipAsSeen(for: m.gameName)
                     }
                 )
                 .padding(.horizontal, 24)
             }
         } background: {
-            gameplayStack(overlayState)
+            gameplayStack(overlayState, adapter: adapter)
         }
     }
 
     @ViewBuilder
-    private func gameplayStack(_ overlayState: RemoteGameStateAdapter.OverlayState) -> some View {
+    private func gameplayStack(_ overlayState: RemoteGameStateAdapter.OverlayState, adapter: RemoteGameStateAdapter) -> some View {
         ZStack {
             VStack(spacing: 0) {
                 topSection
@@ -87,12 +148,12 @@ struct RemoteGameplayView: View {
                 bottomSection
             }
 
-            // Turn lockout overlay (inactive player or saving state)
+            // Turn lockout overlay (inactive player or saving/revealing state)
             if overlayState.isVisible {
                 TurnLockoutOverlay(
                     overlayState: overlayState,
                     opponentName: adapter.opponent.displayName,
-                    lastVisitValue: adapter.lastVisitValue
+                    lastVisitValue: overlayState == .revealing ? gameViewModel.lastScoredVisit : adapter.lastVisitValue
                 )
             }
 
@@ -114,11 +175,22 @@ struct RemoteGameplayView: View {
 
     private var topSection: some View {
         VStack(spacing: 0) {
+            // 🧪 Render Source Debug Logging
+            let _ = {
+                print("📊 [RenderSource] serverScores=\(serverScores?.description ?? "nil")")
+                print("📊 [RenderSource] renderScores=\(renderScores)")
+                print("📊 [RenderSource] serverCurrentPlayerId=\(serverCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
+                print("📊 [RenderSource] renderCurrentPlayerIndex=\(renderCurrentPlayerIndex)")
+                print("📊 [RenderSource] renderVisitNumber=\(renderVisitNumber)")
+                let source = serverScores != nil ? "SERVER ✅" : "VM fallback"
+                print("📊 [RenderSource] UI using: \(source)")
+            }()
+            
             // Stacked player cards (current player in front / expandable into column)
             StackedPlayerCards(
                 players: gameViewModel.players,
-                currentPlayerIndex: gameViewModel.currentPlayerIndex,
-                playerScores: gameViewModel.playerScores,
+                currentPlayerIndex: renderCurrentPlayerIndex,
+                playerScores: renderScores,
                 currentThrow: gameViewModel.currentThrow,
                 legsWon: gameViewModel.legsWon,
                 matchFormat: gameViewModel.matchFormat,
@@ -225,186 +297,341 @@ struct RemoteGameplayView: View {
         }
     }
     
-    init(match: RemoteMatch, challenger: User, receiver: User, currentUserId: UUID) {
-        self.match = match
+    init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID) {
+        self.matchId = matchId
         self.challenger = challenger
         self.receiver = receiver
         self.currentUserId = currentUserId
         
-        let adapter = RemoteGameStateAdapter(
-            match: match,
+        print("🎯 [RemoteGameplayView] Init - matchId: \(matchId.uuidString.prefix(8))...")
+        
+        // Create temporary adapter for initialization (will use live match later)
+        let tempAdapter = RemoteGameStateAdapter(
+            match: RemoteMatch(
+                id: matchId,
+                matchMode: "remote",
+                gameType: "301",
+                gameName: "301",
+                matchFormat: 1,
+                challengerId: challenger.id,
+                receiverId: receiver.id,
+                status: .inProgress,
+                currentPlayerId: nil,
+                challengeExpiresAt: nil,
+                joinWindowExpiresAt: nil,
+                lastVisitPayload: nil,
+                createdAt: Date(),
+                updatedAt: Date(),
+                endedBy: nil,
+                endedReason: nil,
+                debugCounter: nil
+            ),
             challenger: challenger,
             receiver: receiver,
             currentUserId: currentUserId
         )
-        let players = adapter.createPlayersArray()
+        
+        // Create game (will be updated from live match)
         let game = Game(
-            title: match.gameName,
+            title: "301",
             subtitle: "Remote Match",
             players: "2 Players",
             instructions: ""
         )
         
+        // Create players array
+        let players = tempAdapter.createPlayersArray()
+        
+        // Initialize ViewModel
         _gameViewModel = StateObject(
-            wrappedValue: CountdownViewModel(
+            wrappedValue: RemoteGameViewModel(
                 game: game,
                 players: players,
-                matchFormat: match.matchFormat
+                matchFormat: 1,
+                authService: nil,
+                remoteMatchId: matchId
             )
         )
     }
     
-    // Computed property for navigation title
-    private var navigationTitle: String {
-        let gameTitle = match.gameName // "301" or "501"
+    // Helper function for navigation title using live match
+    private func navigationTitle(using m: RemoteMatch) -> String {
+        let gameTitle = m.gameName
         
-        // Remote matches are always 2 players
         if gameViewModel.matchFormat > 1 {
-            // Multi-leg match
-            return "\(gameTitle)  LEG \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)  VISIT \(gameViewModel.currentVisit)"
+            return "\(gameTitle)  LEG \(gameViewModel.currentLeg)/\(gameViewModel.matchFormat)  VISIT \(renderVisitNumber)"
         } else {
-            // Single game (best of 1)
-            return "\(gameTitle)  VISIT \(gameViewModel.currentVisit)"
+            return "\(gameTitle)  VISIT \(renderVisitNumber)"
+        }
+    }
+    
+    // MARK: - Body Extraction (helps the SwiftUI type-checker)
+
+    private func contentWithNavigation(using m: RemoteMatch, adapter: RemoteGameStateAdapter) -> some View {
+        let overlayState = adapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore)
+        
+        return gameplayContent(overlayState, using: m, adapter: adapter)
+            .navigationTitle(navigationTitle(using: m))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    GameplayMenuButton(
+                        onInstructions: { showInstructions = true },
+                        onRestart: { showRestartAlert = true },
+                        onExit: { showExitAlert = true },
+                        onUndo: { showUndoConfirmation = true },
+                        canUndo: gameViewModel.canUndo
+                    )
+                }
+            }
+            .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationBarBackButtonHidden(true)
+            .interactiveDismissDisabled()
+            .ignoresSafeArea(.container, edges: .bottom)
+    }
+    
+    @ViewBuilder
+    private var gameplayRootView: some View {
+        Group {
+            if let m = liveMatch, let adapter = adapter {
+                contentWithNavigation(using: m, adapter: adapter)
+                    .onAppear {
+                        print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
+                        
+                        // 🧪 DEBUG STEP 1: Confirm remoteMatchService exists in environment
+                        print("🧪 [RemoteGameplay] env remoteMatchService exists, flowMatchId=\(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")..., matchId=\(matchId.uuidString.prefix(8))...")
+                        print("🧪 [RemoteGameplay] remoteMatchService instance: \(ObjectIdentifier(remoteMatchService))")
+                        
+                        // Enter remote flow (FlowGate)
+                        remoteMatchService.enterRemoteFlow(matchId: matchId)
+                        print("✅ [RemoteGameplayView] Entered remote flow")
+                        
+                        // Inject authService into the ViewModel
+                        gameViewModel.setAuthService(authService)
+                        
+                        // Inject remoteMatchService into the ViewModel
+                        gameViewModel.setRemoteMatchService(remoteMatchService)
+                        
+                        // Fetch authoritative match state
+                        Task { @MainActor in
+                            _ = try? await remoteMatchService.fetchMatch(matchId: matchId)
+                        }
+                        
+                        // 🧪 TRUTH TABLE DEBUG
+                        Self.printTruthTable(
+                            matchId: matchId,
+                            liveMatch: liveMatch,
+                            currentUserId: currentUserId,
+                            authUserId: authService.currentUser?.id,
+                            challenger: challenger,
+                            receiver: receiver,
+                            adapter: adapter,
+                            overlayState: adapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore),
+                            context: "onAppear"
+                        )
+                        
+                        // Show game-specific tip if available and not seen before
+                        if TipManager.shared.shouldShowTip(for: m.gameName) {
+                            currentTip = TipManager.shared.getTip(for: m.gameName)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                withAnimation { showGameTip = true }
+                            }
+                        }
+                    }
+                    .onDisappear {
+                        print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
+                        remoteMatchService.exitRemoteFlow()
+                    }
+                    .onChange(of: serverScores) { oldValue, newValue in
+                        // Sync VM scores from server when they update
+                        if let newScores = newValue {
+                            print("🔄 [Sync] Server scores updated, syncing to VM: \(newScores)")
+                            gameViewModel.playerScores = newScores
+                        }
+                    }
+                    .onChange(of: serverCurrentPlayerId) { oldValue, newValue in
+                        // Sync VM current player index from server when it updates
+                        if let newPlayerId = newValue, let currentAdapter = self.adapter {
+                            if let newIndex = currentAdapter.playerIndex(for: newPlayerId) {
+                                print("🔄 [Sync] Server currentPlayerId updated to \(newPlayerId.uuidString.prefix(8))..., syncing VM index to \(newIndex)")
+                                gameViewModel.currentPlayerIndex = newIndex
+                            }
+                        }
+                    }
+            } else {
+                // Loading state - show progress view until match loads
+                ProgressView("Loading match…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppColor.backgroundPrimary.ignoresSafeArea())
+                    .onAppear {
+                        print("⏳ [RemoteGameplayView] Waiting for live match...")
+                        // Kick fetch if we arrived before flowMatch is set
+                        Task { @MainActor in
+                            _ = try? await remoteMatchService.fetchMatch(matchId: matchId)
+                        }
+                    }
+            }
+        }
+            .alert("Exit Game", isPresented: $showExitAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Leave Game", role: .destructive) { router.popToRoot() }
+            } message: {
+                Text("Are you sure you want to leave the game? Your progress will be lost.")
+            }
+            .alert("Restart Game", isPresented: $showRestartAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Restart", role: .destructive) { gameViewModel.restartGame() }
+            } message: {
+                Text("Are you sure you want to restart the game? All progress will be lost.")
+            }
+            .alert("Undo Last Visit", isPresented: $showUndoConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Undo", role: .destructive) { gameViewModel.undoLastVisit() }
+            } message: {
+                if let visit = gameViewModel.lastVisit {
+                    Text("Undo visit by \(visit.playerName)?\n\nScore will revert from \(visit.newScore) to \(visit.previousScore).")
+                } else {
+                    Text("Undo the last visit?")
+                }
+            }
+            .sheet(isPresented: $showInstructions) { EmptyView() }
+            .onChange(of: gameViewModel.legWinner) { _, newValue in
+                if newValue != nil && !gameViewModel.isMatchWon {
+                    showLegWinCelebration = true
+                }
+            }
+            .onChange(of: gameViewModel.winner) { _, newValue in
+                if newValue != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigateToGameEnd = true
+                    }
+                }
+            }
+            .alert("Leg Won!", isPresented: $showLegWinCelebration) {
+                Button("Next Leg") {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                        gameViewModel.resetLeg()
+                    }
+                }
+            } message: {
+                if let legWinner = gameViewModel.legWinner {
+                    let winnerLegs = gameViewModel.legsWon[legWinner.id] ?? 0
+                    Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
+                }
+            }
+            .navigationDestination(isPresented: $navigateToGameEnd) {
+                gameEndDestinationView
+            }
+    }
+
+    private var gameEndDestinationView: some View {
+        Group {
+            if let winner = gameViewModel.winner, let m = liveMatch {
+                let tempGame = Game(
+                    title: m.gameName,
+                    subtitle: "Remote Match",
+                    players: "2 Players",
+                    instructions: ""
+                )
+                GameEndView(
+                    game: tempGame,
+                    winner: winner,
+                    players: gameViewModel.players,
+                    onPlayAgain: {
+                        // Reset game with same players
+                        gameViewModel.restartGame()
+                        navigateToGameEnd = false
+                    },
+                    onChangePlayers: {
+                        // Navigate back to game setup
+                        navigateToGameEnd = false
+                        dismiss()
+                    },
+                    onBackToGames: {
+                        // Navigate back to games list
+                        router.popToRoot()
+                    },
+                    matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
+                    legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
+                    matchId: gameViewModel.matchId,
+                    matchResult: gameViewModel.savedMatchResult
+                )
+            } else {
+                EmptyView()
+            }
+        }
+    }
+
+    // MARK: - Truth Table Debug Helper
+    
+    static func printTruthTable(
+        matchId: UUID,
+        liveMatch: RemoteMatch?,
+        currentUserId: UUID,
+        authUserId: UUID?,
+        challenger: User,
+        receiver: User,
+        adapter: RemoteGameStateAdapter?,
+        overlayState: RemoteGameStateAdapter.OverlayState?,
+        context: String
+    ) {
+        print("🧩 [TurnDebug \(context)] ========================================")
+        print("🧩 [TurnDebug] match=\(matchId.uuidString.prefix(8))... status=\(liveMatch?.status?.rawValue ?? "nil") currentPlayer=\(liveMatch?.currentPlayerId?.uuidString.prefix(8) ?? "nil")...")
+        print("🧩 [TurnDebug] currentUser(param)=\(currentUserId.uuidString.prefix(8))... currentUser(auth)=\(authUserId?.uuidString.prefix(8) ?? "nil")...")
+        print("🧩 [TurnDebug] challenger=\(challenger.id.uuidString.prefix(8))... receiver=\(receiver.id.uuidString.prefix(8))...")
+        
+        let amIChallenger = (currentUserId == challenger.id)
+        let amIReceiver = (currentUserId == receiver.id)
+        let isMyTurn = (liveMatch?.currentPlayerId == currentUserId)
+        
+        print("🧩 [TurnDebug] amIChallenger=\(amIChallenger) amIReceiver=\(amIReceiver) isMyTurn=\(isMyTurn)")
+        
+        if let adapter = adapter {
+            let me = (currentUserId == adapter.challenger.id) ? adapter.challenger : adapter.receiver
+            print("🧩 [TurnDebug] adapter.me.id=\(me.id.uuidString.prefix(8))... adapter.opponent.id=\(adapter.opponent.id.uuidString.prefix(8))...")
+            print("🧩 [TurnDebug] adapter.myRole=\(adapter.myRole.displayName)")
+        } else {
+            print("🧩 [TurnDebug] adapter=nil")
+        }
+        
+        print("🧩 [TurnDebug] overlayState=\(overlayState?.description ?? "nil")")
+        print("🧩 [TurnDebug] ========================================")
+        
+        // VALIDATION CHECKS
+        if currentUserId != authUserId {
+            print("⚠️ [TurnDebug] WARNING: currentUserId != authUserId - WRONG USER ID PASSED!")
+        }
+        if !amIChallenger && !amIReceiver {
+            print("⚠️ [TurnDebug] WARNING: Not challenger AND not receiver - WRONG USER ID!")
         }
     }
     
     var body: some View {
-        let overlayState = flowOverlayState
-
         ZStack {
             backgroundLayer
-            gameplayContent(overlayState)
-                .navigationTitle(navigationTitle)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        GameplayMenuButton(
-                            onInstructions: { showInstructions = true },
-                            onRestart: { showRestartAlert = true },
-                            onExit: { showExitAlert = true },
-                            onUndo: { showUndoConfirmation = true },
-                            canUndo: gameViewModel.canUndo
-                        )
-                    }
-                }
-                .toolbarBackground(AppColor.backgroundPrimary, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar(.hidden, for: .tabBar)
-                .navigationBarBackButtonHidden(true)
-                .interactiveDismissDisabled()
-                .ignoresSafeArea(.container, edges: .bottom)
-                .onAppear {
-                    // Inject authService into the ViewModel
-                    gameViewModel.setAuthService(authService)
-
-                    // Show game-specific tip if available and not seen before
-                    if TipManager.shared.shouldShowTip(for: match.gameName) {
-                        currentTip = TipManager.shared.getTip(for: match.gameName)
-                        // Slight delay so it appears after navigation transition
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            withAnimation {
-                                showGameTip = true
-                            }
-                        }
-                    }
-                }
-                .alert("Exit Game", isPresented: $showExitAlert) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Leave Game", role: .destructive) {
-                        // Pop to root (games list)
-                        router.popToRoot()
-                    }
-                } message: {
-                    Text("Are you sure you want to leave the game? Your progress will be lost.")
-                }
-                .alert("Restart Game", isPresented: $showRestartAlert) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Restart", role: .destructive) {
-                        gameViewModel.restartGame()
-                    }
-                } message: {
-                    Text("Are you sure you want to restart the game? All progress will be lost.")
-                }
-                .alert("Undo Last Visit", isPresented: $showUndoConfirmation) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Undo", role: .destructive) {
-                        gameViewModel.undoLastVisit()
-                    }
-                } message: {
-                    if let visit = gameViewModel.lastVisit {
-                        Text("Undo visit by \(visit.playerName)?\n\nScore will revert from \(visit.newScore) to \(visit.previousScore).")
-                    } else {
-                        Text("Undo the last visit?")
-                    }
-                }
-                .sheet(isPresented: $showInstructions) {
-                    EmptyView()
-                }
-                .onChange(of: gameViewModel.legWinner) { _, newValue in
-                    if newValue != nil && !gameViewModel.isMatchWon {
-                        // Leg won but match continues - show celebration
-                        showLegWinCelebration = true
-                    }
-                }
-                .onChange(of: gameViewModel.winner) { _, newValue in
-                    if newValue != nil {
-                        // Match winner detected - navigate to game end screen after brief delay
-                        // This ensures all state updates are complete
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            navigateToGameEnd = true
-                        }
-                    }
-                }
-                .alert("Leg Won!", isPresented: $showLegWinCelebration) {
-                    Button("Next Leg") {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            gameViewModel.resetLeg()
-                        }
-                    }
-                } message: {
-                    if let legWinner = gameViewModel.legWinner {
-                        let winnerLegs = gameViewModel.legsWon[legWinner.id] ?? 0
-                        Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
-                    }
-                }
-                .navigationDestination(isPresented: $navigateToGameEnd) {
-                    if let winner = gameViewModel.winner {
-                        let tempGame = Game(
-                            title: match.gameName,
-                            subtitle: "Remote Match",
-                            players: "2 Players",
-                            instructions: ""
-                        )
-                        GameEndView(
-                            game: tempGame,
-                            winner: winner,
-                            players: gameViewModel.players,
-                            onPlayAgain: {
-                                // Reset game with same players
-                                gameViewModel.restartGame()
-                                navigateToGameEnd = false
-                            },
-                            onChangePlayers: {
-                                // Navigate back to game setup
-                                navigateToGameEnd = false
-                                dismiss()
-                            },
-                            onBackToGames: {
-                                // Navigate back to games list
-                                router.popToRoot()
-                            },
-                            matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
-                            legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                            matchId: gameViewModel.matchId,
-                            matchResult: gameViewModel.savedMatchResult
-                        )
-                    }
-                }
+            gameplayRootView
         }
-
-        // MARK: - Game Logic
-        // All game logic now handled by GameViewModel
+        .onChange(of: liveMatch?.currentPlayerId) { oldValue, newValue in
+            print("🔄 [TurnDebug] currentPlayerId CHANGED: \(oldValue?.uuidString.prefix(8) ?? "nil")... → \(newValue?.uuidString.prefix(8) ?? "nil")...")
+            
+            // Re-print truth table on change
+            if let currentAdapter = adapter {
+                Self.printTruthTable(
+                    matchId: matchId,
+                    liveMatch: liveMatch,
+                    currentUserId: currentUserId,
+                    authUserId: authService.currentUser?.id,
+                    challenger: challenger,
+                    receiver: receiver,
+                    adapter: currentAdapter,
+                    overlayState: currentAdapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore),
+                    context: "onChange"
+                )
+            }
+        }
     }
 }
 
@@ -470,6 +697,7 @@ struct TurnLockoutOverlay: View {
         case .none: return ""
         case .inactiveLockout: return "hourglass"
         case .saving: return "arrow.up.circle.fill"
+        case .revealing: return "checkmark.circle.fill"
         }
     }
     
@@ -478,6 +706,12 @@ struct TurnLockoutOverlay: View {
         case .none: return ""
         case .inactiveLockout: return "\(opponentName) is throwing"
         case .saving: return "Saving visit..."
+        case .revealing:
+            if let lastVisit = lastVisitValue {
+                return "Scored: \(lastVisit)"
+            } else {
+                return "Visit saved"
+            }
         }
     }
     
@@ -490,6 +724,7 @@ struct TurnLockoutOverlay: View {
             }
             return "Waiting for opponent"
         case .saving: return "Please wait"
+        case .revealing: return nil // No subtitle for reveal window
         }
     }
 }

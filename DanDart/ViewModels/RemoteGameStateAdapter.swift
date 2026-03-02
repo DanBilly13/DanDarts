@@ -117,17 +117,37 @@ struct RemoteGameStateAdapter {
     }
     
     /// Overlay state for the current user
-    func overlayState(isSaving: Bool) -> OverlayState {
+    func overlayState(isSaving: Bool, isRevealing: Bool) -> OverlayState {
+        // 🧪 DEBUG STEP 3: Log adapter logic
+        print("🔍 [Adapter.overlayState] currentPlayerId=\(match.currentPlayerId?.uuidString.prefix(8) ?? "nil")... currentUserId=\(currentUserId.uuidString.prefix(8))...")
+        print("🔍 [Adapter.overlayState] isMyTurn=\(isMyTurn) isSaving=\(isSaving) isRevealing=\(isRevealing)")
+        
+        let result: OverlayState
         if isSaving {
             // Both players see "Saving {player}'s visit" overlay
-            return .saving
+            result = .saving
+        } else if isRevealing {
+            // Both players see reveal window with scored visit
+            result = .revealing
         } else if !isMyTurn {
             // Inactive player sees lockout overlay
-            return .inactiveLockout
+            result = .inactiveLockout
         } else {
             // Active player, no overlay
-            return .none
+            result = .none
         }
+        
+        print("🔍 [Adapter.overlayState] result=\(result)")
+        
+        // VALIDATION: Check for inverted logic
+        if isMyTurn && result == .inactiveLockout {
+            print("⚠️ [Adapter.overlayState] WARNING: isMyTurn=true but result=inactiveLockout - LOGIC INVERTED!")
+        }
+        if !isMyTurn && result == .none {
+            print("⚠️ [Adapter.overlayState] WARNING: isMyTurn=false but result=none - LOGIC INVERTED!")
+        }
+        
+        return result
     }
     
     /// Overlay state enum for UI display
@@ -135,9 +155,19 @@ struct RemoteGameStateAdapter {
         case none              // No overlay (active player, not saving)
         case inactiveLockout   // "Waiting for {opponent}" overlay
         case saving            // "Saving {player}'s visit" overlay (shown to both players)
+        case revealing         // "Scored: X" reveal window (shown to both players for 1-2s)
         
         var isVisible: Bool {
             self != .none
+        }
+        
+        var description: String {
+            switch self {
+            case .none: return "none"
+            case .inactiveLockout: return "inactiveLockout"
+            case .saving: return "saving"
+            case .revealing: return "revealing"
+            }
         }
     }
     

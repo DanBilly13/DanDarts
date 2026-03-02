@@ -114,12 +114,27 @@ serve(async (req) => {
       timestamp: now.toISOString(),
     }
 
-    // Update match with next player and last visit
+    // 🆕 STEP 1A: Update player_scores (server-authoritative)
+    // Get current scores or initialize if null
+    const currentScores = match.player_scores || {}
+    
+    // Update the current player's score
+    currentScores[user.id] = score_after
+    
+    console.log(`📊 [save-visit] Updating player_scores: ${JSON.stringify(currentScores)}`)
+
+    // Calculate new turn_index_in_leg (increment from current value)
+    const newTurnIndex = (match.turn_index_in_leg ?? 0) + 1
+    console.log(`🔢 [save-visit] Incrementing turn_index_in_leg: ${match.turn_index_in_leg ?? 0} → ${newTurnIndex}`)
+
+    // Update match with next player, last visit, player_scores, AND turn_index_in_leg
     const { error: updateError } = await supabaseClient
       .from('matches')
       .update({
         current_player_id: nextPlayerId,
         last_visit_payload: visitPayload,
+        player_scores: currentScores,  // Server-authoritative scores
+        turn_index_in_leg: newTurnIndex,  // Increment turn counter
         updated_at: now.toISOString(),
       })
       .eq('id', match_id)
@@ -135,6 +150,7 @@ serve(async (req) => {
     // TODO: Save to match_throws table for history
 
     console.log(`✅ Visit saved for match: ${match_id}`)
+    console.log(`✅ [save-visit] player_scores written to database: ${JSON.stringify(currentScores)}`)
 
     return new Response(
       JSON.stringify({

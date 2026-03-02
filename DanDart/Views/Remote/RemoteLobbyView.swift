@@ -445,10 +445,15 @@ struct RemoteLobbyView: View {
                 print("✅ [Lobby] All checks passed, navigating to gameplay")
                 SoundManager.shared.playBoxingSound()
                 
+                // Determine challenger and receiver from match IDs
+                let challenger = (finalMatch.challengerId == currentUser.id) ? currentUser : opponent
+                let receiver = (finalMatch.receiverId == currentUser.id) ? currentUser : opponent
+                
                 router.push(.remoteGameplay(
-                    match: finalMatch,
-                    opponent: opponent,
-                    currentUser: currentUser
+                    matchId: finalMatch.id,
+                    challenger: challenger,
+                    receiver: receiver,
+                    currentUserId: currentUser.id
                 ))
             } catch is CancellationError {
                 print("🚫 [Lobby] Task cancelled (CancellationError)")

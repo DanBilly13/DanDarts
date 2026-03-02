@@ -39,6 +39,8 @@ class RemoteGameViewModel: ObservableObject {
     // Remote match state
     @Published var isSaving: Bool = false
     @Published var saveError: String? = nil
+    @Published var isRevealingScore: Bool = false // True during 1-2s reveal window
+    @Published var lastScoredVisit: Int? = nil // Value of last scored visit for reveal
     var remoteMatchId: UUID? // Remote match ID for server RPC
     var remoteMatchService: RemoteMatchService?
     
@@ -49,6 +51,12 @@ class RemoteGameViewModel: ObservableObject {
     /// Inject AuthService from the view
     func setAuthService(_ service: AuthService) {
         self.authService = service
+    }
+    
+    /// Inject RemoteMatchService from the view
+    func setRemoteMatchService(_ service: RemoteMatchService) {
+        self.remoteMatchService = service
+        print("✅ [RemoteGameVM] remoteMatchService injected: \(ObjectIdentifier(service)) / flowMatchId=\(service.flowMatchId?.uuidString.prefix(8) ?? "nil")...")
     }
     
     // Animation state
@@ -187,42 +195,48 @@ class RemoteGameViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(game: Game, players: [Player], matchFormat: Int = 1) {
+    init(game: Game, players: [Player], matchFormat: Int = 1, authService: AuthService? = nil, remoteMatchId: UUID? = nil) {
         self.game = game
-        // Randomize player order for fair play
-        let shuffledPlayers = players.shuffled()
-        self.players = shuffledPlayers
-        self.originalPlayerOrder = shuffledPlayers // Store for color consistency
-        self.matchStartTime = Date()
+        self.players = players
         self.matchFormat = matchFormat
+        self.authService = authService
+        self.remoteMatchId = remoteMatchId
+        self.originalPlayerOrder = players
+        self.matchStartTime = Date()
         
-        // Create match ID for saving
-        self.matchId = UUID()
+        print("🎯 [RemoteGameVM] Init - game: \(game.title), players: \(players.count), format: \(matchFormat)")
+        if let matchId = remoteMatchId {
+            print("✅ [RemoteGameVM] remoteMatchId set: \(matchId.uuidString.prefix(8))...")
+        } else {
+            print("⚠️ [RemoteGameVM] remoteMatchId is NIL (local game)")
+        }
         
         // Determine starting score based on game type
-        if game.title.contains("301") {
+        if game.title == "301" {
             self.startingScore = 301
-        } else if game.title.contains("501") {
+        } else if game.title == "501" {
             self.startingScore = 501
         } else {
-            self.startingScore = 301 // Default
+            self.startingScore = 501 // Default
         }
         
         // Initialize player scores
-        for player in self.players {
+        for player in players {
             playerScores[player.id] = startingScore
-            legsWon[player.id] = 0
         }
         
-        // Log game started event
-        let gameType = game.title.contains("301") ? "301" : "501"
-        let hasGuests = players.contains(where: { $0.userId == nil })
-        analytics.logGameStarted(
-            gameType: gameType,
-            playerCount: players.count,
-            hasGuests: hasGuests,
-            matchFormat: matchFormat
-        )
+        // Initialize legs won for multi-leg matches
+        if matchFormat > 1 {
+            for player in players {
+                legsWon[player.id] = 0
+            }
+        }
+        
+        print("✅ [RemoteGameVM] Initialized - startingScore: \(startingScore)")
+    }
+    
+    deinit {
+        print("🗑️ [RemoteGameVM] Deinit")
     }
     
     // MARK: - Game Actions
@@ -329,12 +343,29 @@ class RemoteGameViewModel: ObservableObject {
         guard !currentThrow.isEmpty else { return }
         guard winner == nil else { return }
         guard let remoteMatchId = remoteMatchId else {
-            print("❌ No remoteMatchId - cannot save visit")
+            print("❌ [RemoteGame] No remoteMatchId - cannot save visit")
             return
         }
         guard let remoteMatchService = remoteMatchService else {
-            print("❌ No remoteMatchService - cannot save visit")
+            print("❌ [RemoteGame] No remoteMatchService - cannot save visit")
             return
+        }
+        
+        // Guard: Check match is still valid (server-authoritative)
+        if let flowMatch = remoteMatchService.flowMatch {
+            // Check if expired
+            if flowMatch.isExpired {
+                print("❌ [RemoteGame] Cannot save - match expired")
+                saveError = "Match expired"
+                return
+            }
+            
+            // Check if still in progress
+            if flowMatch.status != .inProgress {
+                print("❌ [RemoteGame] Cannot save - match not in progress (status: \(flowMatch.status?.rawValue ?? "nil"))")
+                saveError = "Match no longer active"
+                return
+            }
         }
         
         // Calculate scores
@@ -345,6 +376,8 @@ class RemoteGameViewModel: ObservableObject {
         // Convert currentThrow to array of integers for server
         let darts = currentThrow.map { $0.totalValue }
         
+        print("💾 [RemoteGame] saveScore START - matchId: \(remoteMatchId.uuidString.prefix(8))..., player: \(currentPlayer.displayName), darts: \(darts), score: \(currentScore) → \(newScore)")
+        
         // Set saving state immediately to lock both players
         isSaving = true
         saveError = nil
@@ -352,7 +385,7 @@ class RemoteGameViewModel: ObservableObject {
         // Call server RPC
         Task {
             do {
-                print("💾 [RemoteGame] Calling saveVisit RPC...")
+                print("🔄 [RemoteGame] Calling save-visit RPC...")
                 let updatedMatch = try await remoteMatchService.saveVisit(
                     matchId: remoteMatchId,
                     darts: darts,
@@ -361,7 +394,10 @@ class RemoteGameViewModel: ObservableObject {
                 )
                 
                 // Server succeeded - update UI from authoritative server state
-                print("✅ [RemoteGame] Visit saved, updating UI from server state")
+                print("✅ [RemoteGame] RPC success - status: \(updatedMatch.status?.rawValue ?? "nil"), currentPlayerId: \(updatedMatch.currentPlayerId?.uuidString.prefix(8) ?? "nil")...")
+                
+                // Store the scored visit value for reveal window
+                lastScoredVisit = throwTotal
                 
                 // Clear current throw
                 currentThrow.removeAll()
@@ -371,12 +407,59 @@ class RemoteGameViewModel: ObservableObject {
                 // Play sound
                 SoundManager.shared.playCountdownSaveScore()
                 
-                // TODO: Update UI from updatedMatch.lastVisitPayload
-                // TODO: Update currentPlayerIndex based on updatedMatch.currentPlayerId
-                // TODO: Trigger score reveal animation
-                
-                // Clear saving state
+                // Clear saving state and enter reveal window
                 isSaving = false
+                isRevealingScore = true
+                
+                // Show reveal window for 1.5 seconds
+                try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+                
+                // Clear reveal state before rotation
+                isRevealingScore = false
+                lastScoredVisit = nil
+                
+                // Update currentPlayerIndex based on server's currentPlayerId
+                if let newCurrentPlayerId = updatedMatch.currentPlayerId {
+                    // Find the index of the player with this ID
+                    if let newIndex = players.firstIndex(where: { $0.id == newCurrentPlayerId }) {
+                        if newIndex != currentPlayerIndex {
+                            // Player changed - trigger rotation animation
+                            let oldPlayer = players[currentPlayerIndex].displayName
+                            let newPlayer = players[newIndex].displayName
+                            print("🔄 [RemoteGame] Turn rotation: \(oldPlayer) → \(newPlayer) (index \(currentPlayerIndex) → \(newIndex))")
+                            isTransitioningPlayers = true
+                            
+                            // Brief delay for rotation animation
+                            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                            
+                            // Update to new player
+                            currentPlayerIndex = newIndex
+                            print("✅ [RemoteGame] Rotation complete - now player \(newIndex)")
+                            
+                            // Clear transition flag
+                            isTransitioningPlayers = false
+                        } else {
+                            print("ℹ️ [RemoteGame] No rotation needed - same player")
+                        }
+                    }
+                }
+                
+                // Update scores from server state (Task 11)
+                // Extract the score from the last visit payload
+                if let lastVisit = updatedMatch.lastVisitPayload {
+                    // Update the score for the player who just threw
+                    playerScores[lastVisit.playerId] = lastVisit.scoreAfter
+                    print("📊 [RemoteGame] Updated score for player \(lastVisit.playerId): \(lastVisit.scoreAfter)")
+                    
+                    // Check for checkout (score reached 0)
+                    if lastVisit.scoreAfter == 0 {
+                        // Player won!
+                        if let winningPlayer = players.first(where: { $0.id == lastVisit.playerId }) {
+                            winner = winningPlayer
+                            print("🏆 [RemoteGame] Winner detected: \(winningPlayer.displayName)")
+                        }
+                    }
+                }
                 
             } catch {
                 // Server error - keep UI consistent

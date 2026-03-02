@@ -294,6 +294,8 @@ class RemoteMatchService: ObservableObject {
             let remote_status: String?
             let challenger_id: UUID
             let receiver_id: UUID
+            let current_player_id: UUID?
+            let player_scores: [String: Int]?  // 🆕 STEP 1: Server-authoritative scores
             let challenge_expires_at: String?
             let join_window_expires_at: String?
             let created_at: String
@@ -303,14 +305,21 @@ class RemoteMatchService: ObservableObject {
             let debug_counter: Int?
         }
         
-        print("🔍 fetchMatch(matchId=\(matchId.uuidString.prefix(8))...)")
+        print("🔍 [fetchMatch] START - matchId=\(matchId.uuidString.prefix(8))...")
         
+        // Execute query and decode
         let response: [MatchResponse] = try await supabaseService.client
             .from("matches")
             .select()
             .eq("id", value: matchId.uuidString)
             .execute()
             .value
+        
+        // 🧪 DEBUG STEP 1: Log response array
+        print("🧪 [fetchMatch] Response count: \(response.count)")
+        if let first = response.first {
+            print("🧪 [fetchMatch] First match id: \(first.id.uuidString.prefix(8))...")
+        }
         
         guard let matchData = response.first else {
             print("❌ Match not found: \(matchId.uuidString.prefix(8))...")
@@ -319,6 +328,23 @@ class RemoteMatchService: ObservableObject {
         
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        // 🧪 DEBUG STEP 2: Log decoded fields
+        print("🧪 [fetchMatch DECODED] id=\(matchData.id.uuidString.prefix(8))...")
+        print("🧪 [fetchMatch DECODED] status=\(matchData.remote_status ?? "nil")")
+        print("🧪 [fetchMatch DECODED] current_player_id=\(matchData.current_player_id?.uuidString.prefix(8) ?? "nil")...")
+        print("🧪 [fetchMatch DECODED] challenger_id=\(matchData.challenger_id.uuidString.prefix(8))...")
+        print("🧪 [fetchMatch DECODED] receiver_id=\(matchData.receiver_id.uuidString.prefix(8))...")
+        print("🧪 [fetchMatch DECODED] player_scores=\(matchData.player_scores?.description ?? "nil")")
+        
+        // Convert player_scores from [String: Int] to [UUID: Int]
+        var playerScores: [UUID: Int]? = nil
+        if let scoresDict = matchData.player_scores {
+            playerScores = Dictionary(uniqueKeysWithValues: scoresDict.compactMap { key, value in
+                guard let uuid = UUID(uuidString: key) else { return nil }
+                return (uuid, value)
+            })
+        }
         
         let match = RemoteMatch(
             id: matchData.id,
@@ -329,10 +355,11 @@ class RemoteMatchService: ObservableObject {
             challengerId: matchData.challenger_id,
             receiverId: matchData.receiver_id,
             status: RemoteMatchStatus(rawValue: matchData.remote_status ?? ""),
-            currentPlayerId: nil,
+            currentPlayerId: matchData.current_player_id,
             challengeExpiresAt: matchData.challenge_expires_at.flatMap { formatter.date(from: $0) },
             joinWindowExpiresAt: matchData.join_window_expires_at.flatMap { formatter.date(from: $0) },
             lastVisitPayload: nil,
+            playerScores: playerScores,  // 🆕 STEP 1: Server-authoritative scores
             createdAt: formatter.date(from: matchData.created_at) ?? Date(),
             updatedAt: formatter.date(from: matchData.updated_at) ?? Date(),
             endedBy: matchData.ended_by,
@@ -340,7 +367,7 @@ class RemoteMatchService: ObservableObject {
             debugCounter: matchData.debug_counter
         )
         
-        print("✅ fetched status=\(match.status?.rawValue ?? "nil")")
+        print("✅ [fetchMatch] status=\(match.status?.rawValue ?? "nil") currentPlayerId=\(match.currentPlayerId?.uuidString.prefix(8) ?? "nil")...")
         
         // Update flowMatch if this is the flow match (KEY FIX for Lobby UI)
         await MainActor.run {
@@ -949,6 +976,13 @@ class RemoteMatchService: ObservableObject {
             }
             
             print("🚨 [RemoteMatch Realtime] Processing - event is for current user!")
+            
+            // 🧪 DEBUG STEP 5: Log current_player_id from realtime payload
+            if let currentPlayerIdString = record["current_player_id"]?.stringValue {
+                print("🧪 [Realtime UPDATE] current_player_id in payload: \(String(currentPlayerIdString.prefix(8)))...")
+            } else {
+                print("🧪 [Realtime UPDATE] current_player_id is NIL in payload")
+            }
             
             // Extract matchId for targeted updates
             guard let matchIdString = record["id"]?.stringValue,

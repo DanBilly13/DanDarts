@@ -30,7 +30,7 @@ enum Destination: Hashable {
     // Remote games flow
     case remoteGameSetup(game: Game, opponent: User?)
     case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, cancelledMatchIds: Binding<Set<UUID>>, onCancel: () -> Void)
-    case remoteGameplay(match: RemoteMatch, opponent: User, currentUser: User)
+    case remoteGameplay(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID)
     
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?)
@@ -56,8 +56,8 @@ enum Destination: Hashable {
             return g1.id == g2.id && o1?.id == o2?.id
         case (.remoteLobby(let m1, let o1, let c1, _, _), .remoteLobby(let m2, let o2, let c2, _, _)):
             return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
-        case (.remoteGameplay(let m1, let o1, let c1), .remoteGameplay(let m2, let o2, let c2)):
-            return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
+        case (.remoteGameplay(let id1, let ch1, let r1, let u1), .remoteGameplay(let id2, let ch2, let r2, let u2)):
+            return id1 == id2 && ch1.id == ch2.id && r1.id == r2.id && u1 == u2
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
         default:
@@ -109,11 +109,12 @@ enum Destination: Hashable {
             hasher.combine(match.id)
             hasher.combine(opponent.id)
             hasher.combine(currentUser.id)
-        case .remoteGameplay(let match, let opponent, let currentUser):
+        case .remoteGameplay(let matchId, let challenger, let receiver, let currentUserId):
             hasher.combine("remoteGameplay")
-            hasher.combine(match.id)
-            hasher.combine(opponent.id)
-            hasher.combine(currentUser.id)
+            hasher.combine(matchId)
+            hasher.combine(challenger.id)
+            hasher.combine(receiver.id)
+            hasher.combine(currentUserId)
         case .gameEnd:
             hasher.combine("gameEnd")
         }
@@ -236,8 +237,13 @@ class Router: ObservableObject {
         case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
             RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
             
-        case .remoteGameplay(let match, let opponent, let currentUser):
-            RemoteGameplayPlaceholderView(match: match, opponent: opponent, currentUser: currentUser)
+        case .remoteGameplay(let matchId, let challenger, let receiver, let currentUserId):
+            RemoteGameplayView(
+                matchId: matchId,
+                challenger: challenger,
+                receiver: receiver,
+                currentUserId: currentUserId
+            )
             
         case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
             GameEndView(
