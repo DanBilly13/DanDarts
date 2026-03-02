@@ -304,6 +304,7 @@ class RemoteMatchService: ObservableObject {
             let ended_by: UUID?
             let ended_reason: String?
             let debug_counter: Int?
+            let last_visit_payload: LastVisitPayload?  // 🎯 Pre-Turn Reveal: opponent's last 3 darts
         }
         
         print("🔍 [fetchMatch] START - matchId=\(matchId.uuidString.prefix(8))...")
@@ -325,6 +326,14 @@ class RemoteMatchService: ObservableObject {
         guard let matchData = response.first else {
             print("❌ Match not found: \(matchId.uuidString.prefix(8))...")
             return nil
+        }
+        
+        // 🧪 DEBUG STEP 3: Log last_visit_payload decode
+        print("🧪 [fetchMatch DECODED] last_visit_payload=\(matchData.last_visit_payload != nil ? "present" : "nil")")
+        if let lvp = matchData.last_visit_payload {
+            print("🧪 [fetchMatch DECODED] lvp.timestamp=\(lvp.timestamp)")
+            print("🧪 [fetchMatch DECODED] lvp.darts=\(lvp.darts)")
+            print("🧪 [fetchMatch DECODED] lvp.playerId=\(lvp.playerId.uuidString.prefix(8))...")
         }
         
         let formatter = ISO8601DateFormatter()
@@ -360,7 +369,7 @@ class RemoteMatchService: ObservableObject {
             currentPlayerId: matchData.current_player_id,
             challengeExpiresAt: matchData.challenge_expires_at.flatMap { formatter.date(from: $0) },
             joinWindowExpiresAt: matchData.join_window_expires_at.flatMap { formatter.date(from: $0) },
-            lastVisitPayload: nil,
+            lastVisitPayload: matchData.last_visit_payload,  // 🎯 Pre-Turn Reveal: pass through decoded payload
             playerScores: playerScores,  // 🆕 STEP 1: Server-authoritative scores
             turnIndexInLeg: matchData.turn_index_in_leg,  // 🆕 Server-authoritative turn counter
             createdAt: formatter.date(from: matchData.created_at) ?? Date(),
@@ -377,6 +386,10 @@ class RemoteMatchService: ObservableObject {
             if self.flowMatchId == matchId {
                 self.flowMatch = match
                 print("🎯 [Flow] flowMatch updated status=\(match.status?.rawValue ?? "nil")")
+                print("✅ [RTGD-SVC] flowMatch.lastVisitPayload = \(String(describing: self.flowMatch?.lastVisitPayload))")
+                print("✅ [RTGD-SVC] flowMatch.lvp.ts = \(String(describing: self.flowMatch?.lastVisitPayload?.timestamp))")
+                print("✅ [RTGD-SVC] flowMatch.lvp.pid = \(String(describing: self.flowMatch?.lastVisitPayload?.playerId))")
+                print("✅ [RTGD-SVC] flowMatch.lvp.darts = \(String(describing: self.flowMatch?.lastVisitPayload?.darts))")
             }
         }
         
