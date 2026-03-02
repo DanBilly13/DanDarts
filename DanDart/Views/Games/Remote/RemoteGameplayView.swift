@@ -28,6 +28,24 @@ struct RemoteGameplayView: View {
     @State private var isScoreboardExpanded: Bool = false
     @State private var isSaving: Bool = false
     
+    // Pre-turn reveal state (timed 1.2s flash when opponent saves)
+    @State private var preTurnRevealThrow: [ScoredThrow] = []
+    @State private var preTurnRevealIsActive: Bool = false
+    @State private var lastSeenVisitTimestamp: String? = nil
+    
+    // Turn transition gating (freeze UI rotation during reveal)
+    @State private var turnTransitionLocked: Bool = false
+    @State private var displayCurrentPlayerId: UUID? = nil
+    @State private var revealTask: Task<Void, Never>? = nil
+    
+    // UI gate: holds lock overlay through reveal + rotation + padding
+    @State private var turnUIGateActive: Bool = false
+    
+    // Timing constants for turn transition phases
+    private let revealHoldNs: UInt64 = 1_200_000_000         // 1.2s reveal duration
+    private let rotateAnimNs: UInt64 = 350_000_000           // 0.35s card rotation animation
+    private let postRotatePaddingNs: UInt64 = 150_000_000    // 0.15s extra padding after rotation
+    
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var router: Router
@@ -84,9 +102,12 @@ struct RemoteGameplayView: View {
         renderMatch?.currentPlayerId
     }
     
-    /// Current player index for UI: derive from server player ID using adapter's deterministic order
+    /// Current player index for UI: derive from display player ID (frozen during reveal)
     private var renderCurrentPlayerIndex: Int {
-        guard let playerId = serverCurrentPlayerId,
+        // Use displayCurrentPlayerId when transition is locked (during reveal)
+        let effectivePlayerId = turnTransitionLocked ? displayCurrentPlayerId : serverCurrentPlayerId
+        
+        guard let playerId = effectivePlayerId,
               let adapter = adapter else {
             return gameViewModel.currentPlayerIndex // Fallback before first turn
         }
@@ -103,10 +124,183 @@ struct RemoteGameplayView: View {
         print("🧮 [Round] serverTurnIndex=\(serverTurnIndex?.description ?? "nil") renderRound=\(roundNumber)")
         return roundNumber
     }
+    
+    /// Check if it's my turn (server-authoritative with fallback)
+    private var isMyTurn: Bool {
+        (serverCurrentPlayerId ?? liveMatch?.currentPlayerId) == currentUserId
+    }
+    
+    /// Input gate: only enable when it's my turn AND UI gate is OFF AND not saving
+    private var isInputEnabled: Bool {
+        isMyTurn && !turnUIGateActive && !gameViewModel.isSaving
+    }
+    
+    /// CurrentThrowDisplay should show:
+    /// - Opponent's last saved visit for 1.5s (reveal window) - PRIORITY
+    /// - My input when it's my turn
+    /// - Otherwise empty []
+    private var renderThrowForCurrentThrowDisplay: [ScoredThrow] {
+        if preTurnRevealIsActive { return preTurnRevealThrow }
+        if isMyTurn { return gameViewModel.currentThrow }
+        return []
+    }
+    
+    // MARK: - Debug Helpers
+    
+    private func dbg(_ msg: String) {
+        print("🧪 [RTGD] \(msg)")
+    }
+    
+    private func dbgMatchSnapshot(_ label: String) {
+        let m = renderMatch
+        let id = m?.id.uuidString.prefix(8) ?? "nil"
+        let cp = (serverCurrentPlayerId ?? liveMatch?.currentPlayerId)?.uuidString.prefix(8) ?? "nil"
+        let lvp = m?.lastVisitPayload
+        let lvpPid = lvp?.playerId.uuidString.prefix(8) ?? "nil"
+        let lvpTs = lvp?.timestamp ?? "nil"
+        let darts = lvp?.darts ?? []
+        dbg("\(label) match=\(id) cp=\(cp) lvp.pid=\(lvpPid) ts=\(lvpTs) darts=\(darts) isMyTurn=\(isMyTurn) preReveal=\(preTurnRevealIsActive)")
+    }
+    
+    // MARK: - Turn Gate Logic
+    
+    /// Centralized turn gate evaluation - triggers on either serverCurrentPlayerId or lastVisitPayload.timestamp changes
+    @MainActor
+    private func evaluateTurnGate(reason: String) {
+        let serverCP = serverCurrentPlayerId
+        let lvp = renderMatch?.lastVisitPayload
+
+        // If locked, do NOT auto-sync display id here
+        if turnTransitionLocked {
+            print("🎯 [TurnGate] evaluate(\(reason)) skipped: locked")
+            return
+        }
+
+        // If we don't have a payload yet, normal sync
+        guard let lvp else {
+            displayCurrentPlayerId = serverCP
+            print("🎯 [TurnGate] evaluate(\(reason)) no LVP → sync displayCP=\(serverCP?.uuidString.prefix(8) ?? "nil")")
+            return
+        }
+
+        // Ignore own visit
+        guard lvp.playerId != currentUserId else {
+            displayCurrentPlayerId = serverCP
+            print("🎯 [TurnGate] evaluate(\(reason)) own LVP → sync displayCP")
+            return
+        }
+
+        // Only gate when it becomes MY turn
+        guard serverCP == currentUserId else {
+            displayCurrentPlayerId = serverCP
+            print("🎯 [TurnGate] evaluate(\(reason)) not my turn → sync displayCP")
+            return
+        }
+
+        // Avoid re-triggering for same timestamp
+        if lastSeenVisitTimestamp == lvp.timestamp {
+            displayCurrentPlayerId = serverCP
+            print("🎯 [TurnGate] evaluate(\(reason)) same ts → sync displayCP")
+            return
+        }
+
+        // 🔥 GATED TRANSITION
+        print("🎯 [TURN_GATE] TRIGGER(\(reason)): serverCP=\(serverCP?.uuidString.prefix(8) ?? "nil") lvp.pid=\(lvp.playerId.uuidString.prefix(8)) ts=\(lvp.timestamp)")
+        lastSeenVisitTimestamp = lvp.timestamp
+
+        // Cancel existing task and reset all gates for safety
+        revealTask?.cancel()
+        preTurnRevealIsActive = false
+        turnTransitionLocked = false
+        turnUIGateActive = false
+        
+        // Set gates ON
+        turnTransitionLocked = true
+        turnUIGateActive = true
+        print("🎯 [TURN_GATE] LOCK ON")
+        print("🎯 [TurnGate] UI GATE ON (lock overlay held)")
+
+        // Show reveal
+        preTurnRevealThrow = lvp.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
+        preTurnRevealIsActive = true
+        print("🎯 [PreTurnReveal] SHOW darts=\(lvp.darts) ts=\(lvp.timestamp)")
+
+        // Two-phase timing: reveal hold → rotate → unlock after animation
+        revealTask = Task { @MainActor in
+            do {
+                // Phase A: Hold reveal
+                try await Task.sleep(nanoseconds: revealHoldNs)
+                
+                // Rotate card AFTER reveal hold
+                print("🎯 [TurnGate] ROTATE (after reveal hold)")
+                displayCurrentPlayerId = serverCurrentPlayerId
+                
+                // Phase B: Keep overlay locked during rotation animation
+                try await Task.sleep(nanoseconds: rotateAnimNs + postRotatePaddingNs)
+                
+                // Now unlock + clear reveal
+                print("🎯 [TurnGate] UNLOCK UI (after rotate)")
+                preTurnRevealIsActive = false
+                turnTransitionLocked = false
+                turnUIGateActive = false
+                print("🎯 [TurnGate] displayCP=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil") unlocked")
+            } catch {
+                print("🎯 [TURN_GATE] cancelled")
+            }
+        }
+    }
+    
+    /// Server last visit timestamp (observes renderMatch for reactive updates)
+    private var serverLastVisitTimestamp: String? {
+        let ts = renderMatch?.lastVisitPayload?.timestamp
+        // NOTE: don't log here, it may get called *a lot*. We'll log changes via onChange below.
+        return ts
+    }
+    
+    /// Server-authoritative last visit payload (for overlay display)
+    private var serverLastVisitPayload: LastVisitPayload? {
+        renderMatch?.lastVisitPayload
+    }
+    
+    private var serverLastVisitDarts: [Int]? {
+        serverLastVisitPayload?.darts
+    }
+    
+    private var serverLastVisitTotal: Int? {
+        guard let darts = serverLastVisitDarts else { return nil }
+        return darts.reduce(0, +)
+    }
+    
+    /// Throw display for UI (as [ScoredThrow]):
+    /// - If it's NOT my turn (inactiveLockout) OR we are revealing, show the server lastVisit darts.
+    /// - Otherwise show my local in-progress input (gameViewModel.currentThrow).
+    private var renderThrowForCards: [ScoredThrow] {
+        guard let adapter = adapter else { return gameViewModel.currentThrow }
+        
+        let overlay = adapter.overlayState(
+            isSaving: gameViewModel.isSaving,
+            isRevealing: gameViewModel.isRevealingScore
+        )
+        
+        let shouldShowServerThrow = (overlay == .inactiveLockout || overlay == .revealing)
+        
+        if shouldShowServerThrow, let darts = serverLastVisitDarts, darts.count == 3 {
+            // Convert [Int] -> [ScoredThrow] for StackedPlayerCards
+            // Assume single scores from server (baseValue = totalValue, scoreType = .single)
+            return darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
+        }
+        
+        return gameViewModel.currentThrow
+    }
 
     // MARK: - Derived UI State
     private var flowOverlayState: RemoteGameStateAdapter.OverlayState {
         adapter?.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore) ?? .none
+    }
+    
+    private var debugRenderProbe: some View {
+        let _ = dbgMatchSnapshot("RENDER")
+        return EmptyView()
     }
 
     // MARK: - View Extraction (helps the SwiftUI type-checker)
@@ -146,16 +340,7 @@ struct RemoteGameplayView: View {
             VStack(spacing: 0) {
                 topSection
                 Spacer(minLength: 0)
-                bottomSection
-            }
-
-            // Turn lockout overlay (inactive player or saving/revealing state)
-            if overlayState.isVisible {
-                TurnLockoutOverlay(
-                    overlayState: overlayState,
-                    opponentName: adapter.opponent.displayName,
-                    lastVisitValue: overlayState == .revealing ? gameViewModel.lastScoredVisit : adapter.lastVisitValue
-                )
+                bottomSectionWithOverlay(overlayState, adapter: adapter)
             }
 
             // When expanded, swallow taps anywhere in the gameplay area
@@ -192,7 +377,7 @@ struct RemoteGameplayView: View {
                 players: gameViewModel.players,
                 currentPlayerIndex: renderCurrentPlayerIndex,
                 playerScores: renderScores,
-                currentThrow: gameViewModel.currentThrow,
+                currentThrow: renderThrowForCards,
                 legsWon: gameViewModel.legsWon,
                 matchFormat: gameViewModel.matchFormat,
                 showScoreAnimation: gameViewModel.showScoreAnimation,
@@ -211,9 +396,10 @@ struct RemoteGameplayView: View {
 
             // Current throw display (always visible)
             CurrentThrowDisplay(
-                currentThrow: gameViewModel.currentThrow,
-                selectedDartIndex: gameViewModel.selectedDartIndex,
+                currentThrow: renderThrowForCurrentThrowDisplay,
+                selectedDartIndex: isInputEnabled ? gameViewModel.selectedDartIndex : nil,
                 onDartTapped: { index in
+                    guard isInputEnabled else { return }
                     gameViewModel.selectDart(at: index)
                 }
             )
@@ -248,6 +434,7 @@ struct RemoteGameplayView: View {
                 },
                 canDelete: gameViewModel.canDelete
             )
+            .disabled(!isInputEnabled)
             .padding(.horizontal, 16)
 
             // Small breathing room between grid and button (replaces Spacer)
@@ -267,6 +454,7 @@ struct RemoteGameplayView: View {
                     role: gameViewModel.isWinningThrow ? .secondary : .primary,
                     controlSize: .extraLarge,
                     action: {
+                        guard isInputEnabled else { return }
                         // View-local saving flag (remote RPC wiring comes in Phase 4)
                         isSaving = true
                         gameViewModel.saveScore()
@@ -295,6 +483,85 @@ struct RemoteGameplayView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 34)
+        }
+    }
+    
+    @ViewBuilder
+    private func bottomSectionWithOverlay(
+        _ overlayState: RemoteGameStateAdapter.OverlayState,
+        adapter: RemoteGameStateAdapter
+    ) -> some View {
+        ZStack {
+            bottomSection
+                .allowsHitTesting(!overlayState.isVisible)
+
+            if overlayState.isVisible {
+                Color.black.opacity(0.70)
+                    .ignoresSafeArea(.container, edges: .bottom)
+
+                VStack(spacing: 12) {
+                    Image(systemName: overlayIconName(for: overlayState))
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+
+                    Text(bottomOverlayTitle(for: overlayState, adapter: adapter))
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColor.textPrimary)
+                        .multilineTextAlignment(.center)
+
+                    if let subtitle = bottomOverlaySubtitle(for: overlayState, adapter: adapter) {
+                        Text(subtitle)
+                            .font(.body)
+                            .foregroundColor(AppColor.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 28)
+            }
+        }
+    }
+
+    private func overlayIconName(for overlayState: RemoteGameStateAdapter.OverlayState) -> String {
+        switch overlayState {
+        case .none: return ""
+        case .inactiveLockout: return "hourglass"
+        case .saving: return "arrow.up.circle.fill"
+        case .revealing: return "checkmark.circle.fill"
+        }
+    }
+
+    private func bottomOverlayTitle(for overlayState: RemoteGameStateAdapter.OverlayState, adapter: RemoteGameStateAdapter) -> String {
+        switch overlayState {
+        case .none:
+            return ""
+        case .inactiveLockout:
+            return "\(adapter.opponent.displayName) is throwing"
+        case .saving:
+            return "Saving visit..."
+        case .revealing:
+            if let total = serverLastVisitTotal {
+                return "Scored: \(total)"
+            }
+            return "Visit saved"
+        }
+    }
+
+    private func bottomOverlaySubtitle(for overlayState: RemoteGameStateAdapter.OverlayState, adapter: RemoteGameStateAdapter) -> String? {
+        switch overlayState {
+        case .none:
+            return nil
+        case .inactiveLockout:
+            if let total = serverLastVisitTotal {
+                return "Last visit: \(total)"
+            }
+            return "Waiting for opponent"
+        case .saving:
+            return "Please wait"
+        case .revealing:
+            // No subtitle during reveal
+            return nil
         }
     }
     
@@ -369,7 +636,18 @@ struct RemoteGameplayView: View {
     // MARK: - Body Extraction (helps the SwiftUI type-checker)
 
     private func contentWithNavigation(using m: RemoteMatch, adapter: RemoteGameStateAdapter) -> some View {
-        let overlayState = adapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore)
+        let baseOverlayState = adapter.overlayState(
+            isSaving: gameViewModel.isSaving,
+            isRevealing: gameViewModel.isRevealingScore
+        )
+        
+        // 🎯 UI GATE: keep the lock overlay up through reveal + rotate + padding
+        let overlayState: RemoteGameStateAdapter.OverlayState = {
+            if turnUIGateActive {
+                return .inactiveLockout
+            }
+            return baseOverlayState
+        }()
         
         return gameplayContent(overlayState, using: m, adapter: adapter)
             .navigationBarTitleDisplayMode(.inline)
@@ -403,8 +681,15 @@ struct RemoteGameplayView: View {
         Group {
             if let m = liveMatch, let adapter = adapter {
                 contentWithNavigation(using: m, adapter: adapter)
+                    .background(debugRenderProbe)
                     .onAppear {
+                        dbg("onAppear")
+                        dbgMatchSnapshot("APPEAR")
                         print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
+                        
+                        // Initialize displayCurrentPlayerId to current server state
+                        displayCurrentPlayerId = serverCurrentPlayerId
+                        print("🎯 [TurnGate] Initialized displayCurrentPlayerId=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
                         
                         // 🧪 DEBUG STEP 1: Confirm remoteMatchService exists in environment
                         print("🧪 [RemoteGameplay] env remoteMatchService exists, flowMatchId=\(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")..., matchId=\(matchId.uuidString.prefix(8))...")
@@ -424,6 +709,9 @@ struct RemoteGameplayView: View {
                         Task { @MainActor in
                             _ = try? await remoteMatchService.fetchMatch(matchId: matchId)
                         }
+                        
+                        // Evaluate turn gate on appear (in case state already present)
+                        evaluateTurnGate(reason: "onAppear")
                         
                         // 🧪 TRUTH TABLE DEBUG
                         Self.printTruthTable(
@@ -448,6 +736,10 @@ struct RemoteGameplayView: View {
                     }
                     .onDisappear {
                         print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
+                        
+                        // Cancel reveal timer
+                        revealTask?.cancel()
+                        
                         remoteMatchService.exitRemoteFlow()
                     }
                     .onChange(of: serverScores) { oldValue, newValue in
@@ -465,6 +757,25 @@ struct RemoteGameplayView: View {
                                 gameViewModel.currentPlayerIndex = newIndex
                             }
                         }
+                        
+                        // Evaluate turn gate (dual-trigger system)
+                        evaluateTurnGate(reason: "serverCP change")
+                    }
+                    .onChange(of: renderMatch?.lastVisitPayload?.timestamp) { oldValue, newValue in
+                        print("🔄 [Sync] lastVisitPayload.timestamp changed: \(oldValue ?? "nil") → \(newValue ?? "nil")")
+                        evaluateTurnGate(reason: "lvp.ts change")
+                    }
+                    .onChange(of: (serverCurrentPlayerId ?? liveMatch?.currentPlayerId)) { oldId, newId in
+                        dbg("onChange(currentPlayerId) old=\(oldId?.uuidString.prefix(8) ?? "nil") new=\(newId?.uuidString.prefix(8) ?? "nil")")
+                        dbgMatchSnapshot("CP_CHANGE")
+                    }
+                    .onChange(of: preTurnRevealIsActive) { old, new in
+                        dbg("onChange(preTurnRevealIsActive) \(old) -> \(new)")
+                        dbgMatchSnapshot("REVEAL_FLAG_CHANGE")
+                    }
+                    .onChange(of: renderThrowForCurrentThrowDisplay.count) { old, new in
+                        dbg("onChange(renderThrowForCurrentThrowDisplay.count) \(old) -> \(new)")
+                        dbgMatchSnapshot("THROW_COUNT_CHANGE")
                     }
             } else {
                 // Loading state - show progress view until match loads
@@ -661,75 +972,3 @@ extension RemoteGameplayView {
     }
 }
 
-// MARK: - Turn Lockout Overlay Component
-
-struct TurnLockoutOverlay: View {
-    let overlayState: RemoteGameStateAdapter.OverlayState
-    let opponentName: String
-    let lastVisitValue: Int?
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                Image(systemName: iconName)
-                    .font(.system(size: 48, weight: .medium))
-                    .foregroundColor(AppColor.textSecondary)
-                
-                Text(mainMessage)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(AppColor.textPrimary)
-                    .multilineTextAlignment(.center)
-                
-                if let subtitle = subtitleMessage {
-                    Text(subtitle)
-                        .font(.body)
-                        .foregroundColor(AppColor.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(32)
-        }
-        .transition(.opacity)
-        .animation(.easeInOut(duration: 0.2), value: overlayState)
-    }
-    
-    private var iconName: String {
-        switch overlayState {
-        case .none: return ""
-        case .inactiveLockout: return "hourglass"
-        case .saving: return "arrow.up.circle.fill"
-        case .revealing: return "checkmark.circle.fill"
-        }
-    }
-    
-    private var mainMessage: String {
-        switch overlayState {
-        case .none: return ""
-        case .inactiveLockout: return "\(opponentName) is throwing"
-        case .saving: return "Saving visit..."
-        case .revealing:
-            if let lastVisit = lastVisitValue {
-                return "Scored: \(lastVisit)"
-            } else {
-                return "Visit saved"
-            }
-        }
-    }
-    
-    private var subtitleMessage: String? {
-        switch overlayState {
-        case .none: return nil
-        case .inactiveLockout:
-            if let lastVisit = lastVisitValue {
-                return "Last visit: \(lastVisit)"
-            }
-            return "Waiting for opponent"
-        case .saving: return "Please wait"
-        case .revealing: return nil // No subtitle for reveal window
-        }
-    }
-}

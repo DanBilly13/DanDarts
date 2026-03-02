@@ -1008,7 +1008,7 @@ class RemoteMatchService: ObservableObject {
             }
             
             Task { @MainActor in
-                // Safe in flow even if activeMatch is nil (uses flowMatchId)
+                // Fetch updated match state (includes all fields decoded correctly)
                 self?.scheduleFlowMatchFetch(matchId: matchId)
                 
                 // Will no-op if in remote flow
