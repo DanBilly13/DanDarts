@@ -28,10 +28,17 @@ struct RemoteGameplayView: View {
     @State private var isScoreboardExpanded: Bool = false
     @State private var isSaving: Bool = false
     
-    // Pre-turn reveal state (timed 1.2s flash when opponent saves)
+    // Pre-turn reveal state (sequential dart reveal when opponent saves)
     @State private var preTurnRevealThrow: [ScoredThrow] = []
+    @State private var fullOpponentDarts: [ScoredThrow] = [] // Store all darts for sequential reveal
+    @State private var revealedDartCount: Int = 0 // 0-3 for sequential dart appearance
+    @State private var showRevealTotal: Bool = false // Show total as 4th item
     @State private var preTurnRevealIsActive: Bool = false
     @State private var lastSeenVisitTimestamp: String? = nil
+    @State private var showOpponentScoreAnimation: Bool = false // Opponent's score animation
+    
+    // Local score override (for showing current player's score update during animation)
+    @State private var localScoreOverride: [UUID: Int]? = nil // Temporary override during animation
     
     // Turn transition gating (freeze UI rotation during reveal)
     @State private var turnTransitionLocked: Bool = false
@@ -42,7 +49,7 @@ struct RemoteGameplayView: View {
     @State private var turnUIGateActive: Bool = false
     
     // Timing constants for turn transition phases
-    private let revealHoldNs: UInt64 = 1_200_000_000         // 1.2s reveal duration
+    private let revealHoldNs: UInt64 = 1_700_000_000         // 1.7s reveal duration (extended for sequential animation)
     private let rotateAnimNs: UInt64 = 350_000_000           // 0.35s card rotation animation
     private let postRotatePaddingNs: UInt64 = 150_000_000    // 0.15s extra padding after rotation
     
@@ -92,9 +99,9 @@ struct RemoteGameplayView: View {
         renderMatch?.playerScores
     }
     
-    /// Scores for UI: prefer server, fallback to VM
+    /// Scores for UI: prefer local override, then server, then VM
     private var renderScores: [UUID: Int] {
-        serverScores ?? gameViewModel.playerScores
+        localScoreOverride ?? serverScores ?? gameViewModel.playerScores
     }
     
     /// Server-authoritative current player ID
@@ -136,13 +143,40 @@ struct RemoteGameplayView: View {
     }
     
     /// CurrentThrowDisplay should show:
-    /// - Opponent's last saved visit for 1.5s (reveal window) - PRIORITY
+    /// - Opponent's darts sequentially during reveal window - PRIORITY
     /// - My input when it's my turn
     /// - Otherwise empty []
     private var renderThrowForCurrentThrowDisplay: [ScoredThrow] {
-        if preTurnRevealIsActive { return preTurnRevealThrow }
+        if preTurnRevealIsActive {
+            // Show only revealed darts (sequential reveal)
+            return Array(fullOpponentDarts.prefix(revealedDartCount))
+        }
         if isMyTurn { return gameViewModel.currentThrow }
         return []
+    }
+    
+    /// Combined score animation state: current player OR opponent
+    /// In remote matches, we animate either:
+    /// - Current player's score when they save (gameViewModel.showScoreAnimation)
+    /// - Opponent's score during reveal (showOpponentScoreAnimation)
+    private var showAnyScoreAnimation: Bool {
+        gameViewModel.showScoreAnimation || showOpponentScoreAnimation
+    }
+    
+    // MARK: - Local Score Override Methods
+    
+    /// Set local score override for current player during animation
+    private func setLocalScoreOverride(playerId: UUID, score: Int) {
+        var override = serverScores ?? gameViewModel.playerScores
+        override[playerId] = score
+        localScoreOverride = override
+        print("🎬 [LocalOverride] Set score for \(playerId.uuidString.prefix(8)): \(score)")
+    }
+    
+    /// Clear local score override (server scores will take over)
+    private func clearLocalScoreOverride() {
+        localScoreOverride = nil
+        print("🎬 [LocalOverride] Cleared")
     }
     
     // MARK: - Debug Helpers
@@ -213,6 +247,9 @@ struct RemoteGameplayView: View {
         preTurnRevealIsActive = false
         turnTransitionLocked = false
         turnUIGateActive = false
+        revealedDartCount = 0
+        showRevealTotal = false
+        showOpponentScoreAnimation = false
         
         // Set gates ON
         turnTransitionLocked = true
@@ -220,18 +257,52 @@ struct RemoteGameplayView: View {
         print("🎯 [TURN_GATE] LOCK ON")
         print("🎯 [TurnGate] UI GATE ON (lock overlay held)")
 
-        // Show reveal
-        preTurnRevealThrow = lvp.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
+        // Store full opponent darts for sequential reveal
+        fullOpponentDarts = lvp.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
         preTurnRevealIsActive = true
-        print("🎯 [PreTurnReveal] SHOW darts=\(lvp.darts) ts=\(lvp.timestamp)")
+        print("🎯 [PreTurnReveal] START sequential reveal darts=\(lvp.darts) ts=\(lvp.timestamp)")
 
-        // Two-phase timing: reveal hold → rotate → unlock after animation
+        // Sequential reveal with score animation
         revealTask = Task { @MainActor in
             do {
-                // Phase A: Hold reveal
-                try await Task.sleep(nanoseconds: revealHoldNs)
+                // Dart 1 appears immediately with Throw sound
+                SoundManager.shared.playCountdownThud()
+                revealedDartCount = 1
+                print("🎯 [PreTurnReveal] Dart 1")
                 
-                // Rotate card AFTER reveal hold
+                // Dart 2 (0.25s later)
+                try await Task.sleep(nanoseconds: 250_000_000)
+                SoundManager.shared.playCountdownThud()
+                revealedDartCount = 2
+                print("🎯 [PreTurnReveal] Dart 2")
+                
+                // Dart 3 (0.25s later)
+                try await Task.sleep(nanoseconds: 250_000_000)
+                SoundManager.shared.playCountdownThud()
+                revealedDartCount = 3
+                print("🎯 [PreTurnReveal] Dart 3")
+                
+                // Total appears (0.25s later, no sound)
+                try await Task.sleep(nanoseconds: 250_000_000)
+                showRevealTotal = true
+                print("🎯 [PreTurnReveal] Total shown")
+                
+                // Opponent score animation (0.5s later, like hitting save button)
+                try await Task.sleep(nanoseconds: 500_000_000)
+                SoundManager.shared.playCountdownSaveScore()
+                showOpponentScoreAnimation = true
+                print("🎯 [PreTurnReveal] Opponent score animation START")
+                
+                // Clear opponent score animation (0.25s later)
+                try await Task.sleep(nanoseconds: 250_000_000)
+                showOpponentScoreAnimation = false
+                print("🎯 [PreTurnReveal] Opponent score animation END")
+                
+                // Brief pause after score animation (0.35s)
+                try await Task.sleep(nanoseconds: 350_000_000)
+                print("🎯 [PreTurnReveal] Pause complete, ready for rotation")
+                
+                // Rotate card AFTER all animations complete
                 print("🎯 [TurnGate] ROTATE (after reveal hold)")
                 displayCurrentPlayerId = serverCurrentPlayerId
                 
@@ -243,9 +314,15 @@ struct RemoteGameplayView: View {
                 preTurnRevealIsActive = false
                 turnTransitionLocked = false
                 turnUIGateActive = false
+                revealedDartCount = 0
+                showRevealTotal = false
                 print("🎯 [TurnGate] displayCP=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil") unlocked")
             } catch {
                 print("🎯 [TURN_GATE] cancelled")
+                // Clean up on cancellation
+                revealedDartCount = 0
+                showRevealTotal = false
+                showOpponentScoreAnimation = false
             }
         }
     }
@@ -380,7 +457,7 @@ struct RemoteGameplayView: View {
                 currentThrow: renderThrowForCards,
                 legsWon: gameViewModel.legsWon,
                 matchFormat: gameViewModel.matchFormat,
-                showScoreAnimation: gameViewModel.showScoreAnimation,
+                showScoreAnimation: showAnyScoreAnimation,
                 isExpanded: isScoreboardExpanded,
                 onTap: {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -713,6 +790,21 @@ struct RemoteGameplayView: View {
                         // Evaluate turn gate on appear (in case state already present)
                         evaluateTurnGate(reason: "onAppear")
                         
+                        // Listen for score updates during animation
+                        NotificationCenter.default.addObserver(
+                            forName: NSNotification.Name("RemoteMatchScoreUpdated"),
+                            object: nil,
+                            queue: .main
+                        ) { notification in
+                            if let playerId = notification.userInfo?["playerId"] as? UUID,
+                               let score = notification.userInfo?["score"] as? Int {
+                                setLocalScoreOverride(playerId: playerId, score: score)
+                            }
+                        }
+                        
+                        // Note: Override is now cleared when server scores update (onChange)
+                        // instead of on a timer, preventing score revert
+                        
                         // 🧪 TRUTH TABLE DEBUG
                         Self.printTruthTable(
                             matchId: matchId,
@@ -747,6 +839,12 @@ struct RemoteGameplayView: View {
                         if let newScores = newValue {
                             print("🔄 [Sync] Server scores updated, syncing to VM: \(newScores)")
                             gameViewModel.playerScores = newScores
+                            
+                            // Clear local override when server scores arrive (prevents revert)
+                            if localScoreOverride != nil {
+                                print("🎬 [LocalOverride] Cleared by server update")
+                                clearLocalScoreOverride()
+                            }
                         }
                     }
                     .onChange(of: serverCurrentPlayerId) { oldValue, newValue in

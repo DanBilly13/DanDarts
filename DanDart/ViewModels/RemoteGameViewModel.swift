@@ -378,11 +378,41 @@ class RemoteGameViewModel: ObservableObject {
         
         print("💾 [RemoteGame] saveScore START - matchId: \(remoteMatchId.uuidString.prefix(8))..., player: \(currentPlayer.displayName), darts: \(darts), score: \(currentScore) → \(newScore)")
         
+        // 🎵 Play sound and trigger animation IMMEDIATELY (matches local game timing)
+        SoundManager.shared.playCountdownSaveScore()
+        showScoreAnimation = true
+        
         // Set saving state immediately to lock both players
         isSaving = true
         saveError = nil
         
-        // Call server RPC
+        // Start animation timing task (independent of server RPC)
+        Task { @MainActor in
+            // Wait for animation to reach peak (mid-point at 0.125s)
+            try? await Task.sleep(nanoseconds: 125_000_000) // 0.125 seconds
+            
+            // Update score at peak of animation (dramatic reveal!)
+            playerScores[currentPlayer.id] = newScore
+            print("🎬 [RemoteGame] Score updated at animation peak: \(currentScore) → \(newScore)")
+            
+            // Notify view to show updated score (for UI override)
+            NotificationCenter.default.post(
+                name: NSNotification.Name("RemoteMatchScoreUpdated"),
+                object: nil,
+                userInfo: ["playerId": currentPlayer.id, "score": newScore]
+            )
+            
+            // Wait for animation to complete (another 0.125s)
+            try? await Task.sleep(nanoseconds: 125_000_000) // 0.125 seconds
+            showScoreAnimation = false
+            print("🎬 [RemoteGame] Animation complete")
+            
+            // Brief pause after animation (0.2s)
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            print("🎬 [RemoteGame] Pause complete, ready for reveal")
+        }
+        
+        // Call server RPC (parallel to animation)
         Task {
             do {
                 print("🔄 [RemoteGame] Calling save-visit RPC...")
@@ -404,8 +434,9 @@ class RemoteGameViewModel: ObservableObject {
                 selectedDartIndex = nil
                 turnStartedWithCheckout = false
                 
-                // Play sound
-                SoundManager.shared.playCountdownSaveScore()
+                // Wait for animation + pause to complete (0.45s total)
+                // Animation: 0.25s, Pause: 0.2s
+                try? await Task.sleep(nanoseconds: 450_000_000) // 0.45 seconds
                 
                 // Clear saving state and enter reveal window
                 isSaving = false

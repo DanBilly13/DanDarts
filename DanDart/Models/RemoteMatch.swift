@@ -179,7 +179,7 @@ struct LastVisitPayload: Codable {
     let darts: [Int] // Array of dart scores
     let scoreBefore: Int
     let scoreAfter: Int
-    let timestamp: Date
+    let timestamp: String  // Server sends ISO8601 string, not Date
     
     enum CodingKeys: String, CodingKey {
         case playerId = "player_id"
