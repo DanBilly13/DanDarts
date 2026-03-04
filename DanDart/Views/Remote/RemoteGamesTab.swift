@@ -24,9 +24,6 @@ struct RemoteGamesTab: View {
     // For subsequent background refreshes, keep the list mounted to avoid row DISAPPEAR/APPEAR flashes.
     @State private var hasLoadedOnce = false
     
-    // Track last rendered active match to reduce log spam
-    @State private var lastRenderedMatchId: UUID?
-    @State private var lastRenderedMatchStatus: RemoteMatchStatus?
     
     // Frozen list snapshot - prevents reading live @Published during enter flow
     @State private var listFrozen = false
@@ -76,42 +73,6 @@ struct RemoteGamesTab: View {
         .refreshable {
             await loadMatches()
         }
-        .onChange(of: remoteMatchService.activeMatch?.match.id) { oldId, newId in
-            if let newId = newId, oldId != newId {
-                let status = remoteMatchService.activeMatch?.match.status
-                print("🎯 [RENDER] Active Match changed - matchId: \(newId.uuidString.prefix(8))..., status: \(status?.rawValue ?? "nil")")
-                lastRenderedMatchId = newId
-                lastRenderedMatchStatus = status
-            }
-        }
-        .onChange(of: remoteMatchService.activeMatch?.match.status) { oldStatus, newStatus in
-            if let matchId = remoteMatchService.activeMatch?.match.id,
-               oldStatus != newStatus {
-                print("🎯 [RENDER] Active Match status changed - matchId: \(matchId.uuidString.prefix(8))..., status: \(newStatus?.rawValue ?? "nil")")
-                lastRenderedMatchStatus = newStatus
-            }
-        }
-        .onChange(of: pendingForUI.map(\.id)) { oldIds, newIds in
-            if oldIds != newIds {
-                print("📋 [SECTION] Pending IDs: [\(oldIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))] → [\(newIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))]")
-            }
-        }
-        .onChange(of: readyForUI.map(\.id)) { oldIds, newIds in
-            if oldIds != newIds {
-                print("📋 [SECTION] Ready IDs: [\(oldIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))] → [\(newIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))]")
-            }
-        }
-        .onChange(of: sentForUI.map(\.id)) { oldIds, newIds in
-            if oldIds != newIds {
-                print("📋 [SECTION] Sent IDs: [\(oldIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))] → [\(newIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))]")
-            }
-        }
-        .onChange(of: remoteMatchService.processingMatchId) { oldId, newId in
-            print("⚙️ [PROCESSING] processingMatchId: \(oldId?.uuidString.prefix(8) ?? "nil") → \(newId?.uuidString.prefix(8) ?? "nil")")
-        }
-        .onChange(of: remoteMatchService.isLoading) { _, newValue in
-            print("🟣 [LOADING] isLoading → \(newValue) (hasLoadedOnce=\(hasLoadedOnce))")
-        }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) {
                 showError = false
@@ -138,17 +99,6 @@ struct RemoteGamesTab: View {
         .background(AppColor.backgroundPrimary)
     }
     
-    // MARK: - Loading View
-    
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .tint(AppColor.interactivePrimaryBackground)
-            Text("Loading matches...")
-                .font(.system(.subheadline, design: .rounded))
-                .foregroundStyle(AppColor.textSecondary)
-        }
-    }
     
     // MARK: - Match List View
     
@@ -312,7 +262,6 @@ struct RemoteGamesTab: View {
                                     isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
                                     expiresAt: matchWithPlayers.match.challengeExpiresAt,
                                     onAccept: {
-                                        print("🔴 [DEBUG] onAccept closure called from RemoteGamesTab for matchId: \(matchWithPlayers.match.id)")
                                         acceptChallenge(matchId: matchWithPlayers.match.id)
                                     },
                                     onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
@@ -476,22 +425,18 @@ struct RemoteGamesTab: View {
     // MARK: - Button Actions
     
     private func acceptChallenge(matchId: UUID) {
-        print("🔵 [DEBUG] acceptChallenge called with matchId: \(matchId)")
-        print("🔵 [DEBUG] processingMatchId: \(String(describing: remoteMatchService.processingMatchId))")
         
         // Prevent double-accept
         guard remoteMatchService.processingMatchId == nil else {
-            print("❌ [DEBUG] Blocked by processingMatchId guard")
             return
         }
         
         // CRITICAL: Capture opponent data NOW before state changes
         guard let matchWithPlayers = remoteMatchService.pendingChallenges.first(where: { $0.match.id == matchId }) else {
-            print("❌ [DEBUG] Cannot find match in pendingChallenges")
+            print("❌ [RemoteGamesTab] acceptChallenge: match not found in pendingChallenges")
             return
         }
         let opponent = matchWithPlayers.opponent
-        print("✅ [DEBUG] Opponent captured: \(opponent.displayName)")
         
         // FREEZE LIST SNAPSHOT - capture BEFORE any state changes or network calls
         FlowDebug.log("ACCEPT TAP", matchId: matchId)
