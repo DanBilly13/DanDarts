@@ -34,6 +34,27 @@ class RemoteMatchService: ObservableObject {
     @Published private(set) var flowMatch: RemoteMatch? = nil
     private var remoteFlowDepth: Int = 0
     
+    // MARK: - Pending Enter Flow Latch (UI smoothing)
+    
+    @Published private(set) var pendingEnterFlowMatchIds: Set<UUID> = []
+    private var enterFlowClearTasks: [UUID: Task<Void, Never>] = [:]
+    
+    // MARK: - Navigation In-Flight Guard (prevents multi-frame navigation)
+    
+    @Published var navInFlightMatchId: UUID? = nil
+    @Published var navToken: UUID = UUID()
+    
+    // MARK: - Processing State (centralized enter-flow tracking)
+    
+    @Published var processingMatchId: UUID? = nil
+    
+    var isEnteringFlow: Bool { processingMatchId != nil }
+    
+    // MARK: - In-Flight Fetch Guard (prevents duplicate network calls)
+    
+    private var inFlightFetch: Task<RemoteMatch?, Error>?
+    private var inFlightMatchId: UUID?
+    
     // MARK: - Realtime Subscription Tokens
     
     // Retain subscription tokens so callbacks stay alive (critical!)
@@ -97,6 +118,93 @@ class RemoteMatchService: ObservableObject {
         }
     }
     
+    // MARK: - Pending Enter Flow Latch Methods
+    
+    @MainActor
+    func beginPendingEnterFlow(matchId: UUID) {
+        FlowDebug.log("EnterFlowLatch BEGIN", matchId: matchId)
+        
+        pendingEnterFlowMatchIds.insert(matchId)
+        
+        // Cancel any existing auto-clear task
+        enterFlowClearTasks[matchId]?.cancel()
+        
+        // Longer TTL to cover accept + join + fetch + push (10s)
+        enterFlowClearTasks[matchId] = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 10_000_000_000) // 10s
+                FlowDebug.log("EnterFlowLatch AUTO-CLEAR (TTL)", matchId: matchId)
+                pendingEnterFlowMatchIds.remove(matchId)
+                enterFlowClearTasks[matchId] = nil
+            } catch {
+                // cancelled
+            }
+        }
+    }
+    
+    @MainActor
+    func clearPendingEnterFlow(matchId: UUID) {
+        FlowDebug.log("EnterFlowLatch CLEAR", matchId: matchId)
+        pendingEnterFlowMatchIds.remove(matchId)
+        enterFlowClearTasks[matchId]?.cancel()
+        enterFlowClearTasks[matchId] = nil
+    }
+    
+    @MainActor
+    func refreshPendingEnterFlow(matchId: UUID) {
+        FlowDebug.log("EnterFlowLatch REFRESH", matchId: matchId)
+        beginPendingEnterFlow(matchId: matchId)
+    }
+    
+    @MainActor
+    func isPendingEnterFlow(matchId: UUID) -> Bool {
+        pendingEnterFlowMatchIds.contains(matchId)
+    }
+    
+    @MainActor
+    func debugPresentationStatus(_ match: RemoteMatch) -> RemoteMatchStatus {
+        let entering = isPendingEnterFlow(matchId: match.id)
+        let raw = match.status ?? .pending
+        let pres: RemoteMatchStatus = entering ? .pending : raw
+        if entering && raw != .pending {
+            FlowDebug.log("LIST FREEZE active raw=\(raw.rawValue) -> pres=\(pres.rawValue)", matchId: match.id)
+        }
+        return pres
+    }
+    
+    @MainActor
+    func setNavInFlight(_ matchId: UUID) {
+        navInFlightMatchId = matchId
+        navToken = UUID()
+        FlowDebug.log("NAV IN-FLIGHT SET", matchId: matchId)
+    }
+    
+    @MainActor
+    func clearNavInFlight(matchId: UUID) {
+        if navInFlightMatchId == matchId {
+            navInFlightMatchId = nil
+            FlowDebug.log("NAV IN-FLIGHT CLEAR", matchId: matchId)
+        }
+    }
+    
+    @MainActor
+    func beginEnterFlow(matchId: UUID) {
+        FlowDebug.log("BEGIN ENTER FLOW (all state)", matchId: matchId)
+        processingMatchId = matchId
+        beginPendingEnterFlow(matchId: matchId)
+        setNavInFlight(matchId)
+    }
+    
+    @MainActor
+    func endEnterFlow(matchId: UUID) {
+        FlowDebug.log("END ENTER FLOW (clear all)", matchId: matchId)
+        clearPendingEnterFlow(matchId: matchId)
+        clearNavInFlight(matchId: matchId)
+        if processingMatchId == matchId {
+            processingMatchId = nil
+        }
+    }
+    
     // MARK: - Realtime Subscription
     
     private var realtimeChannel: RealtimeChannelV2?
@@ -105,6 +213,14 @@ class RemoteMatchService: ObservableObject {
     
     /// Load all remote matches for the current user
     func loadMatches(userId: UUID) async throws {
+        // CRITICAL: Skip loadMatches while entering flow to prevent list rebuild flash
+        await MainActor.run {
+            if isEnteringFlow {
+                FlowDebug.log("SKIP loadMatches (entering flow)", matchId: processingMatchId!)
+                return
+            }
+        }
+        
         isLoading = true
         defer { isLoading = false }
         
@@ -154,7 +270,10 @@ class RemoteMatchService: ObservableObject {
             )
             
             // Handle optional status
-            guard let status = match.status else { continue }
+            guard let _ = match.status else { continue }
+            
+            // Use presentation status to freeze list grouping during enter flow
+            let status = await MainActor.run { debugPresentationStatus(match) }
             
             switch status {
             case .pending:
@@ -286,6 +405,42 @@ class RemoteMatchService: ObservableObject {
     
     /// Fetch a single match from the database with fresh data
     func fetchMatch(matchId: UUID) async throws -> RemoteMatch? {
+        // If already fetching this exact match, join the in-flight task
+        if let inFlightMatchId = inFlightMatchId,
+           inFlightMatchId == matchId,
+           let inFlightFetch = inFlightFetch {
+            print("🔗 [fetchMatch] JOIN (reused in-flight) match=\(matchId.uuidString.prefix(8))...")
+            return try await inFlightFetch.value
+        }
+        
+        // Create new fetch task
+        let task = Task<RemoteMatch?, Error> {
+            try await _fetchMatchImpl(matchId: matchId)
+        }
+        
+        inFlightFetch = task
+        inFlightMatchId = matchId
+        
+        do {
+            let result = try await task.value
+            // Clear in-flight state on completion
+            if inFlightMatchId == matchId {
+                inFlightFetch = nil
+                inFlightMatchId = nil
+            }
+            return result
+        } catch {
+            // Clear in-flight state on error
+            if inFlightMatchId == matchId {
+                inFlightFetch = nil
+                inFlightMatchId = nil
+            }
+            throw error
+        }
+    }
+    
+    /// Internal implementation of fetchMatch (called by public wrapper)
+    private func _fetchMatchImpl(matchId: UUID) async throws -> RemoteMatch? {
         struct MatchResponse: Decodable {
             let id: UUID
             let match_mode: String
@@ -307,7 +462,7 @@ class RemoteMatchService: ObservableObject {
             let last_visit_payload: LastVisitPayload?  // 🎯 Pre-Turn Reveal: opponent's last 3 darts
         }
         
-        print("🔍 [fetchMatch] START - matchId=\(matchId.uuidString.prefix(8))...")
+        print("🔍 [fetchMatch] START (new request) match=\(matchId.uuidString.prefix(8))...")
         
         // Execute query and decode
         let response: [MatchResponse] = try await supabaseService.client
@@ -384,12 +539,17 @@ class RemoteMatchService: ObservableObject {
         // Update flowMatch if this is the flow match (KEY FIX for Lobby UI)
         await MainActor.run {
             if self.flowMatchId == matchId {
-                self.flowMatch = match
-                print("🎯 [Flow] flowMatch updated status=\(match.status?.rawValue ?? "nil")")
-                print("✅ [RTGD-SVC] flowMatch.lastVisitPayload = \(String(describing: self.flowMatch?.lastVisitPayload))")
-                print("✅ [RTGD-SVC] flowMatch.lvp.ts = \(String(describing: self.flowMatch?.lastVisitPayload?.timestamp))")
-                print("✅ [RTGD-SVC] flowMatch.lvp.pid = \(String(describing: self.flowMatch?.lastVisitPayload?.playerId))")
-                print("✅ [RTGD-SVC] flowMatch.lvp.darts = \(String(describing: self.flowMatch?.lastVisitPayload?.darts))")
+                // Only update if data actually changed (prevents SwiftUI churn)
+                if self.flowMatch != match {
+                    self.flowMatch = match
+                    print("🎯 [Flow] flowMatch updated (changed) status=\(match.status?.rawValue ?? "nil")")
+                    print("✅ [RTGD-SVC] flowMatch.lastVisitPayload = \(String(describing: self.flowMatch?.lastVisitPayload))")
+                    print("✅ [RTGD-SVC] flowMatch.lvp.ts = \(String(describing: self.flowMatch?.lastVisitPayload?.timestamp))")
+                    print("✅ [RTGD-SVC] flowMatch.lvp.pid = \(String(describing: self.flowMatch?.lastVisitPayload?.playerId))")
+                    print("✅ [RTGD-SVC] flowMatch.lvp.darts = \(String(describing: self.flowMatch?.lastVisitPayload?.darts))")
+                } else {
+                    print("⏭️ [Flow] flowMatch unchanged, skipping update")
+                }
             }
         }
         

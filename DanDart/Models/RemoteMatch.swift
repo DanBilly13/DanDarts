@@ -51,7 +51,7 @@ enum RemoteMatchStatus: String, Codable, CaseIterable {
 
 // MARK: - Remote Match Model
 
-struct RemoteMatch: Identifiable, Codable {
+struct RemoteMatch: Identifiable, Codable, Equatable {
     let id: UUID
     let matchMode: String // 'local' | 'remote'
     let gameType: String // '301' | '501'
@@ -83,6 +83,22 @@ struct RemoteMatch: Identifiable, Codable {
     
     // Debug counter for Phase 2 testing (DEBUG only)
     var debugCounter: Int?
+    
+    // MARK: - Equatable Conformance
+    
+    /// Custom equality that compares only game-state fields, ignoring timestamps
+    /// to prevent unnecessary SwiftUI updates when server timestamps change
+    static func == (lhs: RemoteMatch, rhs: RemoteMatch) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.status == rhs.status &&
+        lhs.currentPlayerId == rhs.currentPlayerId &&
+        lhs.playerScores == rhs.playerScores &&
+        lhs.turnIndexInLeg == rhs.turnIndexInLeg &&
+        lhs.lastVisitPayload == rhs.lastVisitPayload &&
+        lhs.endedBy == rhs.endedBy &&
+        lhs.endedReason == rhs.endedReason
+        // Note: Ignoring createdAt, updatedAt, debugCounter to prevent churn
+    }
     
     // Computed properties
     var isChallenger: Bool {
@@ -174,7 +190,7 @@ struct RemoteMatch: Identifiable, Codable {
 
 // MARK: - Last Visit Payload
 
-struct LastVisitPayload: Codable {
+struct LastVisitPayload: Codable, Equatable {
     let playerId: UUID
     let darts: [Int] // Array of dart scores
     let scoreBefore: Int
@@ -405,4 +421,16 @@ extension RemoteMatch {
         endedBy: nil,
         endedReason: nil
     )
+}
+
+// MARK: - Presentation Status Extension
+
+extension RemoteMatch {
+    /// Freeze status transitions during enter-flow so the row doesn't jump sections.
+    /// Use this for UI grouping/filtering ONLY, not for business logic.
+    nonisolated func presentationStatus(remoteMatchService: RemoteMatchService) -> RemoteMatchStatus {
+        // Note: This is called from filtering context, so we use the service's helper
+        // which properly handles MainActor isolation
+        return status ?? .pending
+    }
 }

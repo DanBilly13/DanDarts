@@ -12,7 +12,6 @@ struct SuddenDeathGameplayView: View {
     
     @State private var showInstructions = false
     @State private var showExitConfirmation = false
-    @State private var navigateToGameEnd = false
     @State private var showGameTip: Bool = false
     @State private var currentTip: GameTip? = nil
     
@@ -163,31 +162,23 @@ struct SuddenDeathGameplayView: View {
             viewModel.authService = authService
         }
         .onChange(of: viewModel.isGameOver) { _, isOver in
-            if isOver {
-                navigateToGameEnd = true
+            if isOver, let winner = viewModel.winner {
+                router.push(.gameEnd(
+                    game: game,
+                    winner: winner,
+                    players: viewModel.players,
+                    onPlayAgain: {
+                        viewModel.restartGame()
+                        router.pop()
+                    },
+                    onBackToGames: {
+                        router.popToRoot()
+                    },
+                    matchFormat: nil,
+                    legsWon: nil,
+                    matchId: viewModel.matchId
+                ))
             }
-        }
-        .navigationDestination(isPresented: $navigateToGameEnd) {
-            GameEndView(
-                game: game,
-                winner: viewModel.winner ?? viewModel.players[0],
-                players: viewModel.players,
-                onPlayAgain: {
-                    viewModel.restartGame()
-                    navigateToGameEnd = false
-                },
-                onChangePlayers: {
-                    navigateToGameEnd = false
-                    dismiss()
-                },
-                onBackToGames: {
-                    router.popToRoot()
-                },
-                matchFormat: nil,
-                legsWon: nil,
-                matchId: viewModel.matchId,
-                matchResult: viewModel.savedMatchResult
-            )
         }
     }
     

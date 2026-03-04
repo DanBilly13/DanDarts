@@ -29,6 +29,7 @@ struct MainTabView: View {
     // Single global navigation state
     @Namespace private var gameHeroNamespace
     @StateObject private var router = Router.shared
+    @State private var navigationPath = NavigationPath()
 
     private struct InviteTokenToClaim: Identifiable {
         let id: String
@@ -55,12 +56,12 @@ struct MainTabView: View {
                 .foregroundStyle(AppColor.textPrimary)
                 .lineLimit(1)
                 .fixedSize()
-                .opacity(router.path.isEmpty ? 1 : 0)
-                .animation(nil, value: router.path.isEmpty)
+                .opacity(navigationPath.isEmpty ? 1 : 0)
+                .animation(nil, value: navigationPath.isEmpty)
         }
         .sharedBackgroundVisibility(.hidden)
         
-        if router.path.isEmpty {
+        if navigationPath.isEmpty {
             switch selectedTab {
             case 0:
                 // Games tab
@@ -142,7 +143,7 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        NavigationStack(path: $router.path) {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 TabView(selection: $selectedTab) {
                     // Games Tab
@@ -275,6 +276,28 @@ struct MainTabView: View {
                 .environmentObject(authService)
         }
         .onAppear {
+            // Wire router closures to @State path (coalesced to next runloop)
+            router.pushClosure = { destination in
+                DispatchQueue.main.async {
+                    navigationPath.append(Route(destination))
+                    print("[Router] FLUSHED push - path depth: \(navigationPath.count)")
+                }
+            }
+            router.popClosure = {
+                DispatchQueue.main.async {
+                    if !navigationPath.isEmpty {
+                        navigationPath.removeLast()
+                        print("[Router] FLUSHED pop - path depth: \(navigationPath.count)")
+                    }
+                }
+            }
+            router.popToRootClosure = {
+                DispatchQueue.main.async {
+                    navigationPath = NavigationPath()
+                    print("[Router] FLUSHED popToRoot - path cleared")
+                }
+            }
+            
             configureTabBarAppearance()
             loadPendingRequestCount()
             loadPendingChallengeCount()
@@ -570,8 +593,8 @@ struct MainTabView: View {
                     .background(AppColor.backgroundPrimary)
             }
         
-        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
-            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
+        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel, let onUnfreeze):
+            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, onUnfreeze: onUnfreeze, cancelledMatchIds: cancelledMatchIds)
                 .id("lobby-\(match.id.uuidString)")
                 .background(AppColor.backgroundPrimary)
         

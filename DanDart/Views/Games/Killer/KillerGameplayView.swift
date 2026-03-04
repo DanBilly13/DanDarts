@@ -20,7 +20,6 @@ struct KillerGameplayView: View {
     
     @State private var showInstructions = false
     @State private var showExitConfirmation = false
-    @State private var navigateToGameEnd = false
     @State private var showGameTip: Bool = false
     @State private var currentTip: GameTip? = nil
     
@@ -182,37 +181,28 @@ struct KillerGameplayView: View {
             Text("Your progress will be lost.")
         }
         .onChange(of: viewModel.isGameOver) { _, isOver in
-            if isOver {
-                navigateToGameEnd = true
+            if isOver, let winner = viewModel.winner {
+                router.push(.gameEnd(
+                    game: game,
+                    winner: winner,
+                    players: players,
+                    onPlayAgain: {
+                        router.pop()
+                        router.push(.preGameHype(
+                            game: game,
+                            players: players,
+                            matchFormat: 1,
+                            killerLives: startingLives
+                        ))
+                    },
+                    onBackToGames: {
+                        router.popToRoot()
+                    },
+                    matchFormat: nil,
+                    legsWon: nil,
+                    matchId: viewModel.matchId
+                ))
             }
-        }
-        .navigationDestination(isPresented: $navigateToGameEnd) {
-            GameEndView(
-                game: game,
-                winner: viewModel.winner ?? players[0],
-                players: players,
-                onPlayAgain: {
-                    navigateToGameEnd = false
-                    router.pop()
-                    router.push(.preGameHype(
-                        game: game,
-                        players: players,
-                        matchFormat: 1,
-                        killerLives: startingLives
-                    ))
-                },
-                onChangePlayers: {
-                    navigateToGameEnd = false
-                    dismiss()
-                },
-                onBackToGames: {
-                    router.popToRoot()
-                },
-                matchFormat: nil,
-                legsWon: nil,
-                matchId: viewModel.matchId,
-                matchResult: nil
-            )
         }
     }
     

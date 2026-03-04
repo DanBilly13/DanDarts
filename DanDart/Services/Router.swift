@@ -29,7 +29,7 @@ enum Destination: Hashable {
     
     // Remote games flow
     case remoteGameSetup(game: Game, opponent: User?)
-    case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, cancelledMatchIds: Binding<Set<UUID>>, onCancel: () -> Void)
+    case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, cancelledMatchIds: Binding<Set<UUID>>, onCancel: () -> Void, onUnfreeze: () -> Void)
     case remoteGameplay(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID)
     
     // End game
@@ -54,7 +54,7 @@ enum Destination: Hashable {
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.remoteGameSetup(let g1, let o1), .remoteGameSetup(let g2, let o2)):
             return g1.id == g2.id && o1?.id == o2?.id
-        case (.remoteLobby(let m1, let o1, let c1, _, _), .remoteLobby(let m2, let o2, let c2, _, _)):
+        case (.remoteLobby(let m1, let o1, let c1, _, _, _), .remoteLobby(let m2, let o2, let c2, _, _, _)):
             return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
         case (.remoteGameplay(let id1, let ch1, let r1, let u1), .remoteGameplay(let id2, let ch2, let r2, let u2)):
             return id1 == id2 && ch1.id == ch2.id && r1.id == r2.id && u1 == u2
@@ -104,7 +104,7 @@ enum Destination: Hashable {
             hasher.combine("remoteGameSetup")
             hasher.combine(game.id)
             hasher.combine(opponent?.id)
-        case .remoteLobby(let match, let opponent, let currentUser, _, _):
+        case .remoteLobby(let match, let opponent, let currentUser, _, _, _):
             hasher.combine("remoteLobby")
             hasher.combine(match.id)
             hasher.combine(opponent.id)
@@ -139,62 +139,52 @@ struct Route: Hashable {
 class Router: ObservableObject {
     static let shared = Router()
     
-    @Published var path = NavigationPath()
+    // Closures wired to @State path at NavigationStack root
+    var pushClosure: ((Destination) -> Void)?
+    var popClosure: (() -> Void)?
+    var popToRootClosure: (() -> Void)?
+    
+    // Duplicate-push guard (temporary debug safety)
+    private var lastNavKey: String?
+    private var lastNavTime: CFTimeInterval = 0
     
     private init() {}
     
     // MARK: - Navigation Methods
     
     /// Push a new destination onto the navigation stack
-    func push(_ destination: Destination) {
-        let beforeDepth = path.count
-        path.append(Route(destination))
-        let afterDepth = path.count
-        
+    func push(_ destination: Destination,
+              file: StaticString = #fileID,
+              line: UInt = #line) {
         let destinationType = destinationName(for: destination)
-        print("[Router] push(.\(destinationType)) - path depth: \(beforeDepth) → \(afterDepth)")
+        let navKey = "\(destinationType)"
+        let now = CACurrentMediaTime()
+        
+        // Duplicate-push guard: drop if same destination within 0.1s
+        if let lastKey = lastNavKey, lastKey == navKey, (now - lastNavTime) < 0.1 {
+            print("[Router] DROP duplicate push(.\(destinationType)) @ \(file):\(line) [within \(String(format: "%.3f", now - lastNavTime))s]")
+            return
+        }
+        
+        lastNavKey = navKey
+        lastNavTime = now
+        
+        print("[Router] push(.\(destinationType)) @ \(file):\(line)")
+        pushClosure?(destination)
     }
     
     /// Pop the last destination from the stack
-    func pop() {
-        guard !path.isEmpty else {
-            print("[Router] pop() - path already empty, ignoring")
-            return
-        }
-        let beforeDepth = path.count
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            path.removeLast()
-        }
-        let afterDepth = path.count
-        print("[Router] pop() - path depth: \(beforeDepth) → \(afterDepth)")
-    }
-    
-    /// Pop multiple destinations
-    func pop(count: Int) {
-        let actualCount = min(count, path.count)
-        guard actualCount > 0 else { return }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            path.removeLast(actualCount)
-        }
+    func pop(file: StaticString = #fileID,
+             line: UInt = #line) {
+        print("[Router] pop() @ \(file):\(line)")
+        popClosure?()
     }
     
     /// Pop to root (clear entire stack)
-    func popToRoot() {
-        let beforeDepth = path.count
-        withAnimation {
-            path = NavigationPath()
-        }
-        print("[Router] popToRoot() - cleared \(beforeDepth) destinations")
-    }
-    
-    /// Reset navigation to a specific destination
-    func reset(to destination: Destination) {
-        path = NavigationPath()
-        path.append(Route(destination))
+    func popToRoot(file: StaticString = #fileID,
+                   line: UInt = #line) {
+        print("[Router] popToRoot() @ \(file):\(line)")
+        popToRootClosure?()
     }
     
     // MARK: - View Factory
@@ -234,8 +224,8 @@ class Router: ObservableObject {
         case .remoteGameSetup:
             EmptyView() // Requires selectedTab binding - use view(for:selectedTab:) instead
             
-        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel):
-            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, cancelledMatchIds: cancelledMatchIds)
+        case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel, let onUnfreeze):
+            RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, onUnfreeze: onUnfreeze, cancelledMatchIds: cancelledMatchIds)
             
         case .remoteGameplay(let matchId, let challenger, let receiver, let currentUserId):
             RemoteGameplayView(

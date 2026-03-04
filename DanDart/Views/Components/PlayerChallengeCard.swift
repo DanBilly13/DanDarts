@@ -11,6 +11,9 @@ import SwiftUI
 
 struct PlayerChallengeCard: View {
     
+    @EnvironmentObject var remoteMatchService: RemoteMatchService
+    
+    let matchId: UUID
     let player: Player
     let state: RemoteMatchStatus
     let gameType: String
@@ -22,6 +25,7 @@ struct PlayerChallengeCard: View {
     let onJoin: (() -> Void)?
     
     init(
+        matchId: UUID,
         player: Player,
         state: RemoteMatchStatus,
         gameType: String,
@@ -32,6 +36,7 @@ struct PlayerChallengeCard: View {
         onDecline: (() -> Void)? = nil,
         onJoin: (() -> Void)? = nil
     ) {
+        self.matchId = matchId
         self.player = player
         self.state = state
         self.gameType = gameType
@@ -41,6 +46,25 @@ struct PlayerChallengeCard: View {
         self.onAccept = onAccept
         self.onDecline = onDecline
         self.onJoin = onJoin
+        
+        print("🧩 Card INIT matchId=\(matchId.uuidString.prefix(8)) state=\(state.rawValue) isProcessing=\(isProcessing)")
+    }
+    
+    /// Freeze card status during navigation to prevent jumping
+    /// Checks BOTH latch AND isProcessing to cover the entire "entering flow" window
+    private var displayedStatus: RemoteMatchStatus {
+        // Freeze if either latch is active OR this card is being processed
+        let isEntering = remoteMatchService.isPendingEnterFlow(matchId: matchId) || isProcessing
+        
+        guard isEntering else {
+            return state
+        }
+        
+        // Log when card is frozen
+        FlowDebug.log("CARD OVERRIDE active (entering flow) raw=\(state.rawValue)", matchId: matchId)
+        
+        // Freeze to .lobby during transition (feels like "moving forward")
+        return .lobby
     }
     
     private var gameInfoText: String {
@@ -81,7 +105,7 @@ struct PlayerChallengeCard: View {
             .padding(.horizontal, 0)
             PlayerChallengeCardFoot(
                 player: player,
-                state: state,
+                state: displayedStatus,
                 isProcessing: isProcessing,
                 expiresAt: expiresAt,
                 onAccept: onAccept,
@@ -93,6 +117,12 @@ struct PlayerChallengeCard: View {
         .frame(maxWidth: .infinity)
         .background(AppColor.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .onAppear {
+            print("🧩 Card APPEAR matchId=\(matchId.uuidString.prefix(8)) displayedStatus=\(displayedStatus.rawValue)")
+        }
+        .onDisappear {
+            print("🧩 Card DISAPPEAR matchId=\(matchId.uuidString.prefix(8))")
+        }
     }
 }
 
@@ -339,6 +369,7 @@ struct PlayerChallengeCardFoot: View {
 
 #Preview {
     PlayerChallengeCard(
+        matchId: UUID(),
         player: Player(
             displayName: "Alice Johnson",
             nickname: "alice",
@@ -352,6 +383,7 @@ struct PlayerChallengeCardFoot: View {
         matchFormat: 3,
         expiresAt: Date().addingTimeInterval(300)
     )
+    .environmentObject(RemoteMatchService())
     .padding()
     .background(AppColor.backgroundPrimary)
 }

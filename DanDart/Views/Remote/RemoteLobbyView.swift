@@ -13,6 +13,7 @@ struct RemoteLobbyView: View {
     let opponent: User
     let currentUser: User
     let onCancel: () -> Void
+    let onUnfreeze: () -> Void  // Callback to unfreeze list snapshot
     @Binding var cancelledMatchIds: Set<UUID>
     
     @Environment(\.dismiss) private var dismiss
@@ -32,8 +33,10 @@ struct RemoteLobbyView: View {
     @State private var navigationTask: Task<Void, Never>?
     
     // Manual refresh state
-    @State private var isRefreshing = false
-    @State private var pollingTask: Task<Void, Never>?
+    @State private var isRefreshInProgress = false
+    @State private var isTransitioningToGameplay = false
+    @State private var lastRefreshTime: CFTimeInterval = 0
+    private let minRefreshInterval: CFTimeInterval = 0.5  // 500ms minimum between refreshes
     
     private var timeRemaining: TimeInterval {
         guard let expiresAt = match.joinWindowExpiresAt else { return 0 }
@@ -224,10 +227,10 @@ struct RemoteLobbyView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task {
-                        await refreshMatch()
+                        await requestRefresh(reason: "manual_button")
                     }
                 } label: {
-                    if isRefreshing {
+                    if isRefreshInProgress {
                         ProgressView()
                             .tint(AppColor.interactivePrimaryBackground)
                     } else {
@@ -235,12 +238,19 @@ struct RemoteLobbyView: View {
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                 }
-                .disabled(isRefreshing)
+                .disabled(isRefreshInProgress)
             }
         }
         .onAppear {
             print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
             remoteMatchService.enterRemoteFlow(matchId: match.id, initialMatch: match)
+            
+            // Clear ALL enter-flow state (latch, nav-in-flight, processing)
+            remoteMatchService.endEnterFlow(matchId: match.id)
+            
+            // Unfreeze list snapshot in RemoteGamesTab
+            onUnfreeze()
+            
             isViewActive = true
             
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
@@ -248,10 +258,9 @@ struct RemoteLobbyView: View {
             }
             SoundManager.shared.playBoxingSound()
             
-            // Fetch fresh match state on appear
+            // Fetch fresh match state on appear (single-shot, realtime handles updates)
             Task {
-                await refreshMatch()
-                startPolling()
+                await requestRefresh(reason: "onAppear")
             }
         }
         .onDisappear {
@@ -263,7 +272,6 @@ struct RemoteLobbyView: View {
             Self.matchesLock.unlock()
             isViewActive = false
             navigationTask?.cancel()
-            stopPolling()
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
@@ -371,11 +379,18 @@ struct RemoteLobbyView: View {
         
         // Create cancellable Task for navigation with authoritative checks
         navigationTask = Task { @MainActor in
+            // Set transition gate to prevent competing refreshes
+            isTransitioningToGameplay = true
+            defer { isTransitioningToGameplay = false }
+            
             do {
                 // CRITICAL: Fetch fresh match status from database BEFORE scheduling delay
-                print("🔍 [Lobby] Fetching authoritative match status before scheduling navigation...")
-                guard let freshMatch = try await remoteMatchService.fetchMatch(matchId: match.id) else {
-                    print("🚫 [Lobby] Match not found")
+                print("🔍 [Lobby] Authoritative check 1...")
+                await requestRefresh(reason: "authoritative_check_1")
+                
+                // Check flowMatch status (updated by requestRefresh)
+                guard let flowMatch = remoteMatchService.flowMatch else {
+                    print("🚫 [Lobby] flowMatch not available")
                     await MainActor.run {
                         abortAndNavigateBack()
                     }
@@ -383,8 +398,8 @@ struct RemoteLobbyView: View {
                 }
                 
                 // Guard: Check authoritative status is inProgress
-                guard freshMatch.status == .inProgress else {
-                    print("🚫 [Lobby] Status not inProgress: \(freshMatch.status?.rawValue ?? "nil")")
+                guard flowMatch.status == .inProgress else {
+                    print("🚫 [Lobby] Status not inProgress: \(flowMatch.status?.rawValue ?? "nil")")
                     await MainActor.run {
                         abortAndNavigateBack()
                     }
@@ -415,9 +430,16 @@ struct RemoteLobbyView: View {
                 }
                 
                 // SECOND authoritative check - verify status still inProgress
-                print("🔍 [Lobby] Authoritative check 2: Re-fetching match...")
-                guard let finalMatch = try await remoteMatchService.fetchMatch(matchId: match.id) else {
-                    print("🚫 [Lobby] Match not found after countdown")
+                print("🔍 [Lobby] Authoritative check 2...")
+                
+                // Small delay to allow realtime update propagation
+                try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms
+                
+                await requestRefresh(reason: "authoritative_check_2")
+                
+                // Check flowMatch status again
+                guard let finalMatch = remoteMatchService.flowMatch else {
+                    print("🚫 [Lobby] flowMatch not available after check 2")
                     await MainActor.run {
                         abortAndNavigateBack()
                     }
@@ -512,42 +534,43 @@ struct RemoteLobbyView: View {
         }
     }
     
-    // MARK: - Manual Refresh
+    // MARK: - Centralized Refresh
     
-    private func refreshMatch() async {
-        guard !isRefreshing else { return }
+    /// Single entry point for all refresh requests - prevents competing fetches
+    private func requestRefresh(reason: String) async {
+        // Gate 1: Don't refresh if transitioning to gameplay
+        guard !isTransitioningToGameplay else {
+            print("⏭️ [Lobby] SKIP refresh (\(reason)) - transitioning to gameplay")
+            return
+        }
         
-        isRefreshing = true
-        defer { isRefreshing = false }
+        // Gate 2: Don't refresh if already in progress
+        guard !isRefreshInProgress else {
+            print("⏭️ [Lobby] SKIP refresh (\(reason)) - already in progress")
+            return
+        }
         
-        print("🔄 [Lobby] Manual refresh - matchId: \(match.id.uuidString.prefix(8))...")
+        // Gate 3: Throttle - skip if called too soon after last refresh
+        let now = CACurrentMediaTime()
+        if (now - lastRefreshTime) < minRefreshInterval {
+            print("⏭️ [Lobby] SKIP refresh (\(reason)) - throttled [\(String(format: "%.3f", now - lastRefreshTime))s ago]")
+            return
+        }
+        
+        lastRefreshTime = now
+        isRefreshInProgress = true
+        defer { isRefreshInProgress = false }
+        
+        print("🔄 [Lobby] requestRefresh(\(reason)) - matchId: \(match.id.uuidString.prefix(8))...")
         
         do {
             _ = try await remoteMatchService.fetchMatch(matchId: match.id)
-            print("✅ [Lobby] Refresh complete")
+            print("✅ [Lobby] Refresh complete (\(reason))")
         } catch {
-            print("❌ [Lobby] Refresh failed: \(error)")
+            print("❌ [Lobby] Refresh failed (\(reason)): \(error)")
         }
     }
     
-    private func startPolling() {
-        pollingTask?.cancel()
-        
-        pollingTask = Task {
-            while !Task.isCancelled && isViewActive {
-                try? await Task.sleep(for: .seconds(3))
-                
-                if !Task.isCancelled && isViewActive {
-                    await refreshMatch()
-                }
-            }
-        }
-    }
-    
-    private func stopPolling() {
-        pollingTask?.cancel()
-        pollingTask = nil
-    }
 }
 
 // MARK: - Preview
@@ -562,6 +585,7 @@ struct RemoteLobbyView: View {
                 opponent: User.mockUsers[0],
                 currentUser: User.mockUsers[1],
                 onCancel: {},
+                onUnfreeze: {},
                 cancelledMatchIds: $cancelledMatchIds
             )
         }

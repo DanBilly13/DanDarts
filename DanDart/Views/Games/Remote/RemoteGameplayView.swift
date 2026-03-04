@@ -21,7 +21,6 @@ struct RemoteGameplayView: View {
     @State private var showRestartAlert: Bool = false
     @State private var showExitAlert: Bool = false
     @State private var showUndoConfirmation: Bool = false
-    @State private var navigateToGameEnd: Bool = false
     @State private var showLegWinCelebration: Bool = false
     @State private var showGameTip: Bool = false
     @State private var currentTip: GameTip? = nil
@@ -918,9 +917,29 @@ struct RemoteGameplayView: View {
                 }
             }
             .onChange(of: gameViewModel.winner) { _, newValue in
-                if newValue != nil {
+                if let winner = newValue, let m = liveMatch {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        navigateToGameEnd = true
+                        let tempGame = Game(
+                            title: m.gameName,
+                            subtitle: "Remote Match",
+                            players: "2 Players",
+                            instructions: ""
+                        )
+                        router.push(.gameEnd(
+                            game: tempGame,
+                            winner: winner,
+                            players: gameViewModel.players,
+                            onPlayAgain: {
+                                gameViewModel.restartGame()
+                                router.pop()
+                            },
+                            onBackToGames: {
+                                router.popToRoot()
+                            },
+                            matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
+                            legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
+                            matchId: gameViewModel.matchId
+                        ))
                     }
                 }
             }
@@ -936,48 +955,8 @@ struct RemoteGameplayView: View {
                     Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
                 }
             }
-            .navigationDestination(isPresented: $navigateToGameEnd) {
-                gameEndDestinationView
-            }
     }
 
-    private var gameEndDestinationView: some View {
-        Group {
-            if let winner = gameViewModel.winner, let m = liveMatch {
-                let tempGame = Game(
-                    title: m.gameName,
-                    subtitle: "Remote Match",
-                    players: "2 Players",
-                    instructions: ""
-                )
-                GameEndView(
-                    game: tempGame,
-                    winner: winner,
-                    players: gameViewModel.players,
-                    onPlayAgain: {
-                        // Reset game with same players
-                        gameViewModel.restartGame()
-                        navigateToGameEnd = false
-                    },
-                    onChangePlayers: {
-                        // Navigate back to game setup
-                        navigateToGameEnd = false
-                        dismiss()
-                    },
-                    onBackToGames: {
-                        // Navigate back to games list
-                        router.popToRoot()
-                    },
-                    matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
-                    legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                    matchId: gameViewModel.matchId,
-                    matchResult: gameViewModel.savedMatchResult
-                )
-            } else {
-                EmptyView()
-            }
-        }
-    }
 
     // MARK: - Truth Table Debug Helper
     

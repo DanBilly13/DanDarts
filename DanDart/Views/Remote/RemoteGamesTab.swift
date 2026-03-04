@@ -14,36 +14,63 @@ struct RemoteGamesTab: View {
     
     @Binding var showGameSelection: Bool
     
-    @State private var processingMatchId: UUID?
     @State private var errorMessage: String?
     @State private var showError = false
-    @State private var currentTime = Date()
     @State private var expiredMatchIds: Set<UUID> = []
     @State private var fadingMatchIds: Set<UUID> = []
     @State private var cancelledMatchIds: Set<UUID> = []
+
+    // Only show the full-screen loading view on the very first load.
+    // For subsequent background refreshes, keep the list mounted to avoid row DISAPPEAR/APPEAR flashes.
+    @State private var hasLoadedOnce = false
     
     // Track last rendered active match to reduce log spam
     @State private var lastRenderedMatchId: UUID?
     @State private var lastRenderedMatchStatus: RemoteMatchStatus?
     
+    // Frozen list snapshot - prevents reading live @Published during enter flow
+    @State private var listFrozen = false
+    @State private var frozenPending: [RemoteMatchWithPlayers] = []
+    @State private var frozenReady: [RemoteMatchWithPlayers] = []
+    @State private var frozenSent: [RemoteMatchWithPlayers] = []
+    
     var body: some View {
         ZStack {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
-            
-            if remoteMatchService.isLoading {
+
+            // IMPORTANT: avoid swapping the entire list subtree in/out on background refreshes.
+            // Swapping causes SwiftUI to tear down rows (DISAPPEAR) and reinsert them (APPEAR), which looks like a flash.
+            if remoteMatchService.isLoading && !hasLoadedOnce {
                 loadingView
             } else if hasAnyMatches {
                 matchListView
+                    .overlay {
+                        if remoteMatchService.isLoading {
+                            // Non-destructive loading indicator for background refreshes.
+                            ProgressView()
+                                .tint(AppColor.interactivePrimaryBackground)
+                                .padding(12)
+                                .background(AppColor.backgroundPrimary.opacity(0.9))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                    }
             } else {
                 emptyStateView
+                    .overlay {
+                        if remoteMatchService.isLoading {
+                            ProgressView()
+                                .tint(AppColor.interactivePrimaryBackground)
+                        }
+                    }
             }
         }
         .task {
             // Load matches when tab appears
             // Note: Realtime subscription is now set up in MainTabView on app launch
             await loadMatches()
-            
+            await MainActor.run { hasLoadedOnce = true }
+
             // Clean up cancelled IDs for matches that no longer exist
             let allMatchIds = Set(
                 remoteMatchService.pendingChallenges.map { $0.match.id } +
@@ -55,6 +82,7 @@ struct RemoteGamesTab: View {
         }
         .refreshable {
             await loadMatches()
+            await MainActor.run { hasLoadedOnce = true }
         }
         .onChange(of: remoteMatchService.activeMatch?.match.id) { oldId, newId in
             if let newId = newId, oldId != newId {
@@ -71,8 +99,26 @@ struct RemoteGamesTab: View {
                 lastRenderedMatchStatus = newStatus
             }
         }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
-            currentTime = time
+        .onChange(of: pendingForUI.map(\.id)) { oldIds, newIds in
+            if oldIds != newIds {
+                print("📋 [SECTION] Pending IDs: [\(oldIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))] → [\(newIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))]")
+            }
+        }
+        .onChange(of: readyForUI.map(\.id)) { oldIds, newIds in
+            if oldIds != newIds {
+                print("📋 [SECTION] Ready IDs: [\(oldIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))] → [\(newIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))]")
+            }
+        }
+        .onChange(of: sentForUI.map(\.id)) { oldIds, newIds in
+            if oldIds != newIds {
+                print("📋 [SECTION] Sent IDs: [\(oldIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))] → [\(newIds.map { $0.uuidString.prefix(8) }.joined(separator: ", "))]")
+            }
+        }
+        .onChange(of: remoteMatchService.processingMatchId) { oldId, newId in
+            print("⚙️ [PROCESSING] processingMatchId: \(oldId?.uuidString.prefix(8) ?? "nil") → \(newId?.uuidString.prefix(8) ?? "nil")")
+        }
+        .onChange(of: remoteMatchService.isLoading) { _, newValue in
+            print("🟣 [LOADING] isLoading → \(newValue) (hasLoadedOnce=\(hasLoadedOnce))")
         }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) {
@@ -114,45 +160,133 @@ struct RemoteGamesTab: View {
     
     // MARK: - Match List View
     
+    // CRITICAL: Render from frozen snapshot while entering flow to prevent reading live @Published
+    private var pendingForUI: [RemoteMatchWithPlayers] {
+        listFrozen ? frozenPending : remoteMatchService.pendingChallenges
+    }
+    
+    private var readyForUI: [RemoteMatchWithPlayers] {
+        listFrozen ? frozenReady : remoteMatchService.readyMatches
+    }
+    
+    private var sentForUI: [RemoteMatchWithPlayers] {
+        listFrozen ? frozenSent : remoteMatchService.sentChallenges
+    }
+    
+    // STABLE arrays: Prevent section migration during processing
+    // While processingMatchId is set, keep the match in its original section
+    private var readyForUIStable: [RemoteMatchWithPlayers] {
+        guard let processingId = remoteMatchService.processingMatchId else {
+            return readyForUI
+        }
+        // Exclude processing match from ready section
+        return readyForUI.filter { $0.match.id != processingId }
+    }
+    
+    private var pendingForUIStable: [RemoteMatchWithPlayers] {
+        guard let processingId = remoteMatchService.processingMatchId else {
+            return pendingForUI
+        }
+        
+        // If processing match is already in pending, keep it there
+        if pendingForUI.contains(where: { $0.match.id == processingId }) {
+            return pendingForUI
+        }
+        
+        // If processing match moved to ready, add it back to pending for display
+        if let processingMatch = readyForUI.first(where: { $0.match.id == processingId }) {
+            var stable = pendingForUI
+            stable.append(processingMatch)
+            return stable
+        }
+        
+        // If processing match moved to sent, add it back to pending for display
+        if let processingMatch = sentForUI.first(where: { $0.match.id == processingId }) {
+            var stable = pendingForUI
+            stable.append(processingMatch)
+            return stable
+        }
+        
+        return pendingForUI
+    }
+    
+    private var sentForUIStable: [RemoteMatchWithPlayers] {
+        guard let processingId = remoteMatchService.processingMatchId else {
+            return sentForUI
+        }
+        // Exclude processing match from sent section
+        return sentForUI.filter { $0.match.id != processingId }
+    }
+    
+    // Freeze/unfreeze methods
+    @MainActor
+    private func freezeListSnapshot() {
+        guard !listFrozen else { return }
+        // Capture ONCE from the service
+        frozenPending = remoteMatchService.pendingChallenges
+        frozenReady = remoteMatchService.readyMatches
+        frozenSent = remoteMatchService.sentChallenges
+        listFrozen = true
+        print("🧊 [ListFreeze] Snapshot captured - pending: \(frozenPending.count), ready: \(frozenReady.count), sent: \(frozenSent.count)")
+    }
+    
+    @MainActor
+    private func unfreezeListSnapshot() {
+        listFrozen = false
+        frozenPending = []
+        frozenReady = []
+        frozenSent = []
+        print("🧊 [ListFreeze] Snapshot cleared - list unfrozen")
+    }
+
+    // Delay unfreeze to avoid list/section churn during navigation push animations
+    @MainActor
+    private func unfreezeListSnapshotAfterTransition() {
+        Task { @MainActor in
+            // One or two frames is often enough, but use a small delay to cover push animations
+            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s
+            unfreezeListSnapshot()
+        }
+    }
+    
     private var matchListView: some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Ready matches
-                if !remoteMatchService.readyMatches.isEmpty {
+                if !readyForUIStable.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Ready to join", systemImage: "checkmark.circle.fill", color: .green)
                         
-                        ForEach(remoteMatchService.readyMatches.filter { 
-                            !expiredMatchIds.contains($0.id) && 
-                            $0.id != remoteMatchService.activeMatch?.id 
-                        }) { matchWithPlayers in
-                            let _ = currentTime // Force re-evaluation when currentTime changes
+                        ForEach(readyForUIStable) { matchWithPlayers in
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            
-                            PlayerChallengeCard(
-                                player: Player(
-                                    displayName: matchWithPlayers.opponent.displayName,
-                                    nickname: matchWithPlayers.opponent.nickname,
-                                    avatarURL: matchWithPlayers.opponent.avatarURL,
-                                    isGuest: false,
-                                    totalWins: matchWithPlayers.opponent.totalWins,
-                                    totalLosses: matchWithPlayers.opponent.totalLosses,
-                                    userId: matchWithPlayers.opponent.id
-                                ),
-                                state: isExpired ? .expired : .ready,
-                                gameType: matchWithPlayers.match.gameType,
-                                matchFormat: matchWithPlayers.match.matchFormat,
-                                isProcessing: processingMatchId == matchWithPlayers.match.id,
-                                expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
-                                onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
-                                onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
-                            )
-                            .opacity(isFading ? 0 : 1)
-                            .animation(.easeOut(duration: 0.5), value: isFading)
-                            .onChange(of: isExpired) { _, newValue in
-                                if newValue {
-                                    handleExpiration(matchId: matchWithPlayers.id)
+                            if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                               matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                                PlayerChallengeCard(
+                                    matchId: matchWithPlayers.match.id,
+                                    player: Player(
+                                        displayName: matchWithPlayers.opponent.displayName,
+                                        nickname: matchWithPlayers.opponent.nickname,
+                                        avatarURL: matchWithPlayers.opponent.avatarURL,
+                                        isGuest: false,
+                                        totalWins: matchWithPlayers.opponent.totalWins,
+                                        totalLosses: matchWithPlayers.opponent.totalLosses,
+                                        userId: matchWithPlayers.opponent.id
+                                    ),
+                                    state: isExpired ? .expired : .ready,
+                                    gameType: matchWithPlayers.match.gameType,
+                                    matchFormat: matchWithPlayers.match.matchFormat,
+                                    isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                    expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
+                                    onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
+                                    onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
+                                )
+                                .opacity(isFading ? 0 : 1)
+                                .animation(.easeOut(duration: 0.5), value: isFading)
+                                .onChange(of: isExpired) { _, newValue in
+                                    if newValue {
+                                        handleExpiration(matchId: matchWithPlayers.id)
+                                    }
                                 }
                             }
                         }
@@ -160,101 +294,100 @@ struct RemoteGamesTab: View {
                 }
                 
                 // Received challenges (dimmed when match ready)
-                if !remoteMatchService.pendingChallenges.isEmpty {
+                if !pendingForUIStable.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
                         
-                        ForEach(remoteMatchService.pendingChallenges.filter { 
-                            !expiredMatchIds.contains($0.id) && 
-                            $0.id != remoteMatchService.activeMatch?.id 
-                        }) { matchWithPlayers in
-                            let _ = currentTime // Force re-evaluation when currentTime changes
+                        ForEach(pendingForUIStable) { matchWithPlayers in
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            
-                            PlayerChallengeCard(
-                                player: Player(
-                                    displayName: matchWithPlayers.opponent.displayName,
-                                    nickname: matchWithPlayers.opponent.nickname,
-                                    avatarURL: matchWithPlayers.opponent.avatarURL,
-                                    isGuest: false,
-                                    totalWins: matchWithPlayers.opponent.totalWins,
-                                    totalLosses: matchWithPlayers.opponent.totalLosses,
-                                    userId: matchWithPlayers.opponent.id
-                                ),
-                                state: isExpired ? .expired : .pending,
-                                gameType: matchWithPlayers.match.gameType,
-                                matchFormat: matchWithPlayers.match.matchFormat,
-                                isProcessing: processingMatchId == matchWithPlayers.match.id,
-                                expiresAt: matchWithPlayers.match.challengeExpiresAt,
-                                onAccept: {
-                                    print("🔴 [DEBUG] onAccept closure called from RemoteGamesTab for matchId: \(matchWithPlayers.match.id)")
-                                    acceptChallenge(matchId: matchWithPlayers.match.id)
-                                },
-                                onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
-                            )
-                            .opacity(isFading ? 0 : 1)
-                            .animation(.easeOut(duration: 0.5), value: isFading)
-                            .onChange(of: isExpired) { _, newValue in
-                                if newValue {
-                                    handleExpiration(matchId: matchWithPlayers.id)
+                            if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                               matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                                PlayerChallengeCard(
+                                    matchId: matchWithPlayers.match.id,
+                                    player: Player(
+                                        displayName: matchWithPlayers.opponent.displayName,
+                                        nickname: matchWithPlayers.opponent.nickname,
+                                        avatarURL: matchWithPlayers.opponent.avatarURL,
+                                        isGuest: false,
+                                        totalWins: matchWithPlayers.opponent.totalWins,
+                                        totalLosses: matchWithPlayers.opponent.totalLosses,
+                                        userId: matchWithPlayers.opponent.id
+                                    ),
+                                    state: isExpired ? .expired : .pending,
+                                    gameType: matchWithPlayers.match.gameType,
+                                    matchFormat: matchWithPlayers.match.matchFormat,
+                                    isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                    expiresAt: matchWithPlayers.match.challengeExpiresAt,
+                                    onAccept: {
+                                        print("🔴 [DEBUG] onAccept closure called from RemoteGamesTab for matchId: \(matchWithPlayers.match.id)")
+                                        acceptChallenge(matchId: matchWithPlayers.match.id)
+                                    },
+                                    onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
+                                )
+                                .opacity(isFading ? 0 : 1)
+                                .animation(.easeOut(duration: 0.5), value: isFading)
+                                .onChange(of: isExpired) { _, newValue in
+                                    if newValue {
+                                        handleExpiration(matchId: matchWithPlayers.id)
+                                    }
                                 }
                             }
                         }
                     }
-                    .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
+                    .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
                 }
                 
                 // Sent challenges (dimmed when match ready)
-                if !remoteMatchService.sentChallenges.isEmpty {
+                if !sentForUIStable.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
                         
-                        ForEach(remoteMatchService.sentChallenges.filter { 
-                            !expiredMatchIds.contains($0.id) && 
-                            $0.id != remoteMatchService.activeMatch?.id 
-                        }) { matchWithPlayers in
-                            let _ = currentTime // Force re-evaluation when currentTime changes
+                        ForEach(sentForUIStable) { matchWithPlayers in
                             let isExpired = matchWithPlayers.isExpired
                             let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            
-                            PlayerChallengeCard(
-                                player: Player(
-                                    displayName: matchWithPlayers.opponent.displayName,
-                                    nickname: matchWithPlayers.opponent.nickname,
-                                    avatarURL: matchWithPlayers.opponent.avatarURL,
-                                    isGuest: false,
-                                    totalWins: matchWithPlayers.opponent.totalWins,
-                                    totalLosses: matchWithPlayers.opponent.totalLosses,
-                                    userId: matchWithPlayers.opponent.id
-                                ),
-                                state: isExpired ? .expired : .sent,
-                                gameType: matchWithPlayers.match.gameType,
-                                matchFormat: matchWithPlayers.match.matchFormat,
-                                isProcessing: processingMatchId == matchWithPlayers.match.id,
-                                expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
-                                onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
-                            )
-                            .opacity(isFading ? 0 : 1)
-                            .animation(.easeOut(duration: 0.5), value: isFading)
-                            .onChange(of: isExpired) { _, newValue in
-                                if newValue {
-                                    handleExpiration(matchId: matchWithPlayers.id)
+                            if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                               matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                                PlayerChallengeCard(
+                                    matchId: matchWithPlayers.match.id,
+                                    player: Player(
+                                        displayName: matchWithPlayers.opponent.displayName,
+                                        nickname: matchWithPlayers.opponent.nickname,
+                                        avatarURL: matchWithPlayers.opponent.avatarURL,
+                                        isGuest: false,
+                                        totalWins: matchWithPlayers.opponent.totalWins,
+                                        totalLosses: matchWithPlayers.opponent.totalLosses,
+                                        userId: matchWithPlayers.opponent.id
+                                    ),
+                                    state: isExpired ? .expired : .sent,
+                                    gameType: matchWithPlayers.match.gameType,
+                                    matchFormat: matchWithPlayers.match.matchFormat,
+                                    isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                    expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
+                                    onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
+                                )
+                                .opacity(isFading ? 0 : 1)
+                                .animation(.easeOut(duration: 0.5), value: isFading)
+                                .onChange(of: isExpired) { _, newValue in
+                                    if newValue {
+                                        handleExpiration(matchId: matchWithPlayers.id)
+                                    }
                                 }
                             }
                         }
                     }
-                    .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
+                    .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
                 }
                 
                 // Active match (in progress, dimmed when match ready)
                 if let activeMatch = remoteMatchService.activeMatch,
-                   processingMatchId == nil,
+                   remoteMatchService.processingMatchId == nil,
                    !cancelledMatchIds.contains(activeMatch.match.id) {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
                         
                         PlayerChallengeCard(
+                            matchId: activeMatch.match.id,
                             player: Player(
                                 displayName: activeMatch.opponent.displayName,
                                 nickname: activeMatch.opponent.nickname,
@@ -270,12 +403,18 @@ struct RemoteGamesTab: View {
                             expiresAt: nil
                         )
                     }
-                    .opacity(remoteMatchService.readyMatches.isEmpty ? 1.0 : 0.5)
+                    .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 24)
+        }
+        .transaction { tx in
+            // Disable animations during enter flow to prevent jarring section movements
+            if remoteMatchService.processingMatchId != nil || !remoteMatchService.pendingEnterFlowMatchIds.isEmpty {
+                tx.animation = nil
+            }
         }
     }
     
@@ -346,10 +485,10 @@ struct RemoteGamesTab: View {
     
     private func acceptChallenge(matchId: UUID) {
         print("🔵 [DEBUG] acceptChallenge called with matchId: \(matchId)")
-        print("🔵 [DEBUG] processingMatchId: \(String(describing: processingMatchId))")
+        print("🔵 [DEBUG] processingMatchId: \(String(describing: remoteMatchService.processingMatchId))")
         
         // Prevent double-accept
-        guard processingMatchId == nil else {
+        guard remoteMatchService.processingMatchId == nil else {
             print("❌ [DEBUG] Blocked by processingMatchId guard")
             return
         }
@@ -362,8 +501,12 @@ struct RemoteGamesTab: View {
         let opponent = matchWithPlayers.opponent
         print("✅ [DEBUG] Opponent captured: \(opponent.displayName)")
         
-        print("✅ [DEBUG] Guard passed, setting processingMatchId to \(matchId)")
-        processingMatchId = matchId
+        // FREEZE LIST SNAPSHOT - capture BEFORE any state changes or network calls
+        FlowDebug.log("ACCEPT TAP", matchId: matchId)
+        freezeListSnapshot()
+        
+        // BEGIN ENTER FLOW - sets processing, latch, and nav-in-flight all at once
+        remoteMatchService.beginEnterFlow(matchId: matchId)
         
         Task {
             do {
@@ -371,8 +514,14 @@ struct RemoteGamesTab: View {
                     throw RemoteMatchError.notAuthenticated
                 }
                 
+                FlowDebug.log("acceptChallenge START", matchId: matchId)
+                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                
                 // Step 1: Accept challenge (pending → ready)
                 try await remoteMatchService.acceptChallenge(matchId: matchId)
+                
+                FlowDebug.log("acceptChallenge EDGE OK", matchId: matchId)
+                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 2: Auto-join match (ready → lobby)
                 // Guard: Skip auto-join if match was cancelled
@@ -380,17 +529,31 @@ struct RemoteGamesTab: View {
                 guard !isCancelled else {
                     print("🚫 [DEBUG] Skipping auto-join - match was cancelled")
                     await MainActor.run {
-                        processingMatchId = nil
+                        remoteMatchService.endEnterFlow(matchId: matchId)
                     }
                     return
                 }
+                FlowDebug.log("joinMatch START", matchId: matchId)
+                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                
                 try await remoteMatchService.joinMatch(matchId: matchId, currentUserId: currentUser.id)
                 
+                FlowDebug.log("joinMatch OK", matchId: matchId)
+                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                
                 // Step 2.5: Fetch updated match with joinWindowExpiresAt
+                FlowDebug.log("fetchMatch BEFORE", matchId: matchId)
+                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                
                 print("🔍 [DEBUG] Fetching updated match data...")
                 guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     throw RemoteMatchError.databaseError("Failed to fetch updated match")
                 }
+                let statusStr = updatedMatch.status?.rawValue ?? "nil"
+                let cpStr = updatedMatch.currentPlayerId?.uuidString.prefix(8) ?? "nil"
+                FlowDebug.log("fetchMatch AFTER status=\(statusStr) cp=\(cpStr)", matchId: matchId)
+                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                
                 print("✅ [DEBUG] Updated match fetched")
                 
                 // Success haptic
@@ -401,19 +564,40 @@ struct RemoteGamesTab: View {
                 
                 // Step 3: Navigate to lobby with fresh match data (receiver flow)
                 await MainActor.run {
-                    print("🔵 [TIMING] MainActor.run START - processingMatchId: \(String(describing: processingMatchId))")
+                    print("🔵 [TIMING] MainActor.run START - processingMatchId: \(String(describing: remoteMatchService.processingMatchId))")
                     
                     // Guard: Don't navigate if match was cancelled
                     guard !cancelledMatchIds.contains(matchId) else {
                         print("🚫 [DEBUG] Skipping navigation - match was cancelled")
-                        processingMatchId = nil
+                        remoteMatchService.endEnterFlow(matchId: matchId)
                         return
                     }
                     
-                    print("🔵 [TIMING] About to call router.push - processingMatchId: \(String(describing: processingMatchId))")
-                    print("✅ [DEBUG] Navigating to lobby with updated match (receiver)")
+                    FlowDebug.log("NAV REQUEST remoteLobby", matchId: matchId)
                     
-                    router.push(.remoteLobby(
+                    // Capture token for guard
+                    let token = remoteMatchService.navToken
+                    let matchIdLocal = matchId
+                    
+                    // Schedule navigation on next runloop to prevent multi-frame updates
+                    Task { @MainActor in
+                        // Let SwiftUI finish current frame
+                        await Task.yield()
+                        
+                        // Guard: only push if we're still the active nav request
+                        guard remoteMatchService.navInFlightMatchId == matchIdLocal else {
+                            FlowDebug.log("NAV SKIP (navInFlight changed)", matchId: matchIdLocal)
+                            return
+                        }
+                        guard token == remoteMatchService.navToken else {
+                            FlowDebug.log("NAV SKIP (token changed)", matchId: matchIdLocal)
+                            return
+                        }
+                        
+                        FlowDebug.log("NAV PUSH remoteLobby (scheduled)", matchId: matchIdLocal)
+                        FlowDebug.log("NAV PUSH .remoteLobby stack=\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))", matchId: matchIdLocal)
+                        
+                        router.push(.remoteLobby(
                         match: updatedMatch,
                         opponent: opponent,
                         currentUser: currentUser,
@@ -470,14 +654,18 @@ struct RemoteGamesTab: View {
                                     }
                                 }
                             }
-                        }
-                    ))
+                        },
+                        onUnfreeze: unfreezeListSnapshotAfterTransition
+                        ))
+                        
+                        // DO NOT clear latch here - let it stay active until lobby appears
+                        // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
+                        
+                        print("🔵 [TIMING] router.push called - processingMatchId: \(String(describing: remoteMatchService.processingMatchId))")
+                    }
                     
-                    print("🔵 [TIMING] router.push called - processingMatchId: \(String(describing: processingMatchId))")
-                    
-                    // Clear processingMatchId AFTER navigation is initiated
-                    processingMatchId = nil
-                    print("🔵 [TIMING] processingMatchId set to nil")
+                    // Keep processing state active until Lobby.onAppear
+                    FlowDebug.log("PROCESSING KEEP (until Lobby onAppear)", matchId: matchId)
                     print("🔵 [TIMING] MainActor.run END")
                 }
                 
@@ -490,7 +678,8 @@ struct RemoteGamesTab: View {
                 }
             } catch {
                 await MainActor.run {
-                    processingMatchId = nil
+                    // Clear all enter-flow state on error
+                    remoteMatchService.endEnterFlow(matchId: matchId)
                     errorMessage = "Failed to accept challenge: \(error.localizedDescription)"
                     showError = true
                 }
@@ -508,7 +697,7 @@ struct RemoteGamesTab: View {
         print("🟠 [DEBUG] declineChallenge called with matchId: \(matchId)")
         
         // Guard 1: Not already processing
-        guard processingMatchId == nil else {
+        guard remoteMatchService.processingMatchId == nil else {
             print("🟠 [DEBUG] Already processing another match")
             return
         }
@@ -521,7 +710,7 @@ struct RemoteGamesTab: View {
         }
         
         print("🟠 [DEBUG] Guards passed, setting processingMatchId")
-        processingMatchId = matchId
+        remoteMatchService.processingMatchId = matchId
         
         Task {
             do {
@@ -534,11 +723,11 @@ struct RemoteGamesTab: View {
                 #endif
                 
                 await MainActor.run {
-                    processingMatchId = nil
+                    remoteMatchService.processingMatchId = nil
                 }
             } catch {
                 await MainActor.run {
-                    processingMatchId = nil
+                    remoteMatchService.processingMatchId = nil
                     errorMessage = "Failed to decline challenge: \(error.localizedDescription)"
                     showError = true
                 }
@@ -556,7 +745,7 @@ struct RemoteGamesTab: View {
         print("🟠 [RemoteTab] cancelMatch called with matchId: \(matchId)")
         
         // Guard 1: Not already processing
-        guard processingMatchId == nil else {
+        guard remoteMatchService.processingMatchId == nil else {
             print("🟠 [RemoteTab] Already processing another match")
             return
         }
@@ -584,7 +773,7 @@ struct RemoteGamesTab: View {
         
         // IMMEDIATELY mark as cancelled (before async call)
         cancelledMatchIds.insert(matchId)
-        processingMatchId = matchId
+        remoteMatchService.processingMatchId = matchId
         
         Task {
             do {
@@ -606,7 +795,7 @@ struct RemoteGamesTab: View {
                 #endif
                 
                 await MainActor.run {
-                    processingMatchId = nil
+                    remoteMatchService.processingMatchId = nil
                 }
             } catch {
                 print("❌ [RemoteTab] Failed to cancel/abort: \(error)")
@@ -614,7 +803,7 @@ struct RemoteGamesTab: View {
                 await MainActor.run {
                     // On error, remove from cancelled set to allow retry
                     cancelledMatchIds.remove(matchId)
-                    processingMatchId = nil
+                    remoteMatchService.processingMatchId = nil
                     errorMessage = "Failed to cancel match: \(error.localizedDescription)"
                     showError = true
                 }
@@ -635,7 +824,8 @@ struct RemoteGamesTab: View {
             return
         }
         
-        processingMatchId = matchId
+        // BEGIN LATCH IMMEDIATELY - before realtime updates can arrive (challenger flow)
+        remoteMatchService.beginEnterFlow(matchId: matchId)
         
         Task {
             do {
@@ -652,8 +842,6 @@ struct RemoteGamesTab: View {
                 #endif
                 
                 await MainActor.run {
-                    processingMatchId = nil
-                    
                     // Guard: Don't navigate if match was cancelled
                     guard !cancelledMatchIds.contains(matchId) else {
                         print("🚫 [DEBUG] Skipping navigation - match was cancelled")
@@ -667,6 +855,8 @@ struct RemoteGamesTab: View {
                     
                     if let matchWithPlayers = match,
                        let currentUser = authService.currentUser {
+                        // Latch already active from button tap - just push
+                        FlowDebug.log("NAV PUSH .remoteLobby stack=\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))", matchId: matchId)
                         router.push(.remoteLobby(
                             match: matchWithPlayers.match,
                             opponent: matchWithPlayers.opponent,
@@ -724,13 +914,18 @@ struct RemoteGamesTab: View {
                                         }
                                     }
                                 }
-                            }
+                            },
+                            onUnfreeze: unfreezeListSnapshotAfterTransition
                         ))
+                        
+                        // DO NOT clear latch here - let it stay active until lobby appears
+                        // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
                     }
                 }
             } catch {
                 await MainActor.run {
-                    processingMatchId = nil
+                    // Clear all enter-flow state on error (challenger flow)
+                    remoteMatchService.endEnterFlow(matchId: matchId)
                     errorMessage = "Failed to join match: \(error.localizedDescription)"
                     showError = true
                 }

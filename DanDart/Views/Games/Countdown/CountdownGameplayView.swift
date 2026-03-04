@@ -20,7 +20,6 @@ struct CountdownGameplayView: View {
     @State private var showRestartAlert: Bool = false
     @State private var showExitAlert: Bool = false
     @State private var showUndoConfirmation: Bool = false
-    @State private var navigateToGameEnd: Bool = false
     @State private var showLegWinCelebration: Bool = false
     @State private var showGameTip: Bool = false
     @State private var currentTip: GameTip? = nil
@@ -278,11 +277,25 @@ struct CountdownGameplayView: View {
                 }
             }
             .onChange(of: gameViewModel.winner) { oldValue, newValue in
-                if newValue != nil {
+                if let winner = newValue {
                     // Match winner detected - navigate to game end screen after brief delay
                     // This ensures all state updates are complete
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        navigateToGameEnd = true
+                        router.push(.gameEnd(
+                            game: game,
+                            winner: winner,
+                            players: players,
+                            onPlayAgain: {
+                                gameViewModel.restartGame()
+                                router.pop()
+                            },
+                            onBackToGames: {
+                                router.popToRoot()
+                            },
+                            matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
+                            legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
+                            matchId: gameViewModel.matchId
+                        ))
                     }
                 }
             }
@@ -296,33 +309,6 @@ struct CountdownGameplayView: View {
                 if let legWinner = gameViewModel.legWinner {
                     let winnerLegs = gameViewModel.legsWon[legWinner.id] ?? 0
                     Text("\(legWinner.displayName) wins the leg! (\(winnerLegs) legs won)")
-                }
-            }
-            .navigationDestination(isPresented: $navigateToGameEnd) {
-                if let winner = gameViewModel.winner {
-                    GameEndView(
-                        game: game,
-                        winner: winner,
-                        players: players,
-                        onPlayAgain: {
-                            // Reset game with same players
-                            gameViewModel.restartGame()
-                            navigateToGameEnd = false
-                        },
-                        onChangePlayers: {
-                            // Navigate back to game setup
-                            navigateToGameEnd = false
-                            dismiss()
-                        },
-                        onBackToGames: {
-                            // Navigate back to games list
-                            router.popToRoot()
-                        },
-                        matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
-                        legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                        matchId: gameViewModel.matchId,
-                        matchResult: gameViewModel.savedMatchResult
-                    )
                 }
             }
         }
