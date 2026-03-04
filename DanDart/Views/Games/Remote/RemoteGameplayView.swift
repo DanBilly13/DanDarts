@@ -261,6 +261,17 @@ struct RemoteGameplayView: View {
         preTurnRevealIsActive = true
         print("🎯 [PreTurnReveal] START sequential reveal darts=\(lvp.darts) ts=\(lvp.timestamp)")
 
+        // CRITICAL: Hold back opponent's score by setting override with OLD score
+        // This prevents the server's NEW score from showing until animation peak
+        let opponentId = lvp.playerId
+        let oldScore = lvp.scoreBefore
+        setLocalScoreOverride(playerId: opponentId, score: oldScore)
+        print("🎯 [PreTurnReveal] Holding opponent score at OLD value: \(oldScore)")
+
+        // Capture variables for Task closure
+        let capturedLvp = lvp
+        let capturedRenderMatch = renderMatch
+        
         // Sequential reveal with score animation
         revealTask = Task { @MainActor in
             do {
@@ -292,29 +303,43 @@ struct RemoteGameplayView: View {
                 showOpponentScoreAnimation = true
                 print("🎯 [PreTurnReveal] Opponent score animation START")
                 
-                // Clear opponent score animation (0.25s later)
-                try await Task.sleep(nanoseconds: 250_000_000)
+                // Wait for animation to reach peak (0.125s)
+                try await Task.sleep(nanoseconds: 125_000_000)
+                
+                // Update opponent's score at animation peak (dramatic reveal!)
+                let opponentId = capturedLvp.playerId
+                if let match = capturedRenderMatch,
+                   let playerScores = match.playerScores,
+                   let newScore = playerScores[opponentId] {
+                    setLocalScoreOverride(playerId: opponentId, score: newScore)
+                    print("🎯 [PreTurnReveal] Opponent score updated at peak: \(newScore)")
+                }
+                
+                
+                // Clear opponent score animation (0.125s later - completes 0.25s total)
+                try await Task.sleep(nanoseconds: 125_000_000)
                 showOpponentScoreAnimation = false
                 print("🎯 [PreTurnReveal] Opponent score animation END")
                 
-                // Brief pause after score animation (0.35s)
-                try await Task.sleep(nanoseconds: 350_000_000)
+                // Pause to let score settle (0.5s)
+                try await Task.sleep(nanoseconds: 500_000_000)
                 print("🎯 [PreTurnReveal] Pause complete, ready for rotation")
                 
-                // Rotate card AFTER all animations complete
-                print("🎯 [TurnGate] ROTATE (after reveal hold)")
+                // Rotate card after pause
+                print("🎯 [TurnGate] ROTATE (after pause)")
                 displayCurrentPlayerId = serverCurrentPlayerId
                 
                 // Phase B: Keep overlay locked during rotation animation
                 try await Task.sleep(nanoseconds: rotateAnimNs + postRotatePaddingNs)
                 
-                // Now unlock + clear reveal
+                // Now unlock + clear reveal + clear score override
                 print("🎯 [TurnGate] UNLOCK UI (after rotate)")
                 preTurnRevealIsActive = false
                 turnTransitionLocked = false
                 turnUIGateActive = false
                 revealedDartCount = 0
                 showRevealTotal = false
+                clearLocalScoreOverride()
                 print("🎯 [TurnGate] displayCP=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil") unlocked")
             } catch {
                 print("🎯 [TURN_GATE] cancelled")
@@ -322,6 +347,7 @@ struct RemoteGameplayView: View {
                 revealedDartCount = 0
                 showRevealTotal = false
                 showOpponentScoreAnimation = false
+                clearLocalScoreOverride()
             }
         }
     }

@@ -21,7 +21,7 @@ struct MatchCard: View {
                         Image(imageName)
                             .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .scaleEffect(1.2)
+                                
                                 .clipped()
                     } else {
                         LinearGradient(
@@ -36,9 +36,9 @@ struct MatchCard: View {
                 }
             }
             .background(AppColor.inputBackground.opacity(0.1))
-            .frame(width: 52)
-            .frame(maxHeight: .infinity, alignment: .center)
-            .cornerRadius(0)
+            .frame(width: 88)
+            .frame(height: 88, alignment: .center)
+            .cornerRadius(8)
             
             .clipped()
             /*.overlay(
@@ -65,7 +65,7 @@ struct MatchCard: View {
                             .clipShape(Capsule())
                     }
                     
-                    Spacer()
+                       
                     
                     // Date with cloud icon
                     HStack(spacing: 4) {
@@ -86,13 +86,14 @@ struct MatchCard: View {
                 // Players with scores
                 playersRow
             }
-            .padding(.vertical,16)
-            .padding(.trailing,12)
+          
+            .padding(.trailing,4)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        
+        .padding(.vertical,16)
+        .padding(.horizontal,16)
         .background(AppColor.inputBackground)
-        .cornerRadius(12)
+        .cornerRadius(16)
         
         
     }
