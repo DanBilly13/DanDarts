@@ -39,37 +39,30 @@ struct RemoteGamesTab: View {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
 
-            // IMPORTANT: avoid swapping the entire list subtree in/out on background refreshes.
-            // Swapping causes SwiftUI to tear down rows (DISAPPEAR) and reinsert them (APPEAR), which looks like a flash.
-            if remoteMatchService.isLoading && !hasLoadedOnce {
-                loadingView
-            } else if hasAnyMatches {
-                matchListView
-                    .overlay {
-                        if remoteMatchService.isLoading {
-                            // Non-destructive loading indicator for background refreshes.
-                            ProgressView()
-                                .tint(AppColor.interactivePrimaryBackground)
-                                .padding(12)
-                                .background(AppColor.backgroundPrimary.opacity(0.9))
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        }
-                    }
-            } else {
-                emptyStateView
-                    .overlay {
-                        if remoteMatchService.isLoading {
-                            ProgressView()
-                                .tint(AppColor.interactivePrimaryBackground)
-                        }
-                    }
+            // IMPORTANT: never swap the entire list subtree in/out when `isLoading` toggles.
+            // That teardown is what produces the visible “flash” (rows DISAPPEAR/APPEAR).
+            Group {
+                if hasAnyMatches {
+                    matchListView
+                } else {
+                    emptyStateView
+                }
+            }
+            .overlay {
+                if remoteMatchService.isLoading {
+                    // Non-destructive loading indicator (including the first load).
+                    ProgressView()
+                        .tint(AppColor.interactivePrimaryBackground)
+                        .padding(12)
+                        .background(AppColor.backgroundPrimary.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
         }
         .task {
             // Load matches when tab appears
             // Note: Realtime subscription is now set up in MainTabView on app launch
             await loadMatches()
-            await MainActor.run { hasLoadedOnce = true }
 
             // Clean up cancelled IDs for matches that no longer exist
             let allMatchIds = Set(
@@ -82,7 +75,6 @@ struct RemoteGamesTab: View {
         }
         .refreshable {
             await loadMatches()
-            await MainActor.run { hasLoadedOnce = true }
         }
         .onChange(of: remoteMatchService.activeMatch?.match.id) { oldId, newId in
             if let newId = newId, oldId != newId {
@@ -991,3 +983,4 @@ struct RemoteGamesTab: View {
     
     return PreviewWrapper()
 }
+    
