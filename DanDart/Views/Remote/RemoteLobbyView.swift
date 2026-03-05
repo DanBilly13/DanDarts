@@ -256,7 +256,6 @@ struct RemoteLobbyView: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                 showContent = true
             }
-            SoundManager.shared.playBoxingSound()
             
             // Fetch fresh match state on appear (single-shot, realtime handles updates)
             Task {
