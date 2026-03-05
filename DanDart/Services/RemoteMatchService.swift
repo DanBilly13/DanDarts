@@ -458,6 +458,7 @@ class RemoteMatchService: ObservableObject {
             let updated_at: String
             let ended_by: UUID?
             let ended_reason: String?
+            let winner_id: UUID?
             let debug_counter: Int?
             let last_visit_payload: LastVisitPayload?  // 🎯 Pre-Turn Reveal: opponent's last 3 darts
         }
@@ -531,6 +532,7 @@ class RemoteMatchService: ObservableObject {
             updatedAt: formatter.date(from: matchData.updated_at) ?? Date(),
             endedBy: matchData.ended_by,
             endedReason: matchData.ended_reason,
+            winnerId: matchData.winner_id,
             debugCounter: matchData.debug_counter
         )
         

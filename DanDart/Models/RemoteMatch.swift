@@ -80,6 +80,7 @@ struct RemoteMatch: Identifiable, Codable, Equatable {
     // Termination tracking (optional)
     let endedBy: UUID?
     let endedReason: String?
+    let winnerId: UUID? // Winner of the match (set when status = completed)
     
     // Debug counter for Phase 2 testing (DEBUG only)
     var debugCounter: Int?
@@ -96,7 +97,8 @@ struct RemoteMatch: Identifiable, Codable, Equatable {
         lhs.turnIndexInLeg == rhs.turnIndexInLeg &&
         lhs.lastVisitPayload == rhs.lastVisitPayload &&
         lhs.endedBy == rhs.endedBy &&
-        lhs.endedReason == rhs.endedReason
+        lhs.endedReason == rhs.endedReason &&
+        lhs.winnerId == rhs.winnerId
         // Note: Ignoring createdAt, updatedAt, debugCounter to prevent churn
     }
     
@@ -185,6 +187,7 @@ struct RemoteMatch: Identifiable, Codable, Equatable {
         case updatedAt = "updated_at"
         case endedBy = "ended_by"
         case endedReason = "ended_reason"
+        case winnerId = "winner_id"
     }
 }
 
@@ -381,7 +384,8 @@ extension RemoteMatch {
         createdAt: Date(),
         updatedAt: Date(),
         endedBy: nil,
-        endedReason: nil
+        endedReason: nil,
+        winnerId: nil
     )
     
     static let mockReady = RemoteMatch(
@@ -400,7 +404,8 @@ extension RemoteMatch {
         createdAt: Date(),
         updatedAt: Date(),
         endedBy: nil,
-        endedReason: nil
+        endedReason: nil,
+        winnerId: nil
     )
     
     static let mockInProgress = RemoteMatch(
@@ -419,7 +424,8 @@ extension RemoteMatch {
         createdAt: Date(),
         updatedAt: Date(),
         endedBy: nil,
-        endedReason: nil
+        endedReason: nil,
+        winnerId: nil
     )
 }
 

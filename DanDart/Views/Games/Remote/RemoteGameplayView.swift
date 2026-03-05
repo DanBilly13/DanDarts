@@ -47,6 +47,9 @@ struct RemoteGameplayView: View {
     // UI gate: holds lock overlay through reveal + rotation + padding
     @State private var turnUIGateActive: Bool = false
     
+    // Checkout display control
+    @State private var showCheckout: Bool = true
+    
     // Timing constants for turn transition phases
     private let revealHoldNs: UInt64 = 1_700_000_000         // 1.7s reveal duration (extended for sequential animation)
     private let rotateAnimNs: UInt64 = 350_000_000           // 0.35s card rotation animation
@@ -162,6 +165,15 @@ struct RemoteGameplayView: View {
         gameViewModel.showScoreAnimation || showOpponentScoreAnimation
     }
     
+    /// Checkout to display: current player sees live updates, opponent sees frozen initial checkout
+    private var renderCheckout: String? {
+        if isMyTurn {
+            return gameViewModel.suggestedCheckout // Live updates as darts are thrown
+        } else {
+            return gameViewModel.initialCheckoutForTurn // Frozen initial checkout
+        }
+    }
+    
     // MARK: - Local Score Override Methods
     
     /// Set local score override for current player during animation
@@ -182,6 +194,163 @@ struct RemoteGameplayView: View {
     
     private func dbg(_ msg: String) {
         print("🧪 [RTGD] \(msg)")
+    }
+    
+    // MARK: - Setup & Lifecycle Helpers
+    
+    private func setupGameplayView() {
+        dbg("onAppear")
+        dbgMatchSnapshot("APPEAR")
+        print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
+        
+        // Initialize displayCurrentPlayerId to current server state
+        displayCurrentPlayerId = serverCurrentPlayerId
+        print("🎯 [TurnGate] Initialized displayCurrentPlayerId=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
+        
+        // 🧪 DEBUG STEP 1: Confirm remoteMatchService exists in environment
+        print("🧪 [RemoteGameplay] env remoteMatchService exists, flowMatchId=\(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")..., matchId=\(matchId.uuidString.prefix(8))...")
+        print("🧪 [RemoteGameplay] remoteMatchService instance: \(ObjectIdentifier(remoteMatchService))")
+        
+        // Enter remote flow (FlowGate)
+        remoteMatchService.enterRemoteFlow(matchId: matchId)
+        print("✅ [RemoteGameplayView] Entered remote flow")
+        
+        // Inject authService into the ViewModel
+        gameViewModel.setAuthService(authService)
+        
+        // Inject remoteMatchService into the ViewModel
+        gameViewModel.setRemoteMatchService(remoteMatchService)
+        
+        // Fetch authoritative match state
+        Task { @MainActor in
+            _ = try? await remoteMatchService.fetchMatch(matchId: matchId)
+        }
+        
+        // Evaluate turn gate on appear (in case state already present)
+        evaluateTurnGate(reason: "onAppear")
+        
+        setupNotificationObservers()
+        logTruthTable()
+        showGameTipIfNeeded()
+    }
+    
+    private func setupNotificationObservers() {
+        // Listen for score updates during animation
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("RemoteMatchScoreUpdated"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let playerId = notification.userInfo?["playerId"] as? UUID,
+               let score = notification.userInfo?["score"] as? Int {
+                self.setLocalScoreOverride(playerId: playerId, score: score)
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("RemoteMatchScoreAnimationComplete"),
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            // Only clear if not during opponent reveal (opponent manages its own override)
+            if !preTurnRevealIsActive {
+                clearLocalScoreOverride()
+            }
+        }
+    }
+    
+    private func logTruthTable() {
+        guard let m = liveMatch, let adapter = adapter else { return }
+        
+        // 🧪 TRUTH TABLE DEBUG
+        Self.printTruthTable(
+            matchId: matchId,
+            liveMatch: liveMatch,
+            currentUserId: currentUserId,
+            authUserId: authService.currentUser?.id,
+            challenger: challenger,
+            receiver: receiver,
+            adapter: adapter,
+            overlayState: adapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore),
+            context: "onAppear"
+        )
+    }
+    
+    private func showGameTipIfNeeded() {
+        guard let m = liveMatch else { return }
+        
+        // Show game-specific tip if available and not seen before
+        if TipManager.shared.shouldShowTip(for: m.gameName) {
+            currentTip = TipManager.shared.getTip(for: m.gameName)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation { self.showGameTip = true }
+            }
+        }
+    }
+    
+    private func cleanupGameplayView() {
+        print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
+        
+        // Cancel reveal timer
+        revealTask?.cancel()
+        
+        remoteMatchService.exitRemoteFlow()
+    }
+    
+    // MARK: - Server Sync Handlers
+    
+    private func handleServerScoresChange(oldValue: [UUID: Int]?, newValue: [UUID: Int]?) {
+        // Sync VM scores from server when they update
+        if let newScores = newValue {
+            print("🔄 [Sync] Server scores updated, syncing to VM: \(newScores)")
+            gameViewModel.playerScores = newScores
+            
+            // Clear local override when server scores arrive (prevents revert)
+            if localScoreOverride != nil {
+                print("🎬 [LocalOverride] Cleared by server update")
+                clearLocalScoreOverride()
+            }
+        }
+    }
+    
+    private func handleCurrentPlayerChange(oldValue: UUID?, newValue: UUID?) {
+        // Sync VM current player index from server when it updates
+        if let newPlayerId = newValue, let currentAdapter = self.adapter {
+            if let newIndex = currentAdapter.playerIndex(for: newPlayerId) {
+                print("🔄 [Sync] Server currentPlayerId updated to \(newPlayerId.uuidString.prefix(8))..., syncing VM index to \(newIndex)")
+                gameViewModel.currentPlayerIndex = newIndex
+            }
+        }
+        
+        // Evaluate turn gate (dual-trigger system)
+        evaluateTurnGate(reason: "serverCP change")
+    }
+    
+    private func handleLastVisitTimestampChange(oldValue: String?, newValue: String?) {
+        print("🔄 [Sync] lastVisitPayload.timestamp changed: \(oldValue ?? "nil") → \(newValue ?? "nil")")
+        evaluateTurnGate(reason: "lvp.ts change")
+    }
+    
+    private func handleMatchStatusChange(oldStatus: RemoteMatchStatus?, newStatus: RemoteMatchStatus?) {
+        print("🔄 [Remote] Match status changed: \(oldStatus?.rawValue ?? "nil") → \(newStatus?.rawValue ?? "nil")")
+        
+        if newStatus == .completed {
+            // Match ended on server - sync winner
+            if let winnerId = renderMatch?.winnerId {
+                if let winnerPlayer = gameViewModel.players.first(where: { $0.id == winnerId }) {
+                    // Only set if not already set (avoid duplicate navigation)
+                    if gameViewModel.winner == nil {
+                        gameViewModel.winner = winnerPlayer
+                        print("🏆 [Remote] Server reported winner: \(winnerPlayer.displayName)")
+                        
+                        // Play win sound for opponent (winner already played it when they saved)
+                        if winnerId != currentUserId {
+                            SoundManager.shared.playCountdownWinner()
+                        }
+                    }
+                }
+            }
+        }
     }
     
     private func dbgMatchSnapshot(_ label: String) {
@@ -325,6 +494,15 @@ struct RemoteGameplayView: View {
                 try await Task.sleep(nanoseconds: 500_000_000)
                 print("🎯 [PreTurnReveal] Pause complete, ready for rotation")
                 
+                // Fade out checkout before rotation
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showCheckout = false
+                }
+                print("🎯 [Checkout] Fading out before rotation")
+                
+                // Wait for fade to complete
+                try await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+                
                 // Rotate card after pause
                 print("🎯 [TurnGate] ROTATE (after pause)")
                 displayCurrentPlayerId = serverCurrentPlayerId
@@ -341,6 +519,18 @@ struct RemoteGameplayView: View {
                 showRevealTotal = false
                 clearLocalScoreOverride()
                 print("🎯 [TurnGate] displayCP=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil") unlocked")
+                
+                // Wait 0.5s after unlock, then fade in new checkout
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+                
+                // Update checkout for new current player
+                gameViewModel.updateCheckoutSuggestion()
+                
+                // Fade in checkout if available
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showCheckout = true
+                }
+                print("🎯 [Checkout] Fading in for new player")
             } catch {
                 print("🎯 [TURN_GATE] cancelled")
                 // Clean up on cancellation
@@ -510,14 +700,16 @@ struct RemoteGameplayView: View {
 
             // Checkout suggestion slot
             VStack {
-                if let checkout = gameViewModel.suggestedCheckout {
+                if showCheckout, let checkout = renderCheckout {
                     CheckoutSuggestionView(checkout: checkout)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 0)
+                        .transition(.opacity)
                 }
             }
             .frame(height: 40, alignment: .center)
             .padding(.bottom, 8)
+            .animation(.easeInOut(duration: 0.3), value: showCheckout)
 
             Spacer(minLength: 0)
         }
@@ -694,6 +886,7 @@ struct RemoteGameplayView: View {
                 updatedAt: Date(),
                 endedBy: nil,
                 endedReason: nil,
+                winnerId: nil,
                 debugCounter: nil
             ),
             challenger: challenger,
@@ -784,118 +977,12 @@ struct RemoteGameplayView: View {
             if let m = liveMatch, let adapter = adapter {
                 contentWithNavigation(using: m, adapter: adapter)
                     .background(debugRenderProbe)
-                    .onAppear {
-                        dbg("onAppear")
-                        dbgMatchSnapshot("APPEAR")
-                        print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
-                        
-                        // Initialize displayCurrentPlayerId to current server state
-                        displayCurrentPlayerId = serverCurrentPlayerId
-                        print("🎯 [TurnGate] Initialized displayCurrentPlayerId=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
-                        
-                        // 🧪 DEBUG STEP 1: Confirm remoteMatchService exists in environment
-                        print("🧪 [RemoteGameplay] env remoteMatchService exists, flowMatchId=\(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")..., matchId=\(matchId.uuidString.prefix(8))...")
-                        print("🧪 [RemoteGameplay] remoteMatchService instance: \(ObjectIdentifier(remoteMatchService))")
-                        
-                        // Enter remote flow (FlowGate)
-                        remoteMatchService.enterRemoteFlow(matchId: matchId)
-                        print("✅ [RemoteGameplayView] Entered remote flow")
-                        
-                        // Inject authService into the ViewModel
-                        gameViewModel.setAuthService(authService)
-                        
-                        // Inject remoteMatchService into the ViewModel
-                        gameViewModel.setRemoteMatchService(remoteMatchService)
-                        
-                        // Fetch authoritative match state
-                        Task { @MainActor in
-                            _ = try? await remoteMatchService.fetchMatch(matchId: matchId)
-                        }
-                        
-                        // Evaluate turn gate on appear (in case state already present)
-                        evaluateTurnGate(reason: "onAppear")
-                        
-                        // Listen for score updates during animation
-                        NotificationCenter.default.addObserver(
-                            forName: NSNotification.Name("RemoteMatchScoreUpdated"),
-                            object: nil,
-                            queue: .main
-                        ) { notification in
-                            if let playerId = notification.userInfo?["playerId"] as? UUID,
-                               let score = notification.userInfo?["score"] as? Int {
-                                setLocalScoreOverride(playerId: playerId, score: score)
-                            }
-                        }
-                        
-                        NotificationCenter.default.addObserver(
-                            forName: NSNotification.Name("RemoteMatchScoreAnimationComplete"),
-                            object: nil,
-                            queue: .main
-                        ) { [self] _ in
-                            // Only clear if not during opponent reveal (opponent manages its own override)
-                            if !preTurnRevealIsActive {
-                                clearLocalScoreOverride()
-                            }
-                        }
-                        
-                        // 🧪 TRUTH TABLE DEBUG
-                        Self.printTruthTable(
-                            matchId: matchId,
-                            liveMatch: liveMatch,
-                            currentUserId: currentUserId,
-                            authUserId: authService.currentUser?.id,
-                            challenger: challenger,
-                            receiver: receiver,
-                            adapter: adapter,
-                            overlayState: adapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore),
-                            context: "onAppear"
-                        )
-                        
-                        // Show game-specific tip if available and not seen before
-                        if TipManager.shared.shouldShowTip(for: m.gameName) {
-                            currentTip = TipManager.shared.getTip(for: m.gameName)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                withAnimation { showGameTip = true }
-                            }
-                        }
-                    }
-                    .onDisappear {
-                        print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
-                        
-                        // Cancel reveal timer
-                        revealTask?.cancel()
-                        
-                        remoteMatchService.exitRemoteFlow()
-                    }
-                    .onChange(of: serverScores) { oldValue, newValue in
-                        // Sync VM scores from server when they update
-                        if let newScores = newValue {
-                            print("🔄 [Sync] Server scores updated, syncing to VM: \(newScores)")
-                            gameViewModel.playerScores = newScores
-                            
-                            // Clear local override when server scores arrive (prevents revert)
-                            if localScoreOverride != nil {
-                                print("🎬 [LocalOverride] Cleared by server update")
-                                clearLocalScoreOverride()
-                            }
-                        }
-                    }
-                    .onChange(of: serverCurrentPlayerId) { oldValue, newValue in
-                        // Sync VM current player index from server when it updates
-                        if let newPlayerId = newValue, let currentAdapter = self.adapter {
-                            if let newIndex = currentAdapter.playerIndex(for: newPlayerId) {
-                                print("🔄 [Sync] Server currentPlayerId updated to \(newPlayerId.uuidString.prefix(8))..., syncing VM index to \(newIndex)")
-                                gameViewModel.currentPlayerIndex = newIndex
-                            }
-                        }
-                        
-                        // Evaluate turn gate (dual-trigger system)
-                        evaluateTurnGate(reason: "serverCP change")
-                    }
-                    .onChange(of: renderMatch?.lastVisitPayload?.timestamp) { oldValue, newValue in
-                        print("🔄 [Sync] lastVisitPayload.timestamp changed: \(oldValue ?? "nil") → \(newValue ?? "nil")")
-                        evaluateTurnGate(reason: "lvp.ts change")
-                    }
+                    .onAppear { setupGameplayView() }
+                    .onDisappear { cleanupGameplayView() }
+                    .onChange(of: serverScores, handleServerScoresChange)
+                    .onChange(of: serverCurrentPlayerId, handleCurrentPlayerChange)
+                    .onChange(of: renderMatch?.lastVisitPayload?.timestamp, handleLastVisitTimestampChange)
+                    .onChange(of: renderMatch?.status, handleMatchStatusChange)
                     .onChange(of: (serverCurrentPlayerId ?? liveMatch?.currentPlayerId)) { oldId, newId in
                         dbg("onChange(currentPlayerId) old=\(oldId?.uuidString.prefix(8) ?? "nil") new=\(newId?.uuidString.prefix(8) ?? "nil")")
                         dbgMatchSnapshot("CP_CHANGE")

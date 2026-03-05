@@ -21,6 +21,7 @@ class RemoteGameViewModel: ObservableObject {
     @Published var turnHistory: [TurnHistory] = []
     @Published var suggestedCheckout: String? = nil
     @Published var selectedDartIndex: Int? = nil
+    @Published var initialCheckoutForTurn: String? = nil // Checkout at start of turn (for opponent display)
     
     // Track if turn started with a checkout available
     private var turnStartedWithCheckout: Bool = false
@@ -459,6 +460,7 @@ class RemoteGameViewModel: ObservableObject {
                 currentThrow.removeAll()
                 selectedDartIndex = nil
                 turnStartedWithCheckout = false
+                initialCheckoutForTurn = nil
                 
                 // Wait for animation + pause to complete (0.45s total)
                 // Animation: 0.25s, Pause: 0.2s
@@ -482,12 +484,27 @@ class RemoteGameViewModel: ObservableObject {
                         if let winningPlayer = players.first(where: { $0.id == winnerId }) {
                             winner = winningPlayer
                             print("🏆 [RemoteGame] Winner detected from engine: \(winningPlayer.displayName)")
+                            SoundManager.shared.playCountdownWinner()
                         }
                     case .legWon(let winnerId):
                         legsWon = newState.legsWon
                         print("🎯 [RemoteGame] Leg won by \(winnerId)")
                     default:
                         break
+                    }
+                }
+                
+                // Fallback: Check server scores for winner (in case engine missed it)
+                if winner == nil, let serverScores = updatedMatch.playerScores {
+                    for (playerId, score) in serverScores {
+                        if score == 0 {
+                            if let winningPlayer = players.first(where: { $0.id == playerId }) {
+                                winner = winningPlayer
+                                print("🏆 [RemoteGame] Winner detected from server scores: \(winningPlayer.displayName)")
+                                SoundManager.shared.playCountdownWinner()
+                                break
+                            }
+                        }
                     }
                 }
                 
@@ -713,6 +730,11 @@ class RemoteGameViewModel: ObservableObject {
             dartsThrown: currentThrow.count,
             turnStartedWithCheckout: turnStartedWithCheckout
         )
+        
+        // Capture initial checkout at turn start (for opponent display in remote matches)
+        if currentThrow.isEmpty {
+            initialCheckoutForTurn = suggestedCheckout
+        }
     }
     
     // MARK: - Match Storage

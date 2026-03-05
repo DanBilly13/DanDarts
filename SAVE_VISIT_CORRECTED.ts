@@ -151,71 +151,40 @@ serve(async (req) => {
     const newTurnIndex = (match.turn_index_in_leg ?? 0) + 1
     console.log(`🧮 [save-visit] turn_index_in_leg: ${match.turn_index_in_leg ?? 0} -> ${newTurnIndex}`)
 
-    // Check for winner (score = 0)
-    let winnerId: string | null = null
-    for (const [playerId, score] of Object.entries(currentScores)) {
-      if (score === 0) {
-        winnerId = playerId
-        console.log(`🏆 [save-visit] Winner detected: ${winnerId}`)
-        break
-      }
+    // Check for checkout (win condition)
+    let isTerminal = false
+    let winnerId = null
+
+    if (score_after === 0) {
+      // Player won! Set terminal state
+      isTerminal = true
+      winnerId = user.id
+      console.log(`🏆 [save-visit] Player ${user.id} won! Setting terminal state.`)
     }
 
-    if (winnerId) {
-      // Match won! Update status to completed
-      const { data: completedMatch, error: completeError } = await supabaseClient
-        .from('matches')
-        .update({
-          remote_status: 'completed',
-          winner_id: winnerId,
-          ended_at: now.toISOString(),
-          current_player_id: null, // No more turns
-          last_visit_payload: visitPayload,
-          player_scores: currentScores,
-          turn_index_in_leg: newTurnIndex,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', match_id)
-        .select('*')
-        .maybeSingle()
-
-      if (completeError) {
-        console.error('Failed to complete match:', completeError)
-        return new Response(
-          JSON.stringify({ error: 'Failed to complete match', details: completeError } as ErrorResponse),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      console.log(`✅ Match completed - winner: ${winnerId}`)
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: { 
-            winner_id: winnerId,
-            status: 'completed',
-            match: completedMatch,
-          },
-          message: 'Match completed',
-        } as SuccessResponse),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Build update payload with conditional terminal fields
+    const updatePayload: any = {
+      current_player_id: isTerminal ? null : nextPlayerId, // Clear current player if game ended
+      last_visit_payload: visitPayload,
+      player_scores: currentScores,  // Server-authoritative scores
+      turn_index_in_leg: newTurnIndex,  // Increment turn counter
+      updated_at: now.toISOString(),
     }
 
-    // If no winner, continue with normal turn switch
+    if (isTerminal) {
+      updatePayload.remote_status = 'completed'  // Use 'completed' instead of 'ended'
+      updatePayload.winner_id = winnerId
+      updatePayload.ended_at = now.toISOString()
+      updatePayload.ended_reason = 'checkout'
+      console.log(`🏆 [save-visit] Terminal fields set: status=completed, winner=${winnerId}`)
+    }
+
     // Update match with next player, last visit, player_scores, AND turn_index_in_leg
     const { data: updatedMatch, error: updateError } = await supabaseClient
       .from('matches')
-      .update({
-        current_player_id: nextPlayerId,
-        last_visit_payload: visitPayload,
-        player_scores: currentScores,  // Server-authoritative scores
-        turn_index_in_leg: newTurnIndex,  // Increment turn counter
-        updated_at: now.toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', match_id)
-      .select('id, current_player_id, player_scores, turn_index_in_leg, updated_at')
+      .select('id, current_player_id, player_scores, turn_index_in_leg, remote_status, winner_id, updated_at')
       .maybeSingle()
 
     if (updateError) {
@@ -230,15 +199,21 @@ serve(async (req) => {
 
     console.log(`✅ Visit saved for match: ${match_id}`)
     console.log(`✅ [save-visit] player_scores written to database: ${JSON.stringify(currentScores)}`)
+    
+    if (isTerminal) {
+      console.log(`🏆 Match completed - winner: ${winnerId}`)
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         data: { 
-          next_player_id: nextPlayerId,
+          next_player_id: isTerminal ? null : nextPlayerId,
           turn_index_in_leg: updatedMatch?.turn_index_in_leg ?? newTurnIndex,
+          winner_id: winnerId,
+          status: isTerminal ? 'completed' : 'in_progress',
         },
-        message: 'Visit saved successfully',
+        message: isTerminal ? 'Match completed' : 'Visit saved successfully',
       } as SuccessResponse),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
