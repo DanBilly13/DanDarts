@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 Task 300: Update Database Schema for Friend Requests
 ----------------------------------------------------

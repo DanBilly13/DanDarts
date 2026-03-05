@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 Phase 15: Supabase Integration
 ------------------------------

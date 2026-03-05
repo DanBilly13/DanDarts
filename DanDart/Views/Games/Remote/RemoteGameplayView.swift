@@ -827,8 +827,16 @@ struct RemoteGameplayView: View {
                             }
                         }
                         
-                        // Note: Override is now cleared when server scores update (onChange)
-                        // instead of on a timer, preventing score revert
+                        NotificationCenter.default.addObserver(
+                            forName: NSNotification.Name("RemoteMatchScoreAnimationComplete"),
+                            object: nil,
+                            queue: .main
+                        ) { [self] _ in
+                            // Only clear if not during opponent reveal (opponent manages its own override)
+                            if !preTurnRevealIsActive {
+                                clearLocalScoreOverride()
+                            }
+                        }
                         
                         // 🧪 TRUTH TABLE DEBUG
                         Self.printTruthTable(

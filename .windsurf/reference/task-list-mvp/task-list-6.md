@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 Phase 18: Additional Game Modes (Post-Core MVP)
 -----------------------------------------------

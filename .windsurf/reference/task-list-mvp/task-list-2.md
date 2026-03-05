@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 ## Phase 5: Main Navigation Structure
 

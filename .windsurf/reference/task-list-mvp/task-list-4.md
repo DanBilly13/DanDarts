@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 **Task 59: Create Friend Profile View**
 

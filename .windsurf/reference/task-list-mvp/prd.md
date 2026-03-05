@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # 🎯 DanDarts — Product Requirements Document (PRD)
 

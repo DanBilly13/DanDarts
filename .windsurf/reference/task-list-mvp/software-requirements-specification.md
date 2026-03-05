@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # DanDarts — Software Requirements Specification
 

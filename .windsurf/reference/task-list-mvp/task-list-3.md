@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 Phase 9: Gameplay Screen - Scoring (301 Only)
 ---------------------------------------------

@@ -430,6 +430,12 @@ class RemoteGameViewModel: ObservableObject {
             // Brief pause after animation (0.2s)
             try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
             print("🎬 [RemoteGame] Pause complete, ready for reveal")
+            
+            // Clear override after animation completes
+            NotificationCenter.default.post(
+                name: NSNotification.Name("RemoteMatchScoreAnimationComplete"),
+                object: nil
+            )
         }
         
         // Call server RPC (parallel to animation)
