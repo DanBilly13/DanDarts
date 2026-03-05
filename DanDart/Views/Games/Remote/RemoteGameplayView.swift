@@ -16,6 +16,9 @@ struct RemoteGameplayView: View {
     
     // Game state managed by ViewModel
     @StateObject private var gameViewModel: RemoteGameViewModel
+    @StateObject private var syncManager: RemoteGameSyncManager
+    @StateObject private var revealState: RemoteTurnRevealState
+    @StateObject private var scoreAnimationHandler: RemoteScoreAnimationHandler
     @StateObject private var menuCoordinator = MenuCoordinator.shared
     @State private var showInstructions: Bool = false
     @State private var showRestartAlert: Bool = false
@@ -27,34 +30,6 @@ struct RemoteGameplayView: View {
     @State private var isScoreboardExpanded: Bool = false
     @State private var isSaving: Bool = false
     
-    // Pre-turn reveal state (sequential dart reveal when opponent saves)
-    @State private var preTurnRevealThrow: [ScoredThrow] = []
-    @State private var fullOpponentDarts: [ScoredThrow] = [] // Store all darts for sequential reveal
-    @State private var revealedDartCount: Int = 0 // 0-3 for sequential dart appearance
-    @State private var showRevealTotal: Bool = false // Show total as 4th item
-    @State private var preTurnRevealIsActive: Bool = false
-    @State private var lastSeenVisitTimestamp: String? = nil
-    @State private var showOpponentScoreAnimation: Bool = false // Opponent's score animation
-    
-    // Local score override (for showing current player's score update during animation)
-    @State private var localScoreOverride: [UUID: Int]? = nil // Temporary override during animation
-    
-    // Turn transition gating (freeze UI rotation during reveal)
-    @State private var turnTransitionLocked: Bool = false
-    @State private var displayCurrentPlayerId: UUID? = nil
-    @State private var revealTask: Task<Void, Never>? = nil
-    
-    // UI gate: holds lock overlay through reveal + rotation + padding
-    @State private var turnUIGateActive: Bool = false
-    
-    // Checkout display control
-    @State private var showCheckout: Bool = true
-    
-    // Timing constants for turn transition phases
-    private let revealHoldNs: UInt64 = 1_700_000_000         // 1.7s reveal duration (extended for sequential animation)
-    private let rotateAnimNs: UInt64 = 350_000_000           // 0.35s card rotation animation
-    private let postRotatePaddingNs: UInt64 = 150_000_000    // 0.15s extra padding after rotation
-    
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var router: Router
@@ -62,6 +37,7 @@ struct RemoteGameplayView: View {
     
     // MARK: - Live Match Data
     
+    /// Live match - observe remoteMatchService directly for reactive updates
     private var liveMatch: RemoteMatch? {
         // Prefer flowMatch if present and matches our ID
         if let fm = remoteMatchService.flowMatch, fm.id == matchId {
@@ -86,14 +62,9 @@ struct RemoteGameplayView: View {
     
     // MARK: - Unified Render Source (Server-Authoritative)
     
-    /// Server match (flowMatch from RemoteMatchService)
-    private var serverMatch: RemoteMatch? {
-        remoteMatchService.flowMatch
-    }
-    
     /// Primary match data: prefer server, fallback to liveMatch
     private var renderMatch: RemoteMatch? {
-        serverMatch ?? liveMatch
+        remoteMatchService.flowMatch ?? liveMatch
     }
     
     /// Server-authoritative scores from renderMatch
@@ -103,7 +74,7 @@ struct RemoteGameplayView: View {
     
     /// Scores for UI: prefer local override, then server, then VM
     private var renderScores: [UUID: Int] {
-        localScoreOverride ?? serverScores ?? gameViewModel.playerScores
+        scoreAnimationHandler.renderScores(serverScores: serverScores, vmScores: gameViewModel.playerScores)
     }
     
     /// Server-authoritative current player ID
@@ -114,7 +85,7 @@ struct RemoteGameplayView: View {
     /// Current player index for UI: derive from display player ID (frozen during reveal)
     private var renderCurrentPlayerIndex: Int {
         // Use displayCurrentPlayerId when transition is locked (during reveal)
-        let effectivePlayerId = turnTransitionLocked ? displayCurrentPlayerId : serverCurrentPlayerId
+        let effectivePlayerId = revealState.turnTransitionLocked ? revealState.displayCurrentPlayerId : serverCurrentPlayerId
         
         guard let playerId = effectivePlayerId,
               let adapter = adapter else {
@@ -128,10 +99,7 @@ struct RemoteGameplayView: View {
     /// Round number: server-authoritative (increments after both players complete their turns)
     /// Formula: ROUND = (turn_index_in_leg / 2) + 1
     private var renderVisitNumber: Int {
-        let serverTurnIndex = renderMatch?.turnIndexInLeg
-        let roundNumber = serverTurnIndex != nil ? ((serverTurnIndex! / 2) + 1) : gameViewModel.currentVisit
-        print("🧮 [Round] serverTurnIndex=\(serverTurnIndex?.description ?? "nil") renderRound=\(roundNumber)")
-        return roundNumber
+        syncManager.renderVisitNumber
     }
     
     /// Check if it's my turn (server-authoritative with fallback)
@@ -141,7 +109,7 @@ struct RemoteGameplayView: View {
     
     /// Input gate: only enable when it's my turn AND UI gate is OFF AND not saving
     private var isInputEnabled: Bool {
-        isMyTurn && !turnUIGateActive && !gameViewModel.isSaving
+        isMyTurn && !revealState.turnUIGateActive && !gameViewModel.isSaving
     }
     
     /// CurrentThrowDisplay should show:
@@ -149,9 +117,9 @@ struct RemoteGameplayView: View {
     /// - My input when it's my turn
     /// - Otherwise empty []
     private var renderThrowForCurrentThrowDisplay: [ScoredThrow] {
-        if preTurnRevealIsActive {
+        if revealState.preTurnRevealIsActive {
             // Show only revealed darts (sequential reveal)
-            return Array(fullOpponentDarts.prefix(revealedDartCount))
+            return Array(revealState.fullOpponentDarts.prefix(revealState.revealedDartCount))
         }
         if isMyTurn { return gameViewModel.currentThrow }
         return []
@@ -160,9 +128,9 @@ struct RemoteGameplayView: View {
     /// Combined score animation state: current player OR opponent
     /// In remote matches, we animate either:
     /// - Current player's score when they save (gameViewModel.showScoreAnimation)
-    /// - Opponent's score during reveal (showOpponentScoreAnimation)
+    /// - Opponent's score during reveal (revealState.showOpponentScoreAnimation)
     private var showAnyScoreAnimation: Bool {
-        gameViewModel.showScoreAnimation || showOpponentScoreAnimation
+        gameViewModel.showScoreAnimation || revealState.showOpponentScoreAnimation
     }
     
     /// Checkout to display: current player sees live updates, opponent sees frozen initial checkout
@@ -170,24 +138,25 @@ struct RemoteGameplayView: View {
         if isMyTurn {
             return gameViewModel.suggestedCheckout // Live updates as darts are thrown
         } else {
-            return gameViewModel.initialCheckoutForTurn // Frozen initial checkout
+            return nil // Opponent doesn't see checkout (they see opponent's darts)
         }
     }
     
-    // MARK: - Local Score Override Methods
+    // MARK: - Local Score Override Methods (delegated to ScoreAnimationHandler)
     
     /// Set local score override for current player during animation
     private func setLocalScoreOverride(playerId: UUID, score: Int) {
-        var override = serverScores ?? gameViewModel.playerScores
-        override[playerId] = score
-        localScoreOverride = override
-        print("🎬 [LocalOverride] Set score for \(playerId.uuidString.prefix(8)): \(score)")
+        scoreAnimationHandler.setLocalScoreOverride(
+            playerId: playerId,
+            score: score,
+            serverScores: serverScores,
+            vmScores: gameViewModel.playerScores
+        )
     }
     
     /// Clear local score override (server scores will take over)
     private func clearLocalScoreOverride() {
-        localScoreOverride = nil
-        print("🎬 [LocalOverride] Cleared")
+        scoreAnimationHandler.clearLocalScoreOverride()
     }
     
     // MARK: - Debug Helpers
@@ -203,9 +172,14 @@ struct RemoteGameplayView: View {
         dbgMatchSnapshot("APPEAR")
         print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
         
+        // Wire up syncManager dependencies
+        syncManager.remoteMatchService = remoteMatchService
+        syncManager.gameViewModel = gameViewModel
+        syncManager.startSync()
+        
         // Initialize displayCurrentPlayerId to current server state
-        displayCurrentPlayerId = serverCurrentPlayerId
-        print("🎯 [TurnGate] Initialized displayCurrentPlayerId=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
+        revealState.displayCurrentPlayerId = serverCurrentPlayerId
+        print("🎯 [TurnGate] Initialized displayCurrentPlayerId=\(revealState.displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
         
         // 🧪 DEBUG STEP 1: Confirm remoteMatchService exists in environment
         print("🧪 [RemoteGameplay] env remoteMatchService exists, flowMatchId=\(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")..., matchId=\(matchId.uuidString.prefix(8))...")
@@ -235,28 +209,17 @@ struct RemoteGameplayView: View {
     }
     
     private func setupNotificationObservers() {
-        // Listen for score updates during animation
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("RemoteMatchScoreUpdated"),
-            object: nil,
-            queue: .main
-        ) { notification in
-            if let playerId = notification.userInfo?["playerId"] as? UUID,
-               let score = notification.userInfo?["score"] as? Int {
+        scoreAnimationHandler.setupNotificationObservers(
+            preTurnRevealIsActive: {
+                self.revealState.preTurnRevealIsActive
+            },
+            onScoreUpdate: { playerId, score in
                 self.setLocalScoreOverride(playerId: playerId, score: score)
+            },
+            onClearOverride: {
+                self.clearLocalScoreOverride()
             }
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("RemoteMatchScoreAnimationComplete"),
-            object: nil,
-            queue: .main
-        ) { [self] _ in
-            // Only clear if not during opponent reveal (opponent manages its own override)
-            if !preTurnRevealIsActive {
-                clearLocalScoreOverride()
-            }
-        }
+        )
     }
     
     private func logTruthTable() {
@@ -292,65 +255,43 @@ struct RemoteGameplayView: View {
         print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
         
         // Cancel reveal timer
-        revealTask?.cancel()
+        revealState.cancelReveal()
+        
+        // Cleanup score animation
+        scoreAnimationHandler.cleanup()
+        
+        // Stop sync
+        syncManager.stopSync()
         
         remoteMatchService.exitRemoteFlow()
     }
     
-    // MARK: - Server Sync Handlers
+    // MARK: - Server Sync Handlers (delegated to SyncManager)
     
     private func handleServerScoresChange(oldValue: [UUID: Int]?, newValue: [UUID: Int]?) {
-        // Sync VM scores from server when they update
-        if let newScores = newValue {
-            print("🔄 [Sync] Server scores updated, syncing to VM: \(newScores)")
-            gameViewModel.playerScores = newScores
-            
-            // Clear local override when server scores arrive (prevents revert)
-            if localScoreOverride != nil {
-                print("🎬 [LocalOverride] Cleared by server update")
-                clearLocalScoreOverride()
-            }
+        syncManager.handleServerScoresChange(oldValue: oldValue, newValue: newValue)
+        
+        // Clear local override when server scores arrive (prevents revert)
+        if newValue != nil && scoreAnimationHandler.localScoreOverride != nil {
+            print("🎬 [LocalOverride] Cleared by server update")
+            clearLocalScoreOverride()
         }
     }
     
     private func handleCurrentPlayerChange(oldValue: UUID?, newValue: UUID?) {
-        // Sync VM current player index from server when it updates
-        if let newPlayerId = newValue, let currentAdapter = self.adapter {
-            if let newIndex = currentAdapter.playerIndex(for: newPlayerId) {
-                print("🔄 [Sync] Server currentPlayerId updated to \(newPlayerId.uuidString.prefix(8))..., syncing VM index to \(newIndex)")
-                gameViewModel.currentPlayerIndex = newIndex
-            }
-        }
+        syncManager.handleCurrentPlayerChange(oldValue: oldValue, newValue: newValue)
         
         // Evaluate turn gate (dual-trigger system)
         evaluateTurnGate(reason: "serverCP change")
     }
     
     private func handleLastVisitTimestampChange(oldValue: String?, newValue: String?) {
-        print("🔄 [Sync] lastVisitPayload.timestamp changed: \(oldValue ?? "nil") → \(newValue ?? "nil")")
+        syncManager.handleLastVisitTimestampChange(oldValue: oldValue, newValue: newValue)
         evaluateTurnGate(reason: "lvp.ts change")
     }
     
     private func handleMatchStatusChange(oldStatus: RemoteMatchStatus?, newStatus: RemoteMatchStatus?) {
-        print("🔄 [Remote] Match status changed: \(oldStatus?.rawValue ?? "nil") → \(newStatus?.rawValue ?? "nil")")
-        
-        if newStatus == .completed {
-            // Match ended on server - sync winner
-            if let winnerId = renderMatch?.winnerId {
-                if let winnerPlayer = gameViewModel.players.first(where: { $0.id == winnerId }) {
-                    // Only set if not already set (avoid duplicate navigation)
-                    if gameViewModel.winner == nil {
-                        gameViewModel.winner = winnerPlayer
-                        print("🏆 [Remote] Server reported winner: \(winnerPlayer.displayName)")
-                        
-                        // Play win sound for opponent (winner already played it when they saved)
-                        if winnerId != currentUserId {
-                            SoundManager.shared.playCountdownWinner()
-                        }
-                    }
-                }
-            }
-        }
+        syncManager.handleMatchStatusChange(oldStatus: oldStatus, newStatus: newStatus)
     }
     
     private func dbgMatchSnapshot(_ label: String) {
@@ -361,185 +302,30 @@ struct RemoteGameplayView: View {
         let lvpPid = lvp?.playerId.uuidString.prefix(8) ?? "nil"
         let lvpTs = lvp?.timestamp ?? "nil"
         let darts = lvp?.darts ?? []
-        dbg("\(label) match=\(id) cp=\(cp) lvp.pid=\(lvpPid) ts=\(lvpTs) darts=\(darts) isMyTurn=\(isMyTurn) preReveal=\(preTurnRevealIsActive)")
+        dbg("\(label) match=\(id) cp=\(cp) lvp.pid=\(lvpPid) ts=\(lvpTs) darts=\(darts) isMyTurn=\(isMyTurn) preReveal=\(revealState.preTurnRevealIsActive)")
     }
     
-    // MARK: - Turn Gate Logic
+    // MARK: - Turn Gate Logic (delegated to RevealState)
     
     /// Centralized turn gate evaluation - triggers on either serverCurrentPlayerId or lastVisitPayload.timestamp changes
     @MainActor
     private func evaluateTurnGate(reason: String) {
-        let serverCP = serverCurrentPlayerId
-        let lvp = renderMatch?.lastVisitPayload
-
-        // If locked, do NOT auto-sync display id here
-        if turnTransitionLocked {
-            print("🎯 [TurnGate] evaluate(\(reason)) skipped: locked")
-            return
-        }
-
-        // If we don't have a payload yet, normal sync
-        guard let lvp else {
-            displayCurrentPlayerId = serverCP
-            print("🎯 [TurnGate] evaluate(\(reason)) no LVP → sync displayCP=\(serverCP?.uuidString.prefix(8) ?? "nil")")
-            return
-        }
-
-        // Ignore own visit
-        guard lvp.playerId != currentUserId else {
-            displayCurrentPlayerId = serverCP
-            print("🎯 [TurnGate] evaluate(\(reason)) own LVP → sync displayCP")
-            return
-        }
-
-        // Only gate when it becomes MY turn
-        guard serverCP == currentUserId else {
-            displayCurrentPlayerId = serverCP
-            print("🎯 [TurnGate] evaluate(\(reason)) not my turn → sync displayCP")
-            return
-        }
-
-        // Avoid re-triggering for same timestamp
-        if lastSeenVisitTimestamp == lvp.timestamp {
-            displayCurrentPlayerId = serverCP
-            print("🎯 [TurnGate] evaluate(\(reason)) same ts → sync displayCP")
-            return
-        }
-
-        // 🔥 GATED TRANSITION
-        print("🎯 [TURN_GATE] TRIGGER(\(reason)): serverCP=\(serverCP?.uuidString.prefix(8) ?? "nil") lvp.pid=\(lvp.playerId.uuidString.prefix(8)) ts=\(lvp.timestamp)")
-        lastSeenVisitTimestamp = lvp.timestamp
-
-        // Cancel existing task and reset all gates for safety
-        revealTask?.cancel()
-        preTurnRevealIsActive = false
-        turnTransitionLocked = false
-        turnUIGateActive = false
-        revealedDartCount = 0
-        showRevealTotal = false
-        showOpponentScoreAnimation = false
-        
-        // Set gates ON
-        turnTransitionLocked = true
-        turnUIGateActive = true
-        print("🎯 [TURN_GATE] LOCK ON")
-        print("🎯 [TurnGate] UI GATE ON (lock overlay held)")
-
-        // Store full opponent darts for sequential reveal
-        fullOpponentDarts = lvp.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
-        preTurnRevealIsActive = true
-        print("🎯 [PreTurnReveal] START sequential reveal darts=\(lvp.darts) ts=\(lvp.timestamp)")
-
-        // CRITICAL: Hold back opponent's score by setting override with OLD score
-        // This prevents the server's NEW score from showing until animation peak
-        let opponentId = lvp.playerId
-        let oldScore = lvp.scoreBefore
-        setLocalScoreOverride(playerId: opponentId, score: oldScore)
-        print("🎯 [PreTurnReveal] Holding opponent score at OLD value: \(oldScore)")
-
-        // Capture variables for Task closure
-        let capturedLvp = lvp
-        let capturedRenderMatch = renderMatch
-        
-        // Sequential reveal with score animation
-        revealTask = Task { @MainActor in
-            do {
-                // Dart 1 appears immediately with Throw sound
-                SoundManager.shared.playCountdownThud()
-                revealedDartCount = 1
-                print("🎯 [PreTurnReveal] Dart 1")
-                
-                // Dart 2 (0.25s later)
-                try await Task.sleep(nanoseconds: 250_000_000)
-                SoundManager.shared.playCountdownThud()
-                revealedDartCount = 2
-                print("🎯 [PreTurnReveal] Dart 2")
-                
-                // Dart 3 (0.25s later)
-                try await Task.sleep(nanoseconds: 250_000_000)
-                SoundManager.shared.playCountdownThud()
-                revealedDartCount = 3
-                print("🎯 [PreTurnReveal] Dart 3")
-                
-                // Total appears (0.25s later, no sound)
-                try await Task.sleep(nanoseconds: 250_000_000)
-                showRevealTotal = true
-                print("🎯 [PreTurnReveal] Total shown")
-                
-                // Opponent score animation (0.5s later, like hitting save button)
-                try await Task.sleep(nanoseconds: 500_000_000)
-                SoundManager.shared.playCountdownSaveScore()
-                showOpponentScoreAnimation = true
-                print("🎯 [PreTurnReveal] Opponent score animation START")
-                
-                // Wait for animation to reach peak (0.125s)
-                try await Task.sleep(nanoseconds: 125_000_000)
-                
-                // Update opponent's score at animation peak (dramatic reveal!)
-                let opponentId = capturedLvp.playerId
-                if let match = capturedRenderMatch,
-                   let playerScores = match.playerScores,
-                   let newScore = playerScores[opponentId] {
-                    setLocalScoreOverride(playerId: opponentId, score: newScore)
-                    print("🎯 [PreTurnReveal] Opponent score updated at peak: \(newScore)")
-                }
-                
-                
-                // Clear opponent score animation (0.125s later - completes 0.25s total)
-                try await Task.sleep(nanoseconds: 125_000_000)
-                showOpponentScoreAnimation = false
-                print("🎯 [PreTurnReveal] Opponent score animation END")
-                
-                // Pause to let score settle (0.5s)
-                try await Task.sleep(nanoseconds: 500_000_000)
-                print("🎯 [PreTurnReveal] Pause complete, ready for rotation")
-                
-                // Fade out checkout before rotation
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showCheckout = false
-                }
-                print("🎯 [Checkout] Fading out before rotation")
-                
-                // Wait for fade to complete
-                try await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-                
-                // Rotate card after pause
-                print("🎯 [TurnGate] ROTATE (after pause)")
-                displayCurrentPlayerId = serverCurrentPlayerId
-                
-                // Phase B: Keep overlay locked during rotation animation
-                try await Task.sleep(nanoseconds: rotateAnimNs + postRotatePaddingNs)
-                
-                // Now unlock + clear reveal + clear score override
-                print("🎯 [TurnGate] UNLOCK UI (after rotate)")
-                preTurnRevealIsActive = false
-                turnTransitionLocked = false
-                turnUIGateActive = false
-                revealedDartCount = 0
-                showRevealTotal = false
-                clearLocalScoreOverride()
-                print("🎯 [TurnGate] displayCP=\(displayCurrentPlayerId?.uuidString.prefix(8) ?? "nil") unlocked")
-                
-                // Wait 0.5s after unlock, then fade in new checkout
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-                
-                // Update checkout for new current player
-                gameViewModel.updateCheckoutSuggestion()
-                
-                // Fade in checkout if available
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showCheckout = true
-                }
-                print("🎯 [Checkout] Fading in for new player")
-            } catch {
-                print("🎯 [TURN_GATE] cancelled")
-                // Clean up on cancellation
-                revealedDartCount = 0
-                showRevealTotal = false
-                showOpponentScoreAnimation = false
-                clearLocalScoreOverride()
-            }
-        }
+        revealState.evaluateTurnGate(
+            serverCurrentPlayerId: serverCurrentPlayerId,
+            lastVisitPayload: renderMatch?.lastVisitPayload,
+            currentUserId: currentUserId,
+            renderMatch: renderMatch,
+            onScoreOverride: { playerId, score in
+                self.setLocalScoreOverride(playerId: playerId, score: score)
+            },
+            onClearScoreOverride: {
+                self.clearLocalScoreOverride()
+            },
+            onUpdateCheckout: {
+                self.gameViewModel.updateCheckoutSuggestion()
+            },
+            reason: reason
+        )
     }
     
     /// Server last visit timestamp (observes renderMatch for reactive updates)
@@ -700,7 +486,7 @@ struct RemoteGameplayView: View {
 
             // Checkout suggestion slot
             VStack {
-                if showCheckout, let checkout = renderCheckout {
+                if revealState.showCheckout, let checkout = renderCheckout {
                     CheckoutSuggestionView(checkout: checkout)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 0)
@@ -709,7 +495,7 @@ struct RemoteGameplayView: View {
             }
             .frame(height: 40, alignment: .center)
             .padding(.bottom, 8)
-            .animation(.easeInOut(duration: 0.3), value: showCheckout)
+            .animation(.easeInOut(duration: 0.3), value: revealState.showCheckout)
 
             Spacer(minLength: 0)
         }
@@ -915,6 +701,26 @@ struct RemoteGameplayView: View {
                 remoteMatchId: matchId
             )
         )
+        
+        // Initialize SyncManager
+        _syncManager = StateObject(
+            wrappedValue: RemoteGameSyncManager(
+                matchId: matchId,
+                challenger: challenger,
+                receiver: receiver,
+                currentUserId: currentUserId
+            )
+        )
+        
+        // Initialize RevealState
+        _revealState = StateObject(
+            wrappedValue: RemoteTurnRevealState()
+        )
+        
+        // Initialize ScoreAnimationHandler
+        _scoreAnimationHandler = StateObject(
+            wrappedValue: RemoteScoreAnimationHandler()
+        )
     }
     
     // Helper function for navigation title using live match
@@ -938,7 +744,7 @@ struct RemoteGameplayView: View {
         
         // 🎯 UI GATE: keep the lock overlay up through reveal + rotate + padding
         let overlayState: RemoteGameStateAdapter.OverlayState = {
-            if turnUIGateActive {
+            if revealState.turnUIGateActive {
                 return .inactiveLockout
             }
             return baseOverlayState
@@ -987,7 +793,7 @@ struct RemoteGameplayView: View {
                         dbg("onChange(currentPlayerId) old=\(oldId?.uuidString.prefix(8) ?? "nil") new=\(newId?.uuidString.prefix(8) ?? "nil")")
                         dbgMatchSnapshot("CP_CHANGE")
                     }
-                    .onChange(of: preTurnRevealIsActive) { old, new in
+                    .onChange(of: revealState.preTurnRevealIsActive) { old, new in
                         dbg("onChange(preTurnRevealIsActive) \(old) -> \(new)")
                         dbgMatchSnapshot("REVEAL_FLAG_CHANGE")
                     }
