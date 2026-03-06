@@ -13,6 +13,7 @@ struct RemoteGameplayView: View {
     let challenger: User
     let receiver: User
     let currentUserId: UUID
+    @Binding var selectedTab: Int
     
     // Game state managed by ViewModel
     @StateObject private var gameViewModel: RemoteGameViewModel
@@ -29,6 +30,7 @@ struct RemoteGameplayView: View {
     @State private var currentTip: GameTip? = nil
     @State private var isScoreboardExpanded: Bool = false
     @State private var isSaving: Bool = false
+    @State private var isNavigatingToGameEnd: Bool = false
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
@@ -252,17 +254,20 @@ struct RemoteGameplayView: View {
     }
     
     private func cleanupGameplayView() {
+        // Skip exitRemoteFlow if navigating to GameEnd
+        if isNavigatingToGameEnd {
+            print("👋 [RemoteGameplayView] onDisappear - skip exitRemoteFlow (navigating to GameEnd)")
+            // Cancel reveal timer
+            revealState.cancelReveal()
+            return
+        }
+        
         print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
         
         // Cancel reveal timer
         revealState.cancelReveal()
         
-        // Cleanup score animation
-        scoreAnimationHandler.cleanup()
-        
-        // Stop sync
-        syncManager.stopSync()
-        
+        // Exit remote flow
         remoteMatchService.exitRemoteFlow()
     }
     
@@ -645,11 +650,12 @@ struct RemoteGameplayView: View {
         }
     }
     
-    init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID) {
+    init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {
         self.matchId = matchId
         self.challenger = challenger
         self.receiver = receiver
         self.currentUserId = currentUserId
+        self._selectedTab = selectedTab
         
         print("🎯 [RemoteGameplayView] Init - matchId: \(matchId.uuidString.prefix(8))...")
         
@@ -817,9 +823,26 @@ struct RemoteGameplayView: View {
         }
             .alert("Exit Game", isPresented: $showExitAlert) {
                 Button("Cancel", role: .cancel) { }
-                Button("Leave Game", role: .destructive) { router.popToRoot() }
+                Button("Abort Game", role: .destructive) {
+                    print("🟠 [ExitGame] Abort Game button tapped - matchId: \(matchId)")
+                    Task {
+                        do {
+                            try await remoteMatchService.abortMatch(matchId: matchId)
+                            print("✅ [ExitGame] Match aborted successfully")
+                            await MainActor.run {
+                                router.popToRoot()
+                            }
+                        } catch {
+                            print("❌ [ExitGame] Failed to abort match: \(error)")
+                            // Still navigate back even on error
+                            await MainActor.run {
+                                router.popToRoot()
+                            }
+                        }
+                    }
+                }
             } message: {
-                Text("Are you sure you want to leave the game? Your progress will be lost.")
+                Text("Are you sure you want to abort the match? This will end the game for both players.")
             }
             .alert("Restart Game", isPresented: $showRestartAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -846,6 +869,9 @@ struct RemoteGameplayView: View {
             .onChange(of: gameViewModel.winner) { _, newValue in
                 if let winner = newValue, let m = liveMatch {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        // Set flag to prevent exitRemoteFlow in onDisappear
+                        isNavigatingToGameEnd = true
+                        
                         let tempGame = Game(
                             title: m.gameName,
                             subtitle: "Remote Match",
@@ -857,11 +883,18 @@ struct RemoteGameplayView: View {
                             winner: winner,
                             players: gameViewModel.players,
                             onPlayAgain: {
+                                // Exit remote flow before restarting
+                                remoteMatchService.exitRemoteFlow()
+                                
                                 gameViewModel.restartGame()
                                 router.pop()
                             },
                             onBackToGames: {
+                                // CRITICAL: Exit remote flow to clear state and trigger list refresh
+                                remoteMatchService.exitRemoteFlow()
+                                
                                 router.popToRoot()
+                                selectedTab = 0  // Switch to main Games tab
                             },
                             matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
                             legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,

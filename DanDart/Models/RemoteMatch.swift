@@ -51,7 +51,7 @@ enum RemoteMatchStatus: String, Codable, CaseIterable {
 
 // MARK: - Remote Match Model
 
-struct RemoteMatch: Identifiable, Codable, Equatable {
+struct RemoteMatch: Identifiable, Equatable, Decodable {
     let id: UUID
     let matchMode: String // 'local' | 'remote'
     let gameType: String // '301' | '501'
@@ -81,6 +81,7 @@ struct RemoteMatch: Identifiable, Codable, Equatable {
     let endedBy: UUID?
     let endedReason: String?
     let winnerId: UUID? // Winner of the match (set when status = completed)
+    let endedAt: Date?
     
     // Debug counter for Phase 2 testing (DEBUG only)
     var debugCounter: Int?
@@ -188,6 +189,98 @@ struct RemoteMatch: Identifiable, Codable, Equatable {
         case endedBy = "ended_by"
         case endedReason = "ended_reason"
         case winnerId = "winner_id"
+        case endedAt = "ended_at"
+        case debugCounter = "debug_counter"
+    }
+    
+    // MARK: - Initializers
+    
+    /// Memberwise initializer for programmatic creation (mock data, tests)
+    init(
+        id: UUID,
+        matchMode: String,
+        gameType: String,
+        gameName: String,
+        matchFormat: Int,
+        challengerId: UUID,
+        receiverId: UUID,
+        status: RemoteMatchStatus?,
+        currentPlayerId: UUID?,
+        challengeExpiresAt: Date?,
+        joinWindowExpiresAt: Date?,
+        lastVisitPayload: LastVisitPayload?,
+        playerScores: [UUID: Int]? = nil,
+        turnIndexInLeg: Int? = nil,
+        createdAt: Date,
+        updatedAt: Date,
+        endedBy: UUID? = nil,
+        endedReason: String? = nil,
+        winnerId: UUID? = nil,
+        endedAt: Date? = nil,
+        debugCounter: Int? = nil
+    ) {
+        self.id = id
+        self.matchMode = matchMode
+        self.gameType = gameType
+        self.gameName = gameName
+        self.matchFormat = matchFormat
+        self.challengerId = challengerId
+        self.receiverId = receiverId
+        self.status = status
+        self.currentPlayerId = currentPlayerId
+        self.challengeExpiresAt = challengeExpiresAt
+        self.joinWindowExpiresAt = joinWindowExpiresAt
+        self.lastVisitPayload = lastVisitPayload
+        self.playerScores = playerScores
+        self.turnIndexInLeg = turnIndexInLeg
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.endedBy = endedBy
+        self.endedReason = endedReason
+        self.winnerId = winnerId
+        self.endedAt = endedAt
+        self.debugCounter = debugCounter
+    }
+    
+    // MARK: - Custom Decodable Implementation
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try c.decode(UUID.self, forKey: .id)
+        matchMode = try c.decode(String.self, forKey: .matchMode)
+        gameType = try c.decode(String.self, forKey: .gameType)
+        gameName = try c.decode(String.self, forKey: .gameName)
+        matchFormat = try c.decode(Int.self, forKey: .matchFormat)
+        challengerId = try c.decode(UUID.self, forKey: .challengerId)
+        receiverId = try c.decode(UUID.self, forKey: .receiverId)
+        status = try c.decodeIfPresent(RemoteMatchStatus.self, forKey: .status)
+        currentPlayerId = try c.decodeIfPresent(UUID.self, forKey: .currentPlayerId)
+        challengeExpiresAt = try c.decodeIfPresent(Date.self, forKey: .challengeExpiresAt)
+        joinWindowExpiresAt = try c.decodeIfPresent(Date.self, forKey: .joinWindowExpiresAt)
+        lastVisitPayload = try c.decodeIfPresent(LastVisitPayload.self, forKey: .lastVisitPayload)
+        turnIndexInLeg = try c.decodeIfPresent(Int.self, forKey: .turnIndexInLeg)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        endedBy = try c.decodeIfPresent(UUID.self, forKey: .endedBy)
+        endedReason = try c.decodeIfPresent(String.self, forKey: .endedReason)
+        winnerId = try c.decodeIfPresent(UUID.self, forKey: .winnerId)
+        endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
+        debugCounter = try c.decodeIfPresent(Int.self, forKey: .debugCounter)
+        
+        // ✅ Robust decode for player_scores (JSON object with string keys)
+        if let raw = try c.decodeIfPresent([String: Int].self, forKey: .playerScores) {
+            var mapped: [UUID: Int] = [:]
+            mapped.reserveCapacity(raw.count)
+            for (k, v) in raw {
+                if let uuid = UUID(uuidString: k) {
+                    mapped[uuid] = v
+                }
+            }
+            playerScores = mapped.isEmpty ? nil : mapped
+        } else {
+            playerScores = nil
+        }
     }
 }
 

@@ -115,6 +115,20 @@ class RemoteMatchService: ObservableObject {
             flowMatchId = nil
             flowMatch = nil
             print("🚦 [FlowGate] isInRemoteFlow = false (depth=0)")
+            
+            // Refresh match lists to filter out completed/cancelled matches
+            // Add delay to allow database replication to complete
+            Task {
+                guard let userId = await authService.currentUser?.id else { return }
+                let startTime = Date()
+                print("🔄 [FlowGate] Refreshing match lists after flow exit (with 500ms delay) at \(startTime)")
+                try? await Task.sleep(nanoseconds: 500_000_000) // 500ms delay
+                let executeTime = Date()
+                let delay = executeTime.timeIntervalSince(startTime)
+                print("🔄 [FlowGate] Executing delayed loadMatches() at \(executeTime) (actual delay: \(String(format: "%.3f", delay))s)")
+                try? await loadMatches(userId: userId)
+                print("🔄 [FlowGate] Delayed loadMatches() complete")
+            }
         }
     }
     
@@ -224,102 +238,123 @@ class RemoteMatchService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // Query matches where user is challenger or receiver
-        let matches: [RemoteMatch] = try await supabaseService.client
-            .from("matches")
-            .select()
-            .eq("match_mode", value: "remote")
-            .or("challenger_id.eq.\(userId.uuidString),receiver_id.eq.\(userId.uuidString)")
-            .order("created_at", ascending: false)
-            .execute()
-            .value
-        
-        // Load user data for all unique user IDs
-        var userIds = Set<UUID>()
-        for match in matches {
-            userIds.insert(match.challengerId)
-            userIds.insert(match.receiverId)
-        }
-        
-        let users: [User] = try await supabaseService.client
-            .from("users")
-            .select()
-            .in("id", values: Array(userIds).map { $0.uuidString })
-            .execute()
-            .value
-        
-        let userDict = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0) })
-        
-        // Build RemoteMatchWithPlayers objects
-        var pending: [RemoteMatchWithPlayers] = []
-        var sent: [RemoteMatchWithPlayers] = []
-        var ready: [RemoteMatchWithPlayers] = []
-        var active: RemoteMatchWithPlayers?
-        
-        for match in matches {
-            guard let challenger = userDict[match.challengerId],
-                  let receiver = userDict[match.receiverId] else {
-                continue
+        do {
+            // Query matches where user is challenger or receiver
+            let matches: [RemoteMatch] = try await supabaseService.client
+                .from("matches")
+                .select()
+                .eq("match_mode", value: "remote")
+                .or("challenger_id.eq.\(userId.uuidString),receiver_id.eq.\(userId.uuidString)")
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            
+            print("📊 [LoadMatches] Query returned \(matches.count) total matches")
+            for match in matches {
+                print("   - \(match.id.uuidString.prefix(8))... status=\(match.status?.rawValue ?? "nil") updated=\(match.updatedAt)")
             }
             
-            let matchWithPlayers = RemoteMatchWithPlayers(
-                match: match,
-                challenger: challenger,
-                receiver: receiver,
-                currentUserId: userId
-            )
+            // Load user data for all unique user IDs
+            var userIds = Set<UUID>()
+            for match in matches {
+                userIds.insert(match.challengerId)
+                userIds.insert(match.receiverId)
+            }
             
-            // Handle optional status
-            guard let _ = match.status else { continue }
+            let users: [User] = try await supabaseService.client
+                .from("users")
+                .select()
+                .in("id", values: Array(userIds).map { $0.uuidString })
+                .execute()
+                .value
             
-            // Use presentation status to freeze list grouping during enter flow
-            let status = await MainActor.run { debugPresentationStatus(match) }
+            let userDict = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0) })
             
-            switch status {
-            case .pending:
-                if match.receiverId == userId {
-                    pending.append(matchWithPlayers)
-                } else {
-                    sent.append(matchWithPlayers)
+            // Build RemoteMatchWithPlayers objects
+            var pending: [RemoteMatchWithPlayers] = []
+            var sent: [RemoteMatchWithPlayers] = []
+            var ready: [RemoteMatchWithPlayers] = []
+            var active: RemoteMatchWithPlayers?
+            
+            for match in matches {
+                guard let challenger = userDict[match.challengerId],
+                      let receiver = userDict[match.receiverId] else {
+                    continue
                 }
-            case .sent:
-                // This should never come from database, but handle it for completeness
-                // .sent is UI-only state, database always uses .pending
-                sent.append(matchWithPlayers)
-            case .ready:
-                ready.append(matchWithPlayers)
-            case .lobby:
-                // For lobby state, check if current user has joined
-                // If not joined → show as ready (challenger waiting to join)
-                // If joined → show as active (user is in lobby)
-                // Check synchronously to ensure activeMatch is set before loadMatches returns
-                let hasJoined = await checkIfUserJoinedMatch(matchId: match.id, userId: userId)
-                await MainActor.run {
-                    if hasJoined {
-                        active = matchWithPlayers
+                
+                let matchWithPlayers = RemoteMatchWithPlayers(
+                    match: match,
+                    challenger: challenger,
+                    receiver: receiver,
+                    currentUserId: userId
+                )
+                
+                // Handle optional status
+                guard let _ = match.status else { continue }
+                
+                // Use presentation status to freeze list grouping during enter flow
+                let status = await MainActor.run { debugPresentationStatus(match) }
+                
+                print("🔍 [LoadMatches] Match \(match.id.uuidString.prefix(8))... raw=\(match.status?.rawValue ?? "nil") pres=\(status.rawValue)")
+                
+                switch status {
+                case .pending:
+                    if match.receiverId == userId {
+                        pending.append(matchWithPlayers)
                     } else {
-                        ready.append(matchWithPlayers)
+                        sent.append(matchWithPlayers)
                     }
+                case .sent:
+                    // This should never come from database, but handle it for completeness
+                    // .sent is UI-only state, database always uses .pending
+                    sent.append(matchWithPlayers)
+                case .ready:
+                    ready.append(matchWithPlayers)
+                case .lobby:
+                    // For lobby state, check if current user has joined
+                    // If not joined → show as ready (challenger waiting to join)
+                    // If joined → show as active (user is in lobby)
+                    // Check synchronously to ensure activeMatch is set before loadMatches returns
+                    let hasJoined = await checkIfUserJoinedMatch(matchId: match.id, userId: userId)
+                    await MainActor.run {
+                        if hasJoined {
+                            active = matchWithPlayers
+                        } else {
+                            ready.append(matchWithPlayers)
+                        }
+                    }
+                case .inProgress:
+                    active = matchWithPlayers
+                case .cancelled, .completed, .expired:
+                    // Terminal states - don't show in any list
+                    // Cancelled: receiver declined it, or user cancelled their own challenge
+                    // Completed/Expired: match is finished
+                    // Either way, exclude from active lists
+                    print("🚫 [LoadMatches] FILTERED OUT match \(match.id.uuidString.prefix(8))... status=\(status.rawValue)")
+                    break
                 }
-            case .inProgress:
-                active = matchWithPlayers
-            case .cancelled, .completed, .expired:
-                // Terminal states - don't show in any list
-                // Cancelled: receiver declined it, or user cancelled their own challenge
-                // Completed/Expired: match is finished
-                // Either way, exclude from active lists
-                break
             }
+            
+            // Debug logging to confirm filtering
+            print("🧹 Filtered lists - Pending: \(pending.count), Sent: \(sent.count), Ready: \(ready.count)")
+            print("🧹 Sent challenges:", sent.map { "\($0.match.id.uuidString.prefix(8))... status=\($0.match.status?.rawValue ?? "nil")" })
+            
+            self.pendingChallenges = pending
+            self.sentChallenges = sent
+            self.readyMatches = ready
+            self.activeMatch = active
+            
+        } catch {
+            print("❌ Failed to load remote matches: \(error)")
+            // Clear lists to prevent stale UI state from persisting
+            await MainActor.run {
+                self.pendingChallenges = []
+                self.sentChallenges = []
+                self.readyMatches = []
+                self.activeMatch = nil
+            }
+            throw error
         }
-        
-        // Debug logging to confirm filtering
-        print("🧹 Filtered lists - Pending: \(pending.count), Sent: \(sent.count), Ready: \(ready.count)")
-        print("🧹 Sent challenges:", sent.map { "\($0.match.id.uuidString.prefix(8))... status=\($0.match.status?.rawValue ?? "nil")" })
-        
-        self.pendingChallenges = pending
-        self.sentChallenges = sent
-        self.readyMatches = ready
-        self.activeMatch = active
     }
     
     // MARK: - Create Challenge
@@ -704,6 +739,61 @@ class RemoteMatchService: ObservableObject {
         } catch {
             print("❌ [AbortMatch] Unexpected error: \(error)")
             print("🟠 [AbortMatch] ========================================")
+            throw error
+        }
+    }
+    
+    /// Complete a match that has finished naturally with a winner (calls Edge Function)
+    func completeMatch(matchId: UUID, winnerId: UUID) async throws {
+        struct CompleteRequest: Encodable {
+            let match_id: String
+            let winner_id: String
+        }
+        
+        let request = CompleteRequest(match_id: matchId.uuidString, winner_id: winnerId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        // Log request details
+        print("🏆 [CompleteMatch] ========================================")
+        print("🏆 [CompleteMatch] Calling complete-match Edge Function")
+        print("🏆 [CompleteMatch] Match ID: \(matchId)")
+        print("🏆 [CompleteMatch] Winner ID: \(winnerId)")
+        print("🏆 [CompleteMatch] Request payload: match_id=\(request.match_id), winner_id=\(request.winner_id)")
+        print("🏆 [CompleteMatch] Headers: apikey=\(headers["apikey"]?.prefix(20) ?? "nil")...")
+        print("🏆 [CompleteMatch] Auth token: \(headers["Authorization"]?.prefix(30) ?? "nil")...")
+        
+        do {
+            let _: EmptyResponse = try await supabaseService.client.functions
+                .invoke("complete-match", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: request
+                ))
+            
+            print("✅ [CompleteMatch] Match completed successfully: \(matchId), winner: \(winnerId)")
+            print("🏆 [CompleteMatch] ========================================")
+        } catch let error as FunctionsError {
+            // Detailed error logging
+            print("❌ [CompleteMatch] Edge Function error:")
+            print("❌ [CompleteMatch] Error type: \(error)")
+            
+            // Try to extract response body
+            if case .httpError(let code, let data) = error {
+                print("❌ [CompleteMatch] HTTP Code: \(code)")
+                print("❌ [CompleteMatch] Response data size: \(data.count) bytes")
+                
+                // Decode response body as string
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("❌ [CompleteMatch] Response body: \(responseString)")
+                } else {
+                    print("❌ [CompleteMatch] Response body (hex): \(data.map { String(format: "%02x", $0) }.joined())")
+                }
+            }
+            
+            print("🏆 [CompleteMatch] ========================================")
+            throw error
+        } catch {
+            print("❌ [CompleteMatch] Unexpected error: \(error)")
+            print("🏆 [CompleteMatch] ========================================")
             throw error
         }
     }
