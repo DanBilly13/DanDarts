@@ -32,6 +32,10 @@ struct RemoteGameplayView: View {
     @State private var isSaving: Bool = false
     @State private var isNavigatingToGameEnd: Bool = false
     
+    // Local score hold - prevents flash when override clears before server catches up
+    @State private var localScoreHold: [UUID: Int] = [:]
+    @State private var localScoreHoldExpiry: [UUID: Date] = [:]
+    
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var router: Router
@@ -74,9 +78,18 @@ struct RemoteGameplayView: View {
         renderMatch?.playerScores
     }
     
-    /// Scores for UI: prefer local override, then server, then VM
+    /// Scores for UI: prefer local override, then local hold, then server, then VM
     private var renderScores: [UUID: Int] {
-        scoreAnimationHandler.renderScores(serverScores: serverScores, vmScores: gameViewModel.playerScores)
+        // Start with server or VM scores
+        var mergedScores = serverScores ?? gameViewModel.playerScores
+        
+        // Overlay local holds (authoritative for display while server is catching up)
+        for (playerId, score) in localScoreHold {
+            mergedScores[playerId] = score
+        }
+        
+        // Pass merged scores to animation handler (which applies override on top)
+        return scoreAnimationHandler.renderScores(serverScores: mergedScores, vmScores: gameViewModel.playerScores)
     }
     
     /// Server-authoritative current player ID
@@ -161,6 +174,37 @@ struct RemoteGameplayView: View {
         scoreAnimationHandler.clearLocalScoreOverride()
     }
     
+    // MARK: - Local Score Hold Methods
+    
+    /// Set local score hold for a player during animation (prevents flash when override clears)
+    private func setLocalScoreHold(playerId: UUID, score: Int, holdSeconds: TimeInterval = 1.25) {
+        localScoreHold[playerId] = score
+        localScoreHoldExpiry[playerId] = Date().addingTimeInterval(holdSeconds)
+        print("🔒 [ScoreHold] Set hold: player=\(playerId.uuidString.prefix(8)) score=\(score) expires in \(holdSeconds)s")
+        
+        // Cleanup after expiry (don't await; just schedule)
+        DispatchQueue.main.asyncAfter(deadline: .now() + holdSeconds) {
+            // Only clear if we're past expiry (avoid racing multiple holds)
+            if let expiry = self.localScoreHoldExpiry[playerId], expiry <= Date() {
+                self.localScoreHold[playerId] = nil
+                self.localScoreHoldExpiry[playerId] = nil
+                print("⏱️ [ScoreHold] Expired: player=\(playerId.uuidString.prefix(8))")
+            }
+        }
+    }
+    
+    /// Clear local score hold if server has caught up to the held value
+    private func clearLocalScoreHoldIfServerCaughtUp(serverScores: [UUID: Int]?) {
+        guard let serverScores else { return }
+        for (playerId, heldScore) in localScoreHold {
+            if serverScores[playerId] == heldScore {
+                localScoreHold[playerId] = nil
+                localScoreHoldExpiry[playerId] = nil
+                print("✅ [ScoreHold] Cleared early (server caught up): player=\(playerId.uuidString.prefix(8)) score=\(heldScore)")
+            }
+        }
+    }
+    
     // MARK: - Debug Helpers
     
     private func dbg(_ msg: String) {
@@ -206,6 +250,13 @@ struct RemoteGameplayView: View {
         evaluateTurnGate(reason: "onAppear")
         
         setupNotificationObservers()
+        
+        // Register score override callback (synchronous, prevents race condition)
+        gameViewModel.registerScoreOverrideCallback { playerId, score in
+            self.setLocalScoreOverride(playerId: playerId, score: score)
+            self.setLocalScoreHold(playerId: playerId, score: score, holdSeconds: 1.25)
+        }
+        
         logTruthTable()
         showGameTipIfNeeded()
     }
@@ -276,11 +327,11 @@ struct RemoteGameplayView: View {
     private func handleServerScoresChange(oldValue: [UUID: Int]?, newValue: [UUID: Int]?) {
         syncManager.handleServerScoresChange(oldValue: oldValue, newValue: newValue)
         
-        // Clear local override when server scores arrive (prevents revert)
-        if newValue != nil && scoreAnimationHandler.localScoreOverride != nil {
-            print("🎬 [LocalOverride] Cleared by server update")
-            clearLocalScoreOverride()
-        }
+        // If server has caught up to any locally-held scores, release them early
+        clearLocalScoreHoldIfServerCaughtUp(serverScores: newValue)
+        
+        // Don't clear override on server update - let animation complete notification handle it
+        // This prevents score revert during animation when server update arrives early
     }
     
     private func handleCurrentPlayerChange(oldValue: UUID?, newValue: UUID?) {

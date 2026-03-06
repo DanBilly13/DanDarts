@@ -45,6 +45,9 @@ class RemoteGameViewModel: ObservableObject {
     var remoteMatchId: UUID? // Remote match ID for server RPC
     var remoteMatchService: RemoteMatchService?
     
+    // Score override callback (synchronous, prevents race condition)
+    private var setScoreOverrideCallback: ((UUID, Int) -> Void)?
+    
     // Services
     private var authService: AuthService?
     private let analytics = AnalyticsService.shared
@@ -58,6 +61,12 @@ class RemoteGameViewModel: ObservableObject {
     func setRemoteMatchService(_ service: RemoteMatchService) {
         self.remoteMatchService = service
         print("✅ [RemoteGameVM] remoteMatchService injected: \(ObjectIdentifier(service)) / flowMatchId=\(service.flowMatchId?.uuidString.prefix(8) ?? "nil")...")
+    }
+    
+    /// Register callback for setting score override (synchronous, prevents race condition)
+    func registerScoreOverrideCallback(_ callback: @escaping (UUID, Int) -> Void) {
+        self.setScoreOverrideCallback = callback
+        print("✅ [RemoteGameVM] Score override callback registered")
     }
     
     // Animation state
@@ -412,27 +421,26 @@ class RemoteGameViewModel: ObservableObject {
             // Wait for animation to reach peak (mid-point at 0.125s)
             try? await Task.sleep(nanoseconds: 125_000_000) // 0.125 seconds
             
-            // Update score at peak of animation (dramatic reveal!)
+            // Set override FIRST (synchronous, before @Published update)
+            // This prevents race condition where view updates before override is set
+            setScoreOverrideCallback?(currentPlayer.id, newScore)
+            
+            // THEN update score (triggers view update with override already set)
             playerScores[currentPlayer.id] = newScore
             print("🎬 [RemoteGame] Score updated at animation peak: \(currentScore) → \(newScore)")
-            
-            // Notify view to show updated score (for UI override)
-            NotificationCenter.default.post(
-                name: NSNotification.Name("RemoteMatchScoreUpdated"),
-                object: nil,
-                userInfo: ["playerId": currentPlayer.id, "score": newScore]
-            )
             
             // Wait for animation to complete (another 0.125s)
             try? await Task.sleep(nanoseconds: 125_000_000) // 0.125 seconds
             showScoreAnimation = false
             print("🎬 [RemoteGame] Animation complete")
             
-            // Brief pause after animation (0.2s)
-            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
-            print("🎬 [RemoteGame] Pause complete, ready for reveal")
+            // Extended pause to cover card rotation animation (0.7s)
+            // Card rotation uses .spring(response: 0.5, dampingFraction: 0.7)
+            // which takes ~0.5-0.6s to settle. This prevents score revert during rotation.
+            try? await Task.sleep(nanoseconds: 700_000_000) // 0.7 seconds
+            print("🎬 [RemoteGame] Pause complete (including card rotation), ready for reveal")
             
-            // Clear override after animation completes
+            // Clear override after animation AND card rotation complete
             NotificationCenter.default.post(
                 name: NSNotification.Name("RemoteMatchScoreAnimationComplete"),
                 object: nil
@@ -485,6 +493,21 @@ class RemoteGameViewModel: ObservableObject {
                             winner = winningPlayer
                             print("🏆 [RemoteGame] Winner detected from engine: \(winningPlayer.displayName)")
                             SoundManager.shared.playCountdownWinner()
+                            
+                            // Call complete-match edge function to finalize match
+                            Task { [weak self] in
+                                guard let self = self,
+                                      let service = self.remoteMatchService,
+                                      let matchId = self.remoteMatchId else { return }
+                                do {
+                                    print("🏆 [CompleteMatch] Calling complete-match edge function for matchId: \(matchId), winnerId: \(winnerId)")
+                                    try await service.completeMatch(matchId: matchId, winnerId: winnerId)
+                                    print("✅ [CompleteMatch] Match completed successfully")
+                                } catch {
+                                    print("❌ [CompleteMatch] Failed to complete match: \(error)")
+                                    // Non-fatal - match state is already updated locally
+                                }
+                            }
                         }
                     case .legWon(let winnerId):
                         legsWon = newState.legsWon
@@ -502,6 +525,21 @@ class RemoteGameViewModel: ObservableObject {
                                 winner = winningPlayer
                                 print("🏆 [RemoteGame] Winner detected from server scores: \(winningPlayer.displayName)")
                                 SoundManager.shared.playCountdownWinner()
+                                
+                                // Call complete-match edge function to finalize match
+                                Task { [weak self] in
+                                    guard let self = self,
+                                          let service = self.remoteMatchService,
+                                          let matchId = self.remoteMatchId else { return }
+                                    do {
+                                        print("🏆 [CompleteMatch] Calling complete-match edge function for matchId: \(matchId), winnerId: \(playerId)")
+                                        try await service.completeMatch(matchId: matchId, winnerId: playerId)
+                                        print("✅ [CompleteMatch] Match completed successfully")
+                                    } catch {
+                                        print("❌ [CompleteMatch] Failed to complete match: \(error)")
+                                        // Non-fatal - match state is already updated locally
+                                    }
+                                }
                                 break
                             }
                         }
