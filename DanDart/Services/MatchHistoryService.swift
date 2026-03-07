@@ -23,6 +23,8 @@ class MatchHistoryService: ObservableObject {
     
     private let matchesService = MatchesService()
     private let storageManager = MatchStorageManager.shared
+    private let remoteMatchAdapter = RemoteMatchAdapter()
+    private let supabaseService = SupabaseService.shared
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
@@ -61,20 +63,23 @@ class MatchHistoryService: ObservableObject {
         
         // Don't show loading indicator for background preload
         do {
-            // Load from Supabase
+            // Load from Supabase (local matches)
             let supabaseMatches = try await matchesService.loadMatches(userId: userId)
             
             // Load local matches
             let localMatches = storageManager.loadMatches()
             
+            // Load remote matches
+            let remoteMatches = (try? await loadRemoteMatches(userId: userId)) ?? []
+            
             // Merge and deduplicate
-            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
+            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches, remote: remoteMatches)
             
             // Update state
             matches = allMatches.sorted { $0.timestamp > $1.timestamp }
             lastLoadedTime = Date()
             
-            print("✅ Preloaded \(matches.count) matches in background")
+            print("✅ Preloaded \(matches.count) matches in background (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
         } catch {
             print("⚠️ Background preload failed: \(error)")
             // Don't show error for background preload, just use local data
@@ -89,21 +94,24 @@ class MatchHistoryService: ObservableObject {
         loadError = nil
         
         do {
-            // Load from Supabase
+            // Load from Supabase (local matches)
             let supabaseMatches = try await matchesService.loadMatches(userId: userId)
             
             // Load local matches
             let localMatches = storageManager.loadMatches()
             
+            // Load remote matches
+            let remoteMatches = (try? await loadRemoteMatches(userId: userId)) ?? []
+            
             // Merge and deduplicate
-            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
+            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches, remote: remoteMatches)
             
             // Update state
             matches = allMatches.sorted { $0.timestamp > $1.timestamp }
             lastLoadedTime = Date()
             isLoading = false
             
-            print("✅ Refreshed \(matches.count) matches")
+            print("✅ Refreshed \(matches.count) matches (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
         } catch {
             isLoading = false
             loadError = "Couldn't sync with cloud"
@@ -134,7 +142,8 @@ class MatchHistoryService: ObservableObject {
         do {
             let supabaseMatches = try await matchesService.loadMatches(userId: userId)
             let localMatches = storageManager.loadMatches()
-            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches)
+            let remoteMatches = (try? await loadRemoteMatches(userId: userId)) ?? []
+            let allMatches = mergeMatches(local: localMatches, supabase: supabaseMatches, remote: remoteMatches)
             
             matches = allMatches.sorted { $0.timestamp > $1.timestamp }
             lastLoadedTime = Date()
@@ -154,8 +163,138 @@ class MatchHistoryService: ObservableObject {
     
     // MARK: - Private Methods
     
-    /// Merge local and Supabase matches, removing duplicates
-    private func mergeMatches(local: [MatchResult], supabase: [MatchResult]) -> [MatchResult] {
+    /// Load completed remote matches from Supabase and convert to MatchResult
+    private func loadRemoteMatches(userId: UUID) async throws -> [MatchResult] {
+        print("📡 Loading remote matches for user \(userId.uuidString.prefix(8))...")
+        
+        // Define response structure for remote matches
+        struct RemoteMatchResponse: Decodable {
+            let id: UUID
+            let match_mode: String
+            let game_type: String
+            let game_name: String
+            let match_format: Int
+            let challenger_id: UUID
+            let receiver_id: UUID
+            let remote_status: String?
+            let player_scores: [String: Int]?
+            let winner_id: UUID?
+            let ended_at: String?
+            let created_at: String
+            let updated_at: String
+        }
+        
+        // Query matches table for completed remote matches
+        let response: [RemoteMatchResponse] = try await supabaseService.client
+            .from("matches")
+            .select()
+            .eq("match_mode", value: "remote")
+            .eq("remote_status", value: "completed")
+            .or("challenger_id.eq.\(userId.uuidString),receiver_id.eq.\(userId.uuidString)")
+            .order("ended_at", ascending: false)
+            .execute()
+            .value
+        
+        print("📡 Found \(response.count) completed remote matches")
+        
+        // Convert to RemoteMatch objects and then to MatchResult
+        var matchResults: [MatchResult] = []
+        
+        for matchData in response {
+            // Fetch user data for challenger and receiver
+            guard let challenger = try? await fetchUser(id: matchData.challenger_id),
+                  let receiver = try? await fetchUser(id: matchData.receiver_id) else {
+                print("⚠️ Skipping remote match \(matchData.id.uuidString.prefix(8))... - couldn't fetch user data")
+                continue
+            }
+            
+            // Parse dates
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            guard let createdAt = dateFormatter.date(from: matchData.created_at),
+                  let endedAtString = matchData.ended_at,
+                  let endedAt = dateFormatter.date(from: endedAtString) else {
+                print("⚠️ Skipping remote match \(matchData.id.uuidString.prefix(8))... - invalid dates")
+                continue
+            }
+            
+            // Convert player_scores dictionary from [String: Int] to [UUID: Int]
+            var playerScores: [UUID: Int]?
+            if let scores = matchData.player_scores {
+                playerScores = [:]
+                for (key, value) in scores {
+                    if let uuid = UUID(uuidString: key) {
+                        playerScores?[uuid] = value
+                    }
+                }
+            }
+            
+            // Create RemoteMatch object
+            let remoteMatch = RemoteMatch(
+                id: matchData.id,
+                matchMode: matchData.match_mode,
+                gameType: matchData.game_type,
+                gameName: matchData.game_name,
+                matchFormat: matchData.match_format,
+                challengerId: matchData.challenger_id,
+                receiverId: matchData.receiver_id,
+                status: RemoteMatchStatus(rawValue: matchData.remote_status ?? ""),
+                currentPlayerId: nil,
+                challengeExpiresAt: nil,
+                joinWindowExpiresAt: nil,
+                lastVisitPayload: nil,
+                playerScores: playerScores,
+                turnIndexInLeg: nil,
+                createdAt: createdAt,
+                updatedAt: dateFormatter.date(from: matchData.updated_at) ?? createdAt,
+                endedBy: nil,
+                endedReason: nil,
+                winnerId: matchData.winner_id,
+                endedAt: endedAt,
+                debugCounter: nil
+            )
+            
+            // Convert to MatchResult using adapter
+            if let matchResult = remoteMatchAdapter.convertToMatchResult(
+                remoteMatch: remoteMatch,
+                challenger: challenger,
+                receiver: receiver
+            ) {
+                print("✅ [RemoteMatchAdapter] Converted remote match \(matchData.id.uuidString.prefix(8))... to MatchResult")
+                print("   - ID: \(matchResult.id)")
+                print("   - isRemote: \(matchResult.metadata?["isRemote"] ?? "nil")")
+                print("   - Game: \(matchResult.gameName)")
+                print("   - Winner: \(matchResult.winner?.displayName ?? "nil")")
+                matchResults.append(matchResult)
+            } else {
+                print("❌ [RemoteMatchAdapter] Failed to convert remote match \(matchData.id.uuidString.prefix(8))...")
+            }
+        }
+        
+        print("✅ Converted \(matchResults.count) remote matches to MatchResult")
+        return matchResults
+    }
+    
+    /// Fetch user data from Supabase
+    private func fetchUser(id: UUID) async throws -> User {
+        let response: [User] = try await supabaseService.client
+            .from("users")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        
+        guard let user = response.first else {
+            throw NSError(domain: "MatchHistoryService", code: 404, userInfo: [NSLocalizedDescriptionKey: "User not found"])
+        }
+        
+        return user
+    }
+    
+    /// Merge local, Supabase, and remote matches, removing duplicates
+    private func mergeMatches(local: [MatchResult], supabase: [MatchResult], remote: [MatchResult] = []) -> [MatchResult] {
         var matchesById: [UUID: MatchResult] = [:]
         
         // Add local matches first
@@ -165,6 +304,12 @@ class MatchHistoryService: ObservableObject {
         
         // Add Supabase matches (will overwrite local if same ID)
         for match in supabase {
+            matchesById[match.id] = match
+        }
+        
+        // Add remote matches (will overwrite if same ID)
+        for match in remote {
+            print("🔄 [MergeMatches] Adding remote match \(match.id.uuidString.prefix(8))... isRemote=\(match.metadata?["isRemote"] ?? "nil")")
             matchesById[match.id] = match
         }
         

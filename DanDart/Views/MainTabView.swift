@@ -603,7 +603,8 @@ struct MainTabView: View {
                 matchId: matchId,
                 challenger: challenger,
                 receiver: receiver,
-                currentUserId: currentUserId
+                currentUserId: currentUserId,
+                selectedTab: $selectedTab
             )
             .id("gameplay-\(matchId.uuidString)")
             .background(AppColor.backgroundPrimary)
@@ -725,10 +726,15 @@ struct HistoryTabView: View {
     @Binding var showLocalMatches: Bool
     
     var body: some View {
-        MatchHistoryView(
-            isSearchPresented: $isSearchPresented,
-            showLocalMatches: $showLocalMatches
-        )
+        NavigationStack {
+            MatchHistoryView(
+                isSearchPresented: $isSearchPresented,
+                showLocalMatches: $showLocalMatches
+            )
+            .navigationDestination(for: MatchResult.self) { match in
+                MatchDetailView(match: match, isSheet: false)
+            }
+        }
     }
 }
 

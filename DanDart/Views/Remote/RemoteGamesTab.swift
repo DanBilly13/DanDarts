@@ -631,27 +631,28 @@ struct RemoteGamesTab: View {
     }
     
     private func declineChallenge(matchId: UUID) {
-        print("🟠 [DEBUG] declineChallenge called with matchId: \(matchId)")
+        print("� [Decline] Decline button tapped - matchId: \(matchId.uuidString.prefix(8))...")
         
         // Guard 1: Not already processing
         guard remoteMatchService.processingMatchId == nil else {
-            print("🟠 [DEBUG] Already processing another match")
+            print("� [Decline] Already processing another match")
             return
         }
         
         // Guard 2: Match exists in pending challenges
         guard remoteMatchService.pendingChallenges
             .contains(where: { $0.match.id == matchId }) else {
-            print("🟠 [DEBUG] Match not found in pendingChallenges")
+            print("� [Decline] Match not found in pendingChallenges")
             return
         }
         
-        print("🟠 [DEBUG] Guards passed, setting processingMatchId")
+        print("� [Decline] Guards passed, setting processingMatchId")
         remoteMatchService.processingMatchId = matchId
         
         Task {
             do {
                 try await remoteMatchService.cancelChallenge(matchId: matchId)
+                print("✅ [Decline] Challenge declined successfully")
                 
                 // Light haptic
                 #if canImport(UIKit)
@@ -663,6 +664,7 @@ struct RemoteGamesTab: View {
                     remoteMatchService.processingMatchId = nil
                 }
             } catch {
+                print("❌ [Decline] Failed to decline: \(error)")
                 await MainActor.run {
                     remoteMatchService.processingMatchId = nil
                     errorMessage = "Failed to decline challenge: \(error.localizedDescription)"

@@ -227,13 +227,8 @@ class Router: ObservableObject {
         case .remoteLobby(let match, let opponent, let currentUser, let cancelledMatchIds, let onCancel, let onUnfreeze):
             RemoteLobbyView(match: match, opponent: opponent, currentUser: currentUser, onCancel: onCancel, onUnfreeze: onUnfreeze, cancelledMatchIds: cancelledMatchIds)
             
-        case .remoteGameplay(let matchId, let challenger, let receiver, let currentUserId):
-            RemoteGameplayView(
-                matchId: matchId,
-                challenger: challenger,
-                receiver: receiver,
-                currentUserId: currentUserId
-            )
+        case .remoteGameplay:
+            EmptyView() // Requires selectedTab binding - handled in MainTabView instead
             
         case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
             GameEndView(

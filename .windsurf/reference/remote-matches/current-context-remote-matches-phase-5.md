@@ -1,8 +1,8 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
-# DanDart — current-context
+# DanDart — current-context (Phase 5)
 
 ## Project (short)
 DanDart is a native iOS darts scoring companion app built with SwiftUI + Supabase (auth, sync, realtime).

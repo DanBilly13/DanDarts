@@ -31,6 +31,7 @@ struct RemoteGameplayView: View {
     @State private var isScoreboardExpanded: Bool = false
     @State private var isSaving: Bool = false
     @State private var isNavigatingToGameEnd: Bool = false
+    @State private var completedMatchId: UUID?
     
     // Local score hold - prevents flash when override clears before server catches up
     @State private var localScoreHold: [UUID: Int] = [:]
@@ -919,6 +920,10 @@ struct RemoteGameplayView: View {
             }
             .onChange(of: gameViewModel.winner) { _, newValue in
                 if let winner = newValue, let m = liveMatch {
+                    // ✅ Freeze the match ID immediately when game completes
+                    // This prevents using a stale reference if liveMatch changes due to realtime updates
+                    completedMatchId = m.id
+                    
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         // Set flag to prevent exitRemoteFlow in onDisappear
                         isNavigatingToGameEnd = true
@@ -929,6 +934,7 @@ struct RemoteGameplayView: View {
                             players: "2 Players",
                             instructions: ""
                         )
+                        
                         router.push(.gameEnd(
                             game: tempGame,
                             winner: winner,
@@ -949,7 +955,7 @@ struct RemoteGameplayView: View {
                             },
                             matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
                             legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                            matchId: gameViewModel.matchId
+                            matchId: completedMatchId
                         ))
                     }
                 }
@@ -969,6 +975,18 @@ struct RemoteGameplayView: View {
     }
 
 
+    // MARK: - Helper Methods
+    
+    /// Create MatchResult from RemoteMatch for instant "View Details" access
+    private func createMatchResult(from remoteMatch: RemoteMatch) -> MatchResult? {
+        let adapter = RemoteMatchAdapter()
+        return adapter.convertToMatchResult(
+            remoteMatch: remoteMatch,
+            challenger: challenger,
+            receiver: receiver
+        )
+    }
+    
     // MARK: - Truth Table Debug Helper
     
     static func printTruthTable(

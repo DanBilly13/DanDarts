@@ -264,8 +264,11 @@ struct RemoteLobbyView: View {
         }
         .onDisappear {
             print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
-            // DO NOT exit remote flow here - let it persist to Gameplay
-            // remoteMatchService.exitRemoteFlow()
+            
+            // Exit remote flow to maintain correct depth tracking
+            // This ensures loadMatches() runs when the entire stack is popped
+            remoteMatchService.exitRemoteFlow()
+            
             Self.matchesLock.lock()
             Self.matchesBeingStarted.remove(match.id)
             Self.matchesLock.unlock()

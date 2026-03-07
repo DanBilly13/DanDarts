@@ -12,6 +12,40 @@ import Supabase
 class MatchesService: ObservableObject {
     private let supabaseService = SupabaseService.shared
     
+    // MARK: - Date Decoding Helpers
+    
+    private enum SupabaseDateDecoders {
+        static let iso8601WithFractional: ISO8601DateFormatter = {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return f
+        }()
+
+        static func makeDecoder() -> JSONDecoder {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .custom { dec in
+                let c = try dec.singleValueContainer()
+
+                // Supabase typically returns timestamps as ISO8601 strings
+                if let s = try? c.decode(String.self),
+                   let d = iso8601WithFractional.date(from: s) {
+                    return d
+                }
+
+                // Some environments might return unix seconds
+                if let t = try? c.decode(Double.self) {
+                    return Date(timeIntervalSince1970: t)
+                }
+
+                throw DecodingError.dataCorruptedError(
+                    in: c,
+                    debugDescription: "Unsupported date format for Supabase timestamp"
+                )
+            }
+            return decoder
+        }
+    }
+    
     // MARK: - Test Connection
     
     /// Test basic Supabase connection
@@ -317,6 +351,207 @@ class MatchesService: ObservableObject {
             print("❌ Load matches failed: \(error)")
             print("   Error details: \(error.localizedDescription)")
             throw MatchSyncError.loadFailed
+        }
+    }
+    
+    /// Load a single match by ID (optimized for GameEndView)
+    func loadMatchById(_ matchId: UUID) async throws -> MatchResult? {
+        print("🔍 [LoadMatchById] Fetching match \(matchId.uuidString.prefix(8))...")
+
+        do {
+            let response = try await supabaseService.client
+                .from("matches")
+                .select("""
+                    id,
+                    game_type,
+                    game_name,
+                    winner_id,
+                    challenger_id,
+                    receiver_id,
+                    timestamp,
+                    duration,
+                    started_at,
+                    ended_at,
+                    players,
+                    player_scores,
+                    match_format,
+                    total_legs_played,
+                    metadata
+                """)
+                .eq("id", value: matchId.uuidString.lowercased())
+                .single()
+                .execute()
+
+            let decoder = SupabaseDateDecoders.makeDecoder()
+            let matchData = try decoder.decode(GameEndMatchData.self, from: response.data)
+
+            print("✅ [LoadMatchById] Found match \(matchId.uuidString.prefix(8))")
+            print("   - Game: \(matchData.gameName)")
+            print("   - Duration: \(matchData.duration?.description ?? "NULL")")
+            print("   - Winner ID: \(matchData.winnerId?.uuidString.prefix(8) ?? "NULL")...")
+
+            // Build players array with fallback strategies
+            let players = try await buildPlayersFallback(matchData: matchData)
+
+            // Load turn-by-turn data from match_throws table
+            let playersWithTurns = try await loadTurnsForMatch(matchId: matchData.id, players: players)
+
+            // Debug: Verify turns were loaded
+            let turnCounts = playersWithTurns.map { $0.turns.count }
+            let totalTurns = turnCounts.reduce(0, +)
+            print("📊 [LoadMatchById] Loaded turns per player: \(turnCounts), total: \(totalTurns)")
+
+            // winner_id may be NULL but MatchResult currently requires a non-optional winnerId
+            let winnerId = matchData.winnerId ?? UUID()   // placeholder for NULL winner_id
+
+            // Duration: computed (0 if unavailable)
+            let duration = TimeInterval(matchData.computedDurationSeconds ?? 0)
+
+            let match = MatchResult(
+                id: matchData.id,
+                gameType: matchData.gameType,
+                gameName: matchData.gameName,
+                players: playersWithTurns,
+                winnerId: winnerId,
+                timestamp: matchData.timestamp,
+                duration: duration,
+                matchFormat: matchData.matchFormat ?? 1,
+                totalLegsPlayed: matchData.totalLegsPlayed ?? 1,
+                metadata: matchData.metadata
+            )
+
+            return match
+
+        } catch {
+            print("❌ [LoadMatchById] Failed to load match: \(error)")
+            return nil
+        }
+    }
+
+    /// Build players array with fallback strategies for remote matches
+    private func buildPlayersFallback(matchData: GameEndMatchData) async throws -> [MatchPlayer] {
+        // 1) If embedded players exists, use it
+        if let embedded = matchData.players, !embedded.isEmpty {
+            return applyFinalScores(players: embedded, playerScores: matchData.playerScores)
+        }
+
+        // 2) Try match_participants table
+        let matchId = matchData.id
+        let participants = try await loadPlayersForMatch(matchId: matchId)
+        if !participants.isEmpty {
+            return applyFinalScores(players: participants, playerScores: matchData.playerScores)
+        }
+
+        // 3) Final fallback: synthesize from challenger/receiver IDs
+        let ids = [matchData.challengerId, matchData.receiverId].compactMap { $0 }
+        if ids.isEmpty {
+            return []
+        }
+
+        // Try to fetch display names from users table
+        let profiles = try await loadDisplayNames(userIds: ids)
+
+        var synthetic: [MatchPlayer] = ids.map { id in
+            let name = profiles[id] ?? String(id.uuidString.prefix(8)) + "..."
+            return MatchPlayer(
+                id: id,
+                displayName: name,
+                nickname: "",
+                avatarURL: nil,
+                isGuest: false,
+                finalScore: 0,
+                startingScore: 0,
+                totalDartsThrown: 0,
+                turns: [],
+                legsWon: 0
+            )
+        }
+
+        synthetic = applyFinalScores(players: synthetic, playerScores: matchData.playerScores)
+        return synthetic
+    }
+
+    /// Apply final scores from player_scores map to players
+    private func applyFinalScores(players: [MatchPlayer], playerScores: [String: Int]?) -> [MatchPlayer] {
+        guard let playerScores else { return players }
+        return players.map { p in
+            // Check if we have a score for this player (try both lowercase and original UUID)
+            if let score = playerScores[p.id.uuidString.lowercased()] ?? playerScores[p.id.uuidString] {
+                // Create new MatchPlayer with updated finalScore
+                return MatchPlayer(
+                    id: p.id,
+                    displayName: p.displayName,
+                    nickname: p.nickname,
+                    avatarURL: p.avatarURL,
+                    isGuest: p.isGuest,
+                    finalScore: score,
+                    startingScore: p.startingScore,
+                    totalDartsThrown: p.totalDartsThrown,
+                    turns: p.turns,
+                    legsWon: p.legsWon
+                )
+            }
+            return p
+        }
+    }
+
+    /// Load display names from users table
+    private func loadDisplayNames(userIds: [UUID]) async throws -> [UUID: String] {
+        let response = try await supabaseService.client
+            .from("users")
+            .select("id, display_name")
+            .in("id", values: userIds.map { $0.uuidString.lowercased() })
+            .execute()
+
+        guard let rows = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+            return [:]
+        }
+
+        var map: [UUID: String] = [:]
+        for r in rows {
+            guard
+                let idStr = r["id"] as? String,
+                let id = UUID(uuidString: idStr),
+                let name = r["display_name"] as? String
+            else { continue }
+            map[id] = name
+        }
+        return map
+    }
+
+    /// Load players from match_participants table (fallback when matches.players is NULL/empty)
+    private func loadPlayersForMatch(matchId: UUID) async throws -> [MatchPlayer] {
+        let response = try await supabaseService.client
+            .from("match_participants")
+            .select("user_id, display_name, is_guest")
+            .eq("match_id", value: matchId.uuidString.lowercased())
+            .execute()
+
+        guard let participantsJson = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+            return []
+        }
+
+        return participantsJson.compactMap { json in
+            guard
+                let userIdString = json["user_id"] as? String,
+                let userId = UUID(uuidString: userIdString),
+                let displayName = json["display_name"] as? String
+            else { return nil }
+
+            let isGuest = json["is_guest"] as? Bool ?? false
+
+            return MatchPlayer(
+                id: userId,
+                displayName: displayName,
+                nickname: "",
+                avatarURL: nil,
+                isGuest: isGuest,
+                finalScore: 0,
+                startingScore: 0,
+                totalDartsThrown: 0,
+                turns: [],
+                legsWon: 0
+            )
         }
     }
     
@@ -836,6 +1071,57 @@ class MatchesService: ObservableObject {
         }
         
         return successCount
+    }
+}
+
+// MARK: - GameEnd Match Data
+
+/// Lightweight match data for GameEndView (tolerates NULL fields)
+struct GameEndMatchData: Decodable {
+    let id: UUID
+    let gameType: String
+    let gameName: String
+    let winnerId: UUID?               // may be NULL
+    let timestamp: Date
+
+    let duration: Int?                // may be NULL
+    let startedAt: Date?              // may be NULL
+    let endedAt: Date?                // may be NULL
+
+    let players: [MatchPlayer]?       // may be NULL
+    let playerScores: [String: Int]?  // remote matches store this
+
+    let matchFormat: Int?
+    let totalLegsPlayed: Int?
+
+    // Codable-safe: only string->string metadata
+    let metadata: [String: String]?
+
+    // Remote match player IDs
+    let challengerId: UUID?
+    let receiverId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp, duration, players, metadata
+        case gameType = "game_type"
+        case gameName = "game_name"
+        case winnerId = "winner_id"
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case playerScores = "player_scores"
+        case matchFormat = "match_format"
+        case totalLegsPlayed = "total_legs_played"
+        case challengerId = "challenger_id"
+        case receiverId = "receiver_id"
+    }
+
+    /// Compute duration from timestamps if not stored
+    var computedDurationSeconds: Int? {
+        if let duration { return duration }
+        if let start = startedAt, let end = endedAt {
+            return Int(end.timeIntervalSince(start))
+        }
+        return nil
     }
 }
 

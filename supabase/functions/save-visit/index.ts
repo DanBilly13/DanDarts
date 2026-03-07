@@ -1,90 +1,68 @@
 // Edge Function: save-visit
 // Saves a visit (3 darts) for a remote match with server-side validation
+// ✅ PATCH: Handle rpcResult being ARRAY vs OBJECT
+// ✅ PATCH: Add SERVICE ROLE client for debug verification
+// ✅ PATCH: After RPC, query match_throws count + latest row for this match_id
+// ✅ PATCH: Fail loudly if throws still 0 (so the client cannot think it succeeded)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
-// CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Response types
-interface ErrorResponse {
-  error: string
-  details?: any
-}
-
-interface SuccessResponse {
-  success: boolean
-  data?: any
-  message: string
-}
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
     const authHeader = req.headers.get('Authorization')
-    
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
     if (!jwt) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid Authorization header' } as ErrorResponse),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Invalid Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader }
-        },
-      }
-    )
+    const url = Deno.env.get('SUPABASE_URL') ?? ''
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser(jwt)
+    // User-scoped client (keeps current behavior)
+    const supabaseClient = createClient(url, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
 
+    // Service-role client (DEBUG ONLY — do not expose to client; only used server-side)
+    const supabaseAdmin = createClient(url, serviceKey)
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt)
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' } as ErrorResponse),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Unauthorized', details: userError }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const { match_id, darts, score_before, score_after } = await req.json()
-
     if (!match_id || !darts || score_before === undefined || score_after === undefined) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' } as ErrorResponse),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
-
-    // Validate darts array
     if (!Array.isArray(darts) || darts.length !== 3) {
-      return new Response(
-        JSON.stringify({ error: 'Darts must be an array of 3 scores' } as ErrorResponse),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Darts must be an array of 3 scores' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    // Get the match
+    // Fetch match (user-scoped)
     const { data: match, error: matchError } = await supabaseClient
       .from('matches')
       .select('*')
@@ -92,161 +70,121 @@ serve(async (req) => {
       .maybeSingle()
 
     if (matchError || !match) {
-      return new Response(
-        JSON.stringify({ error: 'Match not found' } as ErrorResponse),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate user is participant
-    if (match.challenger_id !== user.id && match.receiver_id !== user.id) {
-      return new Response(
-        JSON.stringify({ error: 'Not authorized for this match' } as ErrorResponse),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate status is in_progress
-    if (match.remote_status !== 'in_progress') {
-      return new Response(
-        JSON.stringify({ error: 'Match is not in progress' } as ErrorResponse),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate it's user's turn
-    if (match.current_player_id !== user.id) {
-      return new Response(
-        JSON.stringify({ error: 'Not your turn' } as ErrorResponse),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const now = new Date()
-
-    // Determine next player
-    const nextPlayerId = match.current_player_id === match.challenger_id 
-      ? match.receiver_id 
-      : match.challenger_id
-
-    // Store visit payload for 1-2s reveal animation
-    const visitPayload = {
-      player_id: user.id,
-      darts,
-      score_before,
-      score_after,
-      timestamp: now.toISOString(),
-    }
-
-    // 🆕 STEP 1A: Update player_scores (server-authoritative)
-    // Get current scores or initialize if null
-    const currentScores = match.player_scores || {}
-    
-    // Update the current player's score
-    currentScores[user.id] = score_after
-    
-    console.log(`📊 [save-visit] Updating player_scores: ${JSON.stringify(currentScores)}`)
-
-    // Calculate new turn_index_in_leg (increment from current value)
-    const newTurnIndex = (match.turn_index_in_leg ?? 0) + 1
-    console.log(`🧮 [save-visit] turn_index_in_leg: ${match.turn_index_in_leg ?? 0} -> ${newTurnIndex}`)
-
-    // Check for winner (score = 0)
-    let winnerId: string | null = null
-    for (const [playerId, score] of Object.entries(currentScores)) {
-      if (score === 0) {
-        winnerId = playerId
-        console.log(`🏆 [save-visit] Winner detected: ${winnerId}`)
-        break
-      }
-    }
-
-    if (winnerId) {
-      // Match won! Update status to completed
-      const { data: completedMatch, error: completeError } = await supabaseClient
-        .from('matches')
-        .update({
-          remote_status: 'completed',
-          winner_id: winnerId,
-          ended_at: now.toISOString(),
-          current_player_id: null, // No more turns
-          last_visit_payload: visitPayload,
-          player_scores: currentScores,
-          turn_index_in_leg: newTurnIndex,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', match_id)
-        .select('*')
-        .maybeSingle()
-
-      if (completeError) {
-        console.error('Failed to complete match:', completeError)
-        return new Response(
-          JSON.stringify({ error: 'Failed to complete match', details: completeError } as ErrorResponse),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      console.log(`✅ Match completed - winner: ${winnerId}`)
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: { 
-            winner_id: winnerId,
-            status: 'completed',
-            match: completedMatch,
-          },
-          message: 'Match completed',
-        } as SuccessResponse),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // If no winner, continue with normal turn switch
-    // Update match with next player, last visit, player_scores, AND turn_index_in_leg
-    const { data: updatedMatch, error: updateError } = await supabaseClient
-      .from('matches')
-      .update({
-        current_player_id: nextPlayerId,
-        last_visit_payload: visitPayload,
-        player_scores: currentScores,  // Server-authoritative scores
-        turn_index_in_leg: newTurnIndex,  // Increment turn counter
-        updated_at: now.toISOString(),
+      return new Response(JSON.stringify({ error: 'Match not found', details: matchError }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-      .eq('id', match_id)
-      .select('id, current_player_id, player_scores, turn_index_in_leg, updated_at')
-      .maybeSingle()
-
-    if (updateError) {
-      console.error('Match update error:', updateError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to save visit', details: updateError } as ErrorResponse),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
     }
 
-    // TODO: Save to match_throws table for history
+    if (match.challenger_id !== user.id && match.receiver_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'Not authorized for this match' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (match.remote_status !== 'in_progress') {
+      return new Response(JSON.stringify({ error: 'Match is not in progress', status: match.remote_status }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (match.current_player_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'Not your turn', current_player_id: match.current_player_id }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-    console.log(`✅ Visit saved for match: ${match_id}`)
-    console.log(`✅ [save-visit] player_scores written to database: ${JSON.stringify(currentScores)}`)
+    const nowIso = new Date().toISOString()
 
-    return new Response(
-      JSON.stringify({
+    console.log('[save-visit] rpc save_remote_visit args', {
+      match_id, player_id: user.id, darts, score_before, score_after, nowIso
+    })
+
+    const { data, error: rpcError } = await supabaseClient.rpc('save_remote_visit', {
+      p_match_id: match_id,
+      p_player_id: user.id,
+      p_throws: darts,
+      p_score_before: score_before,
+      p_score_after: score_after,
+      p_is_bust: false,
+      p_timestamp: nowIso,
+    })
+
+    if (rpcError) {
+      console.error('[save-visit] RPC FAILED', rpcError)
+      return new Response(JSON.stringify({ error: 'Failed to save visit', details: rpcError }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ✅ IMPORTANT: normalize result (PostgREST often returns an array)
+    const rpcResult = Array.isArray(data) ? data[0] : data
+    console.log('[save-visit] RPC OK raw=', data)
+    console.log('[save-visit] RPC OK normalized=', rpcResult)
+
+    // ✅ DEBUG VERIFY: check match_throws using service role
+    const { count: throwCount, error: countErr } = await supabaseAdmin
+      .from('match_throws')
+      .select('*', { count: 'exact', head: true })
+      .eq('match_id', match_id)
+
+    if (countErr) {
+      console.error('[save-visit] DEBUG count match_throws FAILED', countErr)
+      return new Response(JSON.stringify({ error: 'Debug count failed', details: countErr }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { data: latestThrow, error: latestErr } = await supabaseAdmin
+      .from('match_throws')
+      .select('*')
+      .eq('match_id', match_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (latestErr) console.error('[save-visit] DEBUG latest match_throws FAILED', latestErr)
+
+    console.log('[save-visit] DEBUG match_throws count=', throwCount)
+    console.log('[save-visit] DEBUG latest throw=', latestThrow?.[0] ?? null)
+
+    // 🚨 If we still have 0 rows, DO NOT return success — force it to fail loudly
+    if ((throwCount ?? 0) === 0) {
+      return new Response(JSON.stringify({
+        error: 'RPC returned success but match_throws still has 0 rows (insert did not happen)',
+        rpcResult,
+      }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Use normalized rpcResult safely
+    const status = rpcResult?.status
+
+    if (status === 'completed') {
+      return new Response(JSON.stringify({
         success: true,
-        data: { 
-          next_player_id: nextPlayerId,
-          turn_index_in_leg: updatedMatch?.turn_index_in_leg ?? newTurnIndex,
+        data: {
+          winner_id: rpcResult?.winner_id ?? null,
+          status: 'completed',
+          debug_throw_count: throwCount,
+          debug_latest_throw: latestThrow?.[0] ?? null,
         },
-        message: 'Visit saved successfully',
-      } as SuccessResponse),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+        message: 'Match completed',
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        next_player_id: rpcResult?.next_player_id ?? null,
+        turn_index_in_leg: rpcResult?.turn_index ?? null,
+        debug_throw_count: throwCount,
+        debug_latest_throw: latestThrow?.[0] ?? null,
+      },
+      message: 'Visit saved successfully',
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' } as ErrorResponse),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('[save-visit] Unexpected error:', error)
+    return new Response(JSON.stringify({ error: 'Internal server error', details: String(error) }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 })

@@ -54,6 +54,17 @@ struct MatchCard: View {
                     // Game name chip
                     gameNameChip
                     
+                    // Remote badge (if remote match)
+                    if match.metadata?["isRemote"] == "true" {
+                        Text("Remote")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppColor.textSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppColor.inputBackground.opacity(0.5))
+                            .clipShape(Capsule())
+                    }
+                    
                     // Practice badge for single-player matches
                     if match.isPractice {
                         Text("Practice")
