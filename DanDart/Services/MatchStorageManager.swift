@@ -91,7 +91,13 @@ class MatchStorageManager {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let matches = try decoder.decode([MatchResult].self, from: data)
-            print("✅ Loaded \(matches.count) matches")
+            print("✅ Loaded \(matches.count) matches from local storage")
+            if let firstMatch = matches.first {
+                print("   📊 First match: \(firstMatch.gameName), players: \(firstMatch.players.count)")
+                if let firstPlayer = firstMatch.players.first {
+                    print("   📊 First player: \(firstPlayer.displayName), turns: \(firstPlayer.turns.count)")
+                }
+            }
             return matches
         } catch {
             print("❌ Error loading matches: \(error.localizedDescription)")

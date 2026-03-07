@@ -115,12 +115,16 @@ struct MatchHistoryView: View {
                 updateFilteredMatches()
             }
             .onAppear {
+                print("🔄 [MatchHistoryView] onAppear fired")
                 // Check if data is stale and refresh if needed
                 if historyService.isStale {
+                    print("🔄 [MatchHistoryView] Data is stale, refreshing...")
                     Task {
                         guard let userId = authService.currentUser?.id else { return }
                         await historyService.refreshMatches(userId: userId)
                     }
+                } else {
+                    print("✅ [MatchHistoryView] Data is fresh, skipping refresh")
                 }
                 updateFilteredMatches()
                 
@@ -301,6 +305,15 @@ struct MatchHistoryView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .onTapGesture {
+                            print("🔍 [MatchHistoryView] NavigationLink tapped")
+                            print("🔍 [MatchHistoryView] Match ID: \(match.id)")
+                            print("🔍 [MatchHistoryView] Match gameName: \(match.gameName)")
+                            print("🔍 [MatchHistoryView] Match players count: \(match.players.count)")
+                            if !match.players.isEmpty {
+                                print("🔍 [MatchHistoryView] Player 0: \(match.players[0].displayName), turns: \(match.players[0].turns.count)")
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)

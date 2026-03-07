@@ -54,17 +54,6 @@ struct MatchCard: View {
                     // Game name chip
                     gameNameChip
                     
-                    // Remote badge (if remote match)
-                    if match.metadata?["isRemote"] == "true" {
-                        Text("Remote")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppColor.textSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppColor.inputBackground.opacity(0.5))
-                            .clipShape(Capsule())
-                    }
-                    
                     // Practice badge for single-player matches
                     if match.isPractice {
                         Text("Practice")
@@ -222,11 +211,11 @@ struct MatchCard: View {
         let components = calendar.dateComponents([.day, .hour, .minute], from: match.timestamp, to: now)
         
         if let days = components.day, days > 0 {
-            return days == 1 ? "1 day ago" : "\(days) days ago"
+            return "\(days)d ago"
         } else if let hours = components.hour, hours > 0 {
-            return hours == 1 ? "1 hour ago" : "\(hours) hours ago"
+            return "\(hours)h ago"
         } else if let minutes = components.minute, minutes > 0 {
-            return minutes == 1 ? "1 minute ago" : "\(minutes) minutes ago"
+            return "\(minutes)m ago"
         } else {
             return "Just now"
         }

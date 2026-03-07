@@ -977,16 +977,6 @@ struct RemoteGameplayView: View {
 
     // MARK: - Helper Methods
     
-    /// Create MatchResult from RemoteMatch for instant "View Details" access
-    private func createMatchResult(from remoteMatch: RemoteMatch) -> MatchResult? {
-        let adapter = RemoteMatchAdapter()
-        return adapter.convertToMatchResult(
-            remoteMatch: remoteMatch,
-            challenger: challenger,
-            receiver: receiver
-        )
-    }
-    
     // MARK: - Truth Table Debug Helper
     
     static func printTruthTable(

@@ -448,16 +448,17 @@ class MatchesService: ObservableObject {
             return []
         }
 
-        // Try to fetch display names from users table
-        let profiles = try await loadDisplayNames(userIds: ids)
+        // Try to fetch full profiles from users table
+        let profiles = try await loadUserProfiles(userIds: ids)
 
         var synthetic: [MatchPlayer] = ids.map { id in
-            let name = profiles[id] ?? String(id.uuidString.prefix(8)) + "..."
+            let profile = profiles[id]
+            let name = profile?.displayName ?? String(id.uuidString.prefix(8)) + "..."
             return MatchPlayer(
                 id: id,
                 displayName: name,
-                nickname: "",
-                avatarURL: nil,
+                nickname: profile?.nickname ?? "",
+                avatarURL: profile?.avatarURL,
                 isGuest: false,
                 finalScore: 0,
                 startingScore: 0,
@@ -495,11 +496,18 @@ class MatchesService: ObservableObject {
         }
     }
 
-    /// Load display names from users table
-    private func loadDisplayNames(userIds: [UUID]) async throws -> [UUID: String] {
+    /// User profile data for match player reconstruction
+    private struct UserProfile {
+        let displayName: String
+        let nickname: String
+        let avatarURL: String?
+    }
+
+    /// Load user profiles from users table (display_name, nickname, avatar_url)
+    private func loadUserProfiles(userIds: [UUID]) async throws -> [UUID: UserProfile] {
         let response = try await supabaseService.client
             .from("users")
-            .select("id, display_name")
+            .select("id, display_name, nickname, avatar_url")
             .in("id", values: userIds.map { $0.uuidString.lowercased() })
             .execute()
 
@@ -507,14 +515,22 @@ class MatchesService: ObservableObject {
             return [:]
         }
 
-        var map: [UUID: String] = [:]
+        var map: [UUID: UserProfile] = [:]
         for r in rows {
             guard
                 let idStr = r["id"] as? String,
                 let id = UUID(uuidString: idStr),
-                let name = r["display_name"] as? String
+                let displayName = r["display_name"] as? String
             else { continue }
-            map[id] = name
+            
+            let nickname = r["nickname"] as? String ?? ""
+            let avatarURL = r["avatar_url"] as? String
+            
+            map[id] = UserProfile(
+                displayName: displayName,
+                nickname: nickname,
+                avatarURL: avatarURL
+            )
         }
         return map
     }

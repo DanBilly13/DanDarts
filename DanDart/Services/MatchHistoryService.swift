@@ -112,6 +112,12 @@ class MatchHistoryService: ObservableObject {
             isLoading = false
             
             print("✅ Refreshed \(matches.count) matches (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
+            print("📊 [RefreshMatches] Match details:")
+            for (index, match) in matches.prefix(3).enumerated() {
+                let turnCount = match.players.first?.turns.count ?? 0
+                let isRemote = match.metadata?["isRemote"] == "true"
+                print("   [\(index)] \(match.gameName) - \(isRemote ? "REMOTE" : "LOCAL") - \(turnCount) turns")
+            }
         } catch {
             isLoading = false
             loadError = "Couldn't sync with cloud"
@@ -255,8 +261,8 @@ class MatchHistoryService: ObservableObject {
                 debugCounter: nil
             )
             
-            // Convert to MatchResult using adapter
-            if let matchResult = remoteMatchAdapter.convertToMatchResult(
+            // Convert to MatchResult using adapter (now async to load turn data)
+            if let matchResult = await remoteMatchAdapter.convertToMatchResult(
                 remoteMatch: remoteMatch,
                 challenger: challenger,
                 receiver: receiver
@@ -266,6 +272,7 @@ class MatchHistoryService: ObservableObject {
                 print("   - isRemote: \(matchResult.metadata?["isRemote"] ?? "nil")")
                 print("   - Game: \(matchResult.gameName)")
                 print("   - Winner: \(matchResult.winner?.displayName ?? "nil")")
+                print("   - Turns loaded: \(matchResult.players.first?.turns.count ?? 0)")
                 matchResults.append(matchResult)
             } else {
                 print("❌ [RemoteMatchAdapter] Failed to convert remote match \(matchData.id.uuidString.prefix(8))...")
@@ -295,24 +302,55 @@ class MatchHistoryService: ObservableObject {
     
     /// Merge local, Supabase, and remote matches, removing duplicates
     private func mergeMatches(local: [MatchResult], supabase: [MatchResult], remote: [MatchResult] = []) -> [MatchResult] {
-        var matchesById: [UUID: MatchResult] = [:]
+        print("🔄 [MergeMatches] Starting merge:")
+        print("   - Local: \(local.count) matches")
+        print("   - Supabase: \(supabase.count) matches")
+        print("   - Remote: \(remote.count) matches")
         
-        // Add local matches first
+        var matchesById: [UUID: MatchResult] = [:]
+        var localMatchesById: [UUID: MatchResult] = [:]
+        
+        // Store local matches in a separate dictionary to preserve turn data
         for match in local {
+            let turnCount = match.players.first?.turns.count ?? 0
+            print("🔄 [MergeMatches] Adding LOCAL match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns)")
             matchesById[match.id] = match
+            localMatchesById[match.id] = match
         }
         
-        // Add Supabase matches (will overwrite local if same ID)
+        // Add Supabase matches, but preserve turn data from local matches
         for match in supabase {
-            matchesById[match.id] = match
+            let turnCount = match.players.first?.turns.count ?? 0
+            let wasLocal = matchesById[match.id] != nil
+            print("🔄 [MergeMatches] Adding SUPABASE match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns) \(wasLocal ? "[OVERWRITES LOCAL]" : "")")
+
+            // If we have a local version with turn data, prefer it to avoid losing turns
+            if let localMatch = localMatchesById[match.id],
+               let localFirstPlayer = localMatch.players.first,
+               !localFirstPlayer.turns.isEmpty {
+                let localTurnCount = localFirstPlayer.turns.count
+                print("   ✅ Keeping LOCAL version to preserve \(localTurnCount) turns (Supabase version has \(turnCount) turns)")
+                matchesById[match.id] = localMatch
+            } else {
+                matchesById[match.id] = match
+            }
         }
         
         // Add remote matches (will overwrite if same ID)
         for match in remote {
-            print("🔄 [MergeMatches] Adding remote match \(match.id.uuidString.prefix(8))... isRemote=\(match.metadata?["isRemote"] ?? "nil")")
+            let turnCount = match.players.first?.turns.count ?? 0
+            let wasLocal = matchesById[match.id] != nil
+            print("🔄 [MergeMatches] Adding REMOTE match \(match.id.uuidString.prefix(8))... isRemote=\(match.metadata?["isRemote"] ?? "nil"), \(turnCount) turns \(wasLocal ? "[OVERWRITES]" : "")")
             matchesById[match.id] = match
         }
         
-        return Array(matchesById.values)
+        let result = Array(matchesById.values)
+        print("🔄 [MergeMatches] Final result: \(result.count) matches")
+        if let firstMatch = result.first {
+            let turnCount = firstMatch.players.first?.turns.count ?? 0
+            print("   📊 First merged match: \(firstMatch.gameName), \(turnCount) turns")
+        }
+        
+        return result
     }
 }

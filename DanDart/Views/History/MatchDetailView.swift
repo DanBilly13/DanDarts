@@ -22,6 +22,10 @@ struct MatchDetailView: View {
     }
     
     var body: some View {
+        let _ = print("📱 [MatchDetailView] Rendering with match ID: \(match.id)")
+        let _ = print("📱 [MatchDetailView] Match gameName: \(match.gameName)")
+        let _ = print("📱 [MatchDetailView] Match players count: \(match.players.count)")
+        let _ = match.players.isEmpty ? () : print("📱 [MatchDetailView] Player 0: \(match.players[0].displayName), turns: \(match.players[0].turns.count)")
         // Route to game-specific detail view
         if match.gameName == "Halve It" {
             HalveItMatchDetailView(match: match, isSheet: isSheet)

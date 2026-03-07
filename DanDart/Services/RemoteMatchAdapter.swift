@@ -8,6 +8,7 @@
 import Foundation
 
 class RemoteMatchAdapter {
+    private let supabaseService = SupabaseService.shared
     
     /// Convert a completed RemoteMatch to MatchResult for unified history display
     /// - Parameters:
@@ -19,7 +20,7 @@ class RemoteMatchAdapter {
         remoteMatch: RemoteMatch,
         challenger: User,
         receiver: User
-    ) -> MatchResult? {
+    ) async -> MatchResult? {
         // Only convert completed matches with winner
         guard remoteMatch.status == .completed,
               let winnerId = remoteMatch.winnerId,
@@ -53,9 +54,8 @@ class RemoteMatchAdapter {
             startingScore = 501 // Default fallback
         }
         
-        // Create MatchPlayer objects from challenger and receiver
-        // Note: Turns array will be empty initially (Phase 6.3 will add turn data)
-        let challengerPlayer = MatchPlayer(
+        // Create basic MatchPlayer objects (without turn data)
+        let basicChallenger = MatchPlayer(
             id: challenger.id,
             displayName: challenger.displayName,
             nickname: challenger.nickname,
@@ -63,12 +63,12 @@ class RemoteMatchAdapter {
             isGuest: false,
             finalScore: challengerScore,
             startingScore: startingScore,
-            totalDartsThrown: 0, // Unknown without turn data
-            turns: [], // Empty initially - Phase 6.3 will populate
-            legsWon: 0 // Default to 0 for now
+            totalDartsThrown: 0,
+            turns: [],
+            legsWon: 0
         )
         
-        let receiverPlayer = MatchPlayer(
+        let basicReceiver = MatchPlayer(
             id: receiver.id,
             displayName: receiver.displayName,
             nickname: receiver.nickname,
@@ -76,13 +76,17 @@ class RemoteMatchAdapter {
             isGuest: false,
             finalScore: receiverScore,
             startingScore: startingScore,
-            totalDartsThrown: 0, // Unknown without turn data
-            turns: [], // Empty initially - Phase 6.3 will populate
-            legsWon: 0 // Default to 0 for now
+            totalDartsThrown: 0,
+            turns: [],
+            legsWon: 0
         )
         
-        // Create players array (challenger first, receiver second)
-        let players = [challengerPlayer, receiverPlayer]
+        // Load turn data from match_throws table
+        let basicPlayers = [basicChallenger, basicReceiver]
+        let playersWithTurns = await loadTurnsForRemoteMatch(matchId: id, players: basicPlayers)
+        
+        // Use players with turn data
+        let players = playersWithTurns
         
         // Calculate total legs played (default to 1 for now)
         // TODO: Calculate from actual legs data if available in future
@@ -102,7 +106,122 @@ class RemoteMatchAdapter {
             metadata: metadata
         )
         
-        print("✅ [RemoteMatchAdapter] Converted remote match \(id.uuidString.prefix(8))... to MatchResult")
+        print("✅ [RemoteMatchAdapter] Converted remote match \(id.uuidString.prefix(8))... to MatchResult with \(players.first?.turns.count ?? 0) turns")
         return matchResult
+    }
+    
+    /// Load turn data for a remote match from match_throws table
+    /// - Parameters:
+    ///   - matchId: The match ID
+    ///   - players: Basic player data (without turns)
+    /// - Returns: Players with complete turn data
+    private func loadTurnsForRemoteMatch(matchId: UUID, players: [MatchPlayer]) async -> [MatchPlayer] {
+        print("🔍 [RemoteMatchAdapter] Loading turns for match \(matchId.uuidString.prefix(8))...")
+        
+        // Query match_throws table for this match
+        let response: Data
+        do {
+            let result = try await supabaseService.client
+                .from("match_throws")
+                .select("id,match_id,player_order,turn_index,throws,score_before,score_after,is_bust,game_metadata")
+                .eq("match_id", value: matchId.uuidString)
+                .order("player_order")
+                .order("turn_index")
+                .execute()
+            response = result.data
+        } catch {
+            print("⚠️ [RemoteMatchAdapter] Failed to query turn data: \(error)")
+            return players
+        }
+        
+        // Parse throws data
+        guard let throwsArray = try? JSONSerialization.jsonObject(with: response) as? [[String: Any]] else {
+            print("⚠️ [RemoteMatchAdapter] No turn data found, returning players with empty turns")
+            return players
+        }
+        
+        print("📊 [RemoteMatchAdapter] Found \(throwsArray.count) throw records")
+        
+        // Group throws by player_order
+        var playerTurns: [Int: [MatchTurn]] = [:]
+        
+        for throwJson in throwsArray {
+            guard let playerOrder = throwJson["player_order"] as? Int,
+                  let turnIndex = throwJson["turn_index"] as? Int,
+                  let scoreBefore = throwJson["score_before"] as? Int,
+                  let scoreAfter = throwJson["score_after"] as? Int else {
+                continue
+            }
+            
+            // Parse throws - handle multiple formats
+            let dartScores: [Int]
+            if let throwsArray = throwJson["throws"] as? [Int] {
+                dartScores = throwsArray
+            } else if let throwsArray = throwJson["throws"] as? [Any] {
+                dartScores = throwsArray.compactMap { $0 as? Int }
+            } else {
+                print("⚠️ [RemoteMatchAdapter] Skipping turn - could not parse throws data")
+                continue
+            }
+            
+            // Get game_metadata (for Halve-It target display)
+            var targetDisplay: String? = nil
+            if let gameMetadata = throwJson["game_metadata"] as? [String: Any] {
+                if let target = gameMetadata["target_display"] as? String {
+                    targetDisplay = target
+                }
+            }
+            
+            // Get is_bust flag (for Knockout life losses)
+            let isBust = throwJson["is_bust"] as? Bool ?? false
+            
+            // Convert dart scores to MatchDart objects
+            let darts = dartScores.map { score -> MatchDart in
+                // For remote matches, we store total score per dart
+                // Assume singles for now (limitation of current data model)
+                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: nil)
+            }
+            
+            let turn = MatchTurn(
+                turnNumber: turnIndex,
+                darts: darts,
+                scoreBefore: scoreBefore,
+                scoreAfter: scoreAfter,
+                isBust: isBust,
+                targetDisplay: targetDisplay
+            )
+            
+            if playerTurns[playerOrder] == nil {
+                playerTurns[playerOrder] = []
+            }
+            playerTurns[playerOrder]?.append(turn)
+        }
+        
+        // Reconstruct players with turn data
+        var playersWithTurns: [MatchPlayer] = []
+        for (index, player) in players.enumerated() {
+            let turns = playerTurns[index] ?? []
+            let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
+            let finalScore = turns.last?.scoreAfter ?? player.finalScore
+            let startingScore = turns.first?.scoreBefore ?? player.startingScore
+            
+            let playerWithTurns = MatchPlayer(
+                id: player.id,
+                displayName: player.displayName,
+                nickname: player.nickname,
+                avatarURL: player.avatarURL,
+                isGuest: player.isGuest,
+                finalScore: finalScore,
+                startingScore: startingScore,
+                totalDartsThrown: totalDarts,
+                turns: turns,
+                legsWon: player.legsWon
+            )
+            
+            playersWithTurns.append(playerWithTurns)
+        }
+        
+        print("✅ [RemoteMatchAdapter] Loaded \(playerTurns.values.flatMap { $0 }.count) total turns for \(players.count) players")
+        return playersWithTurns
     }
 }
