@@ -12,6 +12,13 @@ import Supabase
 class MatchesService: ObservableObject {
     private let supabaseService = SupabaseService.shared
     
+    // MARK: - Debug Helper
+    
+    @MainActor
+    private func dbg(_ msg: String) {
+        print("🧩 [MatchDBG] \(msg)")
+    }
+    
     // MARK: - Date Decoding Helpers
     
     private enum SupabaseDateDecoders {
@@ -324,8 +331,13 @@ class MatchesService: ObservableObject {
                     metadata = gameMetadata.compactMapValues { $0 as? String }
                 }
                 
+                dbg("[loadMatches] match=\(id.uuidString.prefix(8)) mode=\(json["match_mode"] as? String ?? "NULL") game=\(gameName)")
+                dbg("[loadMatches] playersFromMatchesColumn count=\(basicPlayers.count) ids=\(basicPlayers.map{$0.id.uuidString.prefix(8)})")
+                
                 // Load turn data from match_throws table
                 let playersWithTurns = try await loadTurnsForMatch(matchId: id, players: basicPlayers)
+                
+                dbg("[loadMatches] after loadTurnsForMatch turnsPerPlayer=\(playersWithTurns.map{$0.turns.count})")
                 
                 // Create MatchResult with complete turn data
                 let match = MatchResult(
@@ -389,9 +401,15 @@ class MatchesService: ObservableObject {
             print("   - Game: \(matchData.gameName)")
             print("   - Duration: \(matchData.duration?.description ?? "NULL")")
             print("   - Winner ID: \(matchData.winnerId?.uuidString.prefix(8) ?? "NULL")...")
+            
+            dbg("[loadMatchById] match=\(matchId.uuidString.prefix(8))")
+            dbg("[loadMatchById] embeddedPlayersCount=\(matchData.players?.count ?? 0)")
+            dbg("[loadMatchById] challenger_id=\(matchData.challengerId?.uuidString ?? "NULL") receiver_id=\(matchData.receiverId?.uuidString ?? "NULL")")
 
             // Build players array with fallback strategies
             let players = try await buildPlayersFallback(matchData: matchData)
+            
+            dbg("[loadMatchById] playersBuiltCount=\(players.count) names=\(players.map{$0.displayName})")
 
             // Load turn-by-turn data from match_throws table
             let playersWithTurns = try await loadTurnsForMatch(matchId: matchData.id, players: players)
@@ -430,20 +448,25 @@ class MatchesService: ObservableObject {
 
     /// Build players array with fallback strategies for remote matches
     private func buildPlayersFallback(matchData: GameEndMatchData) async throws -> [MatchPlayer] {
+        dbg("[buildPlayersFallback] match=\(matchData.id.uuidString.prefix(8)) embedded=\(matchData.players?.count ?? 0)")
+        
         // 1) If embedded players exists, use it
         if let embedded = matchData.players, !embedded.isEmpty {
+            dbg("[buildPlayersFallback] Using embedded players from matches.players")
             return applyFinalScores(players: embedded, playerScores: matchData.playerScores)
         }
 
         // 2) Try match_participants table
         let matchId = matchData.id
         let participants = try await loadPlayersForMatch(matchId: matchId)
+        dbg("[buildPlayersFallback] match_participants returned \(participants.count) players")
         if !participants.isEmpty {
             return applyFinalScores(players: participants, playerScores: matchData.playerScores)
         }
 
         // 3) Final fallback: synthesize from challenger/receiver IDs
         let ids = [matchData.challengerId, matchData.receiverId].compactMap { $0 }
+        dbg("[buildPlayersFallback] Synthesizing players from challenger/receiver ids count=\(ids.count)")
         if ids.isEmpty {
             return []
         }
@@ -571,12 +594,44 @@ class MatchesService: ObservableObject {
         }
     }
     
+    /// DEBUG: Minimal throws fetch to isolate PostgrestError 22023
+    private func debugMinimalThrowsFetch(matchId: UUID) async {
+        dbg("========== [debugMinimalThrowsFetch] START match=\(matchId.uuidString) ==========")
+        
+        do {
+            // IMPORTANT: select ONLY raw columns, no computed fields, no embeds
+            let res = try await supabaseService.client
+                .from("match_throws")
+                .select("id,match_id,player_order,turn_index,throws")
+                .eq("match_id", value: matchId.uuidString)
+                .order("player_order", ascending: true)
+                .order("turn_index", ascending: true)
+                .execute()
+            
+            // Print raw JSON so we can see exactly what PostgREST returned
+            if let jsonString = String(data: res.data, encoding: .utf8) {
+                dbg("[debugMinimalThrowsFetch] RAW JSON: \(jsonString)")
+            } else {
+                dbg("[debugMinimalThrowsFetch] Could not decode response as UTF8 string")
+            }
+            
+            dbg("========== [debugMinimalThrowsFetch] END OK ==========")
+        } catch {
+            dbg("========== [debugMinimalThrowsFetch] END ERROR ==========")
+            dbg("[debugMinimalThrowsFetch] error=\(error)")
+        }
+    }
+    
     /// Load turn data for a specific match from match_throws table
     /// - Parameters:
     ///   - matchId: The match ID
     ///   - players: Basic player data (without turns)
     /// - Returns: Players with complete turn data
     private func loadTurnsForMatch(matchId: UUID, players: [MatchPlayer]) async throws -> [MatchPlayer] {
+        print("🔍 [LoadTurnsForMatch] Loading turns for match \(matchId.uuidString.prefix(8))...")
+        print("   Input players: \(players.map { "\($0.displayName)" })")
+        dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) inputPlayersCount=\(players.count)")
+        
         // Query match_throws table for this match
         let response: Data
         do {
@@ -589,15 +644,24 @@ class MatchesService: ObservableObject {
                 .execute()
             response = result.data
         } catch {
-            print("⚠️ Failed to query turn data for match \(matchId): \(error)")
+            print("⚠️ [LoadTurnsForMatch] Failed to query turn data for match \(matchId): \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            dbg("[loadTurnsForMatch] CURRENT SELECT STRING: id,match_id,player_order,turn_index,throws,score_before,score_after,is_bust,game_metadata")
+            
+            // DEBUG: Try minimal query to isolate the issue
+            await debugMinimalThrowsFetch(matchId: matchId)
+            
             return players
         }
         
         // Parse throws data
         guard let throwsArray = try? JSONSerialization.jsonObject(with: response) as? [[String: Any]] else {
-            print("⚠️ No turn data found for match \(matchId), returning players with empty turns")
+            print("⚠️ [LoadTurnsForMatch] No turn data found for match \(matchId), returning players with empty turns")
             return players
         }
+        
+        print("📊 [LoadTurnsForMatch] Found \(throwsArray.count) throw records")
+        dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) throwsRows=\(throwsArray.count)")
         
         // Group throws by player_order
         var playerTurns: [Int: [MatchTurn]] = [:]
@@ -607,6 +671,7 @@ class MatchesService: ObservableObject {
                   let turnIndex = throwJson["turn_index"] as? Int,
                   let scoreBefore = throwJson["score_before"] as? Int,
                   let scoreAfter = throwJson["score_after"] as? Int else {
+                print("⚠️ [LoadTurnsForMatch] Skipping turn - missing required fields")
                 continue
             }
             
@@ -617,7 +682,7 @@ class MatchesService: ObservableObject {
             } else if let throwsArray = throwJson["throws"] as? [Any] {
                 dartScores = throwsArray.compactMap { $0 as? Int }
             } else {
-                print("⚠️ Skipping turn - could not parse throws data")
+                print("⚠️ [LoadTurnsForMatch] Skipping turn - could not parse throws data")
                 continue
             }
             
@@ -678,10 +743,21 @@ class MatchesService: ObservableObject {
             playerTurns[playerOrder]?.append(turn)
         }
         
+        print("📊 [LoadTurnsForMatch] Grouped turns by player_order:")
+        for (order, turns) in playerTurns.sorted(by: { $0.key < $1.key }) {
+            print("   player_order \(order): \(turns.count) turns")
+        }
+        
+        dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) groupedOrders=\(playerTurns.keys.sorted()) counts=\(playerTurns.keys.sorted().map{ playerTurns[$0]?.count ?? 0 })")
+        if players.isEmpty && !throwsArray.isEmpty {
+            dbg("[loadTurnsForMatch][⚠️] Players EMPTY but throwsRows=\(throwsArray.count) -> UI will be blank.")
+        }
+        
         // Reconstruct players with turn data
         var playersWithTurns: [MatchPlayer] = []
         for (index, player) in players.enumerated() {
             let turns = playerTurns[index] ?? []
+            print("   Mapping player[\(index)] '\(player.displayName)' to player_order \(index): \(turns.count) turns")
             let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
             let finalScore = turns.last?.scoreAfter ?? player.finalScore
             let startingScore = turns.first?.scoreBefore ?? player.startingScore
@@ -702,6 +778,7 @@ class MatchesService: ObservableObject {
             playersWithTurns.append(playerWithTurns)
         }
         
+        print("✅ [LoadTurnsForMatch] Returning \(playersWithTurns.count) players with turns")
         return playersWithTurns
     }
     
@@ -822,6 +899,7 @@ class MatchesService: ObservableObject {
         }
         
         print("   Loaded \(participantsJson.count) participants from match_participants table")
+        dbg("[loadMatchesByIds] Loaded participants for \(participantsByMatch.count) matches")
         
         // Step 2: Batch-load ALL turn data for these matches in ONE query
         let turnsResponse = try await supabaseService.client
@@ -874,7 +952,7 @@ class MatchesService: ObservableObject {
             
             // Build players from match_participants data
             let participantsData = participantsByMatch[id] ?? []
-            let basicPlayers = participantsData.compactMap { participantJson -> MatchPlayer? in
+            var basicPlayers = participantsData.compactMap { participantJson -> MatchPlayer? in
                 guard let userIdString = participantJson["user_id"] as? String,
                       let userId = UUID(uuidString: userIdString),
                       let displayName = participantJson["display_name"] as? String else {
@@ -897,6 +975,25 @@ class MatchesService: ObservableObject {
                 )
             }
             
+            dbg("[loadMatchesByIds] match=\(id.uuidString.prefix(8)) participantsRows=\(participantsData.count) basicPlayers=\(basicPlayers.count)")
+            
+            // FALLBACK: If no participants (old local matches), try to load from matches.players column
+            if basicPlayers.isEmpty {
+                dbg("[loadMatchesByIds][WARN] match=\(id.uuidString.prefix(8)) participants=0, trying matches.players fallback")
+                
+                // Try to parse players from the matches.players column (stored as JSON string)
+                if let playersString = json["players"] as? String,
+                   let playersData = playersString.data(using: .utf8) {
+                    let decoder = JSONDecoder()
+                    if let embeddedPlayers = try? decoder.decode([MatchPlayer].self, from: playersData) {
+                        basicPlayers = embeddedPlayers
+                        dbg("[loadMatchesByIds][WARN] matches.players fallback SUCCESS count=\(basicPlayers.count)")
+                    } else {
+                        dbg("[loadMatchesByIds][ERROR] matches.players fallback FAILED - could not decode")
+                    }
+                }
+            }
+            
             // Get metadata
             var metadata: [String: String] = [:]
             if let gameMetadata = json["metadata"] as? [String: Any] {
@@ -905,7 +1002,9 @@ class MatchesService: ObservableObject {
             
             // Get turns for this match
             let matchTurns = turnsByMatch[id] ?? []
+            dbg("[loadMatchesByIds] match=\(id.uuidString.prefix(8)) turnsRows=\(matchTurns.count)")
             let playersWithTurns = buildPlayersWithTurns(players: basicPlayers, turnsJson: matchTurns)
+            dbg("[loadMatchesByIds] match=\(id.uuidString.prefix(8)) returned turnsPerPlayer=\(playersWithTurns.map{$0.turns.count}) players=\(playersWithTurns.map{$0.displayName})")
             
             let match = MatchResult(
                 id: id,
