@@ -131,6 +131,7 @@ class RemoteMatchAdapter {
             response = result.data
         } catch {
             print("⚠️ [RemoteMatchAdapter] Failed to query turn data: \(error)")
+            print("   Error details: \(error.localizedDescription)")
             return players
         }
         

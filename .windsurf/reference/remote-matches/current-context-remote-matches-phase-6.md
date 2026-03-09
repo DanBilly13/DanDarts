@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 # DanDart — current-context-remote-matches-phase-6
 

@@ -223,10 +223,16 @@ class MatchService: ObservableObject {
             .execute()
         
         // Insert match record
-        try await supabaseService.client
-            .from("matches")
-            .insert(matchRecord)
-            .execute()
+        do {
+            try await supabaseService.client
+                .from("matches")
+                .insert(matchRecord)
+                .execute()
+            print("🧩 [MatchDBG] [saveMatch] wrote matches row id=\(matchId.uuidString.prefix(8)) mode=local")
+        } catch {
+            print("🧩 [MatchDBG] [saveMatch][ERROR] matches insert FAILED \(error)")
+            throw error
+        }
         
         // Insert into match_participants table for fast queries
         try await insertMatchParticipants(matchId: matchId, players: playersToSave)
@@ -284,10 +290,19 @@ class MatchService: ObservableObject {
         
         // Insert match throws
         if !throwRecords.isEmpty {
-            try await supabaseService.client
-                .from("match_throws")
-                .insert(throwRecords)
-                .execute()
+            print("🧩 [MatchDBG] [saveMatch] about to insert match_throws rows count=\(throwRecords.count) for match=\(matchId.uuidString.prefix(8))")
+            do {
+                try await supabaseService.client
+                    .from("match_throws")
+                    .insert(throwRecords)
+                    .execute()
+                print("🧩 [MatchDBG] [saveMatch] match_throws insert SUCCESS rows=\(throwRecords.count)")
+            } catch {
+                print("🧩 [MatchDBG] [saveMatch][ERROR] match_throws insert FAILED \(error)")
+                throw error
+            }
+        } else {
+            print("🧩 [MatchDBG] [saveMatch] No throwRecords to insert (turnHistory empty or no valid turns)")
         }
         
         // 4. Update player stats for connected players and get updated user

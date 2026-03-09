@@ -307,6 +307,10 @@ class MatchHistoryService: ObservableObject {
         print("   - Supabase: \(supabase.count) matches")
         print("   - Remote: \(remote.count) matches")
         
+        func totalTurns(_ m: MatchResult) -> Int {
+            m.players.reduce(0) { $0 + $1.turns.count }
+        }
+        
         var matchesById: [UUID: MatchResult] = [:]
         var localMatchesById: [UUID: MatchResult] = [:]
         
@@ -325,12 +329,18 @@ class MatchHistoryService: ObservableObject {
             print("🔄 [MergeMatches] Adding SUPABASE match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns) \(wasLocal ? "[OVERWRITES LOCAL]" : "")")
 
             // If we have a local version with turn data, prefer it to avoid losing turns
-            if let localMatch = localMatchesById[match.id],
-               let localFirstPlayer = localMatch.players.first,
-               !localFirstPlayer.turns.isEmpty {
-                let localTurnCount = localFirstPlayer.turns.count
-                print("   ✅ Keeping LOCAL version to preserve \(localTurnCount) turns (Supabase version has \(turnCount) turns)")
-                matchesById[match.id] = localMatch
+            if let localMatch = localMatchesById[match.id] {
+                let localTurns = totalTurns(localMatch)
+                let supabaseTurns = totalTurns(match)
+                let keeping = localTurns >= supabaseTurns ? "LOCAL" : "SUPABASE"
+                print("🧩 [MatchDBG] [merge] id=\(match.id.uuidString.prefix(8)) localTurns=\(localTurns) supabaseTurns=\(supabaseTurns) -> keeping \(keeping)")
+                
+                if localTurns > 0 {
+                    print("   ✅ Keeping LOCAL version to preserve \(localTurns) turns (Supabase version has \(supabaseTurns) turns)")
+                    matchesById[match.id] = localMatch
+                } else {
+                    matchesById[match.id] = match
+                }
             } else {
                 matchesById[match.id] = match
             }

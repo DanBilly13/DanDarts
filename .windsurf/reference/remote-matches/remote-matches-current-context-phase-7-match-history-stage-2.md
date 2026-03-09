@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 # remote-matches-current-context-phase-7-match-history-stage-2
 
 ## Project Overview
