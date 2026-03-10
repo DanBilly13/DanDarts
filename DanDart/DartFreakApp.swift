@@ -11,10 +11,45 @@ import FirebaseAnalytics
 import FirebaseCrashlytics
 import FirebasePerformance
 import UIKit
+import UserNotifications
+
+// MARK: - AppDelegate for APNs Token Handling
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        // Convert token data to hex string
+        let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        
+        print("📱 APNs device token received: \(tokenString.prefix(20))...")
+        
+        // Sync token to Supabase
+        Task {
+            do {
+                try await NotificationService.shared.syncPushToken(tokenString)
+            } catch {
+                print("❌ Failed to sync token on registration: \(error)")
+                // Token will be retried on next app launch
+            }
+        }
+    }
+    
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("❌ Failed to register for remote notifications: \(error)")
+        print("   This is normal in the simulator - APNs only works on real devices")
+    }
+}
 
 @main
 struct DartFreakApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authService = AuthService.shared
+    @StateObject private var notificationService = NotificationService.shared
     
     init() {
         // Initialize Firebase
@@ -25,6 +60,9 @@ struct DartFreakApp: App {
         
         // Enable Crashlytics
         Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
+        
+        // Set up notification delegate (Phase 8)
+        UNUserNotificationCenter.current().delegate = NotificationService.shared
     }
     
     var body: some Scene {
@@ -35,6 +73,7 @@ struct DartFreakApp: App {
 
                 ContentView()
                     .environmentObject(authService)
+                    .environmentObject(notificationService)
                     .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                         guard let url = activity.webpageURL else { return }
 

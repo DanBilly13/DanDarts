@@ -25,7 +25,7 @@ class RemoteMatchAdapter {
         guard remoteMatch.status == .completed,
               let winnerId = remoteMatch.winnerId,
               let endedAt = remoteMatch.endedAt else {
-            print("⚠️ [RemoteMatchAdapter] Cannot convert incomplete match: status=\(remoteMatch.status?.rawValue ?? "nil"), winnerId=\(remoteMatch.winnerId?.uuidString.prefix(8) ?? "nil")")
+            // print("⚠️ [RemoteMatchAdapter] Cannot convert incomplete match: status=\(remoteMatch.status?.rawValue ?? "nil"), winnerId=\(remoteMatch.winnerId?.uuidString.prefix(8) ?? "nil")")
             return nil
         }
         
@@ -106,7 +106,7 @@ class RemoteMatchAdapter {
             metadata: metadata
         )
         
-        print("✅ [RemoteMatchAdapter] Converted remote match \(id.uuidString.prefix(8))... to MatchResult with \(players.first?.turns.count ?? 0) turns")
+        // print("✅ [RemoteMatchAdapter] Converted remote match \(id.uuidString.prefix(8))... to MatchResult with \(players.first?.turns.count ?? 0) turns")
         return matchResult
     }
     
@@ -116,7 +116,7 @@ class RemoteMatchAdapter {
     ///   - players: Basic player data (without turns)
     /// - Returns: Players with complete turn data
     private func loadTurnsForRemoteMatch(matchId: UUID, players: [MatchPlayer]) async -> [MatchPlayer] {
-        print("🔍 [RemoteMatchAdapter] Loading turns for match \(matchId.uuidString.prefix(8))...")
+        // print("🔍 [RemoteMatchAdapter] Loading turns for match \(matchId.uuidString.prefix(8))...")
         
         // Query match_throws table for this match
         let response: Data
@@ -130,18 +130,18 @@ class RemoteMatchAdapter {
                 .execute()
             response = result.data
         } catch {
-            print("⚠️ [RemoteMatchAdapter] Failed to query turn data: \(error)")
-            print("   Error details: \(error.localizedDescription)")
+            // print("⚠️ [RemoteMatchAdapter] Failed to query turn data: \(error)")
+            // print("   Error details: \(error.localizedDescription)")
             return players
         }
         
         // Parse throws data
         guard let throwsArray = try? JSONSerialization.jsonObject(with: response) as? [[String: Any]] else {
-            print("⚠️ [RemoteMatchAdapter] No turn data found, returning players with empty turns")
+            // print("⚠️ [RemoteMatchAdapter] No turn data found, returning players with empty turns")
             return players
         }
         
-        print("📊 [RemoteMatchAdapter] Found \(throwsArray.count) throw records")
+        // print("📊 [RemoteMatchAdapter] Found \(throwsArray.count) throw records")
         
         // Group throws by player_order
         var playerTurns: [Int: [MatchTurn]] = [:]
@@ -161,7 +161,7 @@ class RemoteMatchAdapter {
             } else if let throwsArray = throwJson["throws"] as? [Any] {
                 dartScores = throwsArray.compactMap { $0 as? Int }
             } else {
-                print("⚠️ [RemoteMatchAdapter] Skipping turn - could not parse throws data")
+                // print("⚠️ [RemoteMatchAdapter] Skipping turn - could not parse throws data")
                 continue
             }
             
@@ -222,7 +222,7 @@ class RemoteMatchAdapter {
             playersWithTurns.append(playerWithTurns)
         }
         
-        print("✅ [RemoteMatchAdapter] Loaded \(playerTurns.values.flatMap { $0 }.count) total turns for \(players.count) players")
+        // print("✅ [RemoteMatchAdapter] Loaded \(playerTurns.values.flatMap { $0 }.count) total turns for \(players.count) players")
         return playersWithTurns
     }
 }

@@ -11,6 +11,7 @@ struct RemoteGamesTab: View {
     @EnvironmentObject var remoteMatchService: RemoteMatchService
     @EnvironmentObject private var router: Router
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var notificationService: NotificationService
     
     @Binding var showGameSelection: Bool
     
@@ -23,6 +24,9 @@ struct RemoteGamesTab: View {
     // Only show the full-screen loading view on the very first load.
     // For subsequent background refreshes, keep the list mounted to avoid row DISAPPEAR/APPEAR flashes.
     @State private var hasLoadedOnce = false
+    
+    // Track if we've requested permissions this session
+    @State private var hasRequestedPermissions = false
     
     
     // Frozen list snapshot - prevents reading live @Published during enter flow
@@ -57,6 +61,9 @@ struct RemoteGamesTab: View {
             }
         }
         .task {
+            // Check and request notification permissions (Phase 8)
+            await checkNotificationPermissions()
+            
             // Load matches when tab appears
             // Note: Realtime subscription is now set up in MainTabView on app launch
             await loadMatches()
@@ -419,6 +426,35 @@ struct RemoteGamesTab: View {
             try await remoteMatchService.loadMatches(userId: userId)
         } catch {
             print("❌ Failed to load remote matches: \(error)")
+        }
+    }
+    
+    /// Check notification permissions and request if needed (Phase 8)
+    private func checkNotificationPermissions() async {
+        // DEBUG: Print JWT token for testing push notifications
+        await authService.printCurrentUserToken()
+        
+        // Only request once per session
+        guard !hasRequestedPermissions else {
+            // Even if we already requested, retry token sync on subsequent visits
+            await notificationService.retryTokenSyncIfNeeded()
+            return
+        }
+        
+        // Check current status
+        await notificationService.checkAuthorizationStatus()
+        
+        // If not determined, request permissions
+        if notificationService.authorizationStatus == .notDetermined {
+            do {
+                try await notificationService.requestPermissions()
+                hasRequestedPermissions = true
+            } catch {
+                print("❌ Failed to request notification permissions: \(error)")
+            }
+        } else if notificationService.authorizationStatus == .authorized {
+            // If already authorized, retry token sync in case it failed previously
+            await notificationService.retryTokenSyncIfNeeded()
         }
     }
     

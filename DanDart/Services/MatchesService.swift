@@ -16,7 +16,7 @@ class MatchesService: ObservableObject {
     
     @MainActor
     private func dbg(_ msg: String) {
-        print("🧩 [MatchDBG] \(msg)")
+        // print("🧩 [MatchDBG] \(msg)")  // Disabled for Phase 8 testing
     }
     
     // MARK: - Date Decoding Helpers
@@ -628,8 +628,8 @@ class MatchesService: ObservableObject {
     ///   - players: Basic player data (without turns)
     /// - Returns: Players with complete turn data
     private func loadTurnsForMatch(matchId: UUID, players: [MatchPlayer]) async throws -> [MatchPlayer] {
-        print("🔍 [LoadTurnsForMatch] Loading turns for match \(matchId.uuidString.prefix(8))...")
-        print("   Input players: \(players.map { "\($0.displayName)" })")
+        // print("🔍 [LoadTurnsForMatch] Loading turns for match \(matchId.uuidString.prefix(8))...")
+        // print("   Input players: \(players.map { "\($0.displayName)" })")
         dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) inputPlayersCount=\(players.count)")
         
         // Query match_throws table for this match
@@ -660,7 +660,7 @@ class MatchesService: ObservableObject {
             return players
         }
         
-        print("📊 [LoadTurnsForMatch] Found \(throwsArray.count) throw records")
+        // print("📊 [LoadTurnsForMatch] Found \(throwsArray.count) throw records")
         dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) throwsRows=\(throwsArray.count)")
         
         // Group throws by player_order
@@ -743,10 +743,10 @@ class MatchesService: ObservableObject {
             playerTurns[playerOrder]?.append(turn)
         }
         
-        print("📊 [LoadTurnsForMatch] Grouped turns by player_order:")
-        for (order, turns) in playerTurns.sorted(by: { $0.key < $1.key }) {
-            print("   player_order \(order): \(turns.count) turns")
-        }
+        // print("📊 [LoadTurnsForMatch] Grouped turns by player_order:")
+        // for (order, turns) in playerTurns.sorted(by: { $0.key < $1.key }) {
+        //     print("   player_order \(order): \(turns.count) turns")
+        // }
         
         dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) groupedOrders=\(playerTurns.keys.sorted()) counts=\(playerTurns.keys.sorted().map{ playerTurns[$0]?.count ?? 0 })")
         if players.isEmpty && !throwsArray.isEmpty {
@@ -757,7 +757,7 @@ class MatchesService: ObservableObject {
         var playersWithTurns: [MatchPlayer] = []
         for (index, player) in players.enumerated() {
             let turns = playerTurns[index] ?? []
-            print("   Mapping player[\(index)] '\(player.displayName)' to player_order \(index): \(turns.count) turns")
+            // print("   Mapping player[\(index)] '\(player.displayName)' to player_order \(index): \(turns.count) turns")
             let totalDarts = turns.reduce(0) { $0 + $1.darts.count }
             let finalScore = turns.last?.scoreAfter ?? player.finalScore
             let startingScore = turns.first?.scoreBefore ?? player.startingScore
@@ -778,7 +778,7 @@ class MatchesService: ObservableObject {
             playersWithTurns.append(playerWithTurns)
         }
         
-        print("✅ [LoadTurnsForMatch] Returning \(playersWithTurns.count) players with turns")
+        // print("✅ [LoadTurnsForMatch] Returning \(playersWithTurns.count) players with turns")
         return playersWithTurns
     }
     

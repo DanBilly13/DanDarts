@@ -49,6 +49,21 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
 
 @MainActor
 class AuthService: ObservableObject {
+    
+    // MARK: - Debug Helper
+    func printCurrentUserToken() async {
+        do {
+            let session = try await SupabaseService.shared.client.auth.session
+            print("🔑 ========================================")
+            print("🔑 USER JWT TOKEN (for testing)")
+            print("🔑 ========================================")
+            print("🔑 User ID: \(session.user.id)")
+            print("🔑 Token: \(session.accessToken)")
+            print("🔑 ========================================")
+        } catch {
+            print("❌ Could not get session: \(error)")
+        }
+    }
     // MARK: - Singleton
     static let shared = AuthService()
     
@@ -777,12 +792,15 @@ class AuthService: ObservableObject {
             // 1. Clear toast notifications
             await FriendRequestToastManager.shared.clearAll()
             
-            // 2. Call Supabase sign out
+            // 2. Deactivate push token (Phase 8)
+            await NotificationService.shared.deactivateCurrentDeviceToken()
+            
+            // 3. Call Supabase sign out
             try await supabaseService.client.auth.signOut()
             
-            // 3. Clear Keychain session (handled by Supabase SDK automatically)
+            // 4. Clear Keychain session (handled by Supabase SDK automatically)
             
-            // 4. Reset currentUser to nil and set isAuthenticated to false
+            // 5. Reset currentUser to nil and set isAuthenticated to false
             clearAuthenticationState()
             
         } catch {

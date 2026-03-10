@@ -348,18 +348,18 @@ class MatchHistoryService: ObservableObject {
         
         // Add remote matches (will overwrite if same ID)
         for match in remote {
-            let turnCount = match.players.first?.turns.count ?? 0
-            let wasLocal = matchesById[match.id] != nil
-            print("🔄 [MergeMatches] Adding REMOTE match \(match.id.uuidString.prefix(8))... isRemote=\(match.metadata?["isRemote"] ?? "nil"), \(turnCount) turns \(wasLocal ? "[OVERWRITES]" : "")")
+            // let turnCount = match.players.first?.turns.count ?? 0
+            // let wasLocal = matchesById[match.id] != nil
+            // print("🔄 [MergeMatches] Adding REMOTE match \(match.id.uuidString.prefix(8))... isRemote=\(match.metadata?["isRemote"] ?? "nil"), \(turnCount) turns \(wasLocal ? "[OVERWRITES]" : "")")
             matchesById[match.id] = match
         }
         
         let result = Array(matchesById.values)
-        print("🔄 [MergeMatches] Final result: \(result.count) matches")
-        if let firstMatch = result.first {
-            let turnCount = firstMatch.players.first?.turns.count ?? 0
-            print("   📊 First merged match: \(firstMatch.gameName), \(turnCount) turns")
-        }
+        // print("🔄 [MergeMatches] Final result: \(result.count) matches")
+        // if let firstMatch = result.first {
+        //     let turnCount = firstMatch.players.first?.turns.count ?? 0
+        //     print("   📊 First merged match: \(firstMatch.gameName), \(turnCount) turns)")
+        // }
         
         return result
     }

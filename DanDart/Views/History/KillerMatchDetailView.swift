@@ -131,7 +131,7 @@ struct KillerMatchDetailView: View {
         }
         .padding(.vertical, 16)
         .onAppear {
-            printGameSummary()
+            // printGameSummary()
         }
     }
     
@@ -657,61 +657,61 @@ struct KillerMatchPlayerCard: View {
 
 extension KillerMatchDetailView {
     private func printGameSummary() {
-        print("\n🎯 ========================================")
-        print("🎯 KILLER GAME - \(startingLives) LIVES")
-        print("🎯 ========================================\n")
-        
-        // Debug metadata
-        print("📋 Metadata keys: \(match.metadata?.keys.sorted() ?? [])")
-        
-        // Print player numbers
-        for player in match.players {
-            let number = playerNumber(for: player)
-            let key = "player_\(player.id.uuidString)"
-            let storedValue = match.metadata?[key]
-            print("   \(player.displayName) - Number: \(number) (key: \(key), stored: \(storedValue ?? "nil"))")
-        }
-        print("")
-        
-        let maxRounds = match.players.map { $0.turns.count }.max() ?? 0
-        
-        for roundNum in 1...maxRounds {
-            print("📍 R\(roundNum)")
-            print("─────────────────────────────────────────")
-            
-            for player in match.players {
-                let turnIndex = roundNum - 1
-                guard turnIndex < player.turns.count else { continue }
-                let turn = player.turns[turnIndex]
-                
-                var dartDescriptions: [String] = []
-                for (idx, dart) in turn.darts.enumerated() {
-                    print("      D\(idx+1): base=\(dart.baseValue), mult=\(dart.multiplier), value=\(dart.value), metadata=\(dart.killerMetadata?.outcome.rawValue ?? "nil")")
-                    if let metadata = dart.killerMetadata {
-                        let dartDesc = describeDart(dart: dart, metadata: metadata, thrower: player)
-                        dartDescriptions.append(dartDesc)
-                    }
-                }
-                
-                let dartsText = dartDescriptions.isEmpty ? "No darts" : dartDescriptions.joined(separator: ". ")
-                print("   \(player.displayName): \(dartsText)")
-            }
-            
-            print("\n   End of Round \(roundNum):")
-            for player in match.players {
-                let livesLost = countLivesLost(player: player, upToRound: roundNum)
-                let livesRemaining = max(0, startingLives - livesLost)
-                let status = livesRemaining == 0 ? " ❌ ELIMINATED" : ""
-                print("   • \(player.displayName): \(livesRemaining) \(livesRemaining == 1 ? "life" : "lives") left\(status)")
-            }
-            print("")
-        }
-        
-        if let winner = match.players.first(where: { $0.id == match.winnerId }) {
-            let finalLivesCount = finalLives(for: winner)
-            print("🏆 WINNER: \(winner.displayName) with \(finalLivesCount) \(finalLivesCount == 1 ? "life" : "lives") remaining")
-        }
-        print("\n🎯 ========================================\n")
+        // print("\n🎯 ========================================")
+        // print("🎯 KILLER GAME - \(startingLives) LIVES")
+        // print("🎯 ========================================\n")
+        // 
+        // // Debug metadata
+        // print("📋 Metadata keys: \(match.metadata?.keys.sorted() ?? [])")
+        // 
+        // // Print player numbers
+        // for player in match.players {
+        //     let number = playerNumber(for: player)
+        //     let key = "player_\(player.id.uuidString)"
+        //     let storedValue = match.metadata?[key]
+        //     print("   \(player.displayName) - Number: \(number) (key: \(key), stored: \(storedValue ?? "nil"))")
+        // }
+        // print("")
+        // 
+        // let maxRounds = match.players.map { $0.turns.count }.max() ?? 0
+        // 
+        // for roundNum in 1...maxRounds {
+        //     print("📍 R\(roundNum)")
+        //     print("─────────────────────────────────────────")
+        //     
+        //     for player in match.players {
+        //         let turnIndex = roundNum - 1
+        //         guard turnIndex < player.turns.count else { continue }
+        //         let turn = player.turns[turnIndex]
+        //         
+        //         var dartDescriptions: [String] = []
+        //         for (idx, dart) in turn.darts.enumerated() {
+        //             print("      D\(idx+1): base=\(dart.baseValue), mult=\(dart.multiplier), value=\(dart.value), metadata=\(dart.killerMetadata?.outcome.rawValue ?? "nil")")
+        //             if let metadata = dart.killerMetadata {
+        //                 let dartDesc = describeDart(dart: dart, metadata: metadata, thrower: player)
+        //                 dartDescriptions.append(dartDesc)
+        //             }
+        //         }
+        //         
+        //         let dartsText = dartDescriptions.isEmpty ? "No darts" : dartDescriptions.joined(separator: ". ")
+        //         print("   \(player.displayName): \(dartsText)")
+        //     }
+        //     
+        //     print("\n   End of Round \(roundNum):")
+        //     for player in match.players {
+        //         let livesLost = countLivesLost(player: player, upToRound: roundNum)
+        //         let livesRemaining = max(0, startingLives - livesLost)
+        //         let status = livesRemaining == 0 ? " ❌ ELIMINATED" : ""
+        //         print("   • \(player.displayName): \(livesRemaining) \(livesRemaining == 1 ? "life" : "lives") left\(status)")
+        //     }
+        //     print("")
+        // }
+        // 
+        // if let winner = match.players.first(where: { $0.id == match.winnerId }) {
+        //     let finalLivesCount = finalLives(for: winner)
+        //     print("🏆 WINNER: \(winner.displayName) with \(finalLivesCount) \(finalLivesCount == 1 ? "life" : "lives") remaining")
+        // }
+        // print("\n🎯 ========================================\n")
     }
     
     private func describeDart(dart: MatchDart, metadata: KillerDartMetadata, thrower: MatchPlayer) -> String {

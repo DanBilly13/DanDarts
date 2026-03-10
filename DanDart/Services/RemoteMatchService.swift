@@ -1294,7 +1294,7 @@ class RemoteMatchService: ObservableObject {
         do {
             // Register broadcast handler BEFORE subscribing, and retain the subscription token
             pingSubscription = channel.onBroadcast(event: "ping") { message in
-                print("📡 [RemoteMatch Realtime] broadcast ping received:", message)
+                // print("📡 [RemoteMatch Realtime] broadcast ping received:", message)  // Disabled for Phase 8 testing
             }
             
             // Use the newer subscribe API that throws errors
@@ -1303,7 +1303,7 @@ class RemoteMatchService: ObservableObject {
             // 🔎 Debug: prove the socket can receive *anything*
             struct PingMessage: Codable { let hello: String }
             try? await channel.broadcast(event: "ping", message: PingMessage(hello: "world"))
-            print("📡 [RemoteMatch Realtime] broadcast ping sent")
+            // print("📡 [RemoteMatch Realtime] broadcast ping sent")  // Disabled for Phase 8 testing
             
             print("✅ [RemoteMatch Realtime] SUBSCRIPTION ACTIVE")
             print("✅ [RemoteMatch Realtime] Channel status: \(channel.status)")
