@@ -224,7 +224,41 @@ serve(async (req) => {
 
     console.log(`✅ Challenge created: ${match.id}`)
 
-    // TODO: Trigger push notification to receiver
+    // Send push notification to receiver
+    try {
+      const pushPayload = {
+        user_id: receiver_id,
+        notification_type: 'challenge_received',
+        match_id: match.id,
+        title: `Challenge from ${user.user_metadata?.full_name || 'Someone'}!`,
+        body: `You've been challenged to a ${game_type} match`,
+        route: 'remote',
+        highlight: 'incoming',
+      }
+
+      const pushResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/push-notifications`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(pushPayload),
+        }
+      )
+
+      if (pushResponse.ok) {
+        const pushResult = await pushResponse.json()
+        console.log(`📤 Push notification sent: ${pushResult.tokens_sent} token(s)`)
+      } else {
+        const pushError = await pushResponse.text()
+        console.error(`⚠️ Push notification failed (non-critical):`, pushError)
+      }
+    } catch (pushError) {
+      // Don't fail challenge creation if push fails
+      console.error(`⚠️ Push notification error (non-critical):`, pushError)
+    }
 
     return new Response(
       JSON.stringify({

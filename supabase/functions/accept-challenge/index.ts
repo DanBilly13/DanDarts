@@ -3,8 +3,22 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import type { ErrorResponse, SuccessResponse } from '../_shared/types.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface ErrorResponse {
+  error: string
+  details?: any
+}
+
+interface SuccessResponse {
+  success: boolean
+  message: string
+  data?: any
+}
 
 const JOIN_WINDOW_SECONDS = 300 // 5 minutes
 
@@ -23,20 +37,24 @@ serve(async (req) => {
       )
     }
 
+    // Extract JWT token from Bearer header
+    const jwt = authHeader.replace('Bearer ', '').trim()
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader }
+          headers: { Authorization: `Bearer ${jwt}` }
         },
       }
     )
 
+    // Get current user using JWT token
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     if (userError || !user) {
       return new Response(
@@ -203,7 +221,41 @@ serve(async (req) => {
 
     console.log(`✅ Challenge accepted: ${match_id}`)
 
-    // TODO: Trigger push notification to challenger
+    // Send push notification to challenger
+    try {
+      const pushPayload = {
+        user_id: match.challenger_id,
+        notification_type: 'match_ready',
+        match_id: match_id,
+        title: `${user.user_metadata?.full_name || 'Your opponent'} accepted!`,
+        body: `Your ${match.game_type} match is ready. Join now!`,
+        route: 'remote',
+        highlight: 'ready',
+      }
+
+      const pushResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/push-notifications`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(pushPayload),
+        }
+      )
+
+      if (pushResponse.ok) {
+        const pushResult = await pushResponse.json()
+        console.log(`📤 Push notification sent: ${pushResult.tokens_sent} token(s)`)
+      } else {
+        const pushError = await pushResponse.text()
+        console.error(`⚠️ Push notification failed (non-critical):`, pushError)
+      }
+    } catch (pushError) {
+      // Don't fail challenge acceptance if push fails
+      console.error(`⚠️ Push notification error (non-critical):`, pushError)
+    }
 
     return new Response(
       JSON.stringify({
