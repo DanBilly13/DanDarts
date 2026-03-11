@@ -136,6 +136,17 @@ struct PlayerChallengeCardFoot: View {
     let onDecline: (() -> Void)?
     let onJoin: (() -> Void)?
     
+    @ViewBuilder
+    private func buttonSpinnerSlot(isVisible: Bool) -> some View {
+        ZStack {
+            if isVisible {
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+        .frame(width: 16, height: 16)
+    }
+
     private func formatTimeRemaining(from expiresAt: Date) -> String {
         let timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
         let totalSeconds = max(0, Int(timeRemaining.rounded(.down)))
@@ -158,12 +169,7 @@ struct PlayerChallengeCardFoot: View {
                         print("🟡 [DEBUG] onDecline closure exists: \(onDecline != nil)")
                         onDecline?()
                     } label: {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text("Decline")
-                        }
+                        Text("Decline")
                     }
                     .disabled(isProcessing)
                     
@@ -175,20 +181,17 @@ struct PlayerChallengeCardFoot: View {
                         print("🟢 [DEBUG] onAccept closure exists: \(onAccept != nil)")
                         onAccept?()
                     } label: {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            HStack(spacing: 8) {
-                                Text("Accept")
-                                
-                                if let expiresAt = expiresAt {
-                                    TimelineView(.periodic(from: .now, by: 1.0)) { context in
-                                        Text(formatTimeRemaining(from: expiresAt))
-                                            .fontWeight(.semibold)
-                                    }
+                        HStack(spacing: 8) {
+                            Text("Accept")
+                            
+                            if !isProcessing, let expiresAt = expiresAt {
+                                TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                                    Text(formatTimeRemaining(from: expiresAt))
+                                        .fontWeight(.semibold)
                                 }
                             }
+                            
+                            buttonSpinnerSlot(isVisible: isProcessing)
                         }
                     }
                     .disabled(isProcessing)
@@ -246,20 +249,17 @@ struct PlayerChallengeCardFoot: View {
                               compact: true) {
                         onJoin?()
                     } label: {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            HStack(spacing: 8) {
-                                Text("Join now")
-                                
-                                if let expiresAt = expiresAt {
-                                    TimelineView(.periodic(from: .now, by: 1.0)) { context in
-                                        Text(formatTimeRemaining(from: expiresAt))
-                                            .fontWeight(.semibold)
-                                    }
+                        HStack(spacing: 8) {
+                            Text("Join now")
+                            
+                            if !isProcessing, let expiresAt = expiresAt {
+                                TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                                    Text(formatTimeRemaining(from: expiresAt))
+                                        .fontWeight(.semibold)
                                 }
                             }
+                            
+                            buttonSpinnerSlot(isVisible: isProcessing)
                         }
                     }
                     .disabled(isProcessing)
@@ -269,12 +269,7 @@ struct PlayerChallengeCardFoot: View {
                               compact: true) {
                         onDecline?()
                     } label: {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text("Cancel Match")
-                        }
+                        Text("Cancel Match")
                     }
                     .disabled(isProcessing)
                 }
@@ -282,8 +277,6 @@ struct PlayerChallengeCardFoot: View {
             case .lobby:
                 VStack(spacing: 16) {
                     HStack(spacing: 8) {
-                        ProgressView()
-                            .tint(AppColor.interactivePrimaryBackground)
                         Text("Opponent is ready!")
                             .font(.system(.subheadline, design: .rounded))
                             .fontWeight(.semibold)
@@ -306,11 +299,9 @@ struct PlayerChallengeCardFoot: View {
                               compact: true) {
                         onJoin?()
                     } label: {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
+                        HStack(spacing: 8) {
                             Text("Join Match")
+                            buttonSpinnerSlot(isVisible: isProcessing)
                         }
                     }
                     .disabled(isProcessing)
