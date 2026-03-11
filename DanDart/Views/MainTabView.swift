@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
+    @EnvironmentObject private var notificationService: NotificationService
     @StateObject private var friendsService = FriendsService()
     @StateObject private var remoteMatchService = RemoteMatchService()
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
@@ -373,6 +374,10 @@ struct MainTabView: View {
             // Update toast suppression based on selected tab
             // Tab 1 = Friends tab, suppress requestReceived toasts there
             toastManager.suppressRequestReceivedToasts = (newValue == 1)
+        }
+        .onChange(of: notificationService.pendingIntent?.matchId) { _, newValue in
+            guard newValue != nil else { return }
+            selectedTab = 2
         }
         .onChange(of: authService.currentUser?.id) { oldValue, newValue in
             loadPendingRequestCount()

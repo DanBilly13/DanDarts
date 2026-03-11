@@ -8,7 +8,9 @@
 
 import Foundation
 import UserNotifications
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 class NotificationService: NSObject, ObservableObject {
@@ -82,9 +84,11 @@ class NotificationService: NSObject, ObservableObject {
                 await checkAuthorizationStatus()
                 
                 // Register for remote notifications on main thread
+                #if canImport(UIKit)
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
+                #endif
             } else {
                 print("❌ Notification permissions denied")
                 await checkAuthorizationStatus()
@@ -238,8 +242,21 @@ class NotificationService: NSObject, ObservableObject {
     
     /// Handle notification tap and create route intent
     func handleNotificationTap(userInfo: [AnyHashable: Any]) {
-        // Implementation will be added in Task 6
-        print("📱 NotificationService.handleNotificationTap() - stub")
+        guard let intent = NotificationPayloadParser.parseIntent(from: userInfo) else {
+            print("⚠️ Notification tap received but payload could not be parsed")
+            return
+        }
+
+        // Foreground policy (Phase 8): if app is already active, do not force navigation.
+        #if canImport(UIKit)
+        guard UIApplication.shared.applicationState != .active else {
+            print("⏭️ Notification tap ignored (app active) matchId=\(intent.matchId.uuidString.prefix(8))...")
+            return
+        }
+        #endif
+
+        print("📍 Enqueue notification intent matchId=\(intent.matchId.uuidString.prefix(8))... highlight=\(intent.highlightStyle)")
+        pendingIntent = intent
     }
     
     /// Clear consumed intent

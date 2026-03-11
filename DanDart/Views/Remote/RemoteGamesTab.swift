@@ -34,6 +34,10 @@ struct RemoteGamesTab: View {
     @State private var frozenPending: [RemoteMatchWithPlayers] = []
     @State private var frozenReady: [RemoteMatchWithPlayers] = []
     @State private var frozenSent: [RemoteMatchWithPlayers] = []
+
+    // Task 5: push-tap deep link consumption
+    @State private var highlightedMatchId: UUID? = nil
+    @State private var isConsumingNotificationIntent: Bool = false
     
     var body: some View {
         ZStack {
@@ -199,169 +203,217 @@ struct RemoteGamesTab: View {
     }
     
     private var matchListView: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Ready matches
-                if !readyForUIStable.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("Ready to join", systemImage: "checkmark.circle.fill", color: .green)
-                        
-                        ForEach(readyForUIStable) { matchWithPlayers in
-                            let isExpired = matchWithPlayers.isExpired
-                            let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            if !expiredMatchIds.contains(matchWithPlayers.id) &&
-                               matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                                PlayerChallengeCard(
-                                    matchId: matchWithPlayers.match.id,
-                                    player: Player(
-                                        displayName: matchWithPlayers.opponent.displayName,
-                                        nickname: matchWithPlayers.opponent.nickname,
-                                        avatarURL: matchWithPlayers.opponent.avatarURL,
-                                        isGuest: false,
-                                        totalWins: matchWithPlayers.opponent.totalWins,
-                                        totalLosses: matchWithPlayers.opponent.totalLosses,
-                                        userId: matchWithPlayers.opponent.id
-                                    ),
-                                    state: isExpired ? .expired : .ready,
-                                    gameType: matchWithPlayers.match.gameType,
-                                    matchFormat: matchWithPlayers.match.matchFormat,
-                                    isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                                    expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
-                                    onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
-                                    onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
-                                )
-                                .opacity(isFading ? 0 : 1)
-                                .animation(.easeOut(duration: 0.5), value: isFading)
-                                .onChange(of: isExpired) { _, newValue in
-                                    if newValue {
-                                        handleExpiration(matchId: matchWithPlayers.id)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Ready matches
+                    if !readyForUIStable.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("Ready to join", systemImage: "checkmark.circle.fill", color: .green)
+                            
+                            ForEach(readyForUIStable) { matchWithPlayers in
+                                let isExpired = matchWithPlayers.isExpired
+                                let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                                if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                                   matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                                    PlayerChallengeCard(
+                                        matchId: matchWithPlayers.match.id,
+                                        player: Player(
+                                            displayName: matchWithPlayers.opponent.displayName,
+                                            nickname: matchWithPlayers.opponent.nickname,
+                                            avatarURL: matchWithPlayers.opponent.avatarURL,
+                                            isGuest: false,
+                                            totalWins: matchWithPlayers.opponent.totalWins,
+                                            totalLosses: matchWithPlayers.opponent.totalLosses,
+                                            userId: matchWithPlayers.opponent.id
+                                        ),
+                                        state: isExpired ? .expired : .ready,
+                                        gameType: matchWithPlayers.match.gameType,
+                                        matchFormat: matchWithPlayers.match.matchFormat,
+                                        isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                        expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
+                                        onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
+                                        onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
+                                    )
+                                    .id(matchWithPlayers.match.id)
+                                    .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                                    .opacity(isFading ? 0 : 1)
+                                    .animation(.easeOut(duration: 0.5), value: isFading)
+                                    .onChange(of: isExpired) { _, newValue in
+                                        if newValue {
+                                            handleExpiration(matchId: matchWithPlayers.id)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                
-                // Received challenges (dimmed when match ready)
-                if !pendingForUIStable.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
-                        
-                        ForEach(pendingForUIStable) { matchWithPlayers in
-                            let isExpired = matchWithPlayers.isExpired
-                            let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            if !expiredMatchIds.contains(matchWithPlayers.id) &&
-                               matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                                PlayerChallengeCard(
-                                    matchId: matchWithPlayers.match.id,
-                                    player: Player(
-                                        displayName: matchWithPlayers.opponent.displayName,
-                                        nickname: matchWithPlayers.opponent.nickname,
-                                        avatarURL: matchWithPlayers.opponent.avatarURL,
-                                        isGuest: false,
-                                        totalWins: matchWithPlayers.opponent.totalWins,
-                                        totalLosses: matchWithPlayers.opponent.totalLosses,
-                                        userId: matchWithPlayers.opponent.id
-                                    ),
-                                    state: isExpired ? .expired : .pending,
-                                    gameType: matchWithPlayers.match.gameType,
-                                    matchFormat: matchWithPlayers.match.matchFormat,
-                                    isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                                    expiresAt: matchWithPlayers.match.challengeExpiresAt,
-                                    onAccept: {
-                                        acceptChallenge(matchId: matchWithPlayers.match.id)
-                                    },
-                                    onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
-                                )
-                                .opacity(isFading ? 0 : 1)
-                                .animation(.easeOut(duration: 0.5), value: isFading)
-                                .onChange(of: isExpired) { _, newValue in
-                                    if newValue {
-                                        handleExpiration(matchId: matchWithPlayers.id)
+                    
+                    // Received challenges (dimmed when match ready)
+                    if !pendingForUIStable.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
+                            
+                            ForEach(pendingForUIStable) { matchWithPlayers in
+                                let isExpired = matchWithPlayers.isExpired
+                                let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                                if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                                   matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                                    PlayerChallengeCard(
+                                        matchId: matchWithPlayers.match.id,
+                                        player: Player(
+                                            displayName: matchWithPlayers.opponent.displayName,
+                                            nickname: matchWithPlayers.opponent.nickname,
+                                            avatarURL: matchWithPlayers.opponent.avatarURL,
+                                            isGuest: false,
+                                            totalWins: matchWithPlayers.opponent.totalWins,
+                                            totalLosses: matchWithPlayers.opponent.totalLosses,
+                                            userId: matchWithPlayers.opponent.id
+                                        ),
+                                        state: isExpired ? .expired : .pending,
+                                        gameType: matchWithPlayers.match.gameType,
+                                        matchFormat: matchWithPlayers.match.matchFormat,
+                                        isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                        expiresAt: matchWithPlayers.match.challengeExpiresAt,
+                                        onAccept: {
+                                            acceptChallenge(matchId: matchWithPlayers.match.id)
+                                        },
+                                        onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
+                                    )
+                                    .id(matchWithPlayers.match.id)
+                                    .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                                    .opacity(isFading ? 0 : 1)
+                                    .animation(.easeOut(duration: 0.5), value: isFading)
+                                    .onChange(of: isExpired) { _, newValue in
+                                        if newValue {
+                                            handleExpiration(matchId: matchWithPlayers.id)
+                                        }
                                     }
                                 }
                             }
                         }
+                        .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
                     }
-                    .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
-                }
-                
-                // Sent challenges (dimmed when match ready)
-                if !sentForUIStable.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
-                        
-                        ForEach(sentForUIStable) { matchWithPlayers in
-                            let isExpired = matchWithPlayers.isExpired
-                            let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                            if !expiredMatchIds.contains(matchWithPlayers.id) &&
-                               matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                                PlayerChallengeCard(
-                                    matchId: matchWithPlayers.match.id,
-                                    player: Player(
-                                        displayName: matchWithPlayers.opponent.displayName,
-                                        nickname: matchWithPlayers.opponent.nickname,
-                                        avatarURL: matchWithPlayers.opponent.avatarURL,
-                                        isGuest: false,
-                                        totalWins: matchWithPlayers.opponent.totalWins,
-                                        totalLosses: matchWithPlayers.opponent.totalLosses,
-                                        userId: matchWithPlayers.opponent.id
-                                    ),
-                                    state: isExpired ? .expired : .sent,
-                                    gameType: matchWithPlayers.match.gameType,
-                                    matchFormat: matchWithPlayers.match.matchFormat,
-                                    isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                                    expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
-                                    onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
-                                )
-                                .opacity(isFading ? 0 : 1)
-                                .animation(.easeOut(duration: 0.5), value: isFading)
-                                .onChange(of: isExpired) { _, newValue in
-                                    if newValue {
-                                        handleExpiration(matchId: matchWithPlayers.id)
+                    
+                    // Sent challenges (dimmed when match ready)
+                    if !sentForUIStable.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
+                            
+                            ForEach(sentForUIStable) { matchWithPlayers in
+                                let isExpired = matchWithPlayers.isExpired
+                                let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                                if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                                   matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                                    PlayerChallengeCard(
+                                        matchId: matchWithPlayers.match.id,
+                                        player: Player(
+                                            displayName: matchWithPlayers.opponent.displayName,
+                                            nickname: matchWithPlayers.opponent.nickname,
+                                            avatarURL: matchWithPlayers.opponent.avatarURL,
+                                            isGuest: false,
+                                            totalWins: matchWithPlayers.opponent.totalWins,
+                                            totalLosses: matchWithPlayers.opponent.totalLosses,
+                                            userId: matchWithPlayers.opponent.id
+                                        ),
+                                        state: isExpired ? .expired : .sent,
+                                        gameType: matchWithPlayers.match.gameType,
+                                        matchFormat: matchWithPlayers.match.matchFormat,
+                                        isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                        expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
+                                        onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
+                                    )
+                                    .id(matchWithPlayers.match.id)
+                                    .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                                    .opacity(isFading ? 0 : 1)
+                                    .animation(.easeOut(duration: 0.5), value: isFading)
+                                    .onChange(of: isExpired) { _, newValue in
+                                        if newValue {
+                                            handleExpiration(matchId: matchWithPlayers.id)
+                                        }
                                     }
                                 }
                             }
                         }
+                        .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
                     }
-                    .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
+                    
+                    // Active match (in progress, dimmed when match ready)
+                    if let activeMatch = remoteMatchService.activeMatch,
+                       remoteMatchService.processingMatchId == nil,
+                       !cancelledMatchIds.contains(activeMatch.match.id) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
+                            
+                            PlayerChallengeCard(
+                                matchId: activeMatch.match.id,
+                                player: Player(
+                                    displayName: activeMatch.opponent.displayName,
+                                    nickname: activeMatch.opponent.nickname,
+                                    avatarURL: activeMatch.opponent.avatarURL,
+                                    isGuest: false,
+                                    totalWins: activeMatch.opponent.totalWins,
+                                    totalLosses: activeMatch.opponent.totalLosses,
+                                    userId: activeMatch.opponent.id
+                                ),
+                                state: activeMatch.match.status ?? .inProgress,
+                                gameType: activeMatch.match.gameType,
+                                matchFormat: activeMatch.match.matchFormat,
+                                expiresAt: nil
+                            )
+                            .id(activeMatch.match.id)
+                            .remoteCardHighlight(isHighlighted: highlightedMatchId == activeMatch.match.id)
+                        }
+                        .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
+                    }
                 }
-                
-                // Active match (in progress, dimmed when match ready)
-                if let activeMatch = remoteMatchService.activeMatch,
-                   remoteMatchService.processingMatchId == nil,
-                   !cancelledMatchIds.contains(activeMatch.match.id) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
-                        
-                        PlayerChallengeCard(
-                            matchId: activeMatch.match.id,
-                            player: Player(
-                                displayName: activeMatch.opponent.displayName,
-                                nickname: activeMatch.opponent.nickname,
-                                avatarURL: activeMatch.opponent.avatarURL,
-                                isGuest: false,
-                                totalWins: activeMatch.opponent.totalWins,
-                                totalLosses: activeMatch.opponent.totalLosses,
-                                userId: activeMatch.opponent.id
-                            ),
-                            state: activeMatch.match.status ?? .inProgress,
-                            gameType: activeMatch.match.gameType,
-                            matchFormat: activeMatch.match.matchFormat,
-                            expiresAt: nil
-                        )
-                    }
-                    .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
+            .transaction { tx in
+                // Disable animations during enter flow to prevent jarring section movements
+                if remoteMatchService.processingMatchId != nil || !remoteMatchService.pendingEnterFlowMatchIds.isEmpty {
+                    tx.animation = nil
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
-        }
-        .transaction { tx in
-            // Disable animations during enter flow to prevent jarring section movements
-            if remoteMatchService.processingMatchId != nil || !remoteMatchService.pendingEnterFlowMatchIds.isEmpty {
-                tx.animation = nil
+            .onChange(of: notificationService.pendingIntent?.matchId) { _, newValue in
+                guard let matchId = newValue,
+                      let intent = notificationService.pendingIntent,
+                      intent.matchId == matchId else {
+                    return
+                }
+                guard !isConsumingNotificationIntent else { return }
+
+                isConsumingNotificationIntent = true
+                Task { @MainActor in
+                    await RemoteNotificationIntentConsumer.consume(
+                        intent: intent,
+                        loadMatches: {
+                            await loadMatches()
+                        },
+                        listsSnapshot: {
+                            RemoteNotificationIntentConsumer.ListsSnapshot(
+                                ready: readyForUIStable,
+                                pending: pendingForUIStable,
+                                sent: sentForUIStable,
+                                active: remoteMatchService.activeMatch
+                            )
+                        },
+                        scrollTo: { targetId in
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                proxy.scrollTo(targetId, anchor: .center)
+                            }
+                        },
+                        setHighlighted: { newValue in
+                            highlightedMatchId = newValue
+                        },
+                        clearIntent: {
+                            notificationService.clearIntent()
+                            isConsumingNotificationIntent = false
+                        }
+                    )
+                }
             }
         }
     }
