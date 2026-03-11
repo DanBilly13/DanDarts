@@ -145,8 +145,7 @@ struct RemoteGameSetupView: View {
                                         totalWins: opponent.totalWins,
                                         totalLosses: opponent.totalLosses,
                                         userId: opponent.id
-                                    ),
-                                    playerNumber: 2
+                                    )
                                 )
                             }
                             .buttonStyle(.plain)
