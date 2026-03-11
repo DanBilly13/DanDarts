@@ -39,6 +39,12 @@ struct RemoteGamesTab: View {
     @State private var highlightedMatchId: UUID? = nil
     @State private var isConsumingNotificationIntent: Bool = false
     
+    // Phase 10: Declined challenge presentation
+    @State private var previousSentChallenges: [RemoteMatchWithPlayers] = []
+    @State private var declinedMatchesCache: [UUID: RemoteMatchWithPlayers] = [:]
+    @State private var showDeclinedForMatchIds: Set<UUID> = []
+    @State private var declineHandledMatchIds: Set<UUID> = []
+    
     var body: some View {
         ZStack {
             AppColor.backgroundPrimary
@@ -114,6 +120,180 @@ struct RemoteGamesTab: View {
     // MARK: - Match List View
     
     // CRITICAL: Render from frozen snapshot while entering flow to prevent reading live @Published
+
+    @ViewBuilder
+    private var readyMatchesSection: some View {
+        if !readyForUIStable.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("Ready to join", systemImage: "checkmark.circle.fill", color: .green)
+                
+                ForEach(readyForUIStable) { matchWithPlayers in
+                    let isExpired = matchWithPlayers.isExpired
+                    let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                    if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                       matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                        PlayerChallengeCard(
+                            matchId: matchWithPlayers.match.id,
+                            player: player(from: matchWithPlayers),
+                            state: cardPresentationState(
+                                for: matchWithPlayers,
+                                isExpired: isExpired,
+                                showAsDeclined: false
+                            ),
+                            gameType: matchWithPlayers.match.gameType,
+                            matchFormat: matchWithPlayers.match.matchFormat,
+                            isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                            expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
+                            onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
+                            onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
+                        )
+                        .id(matchWithPlayers.match.id)
+                        .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                        .onAppear {
+                            let presentationState = cardPresentationState(for: matchWithPlayers, isExpired: isExpired, showAsDeclined: false)
+                            print("🟢 [ReadyCard] APPEAR matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) state=\(presentationState.displayName) isProcessing=\(remoteMatchService.processingMatchId == matchWithPlayers.match.id) hasOnDecline=true")
+                        }
+                        .onDisappear {
+                            print("🟢 [ReadyCard] DISAPPEAR matchId=\(matchWithPlayers.match.id.uuidString.prefix(8))")
+                        }
+                        .onChange(of: cardPresentationState(for: matchWithPlayers, isExpired: isExpired, showAsDeclined: false)) { oldState, newState in
+                            print("🟢 [ReadyCard] STATE CHANGE matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) old=\(oldState.displayName) new=\(newState.displayName)")
+                        }
+                        .onChange(of: remoteMatchService.processingMatchId == matchWithPlayers.match.id) { oldValue, newValue in
+                            print("🟢 [ReadyCard] isProcessing CHANGE matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) old=\(oldValue) new=\(newValue)")
+                        }
+                        .opacity(isFading ? 0 : 1)
+                        .animation(.easeOut(duration: 0.5), value: isFading)
+                        .onChange(of: isExpired) { _, newValue in
+                            if newValue {
+                                handleExpiration(matchId: matchWithPlayers.id)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var receivedChallengesSection: some View {
+        if !pendingForUIStable.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
+                
+                ForEach(pendingForUIStable) { matchWithPlayers in
+                    let isExpired = matchWithPlayers.isExpired
+                    let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                    if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                       matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                        PlayerChallengeCard(
+                            matchId: matchWithPlayers.match.id,
+                            player: player(from: matchWithPlayers),
+                            state: cardPresentationState(
+                                for: matchWithPlayers,
+                                isExpired: isExpired,
+                                showAsDeclined: false
+                            ),
+                            gameType: matchWithPlayers.match.gameType,
+                            matchFormat: matchWithPlayers.match.matchFormat,
+                            isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                            expiresAt: matchWithPlayers.match.challengeExpiresAt,
+                            onAccept: {
+                                acceptChallenge(matchId: matchWithPlayers.match.id)
+                            },
+                            onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
+                        )
+                        .id(matchWithPlayers.match.id)
+                        .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                        .opacity(isFading ? 0 : 1)
+                        .animation(.easeOut(duration: 0.5), value: isFading)
+                        .onChange(of: isExpired) { _, newValue in
+                            if newValue {
+                                handleExpiration(matchId: matchWithPlayers.id)
+                            }
+                        }
+                    }
+                }
+            }
+            .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
+        }
+    }
+    
+    @ViewBuilder
+    private var sentChallengesSection: some View {
+        if !sentForUIWithDeclined.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
+                
+                ForEach(sentForUIWithDeclined) { matchWithPlayers in
+                    let isExpired = matchWithPlayers.isExpired
+                    let isFading = fadingMatchIds.contains(matchWithPlayers.id)
+                    let showAsDeclined = showDeclinedForMatchIds.contains(matchWithPlayers.match.id)
+                    let presentationState = cardPresentationState(
+                        for: matchWithPlayers,
+                        isExpired: isExpired,
+                        showAsDeclined: showAsDeclined
+                    )
+                    if !expiredMatchIds.contains(matchWithPlayers.id) &&
+                       matchWithPlayers.id != remoteMatchService.activeMatch?.id {
+                        PlayerChallengeCard(
+                            matchId: matchWithPlayers.match.id,
+                            player: player(from: matchWithPlayers),
+                            state: presentationState,
+                            gameType: matchWithPlayers.match.gameType,
+                            matchFormat: matchWithPlayers.match.matchFormat,
+                            isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                            expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
+                            onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
+                        )
+                        .id(matchWithPlayers.match.id)
+                        .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                        .onAppear {
+                            print("🧪 [DeclineRow] APPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
+                        }
+                        .onDisappear {
+                            print("🧪 [DeclineRow] DISAPPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
+                        }
+                        .opacity(isFading ? 0 : 1)
+                        .animation(.easeOut(duration: 0.5), value: isFading)
+                        .onChange(of: isExpired) { _, newValue in
+                            if newValue {
+                                handleExpiration(matchId: matchWithPlayers.id)
+                            }
+                        }
+                    }
+                }
+            }
+            .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
+        }
+    }
+    
+    @ViewBuilder
+    private var activeMatchSection: some View {
+        if let activeMatch = remoteMatchService.activeMatch,
+           remoteMatchService.processingMatchId == nil,
+           !cancelledMatchIds.contains(activeMatch.match.id) {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
+                
+                PlayerChallengeCard(
+                    matchId: activeMatch.match.id,
+                    player: player(from: activeMatch),
+                    state: cardPresentationState(
+                        for: activeMatch,
+                        isExpired: false,
+                        showAsDeclined: false
+                    ),
+                    gameType: activeMatch.match.gameType,
+                    matchFormat: activeMatch.match.matchFormat,
+                    expiresAt: nil
+                )
+                .id(activeMatch.match.id)
+                .remoteCardHighlight(isHighlighted: highlightedMatchId == activeMatch.match.id)
+            }
+            .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
+        }
+    }
     private var pendingForUI: [RemoteMatchWithPlayers] {
         listFrozen ? frozenPending : remoteMatchService.pendingChallenges
     }
@@ -171,6 +351,19 @@ struct RemoteGamesTab: View {
         return sentForUI.filter { $0.match.id != processingId }
     }
     
+    // Helper to create Player from match data
+    private func player(from matchWithPlayers: RemoteMatchWithPlayers) -> Player {
+        Player(
+            displayName: matchWithPlayers.opponent.displayName,
+            nickname: matchWithPlayers.opponent.nickname,
+            avatarURL: matchWithPlayers.opponent.avatarURL,
+            isGuest: false,
+            totalWins: matchWithPlayers.opponent.totalWins,
+            totalLosses: matchWithPlayers.opponent.totalLosses,
+            userId: matchWithPlayers.opponent.id
+        )
+    }
+    
     // Freeze/unfreeze methods
     @MainActor
     private func freezeListSnapshot() {
@@ -205,167 +398,16 @@ struct RemoteGamesTab: View {
     private var matchListView: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                Color.clear
+                    .frame(height: 0)
+                    .onAppear {
+                        print("🧪 [DeclineTopLevel] showing matchListView")
+                    }
                 VStack(spacing: 24) {
-                    // Ready matches
-                    if !readyForUIStable.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader("Ready to join", systemImage: "checkmark.circle.fill", color: .green)
-                            
-                            ForEach(readyForUIStable) { matchWithPlayers in
-                                let isExpired = matchWithPlayers.isExpired
-                                let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                                if !expiredMatchIds.contains(matchWithPlayers.id) &&
-                                   matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                                    PlayerChallengeCard(
-                                        matchId: matchWithPlayers.match.id,
-                                        player: Player(
-                                            displayName: matchWithPlayers.opponent.displayName,
-                                            nickname: matchWithPlayers.opponent.nickname,
-                                            avatarURL: matchWithPlayers.opponent.avatarURL,
-                                            isGuest: false,
-                                            totalWins: matchWithPlayers.opponent.totalWins,
-                                            totalLosses: matchWithPlayers.opponent.totalLosses,
-                                            userId: matchWithPlayers.opponent.id
-                                        ),
-                                        state: isExpired ? .expired : .ready,
-                                        gameType: matchWithPlayers.match.gameType,
-                                        matchFormat: matchWithPlayers.match.matchFormat,
-                                        isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                                        expiresAt: matchWithPlayers.match.joinWindowExpiresAt,
-                                        onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) },
-                                        onJoin: { joinMatch(matchId: matchWithPlayers.match.id) }
-                                    )
-                                    .id(matchWithPlayers.match.id)
-                                    .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
-                                    .opacity(isFading ? 0 : 1)
-                                    .animation(.easeOut(duration: 0.5), value: isFading)
-                                    .onChange(of: isExpired) { _, newValue in
-                                        if newValue {
-                                            handleExpiration(matchId: matchWithPlayers.id)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Received challenges (dimmed when match ready)
-                    if !pendingForUIStable.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
-                            
-                            ForEach(pendingForUIStable) { matchWithPlayers in
-                                let isExpired = matchWithPlayers.isExpired
-                                let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                                if !expiredMatchIds.contains(matchWithPlayers.id) &&
-                                   matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                                    PlayerChallengeCard(
-                                        matchId: matchWithPlayers.match.id,
-                                        player: Player(
-                                            displayName: matchWithPlayers.opponent.displayName,
-                                            nickname: matchWithPlayers.opponent.nickname,
-                                            avatarURL: matchWithPlayers.opponent.avatarURL,
-                                            isGuest: false,
-                                            totalWins: matchWithPlayers.opponent.totalWins,
-                                            totalLosses: matchWithPlayers.opponent.totalLosses,
-                                            userId: matchWithPlayers.opponent.id
-                                        ),
-                                        state: isExpired ? .expired : .pending,
-                                        gameType: matchWithPlayers.match.gameType,
-                                        matchFormat: matchWithPlayers.match.matchFormat,
-                                        isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                                        expiresAt: matchWithPlayers.match.challengeExpiresAt,
-                                        onAccept: {
-                                            acceptChallenge(matchId: matchWithPlayers.match.id)
-                                        },
-                                        onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
-                                    )
-                                    .id(matchWithPlayers.match.id)
-                                    .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
-                                    .opacity(isFading ? 0 : 1)
-                                    .animation(.easeOut(duration: 0.5), value: isFading)
-                                    .onChange(of: isExpired) { _, newValue in
-                                        if newValue {
-                                            handleExpiration(matchId: matchWithPlayers.id)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
-                    }
-                    
-                    // Sent challenges (dimmed when match ready)
-                    if !sentForUIStable.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
-                            
-                            ForEach(sentForUIStable) { matchWithPlayers in
-                                let isExpired = matchWithPlayers.isExpired
-                                let isFading = fadingMatchIds.contains(matchWithPlayers.id)
-                                if !expiredMatchIds.contains(matchWithPlayers.id) &&
-                                   matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                                    PlayerChallengeCard(
-                                        matchId: matchWithPlayers.match.id,
-                                        player: Player(
-                                            displayName: matchWithPlayers.opponent.displayName,
-                                            nickname: matchWithPlayers.opponent.nickname,
-                                            avatarURL: matchWithPlayers.opponent.avatarURL,
-                                            isGuest: false,
-                                            totalWins: matchWithPlayers.opponent.totalWins,
-                                            totalLosses: matchWithPlayers.opponent.totalLosses,
-                                            userId: matchWithPlayers.opponent.id
-                                        ),
-                                        state: isExpired ? .expired : .sent,
-                                        gameType: matchWithPlayers.match.gameType,
-                                        matchFormat: matchWithPlayers.match.matchFormat,
-                                        isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                                        expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
-                                        onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
-                                    )
-                                    .id(matchWithPlayers.match.id)
-                                    .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
-                                    .opacity(isFading ? 0 : 1)
-                                    .animation(.easeOut(duration: 0.5), value: isFading)
-                                    .onChange(of: isExpired) { _, newValue in
-                                        if newValue {
-                                            handleExpiration(matchId: matchWithPlayers.id)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
-                    }
-                    
-                    // Active match (in progress, dimmed when match ready)
-                    if let activeMatch = remoteMatchService.activeMatch,
-                       remoteMatchService.processingMatchId == nil,
-                       !cancelledMatchIds.contains(activeMatch.match.id) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader("Active Match", systemImage: "play.circle.fill", color: .blue)
-                            
-                            PlayerChallengeCard(
-                                matchId: activeMatch.match.id,
-                                player: Player(
-                                    displayName: activeMatch.opponent.displayName,
-                                    nickname: activeMatch.opponent.nickname,
-                                    avatarURL: activeMatch.opponent.avatarURL,
-                                    isGuest: false,
-                                    totalWins: activeMatch.opponent.totalWins,
-                                    totalLosses: activeMatch.opponent.totalLosses,
-                                    userId: activeMatch.opponent.id
-                                ),
-                                state: activeMatch.match.status ?? .inProgress,
-                                gameType: activeMatch.match.gameType,
-                                matchFormat: activeMatch.match.matchFormat,
-                                expiresAt: nil
-                            )
-                            .id(activeMatch.match.id)
-                            .remoteCardHighlight(isHighlighted: highlightedMatchId == activeMatch.match.id)
-                        }
-                        .opacity(readyForUIStable.isEmpty ? 1.0 : 0.5)
-                    }
+                    readyMatchesSection
+                    receivedChallengesSection
+                    sentChallengesSection
+                    activeMatchSection
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -375,6 +417,41 @@ struct RemoteGamesTab: View {
                 // Disable animations during enter flow to prevent jarring section movements
                 if remoteMatchService.processingMatchId != nil || !remoteMatchService.pendingEnterFlowMatchIds.isEmpty {
                     tx.animation = nil
+                }
+            }
+            .onReceive(remoteMatchService.$sentChallenges) { newValue in
+                let oldIds = previousSentChallenges.map { String($0.match.id.uuidString.prefix(8)) }.sorted()
+                let newIds = newValue.map { String($0.match.id.uuidString.prefix(8)) }.sorted()
+                print("🧪 [DeclineDebug] sentChallenges publisher old=\(oldIds) new=\(newIds)")
+
+                detectDeclinedMatches(old: previousSentChallenges, new: newValue)
+                previousSentChallenges = newValue
+
+                logDeclineDebugSnapshot("after sentChallenges publisher update")
+            }
+            .onReceive(remoteMatchService.$readyMatches) { newReadyMatches in
+                // Clean up any cached declined matches that have become ready
+                for readyMatch in newReadyMatches {
+                    let matchId = readyMatch.match.id
+                    if declinedMatchesCache[matchId] != nil {
+                        print("🧹 Cleaning up declined cache - match became ready: \(matchId.uuidString.prefix(8))")
+                        declinedMatchesCache.removeValue(forKey: matchId)
+                        showDeclinedForMatchIds.remove(matchId)
+                        declineHandledMatchIds.remove(matchId)
+                        fadingMatchIds.remove(matchId)
+                        expiredMatchIds.remove(matchId)
+                    }
+                }
+            }
+            .onChange(of: remoteMatchService.activeMatch?.match.id) { _, newActiveMatchId in
+                // Clean up any cached declined matches that have become active
+                if let matchId = newActiveMatchId, declinedMatchesCache[matchId] != nil {
+                    print("🧹 Cleaning up declined cache - match became active: \(matchId.uuidString.prefix(8))")
+                    declinedMatchesCache.removeValue(forKey: matchId)
+                    showDeclinedForMatchIds.remove(matchId)
+                    declineHandledMatchIds.remove(matchId)
+                    fadingMatchIds.remove(matchId)
+                    expiredMatchIds.remove(matchId)
                 }
             }
             .onChange(of: notificationService.pendingIntent?.matchId) { _, newValue in
@@ -422,6 +499,12 @@ struct RemoteGamesTab: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 24) {
+            Color.clear
+                .frame(height: 0)
+                .onAppear {
+                    print("🧪 [DeclineTopLevel] showing emptyStateView")
+                }
+            
             Spacer()
             
             Image(systemName: "network")
@@ -465,7 +548,8 @@ struct RemoteGamesTab: View {
         !remoteMatchService.pendingChallenges.isEmpty ||
         !remoteMatchService.sentChallenges.isEmpty ||
         !remoteMatchService.readyMatches.isEmpty ||
-        remoteMatchService.activeMatch != nil
+        remoteMatchService.activeMatch != nil ||
+        !declinedMatchesCache.isEmpty
     }
     
     private func loadMatches() async {
@@ -997,6 +1081,235 @@ struct RemoteGamesTab: View {
                 print("🗑️ Removing expired match from UI: \(matchId)")
                 expiredMatchIds.insert(matchId)
                 fadingMatchIds.remove(matchId)
+            }
+        }
+    }
+    
+    // MARK: - Declined Challenge Presentation
+    
+    private func logDeclineDebugSnapshot(_ context: String) {
+        let sentIds = sentForUIStable.map { String($0.match.id.uuidString.prefix(8)) }.sorted()
+        let cachedIds = declinedMatchesCache.keys.map { String($0.uuidString.prefix(8)) }.sorted()
+        let showingIds = showDeclinedForMatchIds.map { String($0.uuidString.prefix(8)) }.sorted()
+        let handledIds = declineHandledMatchIds.map { String($0.uuidString.prefix(8)) }.sorted()
+        let fadingIds = fadingMatchIds.map { String($0.uuidString.prefix(8)) }.sorted()
+        let expiredIds = expiredMatchIds.map { String($0.uuidString.prefix(8)) }.sorted()
+        let cancelledIds = cancelledMatchIds.map { String($0.uuidString.prefix(8)) }.sorted()
+
+        print("🧪 [DeclineDebug] \(context)")
+        print("   sentForUIStable=\(sentIds)")
+        print("   declinedCache=\(cachedIds)")
+        print("   showDeclined=\(showingIds)")
+        print("   declineHandled=\(handledIds)")
+        print("   fading=\(fadingIds)")
+        print("   expired=\(expiredIds)")
+        print("   cancelled=\(cancelledIds)")
+    }
+    
+    /// Merged list of sent challenges including cached declined matches
+    private var sentForUIWithDeclined: [RemoteMatchWithPlayers] {
+        var merged = sentForUIStable  // From service (or frozen snapshot)
+        
+        // Add cached declined matches that aren't already in the list
+        for (matchId, cachedMatch) in declinedMatchesCache {
+            if !merged.contains(where: { $0.match.id == matchId }) {
+                merged.append(cachedMatch)
+            }
+        }
+        
+        return merged
+    }
+    
+    /// Map authoritative status to card presentation state
+    /// Handles challenger-specific declined presentation
+    private func cardPresentationState(
+        for match: RemoteMatchWithPlayers,
+        isExpired: Bool,
+        showAsDeclined: Bool
+    ) -> CardPresentationState {
+        // Expired takes precedence
+        if isExpired {
+            return .expired
+        }
+        
+        // Declined presentation (local UI decision, not dependent on cached status)
+        // The cached row was captured when status was .pending
+        // The decision to show as declined has already been made by detectDeclinedMatches()
+        if showAsDeclined {
+            return .declined
+        }
+        
+        // Map authoritative status to presentation
+        switch match.match.status {
+        case .pending:
+            // Receiver sees pending, challenger sees sent
+            return match.match.receiverId == authService.currentUser?.id
+                ? .pending
+                : .sent
+        case .sent:
+            return .sent  // Shouldn't come from DB, but handle it
+        case .ready:
+            return .ready
+        case .lobby:
+            // Keep showing .ready for users who haven't joined yet
+            // This preserves the cancel button until they actually join
+            return .ready
+        case .inProgress:
+            return .inProgress
+        case .completed:
+            return .completed
+        case .expired:
+            return .expired
+        case .cancelled:
+            return .cancelled  // Default (not showing as declined)
+        case .none:
+            // No status set - shouldn't happen, default to pending
+            return .pending
+        }
+    }
+    
+    /// Detect declined matches when sent challenges list changes
+    private func detectDeclinedMatches(
+        old: [RemoteMatchWithPlayers],
+        new: [RemoteMatchWithPlayers]
+    ) {
+        let oldIds = Set(old.map { $0.match.id })
+        let newIds = Set(new.map { $0.match.id })
+        let removedIds = oldIds.subtracting(newIds)
+        
+        print("🧪 [DeclineDetect] old=\(oldIds.map { String($0.uuidString.prefix(8)) }.sorted()) new=\(newIds.map { String($0.uuidString.prefix(8)) }.sorted()) removed=\(removedIds.map { String($0.uuidString.prefix(8)) }.sorted())")
+        
+        for removedId in removedIds {
+            // Find the removed match in OLD snapshot
+            guard let removedMatch = old.first(where: { $0.match.id == removedId }) else {
+                continue
+            }
+            
+            // 7-CONDITION RULE for showing as declined:
+            
+            // 1. It was previously visible in the sent section (implicit - we found it in old)
+            
+            // 2. Its previous authoritative status was .pending
+            guard removedMatch.match.status == .pending else {
+                print("⚠️ Skip decline - status was \(removedMatch.match.status?.rawValue ?? "nil"), not .pending")
+                continue
+            }
+            
+            // 3. It disappears from sent (implicit - we detected removal)
+            
+            // 4. It does not appear in ready/lobby/inProgress AND is not in an active enter/accept flow
+            let movedToActive = remoteMatchService.readyMatches.contains(where: { $0.match.id == removedId }) ||
+                               remoteMatchService.activeMatch?.match.id == removedId
+            let isBeingProcessed = remoteMatchService.processingMatchId == removedId
+            
+            guard !movedToActive && !isBeingProcessed else {
+                if isBeingProcessed {
+                    print("⚠️ Skip decline - match is being processed by accept/join flow")
+                } else {
+                    print("⚠️ Skip decline - match moved to ready/active")
+                }
+                continue
+            }
+            
+            // 5. It is not being removed by timeout/expiry
+            guard !expiredMatchIds.contains(removedId) else {
+                print("⚠️ Skip decline - match already expired")
+                continue
+            }
+            
+            // 6. It was not locally cancelled by the challenger
+            guard !cancelledMatchIds.contains(removedId) else {
+                print("⚠️ Skip decline - match was self-cancelled")
+                continue
+            }
+            
+            // 7. We have an authoritative cancel signal (check via realtime or fetch)
+            // For now, we infer this from: match disappeared from sent + wasn't moved + wasn't self-cancelled
+            // The service filters .cancelled matches, so disappearance after passing above checks = declined
+            
+            // Prevent duplicate handling
+            guard !declineHandledMatchIds.contains(removedId),
+                  !showDeclinedForMatchIds.contains(removedId),
+                  !fadingMatchIds.contains(removedId) else {
+                print("⚠️ Skip decline - already handled")
+                continue
+            }
+            
+            print("✅ All 7 conditions met - showing as declined: \(removedId)")
+            
+            // Preserve match data and trigger declined display
+            handleDecline(match: removedMatch)
+        }
+    }
+    
+    /// Handle decline event - show declined state and schedule cleanup
+    private func handleDecline(match: RemoteMatchWithPlayers) {
+        let matchId = match.match.id
+        
+        // Primary guard: ensure toast/timer run only once
+        guard !declineHandledMatchIds.contains(matchId) else {
+            print("⚠️ Decline already handled for: \(matchId)")
+            return
+        }
+        
+        // CRITICAL: Final confirmation that match is NOT transitioning to ready/active
+        // This protects the challenger side during accept transitions
+        let isNowReady = remoteMatchService.readyMatches.contains(where: { $0.match.id == matchId })
+        let isNowActive = remoteMatchService.activeMatch?.match.id == matchId
+        let isInEnterFlow = remoteMatchService.isPendingEnterFlow(matchId: matchId)
+        
+        guard !isNowReady && !isNowActive && !isInEnterFlow else {
+            print("⚠️ Abort decline - match is now ready/active/entering (challenger side protection)")
+            return
+        }
+        
+        print("🚫 Starting decline display for match: \(matchId)")
+        
+        // Mark as handled IMMEDIATELY (before any async work)
+        declineHandledMatchIds.insert(matchId)
+        
+        // Cache the match data
+        declinedMatchesCache[matchId] = match
+        
+        // Mark as showing declined
+        showDeclinedForMatchIds.insert(matchId)
+        
+        print("🧪 [DeclineDebug] Cached declined match wrapperId=\(match.id.uuidString.prefix(8)) matchId=\(matchId.uuidString.prefix(8))")
+        logDeclineDebugSnapshot("after inserting declined cache")
+        
+        // TODO: Show toast "Match declined"
+        
+        // Schedule cleanup after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // Guard: Only proceed if match is still in declined cache
+            // (it may have been cleaned up if it became ready/active)
+            guard declinedMatchesCache[matchId] != nil else {
+                print("⚠️ Skipping declined fade - match was cleaned up (became ready/active)")
+                return
+            }
+            
+            print("🌫️ Starting fade for declined match: \(matchId)")
+            fadingMatchIds.insert(matchId)
+            showDeclinedForMatchIds.remove(matchId)
+            
+            logDeclineDebugSnapshot("after starting declined fade")
+            
+            // Remove after fade completes (0.5s)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Guard: Only proceed if match is still in declined cache
+                guard declinedMatchesCache[matchId] != nil else {
+                    print("⚠️ Skipping declined removal - match was cleaned up (became ready/active)")
+                    fadingMatchIds.remove(matchId)  // Clean up fading state if it was set
+                    return
+                }
+                
+                print("🗑️ Removing declined match from cache: \(matchId)")
+                expiredMatchIds.insert(matchId)
+                fadingMatchIds.remove(matchId)
+                declinedMatchesCache.removeValue(forKey: matchId)
+                declineHandledMatchIds.remove(matchId)  // Clean up guard
+                
+                logDeclineDebugSnapshot("after removing declined cache")
             }
         }
     }
