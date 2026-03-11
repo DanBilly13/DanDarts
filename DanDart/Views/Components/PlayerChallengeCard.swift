@@ -146,7 +146,7 @@ struct PlayerChallengeCardFoot: View {
         }
         .frame(width: 16, height: 16)
     }
-
+    
     private func formatTimeRemaining(from expiresAt: Date) -> String {
         let timeRemaining = max(0, expiresAt.timeIntervalSinceNow)
         let totalSeconds = max(0, Int(timeRemaining.rounded(.down)))
@@ -329,7 +329,7 @@ struct PlayerChallengeCardFoot: View {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                    Text("Time out. Match expired")
+                    Text("Time out. Match request expired")
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundStyle(AppColor.justWhite)
@@ -343,12 +343,15 @@ struct PlayerChallengeCardFoot: View {
             case .cancelled:
                 HStack(spacing: 8) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(AppColor.brandPrimary)
                     Text("Match cancelled")
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
-                        .foregroundStyle(AppColor.textSecondary)
+                        .foregroundStyle(AppColor.brandPrimary)
                 }
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .background(AppColor.brandPrimary.opacity(0.20))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
         }
         .frame(maxWidth: .infinity, minHeight: 36)
@@ -369,7 +372,7 @@ struct PlayerChallengeCardFoot: View {
             totalWins: 15,
             totalLosses: 8
         ),
-        state: .ready,
+        state: .cancelled,
         gameType: "Remote 501",
         matchFormat: 3,
         expiresAt: Date().addingTimeInterval(300)
