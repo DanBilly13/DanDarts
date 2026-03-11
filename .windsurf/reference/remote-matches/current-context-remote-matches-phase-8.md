@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 current-context-remote-matches-phase-8
 

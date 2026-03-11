@@ -24,6 +24,7 @@ struct ProfileView: View {
     @State private var showClearMatchesConfirmation: Bool = false
     @State private var showResetTipsConfirmation: Bool = false
     @State private var navigationPath: [ProfileDestination] = []
+    @State private var isRefreshingProfile: Bool = false
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -83,6 +84,14 @@ struct ProfileView: View {
             .background(AppColor.surfacePrimary)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                await refreshProfileIfPossible()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
+                Task {
+                    await refreshProfileIfPossible()
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
@@ -139,6 +148,20 @@ struct ProfileView: View {
             } message: {
                 Text("This will reset all game tips so they appear again on your next game.\n\nThis is a debug feature for testing.")
             }
+        }
+    }
+
+    @MainActor
+    private func refreshProfileIfPossible() async {
+        guard !isRefreshingProfile else { return }
+        guard authService.currentUser != nil else { return }
+        isRefreshingProfile = true
+        defer { isRefreshingProfile = false }
+
+        do {
+            try await authService.refreshCurrentUser()
+        } catch {
+            print("❌ Failed to refresh profile stats: \(error)")
         }
     }
     

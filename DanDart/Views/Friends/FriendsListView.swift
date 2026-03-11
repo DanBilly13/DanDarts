@@ -265,6 +265,10 @@ struct FriendsListView: View {
             loadFriends()
             loadRequests()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
+            // Reload friends when a match completes to update stats
+            loadFriends()
+        }
         .sheet(isPresented: $showInviteShareSheet) {
             if let url = inviteURLToShare {
                 ShareSheet(

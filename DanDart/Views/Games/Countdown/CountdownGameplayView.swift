@@ -165,7 +165,7 @@ struct CountdownGameplayView: View {
                                     action: { gameViewModel.saveScore() }
                                 ) {
                                     if gameViewModel.isWinningThrow {
-                                        Label("Save Score", systemImage: "trophy.fill")
+                                        Label("Game Over", systemImage: "trophy.fill")
                                     } else if gameViewModel.isBust {
                                         Text("Bust")
                                     } else {

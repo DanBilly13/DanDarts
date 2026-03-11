@@ -13,17 +13,19 @@ struct FriendProfileView: View {
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var router: Router
     @StateObject private var matchesService = MatchesService()
+    @StateObject private var friendsService = FriendsService()
     
     @State private var showRemoveConfirmation: Bool = false
     @State private var showGameSelection: Bool = false
     @State private var headToHeadMatches: [MatchResult] = []
     @State private var isLoadingMatches: Bool = false
+    @State private var refreshedFriend: Player? = nil
     
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Profile Header (Reusable Component)
-                ProfileHeaderView(player: friend)
+                ProfileHeaderView(player: refreshedFriend ?? friend)
                     .padding(.top, 24)
                 
                 // Challenge Button
@@ -159,6 +161,9 @@ struct FriendProfileView: View {
         } message: {
             Text("Head-to-head with \(friend.displayName)")
         }
+        .task {
+            await refreshFriendStats()
+        }
         .onAppear {
             let friendId = friend.userId ?? friend.id
             
@@ -176,6 +181,9 @@ struct FriendProfileView: View {
             let friendId = friend.userId ?? friend.id
             HeadToHeadCache.shared.invalidate(for: friendId)
             loadHeadToHeadMatches()
+            Task {
+                await refreshFriendStats()
+            }
         }
         .refreshable {
             // Manual pull-to-refresh - invalidate cache first
@@ -186,6 +194,24 @@ struct FriendProfileView: View {
     }
     
     // MARK: - Helper Methods
+    
+    /// Refresh friend's stats from Supabase
+    @MainActor
+    private func refreshFriendStats() async {
+        guard let friendUserId = friend.userId else {
+            return
+        }
+        
+        do {
+            let friendUsers = try await friendsService.loadFriends(userId: authService.currentUser?.id ?? UUID())
+            if let updatedFriend = friendUsers.first(where: { $0.id == friendUserId }) {
+                refreshedFriend = updatedFriend.toPlayer()
+                print("✅ Refreshed friend stats: \(updatedFriend.displayName) - \(updatedFriend.totalWins)W/\(updatedFriend.totalLosses)L")
+            }
+        } catch {
+            print("❌ Failed to refresh friend stats: \(error)")
+        }
+    }
     
     /// Load head-to-head matches from Supabase only (async version for refreshable)
     /// OPTIMIZED: Uses match_participants table and batched turn loading
