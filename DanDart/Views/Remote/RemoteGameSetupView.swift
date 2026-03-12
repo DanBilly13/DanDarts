@@ -237,11 +237,16 @@ struct RemoteGameSetupView: View {
                             sendChallenge()
                         } label: {
                             if isCreating {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Text("Send challenge")
-                            }
+                                    HStack(spacing: 8) {
+                                        Text("Sending Challenge")
+                                        
+                                        ProgressView()
+                                            .tint(.white)
+                                            .frame(width: 16, height: 16)
+                                    }
+                                } else {
+                                    Text("Send Challenge")
+                                }
                         }
                     }
                 }

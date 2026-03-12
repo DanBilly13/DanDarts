@@ -125,7 +125,7 @@ struct RemoteGameplayView: View {
     
     /// Input gate: only enable when it's my turn AND UI gate is OFF AND not saving
     private var isInputEnabled: Bool {
-        isMyTurn && !revealState.turnUIGateActive && !gameViewModel.isSaving
+        isMyTurn && !revealState.turnUIGateActive && !isSaving && !gameViewModel.isSaving
     }
     
     /// CurrentThrowDisplay should show:
@@ -601,7 +601,13 @@ struct RemoteGameplayView: View {
                         }
                     }
                 ) {
-                    if gameViewModel.isWinningThrow {
+                    if isSaving {
+                        if gameViewModel.isWinningThrow {
+                            Label("Game Over", systemImage: "trophy.fill")
+                        } else {
+                            Label("Save Score", systemImage: "checkmark.circle.fill")
+                        }
+                    } else if gameViewModel.isWinningThrow {
                         Label("Game Over", systemImage: "trophy.fill")
                     } else if gameViewModel.isBust {
                         Text("Bust")

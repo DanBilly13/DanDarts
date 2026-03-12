@@ -83,11 +83,16 @@ struct CreateChallengeView: View {
                             createChallenge()
                         } label: {
                             if isCreating {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Text("Send Challenge")
-                            }
+                                    HStack(spacing: 8) {
+                                        Text("Sending Challenge")
+                                        
+                                        ProgressView()
+                                            .tint(.white)
+                                            .frame(width: 16, height: 16)
+                                    }
+                                } else {
+                                    Text("Send Challenge")
+                                }
                         }
                         .disabled(selectedFriend == nil || isCreating)
                         .padding(.top, 16)

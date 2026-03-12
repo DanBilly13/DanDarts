@@ -142,6 +142,10 @@ class RemoteGameViewModel: ObservableObject {
     }
     
     var isBust: Bool {
+        if isSaving {
+            return false
+        }
+        
         // Check if bust button was pressed
         if currentThrow.contains(where: { $0.baseValue == -1 }) {
             return true
