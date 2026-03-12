@@ -175,6 +175,13 @@ serve(async (req) => {
 
     const now = new Date().toISOString()
 
+    // Calculate duration in seconds (difference between started_at and now)
+    const duration = match.started_at 
+      ? Math.floor((new Date(now).getTime() - new Date(match.started_at).getTime()) / 1000)
+      : null
+
+    console.log(`🏆 [CompleteMatch] Duration calculated: ${duration} seconds (started: ${match.started_at}, ended: ${now})`)
+
     // -------------------------------
     // 3️⃣ Update match with terminal state guard
     // -------------------------------
@@ -187,6 +194,7 @@ serve(async (req) => {
         ended_at: now,
         ended_by: user.id,
         ended_reason: 'completed',
+        duration: duration,
         updated_at: now,
       })
       .eq('id', normalizedMatchId)

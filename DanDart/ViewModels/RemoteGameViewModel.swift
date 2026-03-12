@@ -500,9 +500,16 @@ class RemoteGameViewModel: ObservableObject {
                                       let service = self.remoteMatchService,
                                       let matchId = self.remoteMatchId else { return }
                                 do {
-                                    print("🏆 [CompleteMatch] Calling complete-match edge function for matchId: \(matchId), winnerId: \(winnerId)")
+                                    print("� [RemoteWin] Calling completeMatch()")
                                     try await service.completeMatch(matchId: matchId, winnerId: winnerId)
-                                    print("✅ [CompleteMatch] Match completed successfully")
+                                    print("🏁 [RemoteWin] completeMatch() succeeded")
+                                    
+                                    // Save match details and update player stats
+                                    await MainActor.run {
+                                        print("🏁 [RemoteWin] Calling saveMatchResult()")
+                                        self.saveMatchResult()
+                                        print("🏁 [RemoteWin] saveMatchResult() finished")
+                                    }
                                 } catch {
                                     print("❌ [CompleteMatch] Failed to complete match: \(error)")
                                     // Non-fatal - match state is already updated locally
@@ -532,9 +539,16 @@ class RemoteGameViewModel: ObservableObject {
                                           let service = self.remoteMatchService,
                                           let matchId = self.remoteMatchId else { return }
                                     do {
-                                        print("🏆 [CompleteMatch] Calling complete-match edge function for matchId: \(matchId), winnerId: \(playerId)")
+                                        print("� [RemoteWin] Calling completeMatch()")
                                         try await service.completeMatch(matchId: matchId, winnerId: playerId)
-                                        print("✅ [CompleteMatch] Match completed successfully")
+                                        print("🏁 [RemoteWin] completeMatch() succeeded")
+                                        
+                                        // Save match details and update player stats
+                                        await MainActor.run {
+                                            print("🏁 [RemoteWin] Calling saveMatchResult()")
+                                            self.saveMatchResult()
+                                            print("🏁 [RemoteWin] saveMatchResult() finished")
+                                        }
                                     } catch {
                                         print("❌ [CompleteMatch] Failed to complete match: \(error)")
                                         // Non-fatal - match state is already updated locally
@@ -779,8 +793,14 @@ class RemoteGameViewModel: ObservableObject {
     
     /// Save match result to local storage and Supabase
     private func saveMatchResult() {
-        guard let winner = winner else { return }
-        guard let matchId = matchId else { return }
+        guard let winner = winner else {
+            print("⚠️ [saveMatchResult] No winner set, skipping save")
+            return
+        }
+        guard let matchId = remoteMatchId else {
+            print("⚠️ [saveMatchResult] No remoteMatchId set, skipping save")
+            return
+        }
         guard !hasBeenSaved else {
             print("⚠️ Match already saved, skipping duplicate save")
             return
@@ -866,26 +886,31 @@ class RemoteGameViewModel: ObservableObject {
             do {
                 let matchService = MatchService()
                 
-                // Determine game ID for database
-                let gameId = game.title.lowercased().replacingOccurrences(of: " ", with: "_")
+                // VERIFICATION LOGGING
+                print("🔍 [VERIFY] ========================================")
+                print("🔍 [VERIFY] Remote match details save starting")
+                print("🔍 [VERIFY] matchId = \(matchId)")
+                print("🔍 [VERIFY] currentUserId = \(currentUserId?.uuidString ?? "nil")")
+                print("🔍 [VERIFY] ========================================")
                 
                 // Get winner's ID (userId for connected players, player.id for guests)
                 let winnerId = winner.userId ?? winner.id
                 
-                let updatedUser = try await matchService.saveMatch(
+                print("🔍 [VERIFY] winnerId = \(winnerId)")
+                
+                // Use dedicated remote post-completion method
+                // This does NOT touch the matches table (edge function already completed it)
+                let updatedUser = try await matchService.saveRemoteMatchDetails(
                     matchId: matchId,
-                    gameId: gameId,
                     players: players,
                     winnerId: winnerId,
-                    startedAt: matchStartTime,
-                    endedAt: Date(),
                     turnHistory: turnHistory,
                     matchFormat: matchFormat,
                     legsWon: legsWon,
                     currentUserId: currentUserId
                 )
                 
-                print("✅ Match saved to Supabase: \(matchId)")
+                print("✅ Remote match details saved to Supabase: \(matchId)")
                 
                 // Delete from local storage after successful sync (member matches only)
                 await MainActor.run {
@@ -896,6 +921,13 @@ class RemoteGameViewModel: ObservableObject {
                 // Update AuthService with the fresh user data directly (no need to query again!)
                 if let updatedUser = updatedUser {
                     await MainActor.run {
+                        // VERIFICATION LOGGING - Before AuthService update
+                        print("🔍 [VERIFY] ========================================")
+                        print("🔍 [VERIFY] Updating AuthService.currentUser")
+                        print("🔍 [VERIFY]   BEFORE: \(self.authService?.currentUser?.totalWins ?? -1)W / \(self.authService?.currentUser?.totalLosses ?? -1)L")
+                        print("🔍 [VERIFY]   AFTER:  \(updatedUser.totalWins)W / \(updatedUser.totalLosses)L")
+                        print("🔍 [VERIFY] ========================================")
+                        
                         // Update the injected authService (which is the same as AuthService.shared)
                         self.authService?.currentUser = updatedUser
                         self.authService?.objectWillChange.send()

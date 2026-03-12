@@ -934,16 +934,79 @@ class MatchesService: ObservableObject {
         // Step 4: Build MatchResult objects with turns
         var matches: [MatchResult] = []
         
+        print("🔍 [loadMatchesByIds] Processing \(matchesJson.count) raw match records...")
+        
         for json in matchesJson {
+            // Extract ID first for logging
             guard let idString = json["id"] as? String,
-                  let id = UUID(uuidString: idString),
-                  let gameType = json["game_type"] as? String,
-                  let gameName = json["game_name"] as? String,
-                  let winnerIdString = json["winner_id"] as? String,
-                  let winnerId = UUID(uuidString: winnerIdString),
-                  let timestampString = json["timestamp"] as? String,
-                  let timestamp = ISO8601DateFormatter().date(from: timestampString),
-                  let duration = json["duration"] as? Int else {
+                  let id = UUID(uuidString: idString) else {
+                print("❌ [Match SKIPPED] Invalid or missing ID")
+                continue
+            }
+            
+            print("🔍 [Match \(id.uuidString.prefix(8))] Starting validation...")
+            
+            // Log all raw fields
+            let gameType = json["game_type"] as? String
+            let gameName = json["game_name"] as? String
+            let matchMode = json["match_mode"] as? String
+            let remoteStatus = json["remote_status"] as? String
+            let winnerIdString = json["winner_id"] as? String
+            let duration = json["duration"] as? Int
+            let timestampString = json["timestamp"] as? String
+            let createdAtString = json["created_at"] as? String
+            
+            // Get participants and turns for this match
+            let participantsData = participantsByMatch[id] ?? []
+            let turnsForMatch = turnsByMatch[id] ?? []
+            
+            print("🔍 [Match \(id.uuidString.prefix(8))] Raw fields:")
+            print("   game_type: \(gameType ?? "nil")")
+            print("   game_name: \(gameName ?? "nil")")
+            print("   match_mode: \(matchMode ?? "nil")")
+            print("   remote_status: \(remoteStatus ?? "nil")")
+            print("   winner_id: \(winnerIdString ?? "nil")")
+            print("   duration: \(duration?.description ?? "nil")")
+            print("   timestamp: \(timestampString ?? "nil")")
+            print("   created_at: \(createdAtString ?? "nil")")
+            print("   participants found: \(participantsData.count)")
+            print("   turns found: \(turnsForMatch.count)")
+            
+            // Now validate required fields
+            guard let validGameType = gameType else {
+                print("❌ [Match \(id.uuidString.prefix(8))] SKIPPED: missing game_type")
+                continue
+            }
+            
+            guard let validGameName = gameName else {
+                print("❌ [Match \(id.uuidString.prefix(8))] SKIPPED: missing game_name")
+                continue
+            }
+            
+            guard let validWinnerIdString = winnerIdString,
+                  let winnerId = UUID(uuidString: validWinnerIdString) else {
+                print("❌ [Match \(id.uuidString.prefix(8))] SKIPPED: missing or invalid winner_id")
+                continue
+            }
+            
+            guard let validTimestampString = timestampString else {
+                print("❌ [Match \(id.uuidString.prefix(8))] SKIPPED: missing timestamp")
+                continue
+            }
+            
+            // Parse timestamp - support both formats (with and without fractional seconds)
+            // Remote matches: 2026-03-12T13:07:10.529551+00:00
+            // Local matches: 2026-03-11T07:57:35+00:00
+            let timestamp: Date
+            let fractionalFormatter = ISO8601DateFormatter()
+            fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            if let parsedDate = fractionalFormatter.date(from: validTimestampString) {
+                timestamp = parsedDate
+            } else if let parsedDate = ISO8601DateFormatter().date(from: validTimestampString) {
+                timestamp = parsedDate
+            } else {
+                print("❌ [Match \(id.uuidString.prefix(8))] SKIPPED: invalid timestamp format: \(validTimestampString)")
                 continue
             }
             
@@ -951,7 +1014,6 @@ class MatchesService: ObservableObject {
             let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
             
             // Build players from match_participants data
-            let participantsData = participantsByMatch[id] ?? []
             var basicPlayers = participantsData.compactMap { participantJson -> MatchPlayer? in
                 guard let userIdString = participantJson["user_id"] as? String,
                       let userId = UUID(uuidString: userIdString),
@@ -974,6 +1036,13 @@ class MatchesService: ObservableObject {
                     legsWon: 0
                 )
             }
+            
+            if basicPlayers.isEmpty {
+                print("❌ [Match \(id.uuidString.prefix(8))] SKIPPED: no valid players built from \(participantsData.count) participant records")
+                continue
+            }
+            
+            print("   ✓ Built \(basicPlayers.count) players")
             
             dbg("[loadMatchesByIds] match=\(id.uuidString.prefix(8)) participantsRows=\(participantsData.count) basicPlayers=\(basicPlayers.count)")
             
@@ -1008,19 +1077,27 @@ class MatchesService: ObservableObject {
             
             let match = MatchResult(
                 id: id,
-                gameType: gameType,
-                gameName: gameName,
+                gameType: validGameType,
+                gameName: validGameName,
                 players: playersWithTurns,
                 winnerId: winnerId,
                 timestamp: timestamp,
-                duration: TimeInterval(duration),
+                duration: TimeInterval(duration ?? 0),
                 matchFormat: matchFormat,
                 totalLegsPlayed: totalLegsPlayed,
                 metadata: metadata
             )
             
+            print("✅ [Match \(id.uuidString.prefix(8))] SUCCESS: MatchResult created")
+            print("   Final: \(validGameName), \(playersWithTurns.count) players, \(matchTurns.count) turns, duration=\(duration?.description ?? "0")")
+            
             matches.append(match)
         }
+        
+        // Log summary of returned matches
+        print("🔍 [loadMatchesByIds] Returning \(matches.count) total matches")
+        let game301Count = matches.filter { $0.gameName.contains("301") }.count
+        print("🔍 [loadMatchesByIds] 301 matches: \(game301Count)")
         
         return matches
     }

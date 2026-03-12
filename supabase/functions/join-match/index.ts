@@ -139,6 +139,7 @@ serve(async (req) => {
 
     if (currentPlayerId) {
       updateData.current_player_id = currentPlayerId
+      updateData.started_at = now.toISOString() // Set started_at when match begins
     }
 
     const { error: updateError } = await supabaseClient

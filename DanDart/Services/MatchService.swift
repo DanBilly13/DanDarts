@@ -215,6 +215,17 @@ class MatchService: ObservableObject {
             players: playersString
         )
         
+        // VERIFICATION LOGGING
+        print("🔍 [VERIFY] ========================================")
+        print("🔍 [VERIFY] MatchRecord being saved:")
+        print("🔍 [VERIFY]   id = \(matchRecord.id)")
+        print("🔍 [VERIFY]   game_id = \"\(matchRecord.game_id)\"")
+        print("🔍 [VERIFY]   game_type = \"\(matchRecord.game_type)\"")
+        print("🔍 [VERIFY]   game_name = \"\(matchRecord.game_name)\"")
+        print("🔍 [VERIFY]   match_mode = NOT SET (will default to 'local')")
+        print("🔍 [VERIFY]   winner_id = \(matchRecord.winner_id ?? "nil")")
+        print("🔍 [VERIFY] ========================================")
+        
         // Delete existing match if it exists (handles duplicate IDs)
         try? await supabaseService.client
             .from("matches")
@@ -317,6 +328,171 @@ class MatchService: ObservableObject {
         return updatedUser
     }
     
+    // MARK: - Remote Match Details
+    
+    /// Save remote match details after edge function has completed the match
+    /// This method does NOT touch the matches table - edge function already handled that
+    /// - Parameters:
+    ///   - matchId: UUID of the match (already exists in matches table)
+    ///   - players: Array of players in the match
+    ///   - winnerId: UUID of the winning player
+    ///   - turnHistory: Array of all turns played
+    ///   - matchFormat: Number of legs (1, 3, 5, or 7)
+    ///   - legsWon: Dictionary of player ID to legs won
+    ///   - currentUserId: UUID of the current user (optional)
+    func saveRemoteMatchDetails(
+        matchId: UUID,
+        players: [Player],
+        winnerId: UUID,
+        turnHistory: [TurnHistory],
+        matchFormat: Int,
+        legsWon: [UUID: Int],
+        currentUserId: UUID?
+    ) async throws -> User? {
+        print("🔍 [RemoteDetails] Saving remote match details for: \(matchId)")
+        print("🔍 [RemoteDetails] Players: \(players.count), Winner: \(winnerId)")
+        
+        // Upload local avatar files to Supabase before saving match details
+        var updatedPlayers = players
+        for (index, player) in players.enumerated() {
+            if let avatarURL = player.avatarURL,
+               (avatarURL.hasPrefix("/") || avatarURL.contains("/Documents/") || avatarURL.contains("/tmp/")) {
+                print("📤 Uploading local avatar for \(player.displayName): \(avatarURL)")
+                
+                var imageData: Data? = nil
+                
+                // First try the stored path directly
+                if let data = try? Data(contentsOf: URL(fileURLWithPath: avatarURL)) {
+                    imageData = data
+                } else if player.isGuest, avatarURL.contains("guest_avatars") {
+                    // Path is stale - try to find the file in current Documents directory
+                    let filename = URL(fileURLWithPath: avatarURL).lastPathComponent
+                    if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                        let currentPath = documentsDirectory
+                            .appendingPathComponent("guest_avatars", isDirectory: true)
+                            .appendingPathComponent(filename)
+                        
+                        print("🔄 Trying current path: \(currentPath.path)")
+                        imageData = try? Data(contentsOf: currentPath)
+                    }
+                }
+                
+                if let imageData = imageData {
+                    do {
+                        let publicURL = try await uploadPlayerAvatar(imageData: imageData, playerId: player.id)
+                        print("✅ Avatar uploaded: \(publicURL)")
+                        
+                        var updatedPlayer = player
+                        updatedPlayer = Player(
+                            id: updatedPlayer.id,
+                            displayName: updatedPlayer.displayName,
+                            nickname: updatedPlayer.nickname,
+                            avatarURL: publicURL,
+                            isGuest: updatedPlayer.isGuest,
+                            totalWins: updatedPlayer.totalWins,
+                            totalLosses: updatedPlayer.totalLosses,
+                            userId: updatedPlayer.userId
+                        )
+                        updatedPlayers[index] = updatedPlayer
+                    } catch {
+                        print("⚠️ Failed to upload avatar for \(player.displayName): \(error)")
+                    }
+                } else {
+                    print("⚠️ Failed to load avatar file for \(player.displayName) - file not found")
+                }
+            }
+        }
+        
+        let playersToSave = updatedPlayers
+        
+        // NOTE: We do NOT write to matches table - edge function already completed it
+        
+        // Delete old child records if this is a re-save (handles duplicates)
+        try? await supabaseService.client
+            .from("match_players")
+            .delete()
+            .eq("match_id", value: matchId.uuidString)
+            .execute()
+        
+        try? await supabaseService.client
+            .from("match_throws")
+            .delete()
+            .eq("match_id", value: matchId.uuidString)
+            .execute()
+        
+        // 1. Insert match_players records
+        print("🔍 [RemoteDetails] Inserting match_players records")
+        for (index, player) in playersToSave.enumerated() {
+            let playerRecord = MatchPlayerRecord(
+                match_id: matchId.uuidString,
+                player_user_id: player.userId?.uuidString,
+                guest_name: player.userId == nil ? player.displayName : nil,
+                player_order: index
+            )
+            
+            try await supabaseService.client
+                .from("match_players")
+                .insert(playerRecord)
+                .execute()
+        }
+        print("✅ [RemoteDetails] match_players inserted")
+        
+        // 2. Insert match_throws records (bulk insert)
+        print("🔍 [RemoteDetails] Inserting match_throws records")
+        var throwRecords: [MatchThrowRecord] = []
+        
+        for turn in turnHistory {
+            guard let playerOrder = players.firstIndex(where: { $0.id == turn.playerId }) else {
+                continue
+            }
+            
+            let throwRecord = MatchThrowRecord(
+                match_id: matchId.uuidString,
+                player_order: playerOrder,
+                turn_index: turn.turnNumber,
+                dart_scores: turn.darts.map { $0.totalValue },
+                score_before: turn.scoreBefore,
+                score_after: turn.scoreAfter,
+                is_bust: turn.isBust,
+                game_metadata: turn.gameMetadata
+            )
+            
+            throwRecords.append(throwRecord)
+        }
+        
+        if !throwRecords.isEmpty {
+            print("🔍 [RemoteDetails] About to insert \(throwRecords.count) throw records")
+            do {
+                try await supabaseService.client
+                    .from("match_throws")
+                    .insert(throwRecords)
+                    .execute()
+                print("✅ [RemoteDetails] match_throws inserted: \(throwRecords.count) records")
+            } catch {
+                print("❌ [RemoteDetails] match_throws insert FAILED: \(error)")
+                throw error
+            }
+        } else {
+            print("⚠️ [RemoteDetails] No throwRecords to insert")
+        }
+        
+        // 3. Insert into match_participants table for fast queries
+        print("🔍 [RemoteDetails] Inserting match_participants records")
+        try await insertMatchParticipants(matchId: matchId, players: playersToSave)
+        print("✅ [RemoteDetails] match_participants inserted")
+        
+        // 4. Update player stats for connected players and get updated user
+        print("🔍 [RemoteDetails] Updating player stats")
+        var updatedUser: User? = nil
+        updatedUser = try await updatePlayerStats(winnerId: winnerId, players: playersToSave, currentUserId: currentUserId)
+        print("✅ [RemoteDetails] Player stats updated")
+        
+        print("✅ [RemoteDetails] Remote match details saved successfully: \(matchId)")
+        
+        // Return updated user so caller can update AuthService directly
+        return updatedUser
+    }
+    
     // MARK: - Player Stats
     
     /// Update player stats after a match and return updated user if current user was in the match
@@ -347,6 +523,15 @@ class MatchService: ObservableObject {
             let newWins = currentUser.totalWins + (isWinner ? 1 : 0)
             let newLosses = currentUser.totalLosses + (isWinner ? 0 : 1)
             
+            // VERIFICATION LOGGING - Before update
+            print("🔍 [VERIFY] ========================================")
+            print("🔍 [VERIFY] Updating stats for player: \(currentUser.displayName)")
+            print("🔍 [VERIFY]   userId = \(userId.uuidString)")
+            print("🔍 [VERIFY]   isWinner = \(isWinner)")
+            print("🔍 [VERIFY]   BEFORE: \(currentUser.totalWins)W / \(currentUser.totalLosses)L")
+            print("🔍 [VERIFY]   AFTER:  \(newWins)W / \(newLosses)L")
+            print("🔍 [VERIFY] ========================================")
+            
             // Create update record
             struct UserStatsUpdate: Encodable {
                 let total_wins: Int
@@ -368,6 +553,10 @@ class MatchService: ObservableObject {
                 .update(updateRecord)
                 .eq("id", value: userId.uuidString)
                 .execute()
+            
+            // VERIFICATION LOGGING - After update
+            print("🔍 [VERIFY] ✅ Database UPDATE completed for \(currentUser.displayName)")
+            print("🔍 [VERIFY]    Response status: \(response.response.statusCode)")
             
             print("✅ Updated stats for \(currentUser.displayName): \(newWins)W/\(newLosses)L")
             print("   Response status: \(response.response.statusCode)")

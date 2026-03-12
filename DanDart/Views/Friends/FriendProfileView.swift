@@ -21,6 +21,11 @@ struct FriendProfileView: View {
     @State private var isLoadingMatches: Bool = false
     @State private var refreshedFriend: Player? = nil
     
+    #if DEBUG
+    @State private var h2hDebugData: H2HDebugData?
+    @StateObject private var debugService = H2HDebugService()
+    #endif
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -105,6 +110,18 @@ struct FriendProfileView: View {
                             friendId: friend.userId ?? friend.id
                         )
                     }
+                    
+                    #if DEBUG
+                    // H2H Debug Panel
+                    if let debugData = h2hDebugData {
+                        H2HDebugPanelView(
+                            data: debugData,
+                            currentUserName: authService.currentUser?.displayName ?? "Current User",
+                            friendName: friend.displayName
+                        )
+                        .padding(.top, 24)
+                    }
+                    #endif
                 }
             }
             .padding(.horizontal, 16)
@@ -250,7 +267,28 @@ struct FriendProfileView: View {
                 
                 let totalDuration = Date().timeIntervalSince(startTime)
                 print("✅ [H2H Optimized] Total load completed in \(String(format: "%.2f", totalDuration))s")
+                
+                // Log what's being passed to HeadToHeadStatsView
+                print("🔍 [H2H Display] Passing \(matches.count) matches to HeadToHeadStatsView")
+                let game301Matches = matches.filter { $0.gameName.contains("301") }
+                print("🔍 [H2H Display] 301 matches: \(game301Matches.count)")
+                for match in game301Matches {
+                    print("🔍 [H2H Display]   - Match \(match.id.uuidString.prefix(8)): duration=\(match.duration)s, winner=\(match.winnerId.uuidString.prefix(8))")
+                }
             }
+            
+            #if DEBUG
+            // Load debug data
+            let debugData = await debugService.collectDebugData(
+                currentUserId: userId,
+                currentUserName: authService.currentUser?.displayName ?? "Current User",
+                friendId: friendUserId,
+                friendName: friend.displayName
+            )
+            await MainActor.run {
+                h2hDebugData = debugData
+            }
+            #endif
             
         } catch {
             let totalDuration = Date().timeIntervalSince(startTime)
@@ -295,12 +333,25 @@ struct HeadToHeadStatsView: View {
     let currentUserId: UUID
     let friendId: UUID
     
+    // Normalize game names for H2H grouping
+    // "Remote 301" -> "301", "Remote 501" -> "501", etc.
+    private func normalizedH2HGameName(_ gameName: String) -> String {
+        return gameName.replacingOccurrences(of: "Remote ", with: "")
+    }
+    
     // Calculate game-specific stats
     private var gameStats: [GameTypeStats] {
-        let gameTypes = Set(matches.map { $0.gameName })
+        // Group by normalized game name
+        let normalizedGameTypes = Set(matches.map { normalizedH2HGameName($0.gameName) })
         
-        return gameTypes.compactMap { gameName in
-            let gameMatches = matches.filter { $0.gameName == gameName }
+        print("🔍 [H2H Render] Computing gameStats from \(matches.count) matches")
+        print("🔍 [H2H Render] Raw game types: \(Set(matches.map { $0.gameName }))")
+        print("🔍 [H2H Render] Normalized game types: \(normalizedGameTypes)")
+        
+        return normalizedGameTypes.compactMap { normalizedName in
+            // Filter matches by normalized name
+            let gameMatches = matches.filter { normalizedH2HGameName($0.gameName) == normalizedName }
+            print("🔍 [H2H Render] Processing \(normalizedName): \(gameMatches.count) matches (raw names: \(Set(gameMatches.map { $0.gameName })))")
             
             // Count wins by checking if winner is current user or friend
             // Handle both local matches (winnerId = MatchPlayer.id) and Supabase matches (winnerId = user account ID)
@@ -336,8 +387,10 @@ struct HeadToHeadStatsView: View {
             
             guard totalMatches > 0 else { return nil }
             
+            print("🔍 [H2H Render] \(normalizedName) final stats: currentUser=\(currentUserWins), friend=\(friendWins), total=\(totalMatches)")
+            
             return GameTypeStats(
-                gameName: gameName,
+                gameName: normalizedName,
                 currentUserWins: currentUserWins,
                 friendWins: friendWins,
                 totalMatches: totalMatches
