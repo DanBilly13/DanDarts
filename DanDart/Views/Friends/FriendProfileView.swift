@@ -21,11 +21,6 @@ struct FriendProfileView: View {
     @State private var isLoadingMatches: Bool = false
     @State private var refreshedFriend: Player? = nil
     
-    #if DEBUG
-    @State private var h2hDebugData: H2HDebugData?
-    @StateObject private var debugService = H2HDebugService()
-    #endif
-    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -110,18 +105,6 @@ struct FriendProfileView: View {
                             friendId: friend.userId ?? friend.id
                         )
                     }
-                    
-                    #if DEBUG
-                    // H2H Debug Panel
-                    if let debugData = h2hDebugData {
-                        H2HDebugPanelView(
-                            data: debugData,
-                            currentUserName: authService.currentUser?.displayName ?? "Current User",
-                            friendName: friend.displayName
-                        )
-                        .padding(.top, 24)
-                    }
-                    #endif
                 }
             }
             .padding(.horizontal, 16)
@@ -223,23 +206,18 @@ struct FriendProfileView: View {
             let friendUsers = try await friendsService.loadFriends(userId: authService.currentUser?.id ?? UUID())
             if let updatedFriend = friendUsers.first(where: { $0.id == friendUserId }) {
                 refreshedFriend = updatedFriend.toPlayer()
-                print("✅ Refreshed friend stats: \(updatedFriend.displayName) - \(updatedFriend.totalWins)W/\(updatedFriend.totalLosses)L")
             }
         } catch {
-            print("❌ Failed to refresh friend stats: \(error)")
+            // Silent fail - stats will show stale data
         }
     }
     
     /// Load head-to-head matches from Supabase only (async version for refreshable)
     /// OPTIMIZED: Uses match_participants table and batched turn loading
     private func loadHeadToHeadMatchesAsync() async {
-        let startTime = Date()
-        print("🔵 [H2H Optimized] Starting head-to-head load for friend: \(friend.displayName)")
-        
         isLoadingMatches = true
         
         guard let userId = authService.currentUser?.id else {
-            print("❌ [H2H Optimized] No current user ID")
             await MainActor.run {
                 isLoadingMatches = false
                 headToHeadMatches = []
@@ -248,7 +226,6 @@ struct FriendProfileView: View {
         }
         
         let friendUserId = friend.userId ?? friend.id
-        print("🔵 [H2H Optimized] Current user: \(userId), Friend: \(friendUserId)")
         
         do {
             // Use the new optimized query method
@@ -264,35 +241,8 @@ struct FriendProfileView: View {
                 
                 let friendId = friend.userId ?? friend.id
                 HeadToHeadCache.shared.setMatches(headToHeadMatches, for: friendId)
-                
-                let totalDuration = Date().timeIntervalSince(startTime)
-                print("✅ [H2H Optimized] Total load completed in \(String(format: "%.2f", totalDuration))s")
-                
-                // Log what's being passed to HeadToHeadStatsView
-                print("🔍 [H2H Display] Passing \(matches.count) matches to HeadToHeadStatsView")
-                let game301Matches = matches.filter { $0.gameName.contains("301") }
-                print("🔍 [H2H Display] 301 matches: \(game301Matches.count)")
-                for match in game301Matches {
-                    print("🔍 [H2H Display]   - Match \(match.id.uuidString.prefix(8)): duration=\(match.duration)s, winner=\(match.winnerId.uuidString.prefix(8))")
-                }
             }
-            
-            #if DEBUG
-            // Load debug data
-            let debugData = await debugService.collectDebugData(
-                currentUserId: userId,
-                currentUserName: authService.currentUser?.displayName ?? "Current User",
-                friendId: friendUserId,
-                friendName: friend.displayName
-            )
-            await MainActor.run {
-                h2hDebugData = debugData
-            }
-            #endif
-            
         } catch {
-            let totalDuration = Date().timeIntervalSince(startTime)
-            print("❌ [H2H Optimized] Load failed after \(String(format: "%.2f", totalDuration))s: \(error)")
             await MainActor.run {
                 isLoadingMatches = false
             }
@@ -344,14 +294,9 @@ struct HeadToHeadStatsView: View {
         // Group by normalized game name
         let normalizedGameTypes = Set(matches.map { normalizedH2HGameName($0.gameName) })
         
-        print("🔍 [H2H Render] Computing gameStats from \(matches.count) matches")
-        print("🔍 [H2H Render] Raw game types: \(Set(matches.map { $0.gameName }))")
-        print("🔍 [H2H Render] Normalized game types: \(normalizedGameTypes)")
-        
         return normalizedGameTypes.compactMap { normalizedName in
             // Filter matches by normalized name
             let gameMatches = matches.filter { normalizedH2HGameName($0.gameName) == normalizedName }
-            print("🔍 [H2H Render] Processing \(normalizedName): \(gameMatches.count) matches (raw names: \(Set(gameMatches.map { $0.gameName })))")
             
             // Count wins by checking if winner is current user or friend
             // Handle both local matches (winnerId = MatchPlayer.id) and Supabase matches (winnerId = user account ID)
@@ -386,8 +331,6 @@ struct HeadToHeadStatsView: View {
             let totalMatches = gameMatches.count
             
             guard totalMatches > 0 else { return nil }
-            
-            print("🔍 [H2H Render] \(normalizedName) final stats: currentUser=\(currentUserWins), friend=\(friendWins), total=\(totalMatches)")
             
             return GameTypeStats(
                 gameName: normalizedName,
