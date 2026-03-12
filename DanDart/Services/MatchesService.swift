@@ -407,7 +407,8 @@ class MatchesService: ObservableObject {
             dbg("[loadMatchById] challenger_id=\(matchData.challengerId?.uuidString ?? "NULL") receiver_id=\(matchData.receiverId?.uuidString ?? "NULL")")
 
             // Build players array with fallback strategies
-            let players = try await buildPlayersFallback(matchData: matchData)
+            var players = try await buildPlayersFallback(matchData: matchData)
+            players = try await enrichPlayersForPresentationIfNeeded(players: players)
             
             dbg("[loadMatchById] playersBuiltCount=\(players.count) names=\(players.map{$0.displayName})")
 
@@ -443,6 +444,49 @@ class MatchesService: ObservableObject {
         } catch {
             print("❌ [LoadMatchById] Failed to load match: \(error)")
             return nil
+        }
+    }
+
+    private func enrichPlayersForPresentationIfNeeded(players: [MatchPlayer]) async throws -> [MatchPlayer] {
+        var idsNeedingProfileSet = Set<UUID>()
+        idsNeedingProfileSet.reserveCapacity(players.count)
+        for player in players {
+            guard !player.isGuest else { continue }
+            if player.nickname.isEmpty || player.avatarURL == nil {
+                idsNeedingProfileSet.insert(player.id)
+            }
+        }
+        let idsNeedingProfile = Array(idsNeedingProfileSet)
+
+        guard !idsNeedingProfile.isEmpty else {
+            return players
+        }
+
+        let profiles = try await loadUserProfiles(userIds: idsNeedingProfile)
+
+        return players.map { p in
+            guard !p.isGuest else { return p }
+            guard let profile = profiles[p.id] else { return p }
+
+            let nickname = p.nickname.isEmpty ? profile.nickname : p.nickname
+            let avatarURL = p.avatarURL ?? profile.avatarURL
+
+            if nickname == p.nickname, avatarURL == p.avatarURL {
+                return p
+            }
+
+            return MatchPlayer(
+                id: p.id,
+                displayName: p.displayName,
+                nickname: nickname,
+                avatarURL: avatarURL,
+                isGuest: p.isGuest,
+                finalScore: p.finalScore,
+                startingScore: p.startingScore,
+                totalDartsThrown: p.totalDartsThrown,
+                turns: p.turns,
+                legsWon: p.legsWon
+            )
         }
     }
 
