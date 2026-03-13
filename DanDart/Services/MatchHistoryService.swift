@@ -427,28 +427,97 @@ class MatchHistoryService: ObservableObject {
     
     /// Load full match detail by ID (with caching)
     func loadFullDetail(matchId: UUID) async throws -> MatchResult {
+        print("� [LoadFullDetail] Starting load for match \(matchId.uuidString.prefix(8))")
+        
         // Check cache first
         if let cached = detailCache[matchId] {
             print("✅ [Cache Hit] Returning cached detail for \(matchId.uuidString.prefix(8))")
+            print("   - Game: \(cached.gameName)")
+            print("   - Type: \(cached.gameType)")
+            print("   - Players: \(cached.players.count)")
+            print("   - Turns: \(cached.players.map { $0.turns.count })")
             return cached
         }
         
         print("🔍 [Cache Miss] Loading full detail for \(matchId.uuidString.prefix(8))")
         
         // Try device-stored first (instant)
+        print("🔍 [LoadFullDetail] Checking device storage...")
         let localMatches = storageManager.loadMatches()
         if let localMatch = localMatches.first(where: { $0.id == matchId }) {
+            print("✅ [LoadFullDetail] Found in device storage")
+            print("   - Source: deviceStored")
+            print("   - Game: \(localMatch.gameName)")
+            print("   - Type: \(localMatch.gameType)")
+            print("   - Players: \(localMatch.players.count)")
+            print("   - Turns: \(localMatch.players.map { $0.turns.count })")
             detailCache[matchId] = localMatch
             return localMatch
         }
+        print("⚠️ [LoadFullDetail] Not found in device storage, trying Supabase...")
         
         // Try Supabase
-        if let match = try await matchesService.loadMatchById(matchId) {
-            detailCache[matchId] = match
-            return match
+        print("🔍 [LoadFullDetail] Querying Supabase for match \(matchId.uuidString.prefix(8))...")
+        do {
+            if let match = try await matchesService.loadMatchById(matchId) {
+                print("✅ [LoadFullDetail] Loaded from Supabase")
+                print("   - Source: supabase (local or remote)")
+                print("   - Game: \(match.gameName)")
+                print("   - Type: \(match.gameType)")
+                print("   - Players: \(match.players.count)")
+                print("   - Turns per player: \(match.players.map { $0.turns.count })")
+                print("   - Total turns: \(match.players.map { $0.turns.count }.reduce(0, +))")
+                
+                // CRITICAL CHECK: Verify turn data was loaded
+                let totalTurns = match.players.map { $0.turns.count }.reduce(0, +)
+                if totalTurns == 0 {
+                    print("❌ [LoadFullDetail] CRITICAL: Match loaded but has ZERO turns!")
+                    print("   - This indicates RLS policy is blocking match_throws access")
+                    print("   - Match ID: \(matchId.uuidString)")
+                    print("   - Game Type: \(match.gameType)")
+                    print("   - Game Name: \(match.gameName)")
+                    print("   - Players: \(match.players.map { $0.displayName })")
+                    print("   - Check match_throws_select_participants RLS policy")
+                    print("   - Verify match_players table has records for this match")
+                    
+                    throw NSError(
+                        domain: "MatchHistoryService",
+                        code: 500,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Match loaded but turn data is missing (RLS policy issue)",
+                            "matchId": matchId.uuidString,
+                            "gameType": match.gameType,
+                            "gameName": match.gameName,
+                            "source": "supabase",
+                            "failureReason": "Zero turns loaded - RLS policy blocking match_throws access"
+                        ]
+                    )
+                }
+                
+                detailCache[matchId] = match
+                return match
+            } else {
+                print("❌ [LoadFullDetail] Supabase returned nil")
+                print("   - Match ID: \(matchId.uuidString)")
+                print("   - This means the query succeeded but returned no match")
+                throw NSError(
+                    domain: "MatchHistoryService",
+                    code: 404,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Match not found in Supabase",
+                        "matchId": matchId.uuidString,
+                        "source": "supabase",
+                        "failureReason": "Query returned nil"
+                    ]
+                )
+            }
+        } catch {
+            print("❌ [LoadFullDetail] Supabase query failed with error")
+            print("   - Match ID: \(matchId.uuidString)")
+            print("   - Error: \(error)")
+            print("   - Error type: \(type(of: error))")
+            throw error
         }
-        
-        throw NSError(domain: "MatchHistoryService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Match not found"])
     }
     
     /// Seed the cache with a pre-loaded MatchResult (called from End Game path)

@@ -27,26 +27,52 @@ class MatchesService: ObservableObject {
             f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             return f
         }()
+        
+        static let iso8601WithoutFractional: ISO8601DateFormatter = {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime]
+            return f
+        }()
 
         static func makeDecoder() -> JSONDecoder {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .custom { dec in
                 let c = try dec.singleValueContainer()
 
-                // Supabase typically returns timestamps as ISO8601 strings
+                // Try ISO8601 WITH fractional seconds first
                 if let s = try? c.decode(String.self),
                    let d = iso8601WithFractional.date(from: s) {
                     return d
                 }
+                
+                // Try ISO8601 WITHOUT fractional seconds (fixes halve_it, knockout, etc.)
+                if let s = try? c.decode(String.self),
+                   let d = iso8601WithoutFractional.date(from: s) {
+                    return d
+                }
 
-                // Some environments might return unix seconds
+                // Try Unix epoch as Double
                 if let t = try? c.decode(Double.self) {
                     return Date(timeIntervalSince1970: t)
                 }
+                
+                // Try Unix epoch as Int (extra safety)
+                if let t = try? c.decode(Int.self) {
+                    return Date(timeIntervalSince1970: Double(t))
+                }
 
+                // LOUD failure with actual value
+                let attemptedValue = (try? c.decode(String.self)) ?? 
+                                    String(describing: try? c.decode(Double.self)) ??
+                                    "UNKNOWN_TYPE"
+                
+                print("❌ [TIMESTAMP DECODE FAILED]")
+                print("   Raw value: '\(attemptedValue)'")
+                print("   Expected: ISO8601 string or Unix epoch number")
+                
                 throw DecodingError.dataCorruptedError(
                     in: c,
-                    debugDescription: "Unsupported date format for Supabase timestamp"
+                    debugDescription: "Unsupported date format: '\(attemptedValue)'"
                 )
             }
             return decoder
@@ -367,6 +393,7 @@ class MatchesService: ObservableObject {
     }
     
     /// Load a single match by ID (optimized for GameEndView)
+    /// Uses manual JSON parsing like loadMatches() to handle all edge cases
     func loadMatchById(_ matchId: UUID) async throws -> MatchResult? {
         print("🔍 [LoadMatchById] Fetching match \(matchId.uuidString.prefix(8))...")
 
@@ -378,42 +405,156 @@ class MatchesService: ObservableObject {
                     game_type,
                     game_name,
                     winner_id,
-                    challenger_id,
-                    receiver_id,
                     timestamp,
                     duration,
-                    started_at,
-                    ended_at,
                     players,
-                    player_scores,
                     match_format,
                     total_legs_played,
-                    metadata
+                    metadata,
+                    match_mode,
+                    challenger_id,
+                    receiver_id,
+                    player_scores
                 """)
                 .eq("id", value: matchId.uuidString.lowercased())
                 .single()
                 .execute()
 
-            let decoder = SupabaseDateDecoders.makeDecoder()
-            let matchData = try decoder.decode(GameEndMatchData.self, from: response.data)
+            // Parse response manually to handle JSONB fields (same as loadMatches())
+            guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
+                print("❌ Failed to parse response as JSON")
+                return nil
+            }
+            
+            print("🔍 [LoadMatchById] Match \(matchId.uuidString.prefix(8)):")
+            print("   - game_type: \(json["game_type"] ?? "NULL")")
+            print("   - timestamp: \(json["timestamp"] ?? "NULL")")
 
+            // Extract required fields
+            guard let gameType = json["game_type"] as? String else {
+                print("❌ Missing game_type")
+                return nil
+            }
+            guard let gameName = json["game_name"] as? String else {
+                print("❌ Missing game_name")
+                return nil
+            }
+            guard let timestampString = json["timestamp"] as? String else {
+                print("❌ Missing timestamp")
+                return nil
+            }
+            
+            // Parse timestamp with fallbacks (same as loadMatches())
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            var timestamp = formatter.date(from: timestampString)
+            
+            if timestamp == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                timestamp = formatter.date(from: timestampString)
+            }
+            
+            if timestamp == nil {
+                let basicFormatter = DateFormatter()
+                basicFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                timestamp = basicFormatter.date(from: timestampString)
+            }
+            
+            guard let timestamp = timestamp else {
+                print("❌ Invalid timestamp: \(timestampString)")
+                return nil
+            }
+            
+            // Parse winner_id (optional)
+            let winnerId: UUID?
+            if let winnerIdString = json["winner_id"] as? String {
+                winnerId = UUID(uuidString: winnerIdString)
+            } else {
+                winnerId = nil
+            }
+            
+            // Parse duration (optional)
+            let duration = json["duration"] as? Int
+            
+            // Parse players JSONB (same as loadMatches())
+            let basicPlayers: [MatchPlayer]
+            if let playersString = json["players"] as? String {
+                // Case 1: players is a JSON string
+                guard let playersJsonData = playersString.data(using: .utf8) else {
+                    print("❌ Could not convert players string to data")
+                    return nil
+                }
+                let decoder = JSONDecoder()
+                basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+            } else if let playersArray = json["players"] as? [[String: Any]] {
+                // Case 2: players is already parsed as an array
+                let playersJsonData = try JSONSerialization.data(withJSONObject: playersArray)
+                let decoder = JSONDecoder()
+                basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+            } else if json["match_mode"] as? String == "remote" {
+                // Case 3: Remote match - players column is NULL, reconstruct from challenger/receiver
+                print("🔍 [LoadMatchById] Remote match detected, reconstructing players...")
+                
+                guard let challengerIdString = json["challenger_id"] as? String,
+                      let challengerId = UUID(uuidString: challengerIdString),
+                      let receiverIdString = json["receiver_id"] as? String,
+                      let receiverId = UUID(uuidString: receiverIdString) else {
+                    print("❌ Missing challenger_id or receiver_id for remote match")
+                    return nil
+                }
+                
+                // Extract player_scores if available
+                let playerScores = json["player_scores"] as? [String: Int]
+                
+                // Build players using existing profile loading logic
+                let profiles = try await loadUserProfiles(userIds: [challengerId, receiverId])
+                
+                basicPlayers = [challengerId, receiverId].map { id in
+                    let profile = profiles[id]
+                    let score = playerScores?[id.uuidString] ?? playerScores?[id.uuidString.lowercased()] ?? 0
+                    
+                    return MatchPlayer(
+                        id: id,
+                        displayName: profile?.displayName ?? "Player",
+                        nickname: profile?.nickname ?? "",
+                        avatarURL: profile?.avatarURL,
+                        isGuest: false,
+                        finalScore: score,
+                        startingScore: gameType.contains("301") ? 301 : 501,
+                        totalDartsThrown: 0,
+                        turns: [],
+                        legsWon: 0
+                    )
+                }
+                
+                print("✅ [LoadMatchById] Reconstructed \(basicPlayers.count) players for remote match")
+            } else {
+                print("❌ Players data is neither string nor array")
+                return nil
+            }
+            
+            // Get optional fields
+            let matchFormat = json["match_format"] as? Int ?? 1
+            let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
+            
+            // Parse metadata (same as loadMatches())
+            var metadata: [String: String]? = nil
+            if let metadataDict = json["metadata"] as? [String: Any],
+               let gameMetadata = metadataDict["game_metadata"] as? [String: Any] {
+                metadata = gameMetadata.compactMapValues { $0 as? String }
+            }
+            
             print("✅ [LoadMatchById] Found match \(matchId.uuidString.prefix(8))")
-            print("   - Game: \(matchData.gameName)")
-            print("   - Duration: \(matchData.duration?.description ?? "NULL")")
-            print("   - Winner ID: \(matchData.winnerId?.uuidString.prefix(8) ?? "NULL")...")
+            print("   - Game: \(gameName)")
+            print("   - Duration: \(duration?.description ?? "NULL")")
+            print("   - Winner ID: \(winnerId?.uuidString.prefix(8) ?? "NULL")...")
+            print("   - Players: \(basicPlayers.count)")
             
-            dbg("[loadMatchById] match=\(matchId.uuidString.prefix(8))")
-            dbg("[loadMatchById] embeddedPlayersCount=\(matchData.players?.count ?? 0)")
-            dbg("[loadMatchById] challenger_id=\(matchData.challengerId?.uuidString ?? "NULL") receiver_id=\(matchData.receiverId?.uuidString ?? "NULL")")
-
-            // Build players array with fallback strategies
-            var players = try await buildPlayersFallback(matchData: matchData)
-            players = try await enrichPlayersForPresentationIfNeeded(players: players)
+            // Enrich players with profile data if needed
+            let players = try await enrichPlayersForPresentationIfNeeded(players: basicPlayers)
             
-            dbg("[loadMatchById] playersBuiltCount=\(players.count) names=\(players.map{$0.displayName})")
-
             // Load turn-by-turn data from match_throws table
-            let playersWithTurns = try await loadTurnsForMatch(matchId: matchData.id, players: players)
+            let playersWithTurns = try await loadTurnsForMatch(matchId: matchId, players: players)
 
             // Debug: Verify turns were loaded
             let turnCounts = playersWithTurns.map { $0.turns.count }
@@ -421,22 +562,22 @@ class MatchesService: ObservableObject {
             print("📊 [LoadMatchById] Loaded turns per player: \(turnCounts), total: \(totalTurns)")
 
             // winner_id may be NULL but MatchResult currently requires a non-optional winnerId
-            let winnerId = matchData.winnerId ?? UUID()   // placeholder for NULL winner_id
+            let finalWinnerId = winnerId ?? UUID()   // placeholder for NULL winner_id
 
             // Duration: computed (0 if unavailable)
-            let duration = TimeInterval(matchData.computedDurationSeconds ?? 0)
+            let finalDuration = TimeInterval(duration ?? 0)
 
             let match = MatchResult(
-                id: matchData.id,
-                gameType: matchData.gameType,
-                gameName: matchData.gameName,
+                id: matchId,
+                gameType: gameType,
+                gameName: gameName,
                 players: playersWithTurns,
-                winnerId: winnerId,
-                timestamp: matchData.timestamp,
-                duration: duration,
-                matchFormat: matchData.matchFormat ?? 1,
-                totalLegsPlayed: matchData.totalLegsPlayed ?? 1,
-                metadata: matchData.metadata
+                winnerId: finalWinnerId,
+                timestamp: timestamp,
+                duration: finalDuration,
+                matchFormat: matchFormat,
+                totalLegsPlayed: totalLegsPlayed,
+                metadata: metadata
             )
 
             return match
@@ -674,13 +815,17 @@ class MatchesService: ObservableObject {
     ///   - players: Basic player data (without turns)
     /// - Returns: Players with complete turn data
     private func loadTurnsForMatch(matchId: UUID, players: [MatchPlayer]) async throws -> [MatchPlayer] {
-        // print("🔍 [LoadTurnsForMatch] Loading turns for match \(matchId.uuidString.prefix(8))...")
-        // print("   Input players: \(players.map { "\($0.displayName)" })")
-        dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) inputPlayersCount=\(players.count)")
+        print("\n🎯 [DECISION TREE] ========================================")
+        print("🎯 [DECISION TREE] Match ID: \(matchId.uuidString)")
+        print("🎯 [DECISION TREE] A. Match row loaded: YES (we're in loadTurnsForMatch)")
+        print("🎯 [DECISION TREE] Input players: \(players.map { "\($0.displayName) (id: \($0.id.uuidString.prefix(8)))" })")
+        print("🎯 [DECISION TREE] Number of players: \(players.count)")
         
         // Query match_throws table for this match
         let response: Data
         do {
+            print("🎯 [DECISION TREE] Executing query to match_throws table...")
+            print("🎯 [DECISION TREE] Query: SELECT * FROM match_throws WHERE match_id = '\(matchId.uuidString)'")
             let result = try await supabaseService.client
                 .from("match_throws")
                 .select("id,match_id,player_order,turn_index,throws,score_before,score_after,is_bust,game_metadata")
@@ -689,37 +834,62 @@ class MatchesService: ObservableObject {
                 .order("turn_index")
                 .execute()
             response = result.data
+            print("🎯 [DECISION TREE] Query executed successfully, response size: \(response.count) bytes")
         } catch {
-            print("⚠️ [LoadTurnsForMatch] Failed to query turn data for match \(matchId): \(error)")
-            print("   Error details: \(error.localizedDescription)")
-            dbg("[loadTurnsForMatch] CURRENT SELECT STRING: id,match_id,player_order,turn_index,throws,score_before,score_after,is_bust,game_metadata")
-            
-            // DEBUG: Try minimal query to isolate the issue
-            await debugMinimalThrowsFetch(matchId: matchId)
-            
+            print("🎯 [DECISION TREE] ❌ C. Query FAILED with error: \(error)")
+            print("🎯 [DECISION TREE] Cannot determine if rows exist (B) - query error prevents access")
+            print("🎯 [DECISION TREE] Returning players with EMPTY turns")
+            print("🎯 [DECISION TREE] ========================================\n")
             return players
         }
         
-        // Parse throws data
+        // Parse response as array of dictionaries
         guard let throwsArray = try? JSONSerialization.jsonObject(with: response) as? [[String: Any]] else {
-            print("⚠️ [LoadTurnsForMatch] No turn data found for match \(matchId), returning players with empty turns")
+            print("🎯 [DECISION TREE] ❌ Failed to parse response as JSON array")
+            print("🎯 [DECISION TREE] Raw response: \(String(data: response, encoding: .utf8) ?? "<not UTF-8>")")
+            print("🎯 [DECISION TREE] Returning players with EMPTY turns")
+            print("🎯 [DECISION TREE] ========================================\n")
             return players
         }
         
-        // print("📊 [LoadTurnsForMatch] Found \(throwsArray.count) throw records")
-        dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) throwsRows=\(throwsArray.count)")
+        print("🎯 [DECISION TREE] C. Query returned \(throwsArray.count) rows")
+        
+        if throwsArray.isEmpty {
+            print("🎯 [DECISION TREE] ❌ C = NO (query returned 0 rows)")
+            print("🎯 [DECISION TREE] ")
+            print("🎯 [DECISION TREE] Possible causes:")
+            print("🎯 [DECISION TREE]   - B = NO: Rows never written to match_throws (data persistence issue)")
+            print("🎯 [DECISION TREE]   - B = YES, C = NO: Rows exist but RLS policy blocks access")
+            print("🎯 [DECISION TREE]   - B = YES, C = NO: Query uses wrong match_id format")
+            print("🎯 [DECISION TREE] ")
+            print("🎯 [DECISION TREE] CLASSIFICATION: ROWS NOT RETURNED (need to check if B = YES or NO)")
+            print("🎯 [DECISION TREE] Returning players with EMPTY turns")
+            print("🎯 [DECISION TREE] ========================================\n")
+            return players
+        }
+        
+        print("🎯 [DECISION TREE] ✅ C = YES (query returned rows successfully)")
+        print("🎯 [DECISION TREE] Sample row: \(throwsArray.first ?? [:])")
+        print("🎯 [DECISION TREE] Player orders in data: \(Set(throwsArray.compactMap { $0["player_order"] as? Int }).sorted())")
+        
+        print("🎯 [DECISION TREE] D. Attempting to decode rows into turns...")
         
         // Group throws by player_order
         var playerTurns: [Int: [MatchTurn]] = [:]
+        
+        var decodedTurns = 0
+        var failedTurns = 0
         
         for throwJson in throwsArray {
             guard let playerOrder = throwJson["player_order"] as? Int,
                   let turnIndex = throwJson["turn_index"] as? Int,
                   let scoreBefore = throwJson["score_before"] as? Int,
                   let scoreAfter = throwJson["score_after"] as? Int else {
-                print("⚠️ [LoadTurnsForMatch] Skipping turn - missing required fields")
+                print("🎯 [DECISION TREE] ⚠️ Failed to decode turn - missing required fields: \(throwJson)")
+                failedTurns += 1
                 continue
             }
+            decodedTurns += 1
             
             // Parse throws - handle multiple formats
             let dartScores: [Int]
@@ -789,15 +959,17 @@ class MatchesService: ObservableObject {
             playerTurns[playerOrder]?.append(turn)
         }
         
-        // print("📊 [LoadTurnsForMatch] Grouped turns by player_order:")
-        // for (order, turns) in playerTurns.sorted(by: { $0.key < $1.key }) {
-        //     print("   player_order \(order): \(turns.count) turns")
-        // }
+        print("🎯 [DECISION TREE] D. Decode results: \(decodedTurns) successful, \(failedTurns) failed")
         
-        dbg("[loadTurnsForMatch] match=\(matchId.uuidString.prefix(8)) groupedOrders=\(playerTurns.keys.sorted()) counts=\(playerTurns.keys.sorted().map{ playerTurns[$0]?.count ?? 0 })")
-        if players.isEmpty && !throwsArray.isEmpty {
-            dbg("[loadTurnsForMatch][⚠️] Players EMPTY but throwsRows=\(throwsArray.count) -> UI will be blank.")
+        if decodedTurns == 0 {
+            print("🎯 [DECISION TREE] ❌ D = NO (all rows failed to decode)")
+            print("🎯 [DECISION TREE] CLASSIFICATION: ROWS NOT DECODED")
+            print("🎯 [DECISION TREE] Returning players with EMPTY turns")
+            print("🎯 [DECISION TREE] ========================================\n")
+            return players
         }
+        
+        print("🎯 [DECISION TREE] ✅ D = YES (rows decoded into \(decodedTurns) turns)")
         
         // Reconstruct players with turn data
         var playersWithTurns: [MatchPlayer] = []
@@ -1106,7 +1278,7 @@ class MatchesService: ObservableObject {
     /// Build players with turn data from JSON
     private func buildPlayersWithTurns(players: [MatchPlayer], turnsJson: [[String: Any]]) -> [MatchPlayer] {
         // Group turns by player_order
-        var playerTurns: [Int: [MatchTurn]] = [:]
+        var playerTurns: [Int: [MatchTurn]] = [Int: [MatchTurn]]()
         
         for turnJson in turnsJson {
             guard let playerOrder = turnJson["player_order"] as? Int,
@@ -1306,6 +1478,44 @@ struct GameEndMatchData: Decodable {
         case totalLegsPlayed = "total_legs_played"
         case challengerId = "challenger_id"
         case receiverId = "receiver_id"
+    }
+    
+    // Custom decoder to handle players field (can be string, array, or null)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Decode simple fields
+        id = try container.decode(UUID.self, forKey: .id)
+        gameType = try container.decode(String.self, forKey: .gameType)
+        gameName = try container.decode(String.self, forKey: .gameName)
+        winnerId = try container.decodeIfPresent(UUID.self, forKey: .winnerId)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        duration = try container.decodeIfPresent(Int.self, forKey: .duration)
+        startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt)
+        endedAt = try container.decodeIfPresent(Date.self, forKey: .endedAt)
+        playerScores = try container.decodeIfPresent([String: Int].self, forKey: .playerScores)
+        matchFormat = try container.decodeIfPresent(Int.self, forKey: .matchFormat)
+        totalLegsPlayed = try container.decodeIfPresent(Int.self, forKey: .totalLegsPlayed)
+        metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata)
+        challengerId = try container.decodeIfPresent(UUID.self, forKey: .challengerId)
+        receiverId = try container.decodeIfPresent(UUID.self, forKey: .receiverId)
+        
+        // Handle players field - can be string (JSONB), array, or null
+        if let playersString = try? container.decode(String.self, forKey: .players) {
+            // Case 1: players is a JSON string - convert to Data and decode
+            if let playersData = playersString.data(using: .utf8) {
+                let decoder = JSONDecoder()
+                players = try? decoder.decode([MatchPlayer].self, from: playersData)
+            } else {
+                players = nil
+            }
+        } else if let playersArray = try? container.decode([MatchPlayer].self, forKey: .players) {
+            // Case 2: players is already an array
+            players = playersArray
+        } else {
+            // Case 3: players is null or missing
+            players = nil
+        }
     }
 
     /// Compute duration from timestamps if not stored
