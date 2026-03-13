@@ -56,8 +56,8 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!Array.isArray(darts) || darts.length !== 3) {
-      return new Response(JSON.stringify({ error: 'Darts must be an array of 3 scores' }), {
+    if (!Array.isArray(darts) || darts.length < 1 || darts.length > 3) {
+      return new Response(JSON.stringify({ error: 'Darts must be an array of 1-3 scores' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

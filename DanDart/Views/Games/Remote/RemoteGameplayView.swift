@@ -406,6 +406,29 @@ struct RemoteGameplayView: View {
         return darts.reduce(0, +)
     }
     
+    /// Check if the opponent just busted
+    /// Only relevant when showing to the inactive player
+    /// Note: currentPlayerId has already switched to us by the time we check,
+    /// so we just check if the last visit (by opponent) was a bust
+    private var didOpponentBust: Bool {
+        guard let payload = serverLastVisitPayload else {
+            print("🔍 [BustCheck] No serverLastVisitPayload")
+            return false
+        }
+        
+        // Check if last visit was by opponent (not us)
+        guard payload.playerId != currentUserId else {
+            print("🔍 [BustCheck] Last visit was by us, not opponent")
+            return false
+        }
+        
+        let isBust = payload.scoreBefore == payload.scoreAfter
+        
+        print("🔍 [BustCheck] opponent visit - playerId: \(payload.playerId.uuidString.prefix(8))..., scoreBefore: \(payload.scoreBefore), scoreAfter: \(payload.scoreAfter), isBust: \(isBust)")
+        
+        return isBust
+    }
+    
     /// Throw display for UI (as [ScoredThrow]):
     /// - If it's NOT my turn (inactiveLockout) OR we are revealing, show the server lastVisit darts.
     /// - Otherwise show my local in-progress input (gameViewModel.currentThrow).
@@ -684,28 +707,28 @@ struct RemoteGameplayView: View {
         case .saving:
             return "Saving visit..."
         case .revealing:
-            if let total = serverLastVisitTotal {
-                return "Scored: \(total)"
-            }
             return "Visit saved"
         }
     }
 
     private func bottomOverlaySubtitle(for overlayState: RemoteGameStateAdapter.OverlayState, adapter: RemoteGameStateAdapter) -> String? {
+        let subtitle: String?
+        
         switch overlayState {
         case .none:
-            return nil
+            subtitle = nil
         case .inactiveLockout:
-            if let total = serverLastVisitTotal {
-                return "Last visit: \(total)"
-            }
-            return "Waiting for opponent"
+            // Only show "Bust" if opponent busted
+            let bustCheck = didOpponentBust
+            subtitle = bustCheck ? "Bust" : nil
+            print("📝 [Subtitle] overlayState: .inactiveLockout, didOpponentBust: \(bustCheck), subtitle: \(subtitle ?? "nil")")
         case .saving:
-            return "Please wait"
+            subtitle = "Please wait"
         case .revealing:
-            // No subtitle during reveal
-            return nil
+            subtitle = nil
         }
+        
+        return subtitle
     }
     
     init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {
@@ -1048,6 +1071,14 @@ struct RemoteGameplayView: View {
                     overlayState: currentAdapter.overlayState(isSaving: gameViewModel.isSaving, isRevealing: gameViewModel.isRevealingScore),
                     context: "onChange"
                 )
+            }
+        }
+        .onChange(of: serverLastVisitPayload) { oldValue, newValue in
+            if let payload = newValue {
+                let isBust = payload.scoreBefore == payload.scoreAfter
+                print("📦 [LastVisit] Received UPDATE - playerId: \(payload.playerId.uuidString.prefix(8))..., darts: \(payload.darts), scoreBefore: \(payload.scoreBefore), scoreAfter: \(payload.scoreAfter), isBust: \(isBust), currentPlayerId: \(renderMatch?.currentPlayerId?.uuidString.prefix(8) ?? "nil")..., isMyTurn: \(isMyTurn)")
+            } else {
+                print("📦 [LastVisit] Cleared (nil)")
             }
         }
     }

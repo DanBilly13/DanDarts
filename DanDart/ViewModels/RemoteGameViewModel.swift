@@ -410,7 +410,13 @@ class RemoteGameViewModel: ObservableObject {
         // Convert currentThrow to array of integers for server
         let darts = currentThrow.map { $0.totalValue }
         
-        print("💾 [RemoteGame] saveScore START - matchId: \(remoteMatchId.uuidString.prefix(8))..., player: \(currentPlayer.displayName), darts: \(darts), score: \(currentScore) → \(newScore)")
+        // 🚨 DEBUG: Check if this is a bust visit
+        let isBustVisit = (currentScore == newScore)
+        if isBustVisit {
+            print("🚨 [BUST] Saving bust visit - player: \(currentPlayer.displayName), darts: \(darts), score: \(currentScore) → \(newScore) (NO CHANGE = BUST)")
+        }
+        
+        print("💾 [RemoteGame] saveScore START - matchId: \(remoteMatchId.uuidString.prefix(8))..., player: \(currentPlayer.displayName), darts: \(darts), score: \(currentScore) → \(newScore), isBust: \(isBustVisit)")
         
         // 🎵 Play sound and trigger animation IMMEDIATELY (matches local game timing)
         SoundManager.shared.playCountdownSaveScore()
