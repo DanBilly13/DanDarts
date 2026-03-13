@@ -261,15 +261,9 @@ struct MainTabView: View {
                     .environmentObject(friendsService)
                     .environmentObject(remoteMatchService)
             }
-            .navigationDestination(for: MatchResult.self) { match in
-                print("🎯 [MainTabView] navigationDestination triggered")
-                print("🎯 [MainTabView] Match ID: \(match.id)")
-                print("🎯 [MainTabView] Match gameName: \(match.gameName)")
-                print("🎯 [MainTabView] Match players count: \(match.players.count)")
-                if !match.players.isEmpty {
-                    print("🎯 [MainTabView] Player 0: \(match.players[0].displayName), turns: \(match.players[0].turns.count)")
-                }
-                return MatchDetailView(match: match, isSheet: false)
+            .navigationDestination(for: UUID.self) { matchId in
+                MatchDetailLoadingView(matchId: matchId)
+                    .environmentObject(MatchHistoryService.shared)
             }
         }
         .environmentObject(router)

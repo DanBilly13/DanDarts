@@ -176,7 +176,8 @@ struct SuddenDeathGameplayView: View {
                     },
                     matchFormat: nil,
                     legsWon: nil,
-                    matchId: viewModel.matchId
+                    matchId: viewModel.matchId,
+                    matchResult: nil
                 ))
             }
         }

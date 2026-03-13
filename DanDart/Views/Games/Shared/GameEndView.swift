@@ -222,9 +222,13 @@ struct GameEndView: View {
         print("   - matchId: \(matchId?.uuidString.prefix(8) ?? "nil")...")
         print("   - matchResult passed in: \(matchResult != nil)")
 
-        // If matchResult is already provided, use it
+        // If matchResult is already provided, use it AND seed the cache
         if let matchResult = matchResult {
             print("✅ [GameEndView] Using pre-loaded matchResult")
+            
+            // Seed the cache so future revisits are instant
+            MatchHistoryService.shared.seedDetailCache(match: matchResult)
+            
             loadedMatch = matchResult
             showMatchDetails = true
             return
@@ -240,54 +244,20 @@ struct GameEndView: View {
         Task {
             print("🔍 [GameEndView] Loading match \(matchId.uuidString.prefix(8))...")
 
-            // 1) Local storage
-            let localMatches = MatchStorageManager.shared.loadMatches()
-            if let localMatch = localMatches.first(where: { $0.id == matchId }) {
-                print("✅ [GameEndView] Found match in local storage")
+            do {
+                // Use MatchHistoryService's cached loader (may already be cached from above)
+                let match = try await MatchHistoryService.shared.loadFullDetail(matchId: matchId)
                 await MainActor.run {
-                    loadedMatch = localMatch
+                    loadedMatch = match
                     isLoadingMatch = false
                     showMatchDetails = true
                 }
-                return
-            }
-
-            // 2) Supabase direct query by id
-            do {
-                if authService.currentUser != nil {
-                    print("☁️ [GameEndView] Querying Supabase directly by ID...")
-                    let matchesService = MatchesService()
-
-                    if let match = try await matchesService.loadMatchById(matchId) {
-                        print("✅ [GameEndView] Found match in Supabase")
-                        await MainActor.run {
-                            loadedMatch = match
-                            isLoadingMatch = false
-                            showMatchDetails = true
-                        }
-                        return
-                    } else {
-                        print("⚠️ [GameEndView] Match not found in Supabase")
-                    }
-                }
             } catch {
-                print("⚠️ [GameEndView] Failed to load match from Supabase: \(error)")
-            }
-
-            // 3) Fallback: MatchHistoryService
-            await MainActor.run {
-                let historyMatches = MatchHistoryService.shared.matches
-                print("📊 [GameEndView] Checking MatchHistoryService (\(historyMatches.count) matches)")
-
-                if let historyMatch = historyMatches.first(where: { $0.id == matchId }) {
-                    print("✅ [GameEndView] Found match in MatchHistoryService")
-                    loadedMatch = historyMatch
-                } else {
-                    print("❌ [GameEndView] Match not found anywhere: \(matchId)")
+                print("❌ [GameEndView] Failed to load match: \(error)")
+                await MainActor.run {
+                    isLoadingMatch = false
+                    showMatchDetails = true
                 }
-
-                isLoadingMatch = false
-                showMatchDetails = true
             }
         }
     }

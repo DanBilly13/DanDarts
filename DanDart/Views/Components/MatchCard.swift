@@ -9,7 +9,7 @@ import SwiftUI
 import UIKit
 
 struct MatchCard: View {
-    let match: MatchResult
+    let summary: MatchSummary
     var isSyncedToCloud: Bool = false
     
     var body: some View {
@@ -55,7 +55,7 @@ struct MatchCard: View {
                     gameNameChip
                     
                     // Practice badge for single-player matches
-                    if match.isPractice {
+                    if summary.isPractice {
                         Text("Practice")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(AppColor.textSecondary)
@@ -102,7 +102,7 @@ struct MatchCard: View {
     // MARK: - Sub Views
 
     private var gameNameChip: some View {
-        Chip(title: match.gameName)
+        Chip(title: summary.gameName)
     }
     
     private var playersRow: some View {
@@ -125,7 +125,7 @@ struct MatchCard: View {
                             placementView(for: playerPlacement(player))
                         } else {
                             // Show trophy for winner, score for others (301/501)
-                            if player.id == match.winnerId {
+                            if player.id == summary.winnerId {
                                 Image(systemName: "crown")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(AppColor.interactivePrimaryBackground)
@@ -179,7 +179,7 @@ struct MatchCard: View {
     
     /// Check if this is a ranking-based game (Knockout, Sudden Death, Halve-It)
     private var isRankingBasedGame: Bool {
-        let gameType = match.gameType.lowercased()
+        let gameType = summary.gameType.lowercased()
         return gameType == "knockout" ||
                gameType == "sudden death" || gameType == "sudden_death" ||
                gameType == "halve it" || gameType == "halve_it"
@@ -187,20 +187,20 @@ struct MatchCard: View {
     
     /// Players ranked by final score (highest to lowest for Halve-It/Knockout, lowest to highest for Sudden Death)
     private var rankedPlayers: [MatchPlayer] {
-        let gameType = match.gameType.lowercased()
+        let gameType = summary.gameType.lowercased()
         
         if gameType == "knockout" {
             // For Knockout: higher lives = better placement
-            return match.players.sorted { $0.finalScore > $1.finalScore }
+            return summary.players.sorted { $0.finalScore > $1.finalScore }
         } else if gameType == "sudden death" || gameType == "sudden_death" {
             // For Sudden Death: higher lives = better placement
-            return match.players.sorted { $0.finalScore > $1.finalScore }
+            return summary.players.sorted { $0.finalScore > $1.finalScore }
         } else if gameType == "halve it" || gameType == "halve_it" {
             // For Halve-It: higher score = better placement
-            return match.players.sorted { $0.finalScore > $1.finalScore }
+            return summary.players.sorted { $0.finalScore > $1.finalScore }
         } else {
             // For other games: keep original order
-            return match.players
+            return summary.players
         }
     }
     
@@ -208,7 +208,7 @@ struct MatchCard: View {
         let calendar = Calendar.current
         let now = Date()
         
-        let components = calendar.dateComponents([.day, .hour, .minute], from: match.timestamp, to: now)
+        let components = calendar.dateComponents([.day, .hour, .minute], from: summary.timestamp, to: now)
         
         if let days = components.day, days > 0 {
             return "\(days)d ago"
@@ -223,7 +223,7 @@ struct MatchCard: View {
 
     /// Resolve a cover image name for this match's game using common naming patterns
     private var resolvedCoverImageName: String? {
-        let titleKey = match.gameName
+        let titleKey = summary.gameName
         let candidates: [String] = [
             "game-cover/\(titleKey)",
             titleKey,
@@ -244,34 +244,58 @@ struct MatchCard: View {
 // MARK: - Preview
 
 #Preview {
+    let winnerId = UUID()
+    
     VStack(spacing: 16) {
-        MatchCard(match: MatchResult.mock301)
+        MatchCard(summary: MatchSummary(
+            gameType: "301",
+            gameName: "301",
+            players: [
+                MatchPlayer.forSummary(
+                    id: winnerId,
+                    displayName: "John Doe",
+                    nickname: "johndoe",
+                    avatarURL: "avatar1",
+                    isGuest: false,
+                    finalScore: 0,
+                    legsWon: 1
+                ),
+                MatchPlayer.forSummary(
+                    id: UUID(),
+                    displayName: "Jane Smith",
+                    nickname: "janesmith",
+                    avatarURL: "avatar2",
+                    isGuest: false,
+                    finalScore: 150,
+                    legsWon: 0
+                )
+            ],
+            winnerId: winnerId,
+            timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
+            duration: 180
+        ))
         
-        MatchCard(match: MatchResult(
+        MatchCard(summary: MatchSummary(
             gameType: "501",
             gameName: "501",
             players: [
-                MatchPlayer(
+                MatchPlayer.forSummary(
                     id: UUID(),
                     displayName: "Bob Smith",
                     nickname: "bobsmith",
                     avatarURL: "avatar2",
                     isGuest: false,
                     finalScore: 0,
-                    startingScore: 501,
-                    totalDartsThrown: 24,
-                    turns: []
+                    legsWon: 1
                 ),
-                MatchPlayer(
+                MatchPlayer.forSummary(
                     id: UUID(),
                     displayName: "Alice Jones",
                     nickname: "alicej",
                     avatarURL: "avatar3",
                     isGuest: false,
                     finalScore: 888,
-                    startingScore: 501,
-                    totalDartsThrown: 24,
-                    turns: []
+                    legsWon: 0
                 )
             ],
             winnerId: UUID(),

@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 current-context-phase-10-playerchallengecard-declined-state
 
@@ -11,7 +9,7 @@ It supports:
 - **Local games**: players score together in the same room on one device
 - **Remote matches**: matches played from different locations using a server-authoritative flow
 
-This context is for a **single tightly scoped Phase 9 task**:
+This context is for a **single tightly scoped Phase 10 task**:
 adding a new **declined** presentation state to `PlayerChallengeCard` for the challenger.
 
 ---

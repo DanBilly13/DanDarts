@@ -984,7 +984,8 @@ struct RemoteGameplayView: View {
                             },
                             matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
                             legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
-                            matchId: completedMatchId
+                            matchId: completedMatchId,
+                            matchResult: nil
                         ))
                     }
                 }

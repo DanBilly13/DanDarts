@@ -14,7 +14,8 @@ class MatchHistoryService: ObservableObject {
     
     // MARK: - Published Properties
     
-    @Published var matches: [MatchResult] = []
+    @Published var summaries: [MatchSummary] = []  // NEW: Lightweight summaries for list
+    @Published var matches: [MatchResult] = []      // DEPRECATED: Will be removed
     @Published var isLoading: Bool = false
     @Published var lastLoadedTime: Date?
     @Published var loadError: String?
@@ -26,6 +27,9 @@ class MatchHistoryService: ObservableObject {
     private let remoteMatchAdapter = RemoteMatchAdapter()
     private let supabaseService = SupabaseService.shared
     private var cancellables = Set<AnyCancellable>()
+    
+    // Detail cache for lazy loading
+    private var detailCache: [UUID: MatchResult] = [:]
     
     // MARK: - Computed Properties
     
@@ -46,10 +50,16 @@ class MatchHistoryService: ObservableObject {
     private func setupNotificationListeners() {
         // Listen for match completed notifications
         NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))
-            .sink { [weak self] _ in
+            .sink { [weak self] notification in
                 guard let self = self else { return }
+                
+                // Invalidate cache for new match
+                if let matchId = notification.userInfo?["matchId"] as? UUID {
+                    self.invalidateDetailCache(matchId: matchId)
+                }
+                
                 Task {
-                    await self.refreshMatchesInBackground()
+                    await self.refreshSummariesInBackground()
                 }
             }
             .store(in: &cancellables)
@@ -362,5 +372,99 @@ class MatchHistoryService: ObservableObject {
         // }
         
         return result
+    }
+    
+    // MARK: - Summary Loading (Phase 11: Lazy Loading)
+    
+    /// Refresh match summaries (lightweight, no turn data)
+    func refreshSummaries(userId: UUID) async {
+        isLoading = true
+        loadError = nil
+        
+        do {
+            let allSummaries = try await matchesService.loadAllMatchSummaries(userId: userId)
+            summaries = allSummaries
+            lastLoadedTime = Date()
+            isLoading = false
+            
+            // Clear detail cache on refresh
+            detailCache.removeAll()
+            
+            print("✅ Refreshed \(summaries.count) match summaries")
+        } catch {
+            isLoading = false
+            loadError = "Couldn't sync with cloud"
+            print("❌ Refresh summaries error: \(error)")
+        }
+    }
+    
+    /// Refresh summaries in background (called on match completed notification)
+    private func refreshSummariesInBackground() async {
+        guard !isLoading else {
+            print("⏭️ Skipping background summary refresh - already loading")
+            return
+        }
+        
+        print("🔔 Match completed - refreshing summaries in background")
+        
+        guard let userId = AuthService.shared.currentUser?.id else {
+            print("⚠️ No current user for background refresh")
+            return
+        }
+        
+        do {
+            let allSummaries = try await matchesService.loadAllMatchSummaries(userId: userId)
+            summaries = allSummaries
+            lastLoadedTime = Date()
+            
+            print("✅ Background summary refresh complete: \(summaries.count) summaries")
+        } catch {
+            print("⚠️ Background summary refresh failed: \(error)")
+        }
+    }
+    
+    // MARK: - Detail Loading (Lazy with Cache)
+    
+    /// Load full match detail by ID (with caching)
+    func loadFullDetail(matchId: UUID) async throws -> MatchResult {
+        // Check cache first
+        if let cached = detailCache[matchId] {
+            print("✅ [Cache Hit] Returning cached detail for \(matchId.uuidString.prefix(8))")
+            return cached
+        }
+        
+        print("🔍 [Cache Miss] Loading full detail for \(matchId.uuidString.prefix(8))")
+        
+        // Try device-stored first (instant)
+        let localMatches = storageManager.loadMatches()
+        if let localMatch = localMatches.first(where: { $0.id == matchId }) {
+            detailCache[matchId] = localMatch
+            return localMatch
+        }
+        
+        // Try Supabase
+        if let match = try await matchesService.loadMatchById(matchId) {
+            detailCache[matchId] = match
+            return match
+        }
+        
+        throw NSError(domain: "MatchHistoryService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Match not found"])
+    }
+    
+    /// Seed the cache with a pre-loaded MatchResult (called from End Game path)
+    func seedDetailCache(match: MatchResult) {
+        detailCache[match.id] = match
+        print("🌱 [Cache Seed] Cached detail for \(match.id.uuidString.prefix(8)) from End Game")
+    }
+    
+    /// Invalidate detail cache
+    func invalidateDetailCache(matchId: UUID? = nil) {
+        if let matchId = matchId {
+            detailCache.removeValue(forKey: matchId)
+            print("🗑️ Invalidated cache for match \(matchId.uuidString.prefix(8))")
+        } else {
+            detailCache.removeAll()
+            print("🗑️ Cleared entire detail cache")
+        }
     }
 }

@@ -202,6 +202,30 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
             legsWon: legsWon
         )
     }
+    
+    /// Create a summary-level MatchPlayer for list display (no turn data)
+    static func forSummary(
+        id: UUID,
+        displayName: String,
+        nickname: String,
+        avatarURL: String?,
+        isGuest: Bool,
+        finalScore: Int,
+        legsWon: Int = 0
+    ) -> MatchPlayer {
+        return MatchPlayer(
+            id: id,
+            displayName: displayName,
+            nickname: nickname,
+            avatarURL: avatarURL,
+            isGuest: isGuest,
+            finalScore: finalScore,
+            startingScore: 0,           // Default for summary
+            totalDartsThrown: 0,        // Default for summary
+            turns: [],                  // Empty for summary
+            legsWon: legsWon
+        )
+    }
 }
 
 // MARK: - Match Turn Model

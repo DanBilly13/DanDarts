@@ -33,7 +33,7 @@ enum Destination: Hashable {
     case remoteGameplay(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID)
     
     // End game
-    case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?)
+    case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?, matchResult: MatchResult?)
     
     // Note: We can't include closures in Hashable, so gameEnd will need special handling
     static func == (lhs: Destination, rhs: Destination) -> Bool {
@@ -230,7 +230,7 @@ class Router: ObservableObject {
         case .remoteGameplay:
             EmptyView() // Requires selectedTab binding - handled in MainTabView instead
             
-        case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId):
+        case .gameEnd(let game, let winner, let players, let onPlayAgain, let onBackToGames, let matchFormat, let legsWon, let matchId, let matchResult):
             GameEndView(
                 game: game,
                 winner: winner,
@@ -241,7 +241,7 @@ class Router: ObservableObject {
                 matchFormat: matchFormat,
                 legsWon: legsWon,
                 matchId: matchId,
-                matchResult: nil // Router doesn't have access to savedMatchResult
+                matchResult: matchResult
             )
         }
     }

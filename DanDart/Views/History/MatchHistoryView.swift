@@ -17,7 +17,7 @@ struct MatchHistoryView: View {
     
     @State private var selectedFilter: GameFilter = .all
     @State private var searchText: String = ""
-    @State private var filteredMatches: [MatchResult] = []
+    @State private var filteredSummaries: [MatchSummary] = []
     @FocusState private var isSearchFieldFocused: Bool
     @State private var supabaseMatchIds: Set<UUID> = [] // Track which matches came from Supabase
     
@@ -49,22 +49,17 @@ struct MatchHistoryView: View {
     
     // Update filtered matches based on current state
     private func updateFilteredMatches() {
-        var filtered = historyService.matches
+        var filtered = historyService.summaries
         
         // TEMPORARY: Filter out local matches if toggle is off
         if !showLocalMatches {
             // Hide matches that came from local storage (not from Supabase)
             let beforeCount = filtered.count
-            filtered = filtered.filter { match in
+            filtered = filtered.filter { summary in
                 // Keep only matches that came from Supabase
-                let isFromSupabase = supabaseMatchIds.contains(match.id)
-                // if !isFromSupabase {
-                //     print("  🔘 Hiding local match: \(match.id)")
-                // }
+                let isFromSupabase = supabaseMatchIds.contains(summary.id)
                 return isFromSupabase
             }
-            // let afterCount = filtered.count
-            // print("🔘 Toggle OFF: \(beforeCount) → \(afterCount) matches (hid \(beforeCount - afterCount) local-only matches)")
         }
         
         // Apply game type filter (only when not searching)
@@ -74,19 +69,19 @@ struct MatchHistoryView: View {
         
         // Apply search filter
         if !searchText.isEmpty {
-            filtered = filtered.filter { match in
+            filtered = filtered.filter { summary in
                 // Search in game name
-                if match.gameName.localizedCaseInsensitiveContains(searchText) {
+                if summary.gameName.localizedCaseInsensitiveContains(searchText) {
                     return true
                 }
                 
                 // Search in player names
-                if match.players.contains(where: { $0.displayName.localizedCaseInsensitiveContains(searchText) }) {
+                if summary.players.contains(where: { $0.displayName.localizedCaseInsensitiveContains(searchText) }) {
                     return true
                 }
                 
                 // Search in date (use cached formatter)
-                let dateString = dateFormatter.string(from: match.timestamp)
+                let dateString = dateFormatter.string(from: summary.timestamp)
                 if dateString.localizedCaseInsensitiveContains(searchText) {
                     return true
                 }
@@ -95,7 +90,7 @@ struct MatchHistoryView: View {
             }
         }
         
-        filteredMatches = filtered
+        filteredSummaries = filtered
     }
     
     var body: some View {
@@ -121,7 +116,7 @@ struct MatchHistoryView: View {
                     // print("🔄 [MatchHistoryView] Data is stale, refreshing...")
                     Task {
                         guard let userId = authService.currentUser?.id else { return }
-                        await historyService.refreshMatches(userId: userId)
+                        await historyService.refreshSummaries(userId: userId)
                     }
                 } else {
                     // print("✅ [MatchHistoryView] Data is fresh, skipping refresh")
@@ -129,9 +124,9 @@ struct MatchHistoryView: View {
                 updateFilteredMatches()
                 
                 // Log match history viewed event
-                analytics.logMatchHistoryViewed(totalMatches: historyService.matches.count)
+                analytics.logMatchHistoryViewed(totalMatches: historyService.summaries.count)
             }
-            .onChange(of: historyService.matches) { _, _ in
+            .onChange(of: historyService.summaries) { _, _ in
                 updateFilteredMatches()
             }
             .onChange(of: historyService.lastLoadedTime) { _, _ in
@@ -249,7 +244,7 @@ struct MatchHistoryView: View {
     
     @ViewBuilder
     private var contentView: some View {
-        if filteredMatches.isEmpty {
+        if filteredSummaries.isEmpty {
             VStack(spacing: 0) {
                 filterButtonsView
                     .padding(.horizontal, 16)
@@ -298,22 +293,13 @@ struct MatchHistoryView: View {
                 
                 // Match list
                 LazyVStack(spacing: 12) {
-                    ForEach(filteredMatches) { match in
-                        NavigationLink(value: match) {
-                            matchRowView(match)
+                    ForEach(filteredSummaries) { summary in
+                        NavigationLink(value: summary.id) {
+                            matchRowView(summary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .onTapGesture {
-                            // print("🔍 [MatchHistoryView] NavigationLink tapped")
-                            // print("🔍 [MatchHistoryView] Match ID: \(match.id)")
-                            // print("🔍 [MatchHistoryView] Match gameName: \(match.gameName)")
-                            // print("🔍 [MatchHistoryView] Match players count: \(match.players.count)")
-                            // if !match.players.isEmpty {
-                            //     print("🔍 [MatchHistoryView] Player 0: \(match.players[0].displayName), turns: \(match.players[0].turns.count)")
-                            // }
-                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -322,13 +308,13 @@ struct MatchHistoryView: View {
             .padding(.top, 16)
             .refreshable {
                 guard let userId = authService.currentUser?.id else { return }
-                await historyService.refreshMatches(userId: userId)
+                await historyService.refreshSummaries(userId: userId)
             }
         }
     }
 
-    private func matchRowView(_ match: MatchResult) -> some View {
-        MatchCard(match: match)
+    private func matchRowView(_ summary: MatchSummary) -> some View {
+        MatchCard(summary: summary)
     }
     // Search overlay (Liquid Glass pattern)
     private var searchOverlay: some View {
@@ -357,7 +343,7 @@ struct MatchHistoryView: View {
                     Spacer()
                 }
             } else {
-                if filteredMatches.isEmpty {
+                if filteredSummaries.isEmpty {
                     // No results
                     VStack(spacing: 16) {
                         Spacer()
@@ -380,9 +366,9 @@ struct MatchHistoryView: View {
                     // Results list
                     ScrollView {
                         LazyVStack(spacing: 12) {
-                            ForEach(filteredMatches) { match in
-                                NavigationLink(value: match) {
-                                    matchRowView(match)
+                            ForEach(filteredSummaries) { summary in
+                                NavigationLink(value: summary.id) {
+                                    matchRowView(summary)
                                 }
                                 .buttonStyle(.plain)
                                 .simultaneousGesture(TapGesture().onEnded {

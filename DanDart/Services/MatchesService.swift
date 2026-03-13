@@ -565,6 +565,7 @@ class MatchesService: ObservableObject {
 
     /// User profile data for match player reconstruction
     private struct UserProfile {
+        let id: UUID
         let displayName: String
         let nickname: String
         let avatarURL: String?
@@ -594,6 +595,7 @@ class MatchesService: ObservableObject {
             let avatarURL = r["avatar_url"] as? String
             
             map[id] = UserProfile(
+                id: id,
                 displayName: displayName,
                 nickname: nickname,
                 avatarURL: avatarURL
@@ -1376,5 +1378,479 @@ enum MatchSyncError: LocalizedError {
         case .notAuthenticated:
             return "You must be signed in to sync matches"
         }
+    }
+}
+
+// MARK: - Summary Loading (Phase 11: Lazy Loading)
+
+extension MatchesService {
+    
+    /// Load device-stored match summaries (convert from local MatchResult)
+    func loadDeviceStoredSummaries() -> [MatchSummary] {
+        let fullMatches = MatchStorageManager.shared.loadMatches()
+        return fullMatches.map { convertToSummary($0, source: "device_stored") }
+    }
+    
+    /// Convert MatchResult to MatchSummary
+    private func convertToSummary(_ match: MatchResult, source: String) -> MatchSummary {
+        let summaryPlayers = match.players.map { player in
+            MatchPlayer.forSummary(
+                id: player.id,
+                displayName: player.displayName,
+                nickname: player.nickname,
+                avatarURL: player.avatarURL,
+                isGuest: player.isGuest,
+                finalScore: player.finalScore,
+                legsWon: player.legsWon
+            )
+        }
+        
+        var metadata = match.metadata ?? [:]
+        metadata["source"] = source
+        
+        return MatchSummary(
+            id: match.id,
+            gameType: match.gameType,
+            gameName: match.gameName,
+            players: summaryPlayers,
+            winnerId: match.winnerId,
+            timestamp: match.timestamp,
+            duration: match.duration,
+            matchFormat: match.matchFormat,
+            totalLegsPlayed: match.totalLegsPlayed,
+            metadata: metadata
+        )
+    }
+    
+    /// Load Supabase local match summaries (no match_throws query)
+    func loadSupabaseLocalSummaries(userId: UUID) async throws -> [MatchSummary] {
+        do {
+            // Query matches where user participated (via match_players table)
+            let response = try await supabaseService.client
+                .from("match_players")
+                .select("match_id")
+                .eq("player_user_id", value: userId.uuidString.lowercased())
+                .execute()
+            
+            guard let participantData = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+                print("❌ Failed to parse match_players response")
+                return []
+            }
+            
+            let matchIds = participantData.compactMap { dict -> String? in
+                dict["match_id"] as? String
+            }
+            
+            if matchIds.isEmpty {
+                print("📊 User has no match participations")
+                return []
+            }
+            
+            // Now fetch the actual matches
+            let matchesResponse = try await supabaseService.client
+                .from("matches")
+                .select("id, game_type, game_name, winner_id, timestamp, duration, players, match_format, total_legs_played, metadata, match_mode")
+                .in("id", value: matchIds)
+                .eq("match_mode", value: "local")
+                .order("timestamp", ascending: false)
+                .execute()
+            
+            guard let jsonArray = try? JSONSerialization.jsonObject(with: matchesResponse.data) as? [[String: Any]] else {
+                print("❌ Failed to parse Supabase local summaries response")
+                return []
+            }
+            
+            print("📊 Supabase local summaries query returned \(jsonArray.count) matches for user")
+            
+            var summaries: [MatchSummary] = []
+            var skippedCount = 0
+            
+            for (index, json) in jsonArray.enumerated() {
+                print("🔍 [Summary \(index+1)/\(jsonArray.count)] Processing match...")
+                
+                guard let idString = json["id"] as? String else {
+                    print("❌ [Summary \(index+1)] Missing 'id' field")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let id = UUID(uuidString: idString) else {
+                    print("❌ [Summary \(index+1)] Invalid UUID: \(idString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let gameType = json["game_type"] as? String else {
+                    print("❌ [Summary \(index+1)] Missing 'game_type' for match \(idString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let gameName = json["game_name"] as? String else {
+                    print("❌ [Summary \(index+1)] Missing 'game_name' for match \(idString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let winnerIdString = json["winner_id"] as? String else {
+                    print("❌ [Summary \(index+1)] Missing 'winner_id' for match \(idString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let winnerId = UUID(uuidString: winnerIdString) else {
+                    print("❌ [Summary \(index+1)] Invalid winner UUID: \(winnerIdString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let timestampString = json["timestamp"] as? String else {
+                    print("❌ [Summary \(index+1)] Missing 'timestamp' for match \(idString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                guard let duration = json["duration"] as? Int else {
+                    print("❌ [Summary \(index+1)] Missing 'duration' for match \(idString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                // Parse timestamp (try with fractional seconds first, then without)
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                var timestamp = formatter.date(from: timestampString)
+                
+                if timestamp == nil {
+                    // Try without fractional seconds
+                    formatter.formatOptions = [.withInternetDateTime]
+                    timestamp = formatter.date(from: timestampString)
+                }
+                
+                guard let timestamp = timestamp else {
+                    print("❌ [Summary \(index+1)] Failed to parse timestamp: \(timestampString)")
+                    skippedCount += 1
+                    continue
+                }
+                
+                // Parse players (basic info only, no turns)
+                // Note: User participation already verified via match_players query
+                let summaryPlayers: [MatchPlayer]
+                
+                print("🔍 [Summary \(index+1)] Parsing players...")
+                print("🔍 [Summary \(index+1)] Players type: \(type(of: json["players"]))")
+                
+                if let playersString = json["players"] as? String {
+                    print("🔍 [Summary \(index+1)] Players is String, decoding...")
+                    guard let playersJsonData = playersString.data(using: .utf8) else {
+                        print("❌ [Summary \(index+1)] Failed to convert players string to data")
+                        skippedCount += 1
+                        continue
+                    }
+                    
+                    let decoder = JSONDecoder()
+                    do {
+                        let basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                        print("✅ [Summary \(index+1)] Decoded \(basicPlayers.count) players from string")
+                        
+                        // Convert to summary players (no turns)
+                        summaryPlayers = basicPlayers.map { player in
+                            MatchPlayer.forSummary(
+                                id: player.id,
+                                displayName: player.displayName,
+                                nickname: player.nickname,
+                                avatarURL: player.avatarURL,
+                                isGuest: player.isGuest,
+                                finalScore: player.finalScore,
+                                legsWon: player.legsWon
+                            )
+                        }
+                    } catch {
+                        print("❌ [Summary \(index+1)] Failed to decode players from string: \(error)")
+                        skippedCount += 1
+                        continue
+                    }
+                } else if let playersArray = json["players"] as? [[String: Any]] {
+                    print("🔍 [Summary \(index+1)] Players is Array, decoding...")
+                    do {
+                        let playersJsonData = try JSONSerialization.data(withJSONObject: playersArray)
+                        let decoder = JSONDecoder()
+                        let basicPlayers = try decoder.decode([MatchPlayer].self, from: playersJsonData)
+                        print("✅ [Summary \(index+1)] Decoded \(basicPlayers.count) players from array")
+                        
+                        summaryPlayers = basicPlayers.map { player in
+                            MatchPlayer.forSummary(
+                                id: player.id,
+                                displayName: player.displayName,
+                                nickname: player.nickname,
+                                avatarURL: player.avatarURL,
+                                isGuest: player.isGuest,
+                                finalScore: player.finalScore,
+                                legsWon: player.legsWon
+                            )
+                        }
+                    } catch {
+                        print("❌ [Summary \(index+1)] Failed to decode players from array: \(error)")
+                        skippedCount += 1
+                        continue
+                    }
+                } else {
+                    print("❌ [Summary \(index+1)] Players field is neither String nor Array, skipping")
+                    print("❌ [Summary \(index+1)] Players value: \(String(describing: json["players"]))")
+                    skippedCount += 1
+                    continue
+                }
+                
+                let matchFormat = json["match_format"] as? Int ?? 1
+                let totalLegsPlayed = json["total_legs_played"] as? Int ?? 1
+                
+                var metadata: [String: String]? = nil
+                if let metadataDict = json["metadata"] as? [String: Any],
+                   let gameMetadata = metadataDict["game_metadata"] as? [String: Any] {
+                    metadata = gameMetadata.compactMapValues { $0 as? String }
+                }
+                metadata?["source"] = "supabase_local"
+                
+                let summary = MatchSummary(
+                    id: id,
+                    gameType: gameType,
+                    gameName: gameName,
+                    players: summaryPlayers,
+                    winnerId: winnerId,
+                    timestamp: timestamp,
+                    duration: TimeInterval(duration),
+                    matchFormat: matchFormat,
+                    totalLegsPlayed: totalLegsPlayed,
+                    metadata: metadata
+                )
+                
+                print("✅ [Summary \(index+1)] Successfully created summary for match \(idString)")
+                summaries.append(summary)
+            }
+            
+            print("📊 Summary parsing complete:")
+            print("   ✅ Successfully loaded: \(summaries.count)")
+            print("   ❌ Skipped: \(skippedCount)")
+            print("   📝 Total processed: \(jsonArray.count)")
+            
+            return summaries
+            
+        } catch {
+            print("❌ Load Supabase local summaries failed: \(error)")
+            throw MatchSyncError.loadFailed
+        }
+    }
+    
+    /// Load Supabase remote match summaries (no match_throws query)
+    func loadSupabaseRemoteSummaries(userId: UUID) async throws -> [MatchSummary] {
+        do {
+            struct RemoteMatchResponse: Decodable {
+                let id: UUID
+                let game_type: String
+                let game_name: String
+                let match_format: Int
+                let challenger_id: UUID
+                let receiver_id: UUID
+                let player_scores: [String: Int]?
+                let winner_id: UUID?
+                let ended_at: String?
+                let created_at: String
+                let metadata: [String: [String: String]]?
+            }
+            
+            let response: [RemoteMatchResponse] = try await supabaseService.client
+                .from("matches")
+                .select()
+                .eq("match_mode", value: "remote")
+                .eq("remote_status", value: "completed")
+                .or("challenger_id.eq.\(userId.uuidString),receiver_id.eq.\(userId.uuidString)")
+                .order("ended_at", ascending: false)
+                .execute()
+                .value
+            
+            print("📡 Found \(response.count) completed remote matches")
+            
+            var summaries: [MatchSummary] = []
+            
+            // Collect all unique user IDs
+            let userIds = Set(response.flatMap { matchData in
+                [matchData.challenger_id, matchData.receiver_id]
+            })
+            
+            // Load all user profiles in one batch
+            let userProfiles = try await loadUserProfiles(userIds: Array(userIds))
+            
+            for matchData in response {
+                // Get user data for challenger and receiver
+                guard let challenger = userProfiles[matchData.challenger_id],
+                      let receiver = userProfiles[matchData.receiver_id] else {
+                    continue
+                }
+                
+                // Parse dates
+                let dateFormatter = ISO8601DateFormatter()
+                dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                
+                guard let endedAtString = matchData.ended_at,
+                      let endedAt = dateFormatter.date(from: endedAtString) else {
+                    continue
+                }
+                
+                // Build summary players from player_scores
+                let summaryPlayers: [MatchPlayer]
+                if let playerScores = matchData.player_scores {
+                    summaryPlayers = [
+                        MatchPlayer.forSummary(
+                            id: challenger.id,
+                            displayName: challenger.displayName,
+                            nickname: challenger.nickname,
+                            avatarURL: challenger.avatarURL,
+                            isGuest: false,
+                            finalScore: playerScores[challenger.id.uuidString] ?? 0,
+                            legsWon: 0
+                        ),
+                        MatchPlayer.forSummary(
+                            id: receiver.id,
+                            displayName: receiver.displayName,
+                            nickname: receiver.nickname,
+                            avatarURL: receiver.avatarURL,
+                            isGuest: false,
+                            finalScore: playerScores[receiver.id.uuidString] ?? 0,
+                            legsWon: 0
+                        )
+                    ]
+                } else {
+                    summaryPlayers = [
+                        MatchPlayer.forSummary(
+                            id: challenger.id,
+                            displayName: challenger.displayName,
+                            nickname: challenger.nickname,
+                            avatarURL: challenger.avatarURL,
+                            isGuest: false,
+                            finalScore: 0,
+                            legsWon: 0
+                        ),
+                        MatchPlayer.forSummary(
+                            id: receiver.id,
+                            displayName: receiver.displayName,
+                            nickname: receiver.nickname,
+                            avatarURL: receiver.avatarURL,
+                            isGuest: false,
+                            finalScore: 0,
+                            legsWon: 0
+                        )
+                    ]
+                }
+                
+                var metadata = matchData.metadata?["game_metadata"] ?? [:]
+                metadata["source"] = "remote"
+                metadata["isRemote"] = "true"
+                
+                let summary = MatchSummary(
+                    id: matchData.id,
+                    gameType: matchData.game_type,
+                    gameName: matchData.game_name,
+                    players: summaryPlayers,
+                    winnerId: matchData.winner_id ?? matchData.challenger_id,
+                    timestamp: endedAt,
+                    duration: 0,
+                    matchFormat: matchData.match_format,
+                    totalLegsPlayed: 1,
+                    metadata: metadata
+                )
+                
+                summaries.append(summary)
+            }
+            
+            print("✅ Loaded \(summaries.count) remote match summaries")
+            return summaries
+            
+        } catch {
+            print("❌ Load remote summaries failed: \(error)")
+            throw MatchSyncError.loadFailed
+        }
+    }
+    
+    /// Load all match summaries from all three sources with completeness scoring merge
+    func loadAllMatchSummaries(userId: UUID) async throws -> [MatchSummary] {
+        let deviceStored = loadDeviceStoredSummaries()
+        let supabaseLocal = try await loadSupabaseLocalSummaries(userId: userId)
+        let supabaseRemote = try await loadSupabaseRemoteSummaries(userId: userId)
+        
+        return mergeSummaries(
+            deviceStored: deviceStored,
+            supabaseLocal: supabaseLocal,
+            supabaseRemote: supabaseRemote
+        )
+    }
+    
+    /// Merge summaries with completeness scoring
+    private func mergeSummaries(
+        deviceStored: [MatchSummary],
+        supabaseLocal: [MatchSummary],
+        supabaseRemote: [MatchSummary]
+    ) -> [MatchSummary] {
+        var summariesById: [UUID: MatchSummary] = [:]
+        
+        let allSummaries = deviceStored + supabaseLocal + supabaseRemote
+        
+        for summary in allSummaries {
+            if let existing = summariesById[summary.id] {
+                // Duplicate found - use completeness scoring
+                let existingScore = displayCompletenessScore(existing)
+                let newScore = displayCompletenessScore(summary)
+                
+                if newScore > existingScore {
+                    summariesById[summary.id] = summary
+                } else if newScore == existingScore {
+                    // Tie-break by source priority
+                    summariesById[summary.id] = preferredBySource(existing, summary)
+                }
+            } else {
+                summariesById[summary.id] = summary
+            }
+        }
+        
+        return Array(summariesById.values).sorted { $0.timestamp > $1.timestamp }
+    }
+    
+    /// Score a summary based on display completeness (card-level needs only)
+    private func displayCompletenessScore(_ summary: MatchSummary) -> Int {
+        var score = 0
+        
+        // Valid players present
+        if !summary.players.isEmpty { score += 10 }
+        
+        // All players have display names
+        if summary.players.allSatisfy({ !$0.displayName.isEmpty }) { score += 5 }
+        
+        // All players have nicknames
+        if summary.players.allSatisfy({ !$0.nickname.isEmpty }) { score += 3 }
+        
+        // All players have avatar URLs
+        if summary.players.allSatisfy({ $0.avatarURL != nil && !$0.avatarURL!.isEmpty }) { score += 3 }
+        
+        // Valid winner ID
+        if summary.winner != nil { score += 5 }
+        
+        // Valid final scores
+        if summary.players.allSatisfy({ $0.finalScore >= 0 }) { score += 2 }
+        
+        // Valid match format / legs data
+        if summary.matchFormat > 0 && summary.totalLegsPlayed > 0 { score += 2 }
+        
+        return score
+    }
+    
+    /// Tie-break by source priority: remote > local > device-stored
+    private func preferredBySource(_ a: MatchSummary, _ b: MatchSummary) -> MatchSummary {
+        let aSource = a.metadata?["source"] ?? "unknown"
+        let bSource = b.metadata?["source"] ?? "unknown"
+        
+        let priority = ["remote": 3, "supabase_local": 2, "device_stored": 1]
+        let aPriority = priority[aSource] ?? 0
+        let bPriority = priority[bSource] ?? 0
+        
+        return aPriority >= bPriority ? a : b
     }
 }
