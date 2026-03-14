@@ -578,6 +578,7 @@ struct RemoteLobbyView: View {
                         .foregroundColor(AppColor.textSecondary)
                 }
                 .opacity(0.7)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 
             case .connected:
                 HStack(spacing: 6) {
@@ -588,6 +589,7 @@ struct RemoteLobbyView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(AppColor.interactiveSecondaryBackground)
                 }
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 
             case .failed, .disconnected:
                 HStack(spacing: 6) {
@@ -599,11 +601,13 @@ struct RemoteLobbyView: View {
                         .foregroundColor(AppColor.textSecondary)
                 }
                 .opacity(0.6)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 
             case .idle, .ended:
                 EmptyView()
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: voiceChatService.connectionState)
     }
     
     /// Voice control button - top-left toolbar
@@ -640,8 +644,11 @@ struct RemoteLobbyView: View {
                 }
             }
             .font(.system(size: 20))
+            .contentTransition(.symbolEffect(.replace))
         }
         .disabled(voiceChatService.connectionState != VoiceSessionState.connected)
+        .animation(.easeInOut(duration: 0.2), value: voiceChatService.connectionState)
+        .animation(.easeInOut(duration: 0.2), value: voiceChatService.muteState)
     }
     
     // MARK: - Centralized Refresh

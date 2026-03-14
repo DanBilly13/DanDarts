@@ -1150,8 +1150,11 @@ extension RemoteGameplayView {
                 }
             }
             .font(.system(size: 20))
+            .contentTransition(.symbolEffect(.replace))
         }
         .disabled(voiceChatService.connectionState != VoiceSessionState.connected)
+        .animation(.easeInOut(duration: 0.2), value: voiceChatService.connectionState)
+        .animation(.easeInOut(duration: 0.2), value: voiceChatService.muteState)
     }
 }
 
