@@ -12,6 +12,7 @@ struct MainTabView: View {
     @EnvironmentObject private var notificationService: NotificationService
     @StateObject private var friendsService = FriendsService()
     @StateObject private var remoteMatchService = RemoteMatchService()
+    @StateObject private var voiceChatService = VoiceChatService.shared
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
@@ -260,6 +261,7 @@ struct MainTabView: View {
                     .environmentObject(authService)
                     .environmentObject(friendsService)
                     .environmentObject(remoteMatchService)
+                    .environmentObject(voiceChatService)
             }
             .navigationDestination(for: UUID.self) { matchId in
                 MatchDetailLoadingView(matchId: matchId)
@@ -270,6 +272,7 @@ struct MainTabView: View {
         .environmentObject(authService)
         .environmentObject(friendsService)
         .environmentObject(remoteMatchService)
+        .environmentObject(voiceChatService)
         .sheet(item: $inviteTokenToClaim, onDismiss: {
             PendingInviteStore.shared.clearToken()
         }) { token in

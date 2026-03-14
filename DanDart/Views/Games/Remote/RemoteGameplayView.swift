@@ -41,6 +41,7 @@ struct RemoteGameplayView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var router: Router
     @EnvironmentObject var remoteMatchService: RemoteMatchService
+    @EnvironmentObject var voiceChatService: VoiceChatService
     
     // MARK: - Live Match Data
     
@@ -219,6 +220,21 @@ struct RemoteGameplayView: View {
         dbgMatchSnapshot("APPEAR")
         print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
         
+        // Task 13: Validate voice session matches current match
+        if !voiceChatService.isSessionValid(for: matchId) {
+            print("⚠️ [RemoteGameplayView] Voice session mismatch, restarting for match: \(matchId.uuidString.prefix(8))")
+            Task {
+                do {
+                    try await voiceChatService.startSession(for: matchId)
+                    print("✅ [RemoteGameplayView] Voice session restarted")
+                } catch {
+                    print("⚠️ [RemoteGameplayView] Failed to restart voice session: \(error)")
+                }
+            }
+        } else {
+            print("✅ [RemoteGameplayView] Voice session valid for current match")
+        }
+        
         // Wire up syncManager dependencies
         syncManager.remoteMatchService = remoteMatchService
         syncManager.gameViewModel = gameViewModel
@@ -311,10 +327,17 @@ struct RemoteGameplayView: View {
             print("👋 [RemoteGameplayView] onDisappear - skip exitRemoteFlow (navigating to GameEnd)")
             // Cancel reveal timer
             revealState.cancelReveal()
+            // Task 13: Voice session persists to GameEnd, don't end it here
             return
         }
         
         print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
+        
+        // Task 14: End voice session when exiting remote flow
+        Task {
+            await voiceChatService.endSession()
+            print("✅ [RemoteGameplayView] Voice session ended on flow exit")
+        }
         
         // Cancel reveal timer
         revealState.cancelReveal()
@@ -840,6 +863,11 @@ struct RemoteGameplayView: View {
         return gameplayContent(overlayState, using: m, adapter: adapter)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Task 12: Voice control button (top-left)
+                ToolbarItem(placement: .topBarLeading) {
+                    voiceControlButton
+                }
+                
                 ToolbarItem(placement: .principal) {
                     Text(navigationTitle(using: m))
                         .font(.headline)
@@ -1082,6 +1110,48 @@ struct RemoteGameplayView: View {
                 print("📦 [LastVisit] Cleared (nil)")
             }
         }
+    }
+}
+
+// MARK: - Voice UI Components (Task 12)
+
+extension RemoteGameplayView {
+    /// Voice control button - top-left toolbar
+    private var voiceControlButton: some View {
+        Button {
+            // Task 12: Toggle mute
+            Task {
+                await voiceChatService.toggleMute()
+            }
+        } label: {
+            Group {
+                switch voiceChatService.connectionState {
+                case .idle, .connecting:
+                    // Show microphone icon but disabled appearance
+                    Image(systemName: "microphone")
+                        .foregroundColor(AppColor.textSecondary)
+                        .opacity(0.5)
+                    
+                case .connected:
+                    // Show mute state
+                    if voiceChatService.muteState == .muted {
+                        Image(systemName: "microphone.slash")
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    } else {
+                        Image(systemName: "microphone")
+                            .foregroundColor(AppColor.interactiveSecondaryBackground)
+                    }
+                    
+                case .failed, .disconnected, .ended:
+                    // Show unavailable state
+                    Image(systemName: "microphone.slash")
+                        .foregroundColor(AppColor.textSecondary)
+                        .opacity(0.5)
+                }
+            }
+            .font(.system(size: 20))
+        }
+        .disabled(voiceChatService.connectionState != VoiceSessionState.connected)
     }
 }
 

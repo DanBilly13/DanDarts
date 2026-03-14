@@ -270,9 +270,26 @@ struct RemoteLobbyView: View {
             Task {
                 await requestRefresh(reason: "onAppear")
             }
+            
+            // Task 13: Start voice session for this match
+            Task {
+                do {
+                    try await voiceChatService.startSession(for: match.id)
+                    print("✅ [Lobby] Voice session started for match: \(match.id.uuidString.prefix(8))")
+                } catch {
+                    print("⚠️ [Lobby] Failed to start voice session: \(error)")
+                    // Non-blocking: voice failure doesn't prevent match
+                }
+            }
         }
         .onDisappear {
             print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
+            
+            // Task 14: End voice session when leaving lobby
+            Task {
+                await voiceChatService.endSession()
+                print("✅ [Lobby] Voice session ended")
+            }
             
             // Exit remote flow to maintain correct depth tracking
             // This ensures loadMatches() runs when the entire stack is popped
