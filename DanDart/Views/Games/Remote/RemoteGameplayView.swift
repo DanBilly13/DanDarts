@@ -665,7 +665,7 @@ struct RemoteGameplayView: View {
                 Color.black.opacity(0.70)
                     .ignoresSafeArea(.container, edges: .bottom)
 
-                VStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
                     Image(systemName: overlayIconName(for: overlayState))
                         .font(.system(size: 40, weight: .medium))
                         .foregroundColor(AppColor.textSecondary)

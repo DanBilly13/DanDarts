@@ -19,6 +19,7 @@ struct RemoteLobbyView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var remoteMatchService: RemoteMatchService
+    @EnvironmentObject private var voiceChatService: VoiceChatService
     
     @State private var instanceId = UUID()
     
@@ -135,6 +136,9 @@ struct RemoteLobbyView: View {
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(AppColor.interactiveSecondaryBackground)
                             
+                            // Task 10: Voice status line
+                            voiceStatusLine
+                            
                             Text("MATCH STARTING")
                                 .font(.system(size: 32, weight: .black))
                                 .foregroundColor(AppColor.interactivePrimaryBackground)
@@ -224,6 +228,11 @@ struct RemoteLobbyView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
+            // Task 11: Voice control button (top-left)
+            ToolbarItem(placement: .topBarLeading) {
+                voiceControlButton
+            }
+            
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task {
@@ -534,6 +543,88 @@ struct RemoteLobbyView: View {
                     .foregroundColor(AppColor.interactivePrimaryBackground)
             }
         }
+    }
+    
+    // MARK: - Voice UI Components (Task 10-11)
+    
+    /// Voice status line - shows underneath "Players Ready"
+    private var voiceStatusLine: some View {
+        Group {
+            switch voiceChatService.connectionState {
+            case .connecting:
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .tint(AppColor.textSecondary)
+                    Text("Connecting voice...")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                }
+                .opacity(0.7)
+                
+            case .connected:
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColor.interactiveSecondaryBackground)
+                    Text("Voice ready")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(AppColor.interactiveSecondaryBackground)
+                }
+                
+            case .failed, .disconnected:
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColor.textSecondary)
+                    Text("Voice not available")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                }
+                .opacity(0.6)
+                
+            case .idle, .ended:
+                EmptyView()
+            }
+        }
+    }
+    
+    /// Voice control button - top-left toolbar
+    private var voiceControlButton: some View {
+        Button {
+            // Task 11: Toggle mute
+            Task {
+                await voiceChatService.toggleMute()
+            }
+        } label: {
+            Group {
+                switch voiceChatService.connectionState {
+                case .idle, .connecting:
+                    // Show microphone icon but disabled appearance
+                    Image(systemName: "microphone")
+                        .foregroundColor(AppColor.textSecondary)
+                        .opacity(0.5)
+                    
+                case .connected:
+                    // Show mute state
+                    if voiceChatService.muteState == .muted {
+                        Image(systemName: "microphone.slash")
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                    } else {
+                        Image(systemName: "microphone")
+                            .foregroundColor(AppColor.interactiveSecondaryBackground)
+                    }
+                    
+                case .failed, .disconnected, .ended:
+                    // Show unavailable state
+                    Image(systemName: "microphone.slash")
+                        .foregroundColor(AppColor.textSecondary)
+                        .opacity(0.5)
+                }
+            }
+            .font(.system(size: 20))
+        }
+        .disabled(voiceChatService.connectionState != VoiceSessionState.connected)
     }
     
     // MARK: - Centralized Refresh
