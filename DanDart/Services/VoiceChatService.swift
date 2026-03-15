@@ -277,23 +277,84 @@ class VoiceChatService: NSObject, ObservableObject {
             return
         }
         
-        // TODO: Check microphone permissions
-        // TODO: Check if this is a remote match (availability)
-        // TODO: Create WebRTC offer
-        // TODO: Publish offer to Realtime channel
+        // Check if voice is usable (permission + preference)
+        // Do NOT request permission here - that's handled by VoicePermissionManager
+        guard VoicePermissionManager.shared.isVoiceUsable else {
+            print("ℹ️ [VoiceChatService] Voice not usable - creating unavailable session")
+            print("   - Permission: \(VoicePermissionManager.shared.microphoneAuthorizationStatus)")
+            print("   - App preference: \(VoicePermissionManager.shared.isVoiceEnabledInApp)")
+            print("   - Match will continue without voice")
+            
+            let availability: VoiceAvailability = {
+                switch VoicePermissionManager.shared.microphoneAuthorizationStatus {
+                case .granted:
+                    return .systemUnavailable // App disabled
+                case .denied:
+                    return .permissionDenied
+                case .undetermined:
+                    return .systemUnavailable
+                @unknown default:
+                    return .systemUnavailable
+                }
+            }()
+            
+            let session = VoiceSession(
+                id: UUID(),
+                matchId: matchId,
+                connectionState: .idle,
+                muteState: .unmuted,
+                availability: availability,
+                createdAt: Date()
+            )
+            updateSession(session)
+            // Do NOT throw - let match flow continue without voice
+            return
+        }
         
-        // For now, create session in idle state
-        let session = VoiceSession(
+        // Create session in connecting state
+        var session = VoiceSession(
             id: UUID(),
             matchId: matchId,
-            connectionState: .idle,
+            connectionState: .connecting,
             muteState: .unmuted,
-            availability: .available, // TODO: Determine actual availability
+            availability: .available,
             createdAt: Date()
         )
         
         updateSession(session)
         print("✅ [VoiceChatService] Session created for match: \(matchId)")
+        
+        // Initialize WebRTC components
+        do {
+            // Initialize factory if needed
+            if peerConnectionFactory == nil {
+                initializePeerConnectionFactory()
+            }
+            
+            // Configure audio session
+            try configureAudioSession()
+            
+            // Create peer connection
+            try createPeerConnection()
+            
+            // Add local audio track
+            try addLocalAudioTrack()
+            
+            print("✅ [VoiceChatService] WebRTC initialized successfully")
+            
+        } catch {
+            print("❌ [VoiceChatService] Failed to initialize WebRTC: \(error)")
+            session.connectionState = .failed
+            session.lastError = error as? VoiceSessionError ?? .unknown(error)
+            updateSession(session)
+            throw error
+        }
+        
+        // Setup signalling channel (get other player ID from RemoteMatchService)
+        // For now, we'll set this up when we receive the first message
+        // The actual offer will be created by the challenger role
+        
+        print("✅ [VoiceChatService] Voice session started, waiting for signalling setup")
     }
     
     /// End the current voice session
@@ -306,9 +367,22 @@ class VoiceChatService: NSObject, ObservableObject {
         
         print("🎤 [VoiceChatService] Ending session: \(session.id)")
         
-        // TODO: Close WebRTC peer connection
-        // TODO: Send disconnect signal
-        // TODO: Clean up audio session
+        // Send disconnect signal to peer (best-effort)
+        do {
+            try await sendDisconnect(reason: .session_ended)
+        } catch {
+            print("⚠️ [VoiceChatService] Failed to send disconnect signal: \(error)")
+            // Continue cleanup even if signal fails
+        }
+        
+        // Teardown signalling channel
+        await teardownSignallingChannel()
+        
+        // Close WebRTC peer connection
+        cleanupWebRTC()
+        
+        // Deactivate audio session
+        deactivateAudioSession()
         
         var updatedSession = session
         updatedSession.connectionState = .ended
@@ -341,7 +415,13 @@ class VoiceChatService: NSObject, ObservableObject {
         let newMuteState: VoiceMuteState = session.muteState == .muted ? .unmuted : .muted
         session.muteState = newMuteState
         
-        // TODO: Actually mute/unmute local audio track
+        // Actually mute/unmute local audio track
+        if let audioTrack = localAudioTrack {
+            audioTrack.isEnabled = (newMuteState == .unmuted)
+            print("🔊 [VoiceChatService] Local audio track \(newMuteState == .unmuted ? "enabled" : "disabled")")
+        } else {
+            print("⚠️ [VoiceChatService] No local audio track to mute/unmute")
+        }
         
         updateSession(session)
         print("🎤 [VoiceChatService] Mute toggled to: \(newMuteState)")
@@ -369,7 +449,13 @@ class VoiceChatService: NSObject, ObservableObject {
         
         session.muteState = newMuteState
         
-        // TODO: Actually mute/unmute local audio track
+        // Actually mute/unmute local audio track
+        if let audioTrack = localAudioTrack {
+            audioTrack.isEnabled = !muted
+            print("🔊 [VoiceChatService] Local audio track \(muted ? "disabled" : "enabled")")
+        } else {
+            print("⚠️ [VoiceChatService] No local audio track to mute/unmute")
+        }
         
         updateSession(session)
         print("🎤 [VoiceChatService] Mute set to: \(newMuteState)")

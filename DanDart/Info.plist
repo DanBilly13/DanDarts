@@ -37,6 +37,8 @@
 		<string>googlegmail</string>
 		<string>googlemail</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Voice chat uses your microphone during remote matches so you can talk to the other player.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

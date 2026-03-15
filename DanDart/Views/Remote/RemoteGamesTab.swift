@@ -27,6 +27,7 @@ struct RemoteGamesTab: View {
     
     // Track if we've requested permissions this session
     @State private var hasRequestedPermissions = false
+    @State private var hasRequestedVoicePermission = false
     
     
     // Frozen list snapshot - prevents reading live @Published during enter flow
@@ -73,6 +74,10 @@ struct RemoteGamesTab: View {
         .task {
             // Check and request notification permissions (Phase 8)
             await checkNotificationPermissions()
+            
+            // Request voice permission if needed (Phase 12.1)
+            // This happens AFTER notifications, from stable top-level state
+            await requestVoicePermissionIfNeeded()
             
             // Load matches when tab appears
             // Note: Realtime subscription is now set up in MainTabView on app launch
@@ -591,6 +596,40 @@ struct RemoteGamesTab: View {
         } else if notificationService.authorizationStatus == .authorized {
             // If already authorized, retry token sync in case it failed previously
             await notificationService.retryTokenSyncIfNeeded()
+        }
+    }
+    
+    /// Request microphone permission for voice chat (Phase 12.1)
+    /// Only runs once per session, from stable top-level Remote Games context
+    private func requestVoicePermissionIfNeeded() async {
+        // Only request once per session
+        guard !hasRequestedVoicePermission else {
+            return
+        }
+        
+        // Only request if not already determined
+        guard VoicePermissionManager.shared.microphoneAuthorizationStatus == .undetermined else {
+            return
+        }
+        
+        // Only request if we haven't attempted the initial prompt before
+        guard !VoicePermissionManager.shared.hasAttemptedInitialPrompt else {
+            return
+        }
+        
+        // Small delay to ensure screen is stable after notifications dialog
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        print("🎤 [RemoteGamesTab] Requesting microphone permission for voice chat...")
+        
+        // Request permission
+        let granted = await VoicePermissionManager.shared.requestMicrophonePermissionIfNeeded()
+        hasRequestedVoicePermission = true
+        
+        if granted {
+            print("✅ [RemoteGamesTab] Microphone permission granted - voice chat available")
+        } else {
+            print("ℹ️ [RemoteGamesTab] Microphone permission denied - remote matches will work without voice")
         }
     }
     

@@ -18,11 +18,14 @@ struct ProfileView: View {
 
     @EnvironmentObject var authService: AuthService
     @StateObject private var soundManager = SoundManager.shared
+    @StateObject private var voicePermissionManager = VoicePermissionManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
     @State private var showEditProfileV2: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
     @State private var showResetTipsConfirmation: Bool = false
+    @State private var showVoicePermissionAlert = false
+    @State private var voiceAlertMessage = ""
     @State private var navigationPath: [ProfileDestination] = []
     @State private var isRefreshingProfile: Bool = false
     
@@ -148,6 +151,14 @@ struct ProfileView: View {
             } message: {
                 Text("This will reset all game tips so they appear again on your next game.\n\nThis is a debug feature for testing.")
             }
+            .alert("Voice Chat", isPresented: $showVoicePermissionAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Open Settings") {
+                    voicePermissionManager.openAppSettings()
+                }
+            } message: {
+                Text(voiceAlertMessage)
+            }
         }
     }
 
@@ -183,6 +194,28 @@ struct ProfileView: View {
         // Haptic feedback
         let feedback = UINotificationFeedbackGenerator()
         feedback.notificationOccurred(.success)
+    }
+    
+    private func handleVoiceChatTap() {
+        switch voicePermissionManager.microphoneAuthorizationStatus {
+        case .granted:
+            // Toggle is shown, button is disabled - do nothing
+            break
+            
+        case .denied:
+            // Show alert explaining permission is denied
+            voiceAlertMessage = "Microphone access is turned off for DanDart. Enable it in Settings to use voice chat in remote matches."
+            showVoicePermissionAlert = true
+            
+        case .undetermined:
+            // Request permission from this stable context
+            Task {
+                await voicePermissionManager.requestMicrophonePermissionIfNeeded()
+            }
+            
+        @unknown default:
+            break
+        }
     }
     
     // MARK: - Sub Views
@@ -236,6 +269,13 @@ struct ProfileView: View {
                     title: "Sound Effects",
                     isOn: $soundManager.soundEffectsEnabled
                 )
+                
+                Divider()
+                    .background(AppColor.textSecondary.opacity(0.2))
+                    .padding(.leading, 44)
+                
+                // Voice Chat Setting
+                voiceChatSettingRow
                 
                 Divider()
                     .background(AppColor.textSecondary.opacity(0.2))
@@ -344,6 +384,83 @@ struct ProfileView: View {
             }
             .background(AppColor.inputBackground)
             .cornerRadius(12)
+        }
+    }
+    
+    private var voiceChatSettingRow: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundColor(voiceChatIconColor)
+                .frame(width: 28)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Voice Chat")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppColor.textPrimary)
+                
+                Text(voiceChatStatusText)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(AppColor.textSecondary)
+            }
+            
+            Spacer()
+            
+            if shouldShowToggle {
+                Toggle("", isOn: $voicePermissionManager.isVoiceEnabledInApp)
+                    .labelsHidden()
+                    .tint(.green)
+            } else {
+                Button(action: handleVoiceChatTap) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColor.textSecondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+    
+    private var voiceChatStatusText: String {
+        switch voicePermissionManager.microphoneAuthorizationStatus {
+        case .granted:
+            return voicePermissionManager.isVoiceEnabledInApp ? "Enabled" : "Off"
+        case .denied:
+            return "Microphone Access Off"
+        case .undetermined:
+            return voicePermissionManager.isVoiceEnabledInApp ? "Ready" : "Off"
+        @unknown default:
+            return "Unavailable"
+        }
+    }
+    
+    private var voiceChatIconColor: Color {
+        switch voicePermissionManager.microphoneAuthorizationStatus {
+        case .granted:
+            return voicePermissionManager.isVoiceEnabledInApp 
+                ? AppColor.interactivePrimaryBackground 
+                : AppColor.textSecondary
+        case .denied:
+            return .orange
+        case .undetermined:
+            return AppColor.interactivePrimaryBackground
+        @unknown default:
+            return AppColor.textSecondary
+        }
+    }
+    
+    private var shouldShowToggle: Bool {
+        // Show toggle for undetermined (default) and granted states
+        // Only show chevron for denied state
+        switch voicePermissionManager.microphoneAuthorizationStatus {
+        case .granted, .undetermined:
+            return true
+        case .denied:
+            return false
+        @unknown default:
+            return false
         }
     }
     
