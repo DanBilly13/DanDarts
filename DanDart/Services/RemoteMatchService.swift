@@ -12,6 +12,7 @@ import Supabase
 class RemoteMatchService: ObservableObject {
     private let supabaseService = SupabaseService.shared
     private let authService = AuthService.shared
+    private let voiceChatService = VoiceChatService.shared
     
     // MARK: - Configuration Constants
     
@@ -115,6 +116,12 @@ class RemoteMatchService: ObservableObject {
             flowMatchId = nil
             flowMatch = nil
             print("🚦 [FlowGate] isInRemoteFlow = false (depth=0)")
+            
+            // End voice session on true flow exit
+            Task {
+                await voiceChatService.endSession()
+                print("✅ [FlowGate] Voice session ended on flow exit")
+            }
             
             // Refresh match lists to filter out completed/cancelled matches
             // Add delay to allow database replication to complete

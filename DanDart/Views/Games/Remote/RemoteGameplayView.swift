@@ -225,7 +225,18 @@ struct RemoteGameplayView: View {
             print("⚠️ [RemoteGameplayView] Voice session mismatch, restarting for match: \(matchId.uuidString.prefix(8))")
             Task {
                 do {
-                    try await voiceChatService.startSession(for: matchId)
+                    // Get match data for voice session
+                    guard let match = liveMatch else {
+                        print("⚠️ [RemoteGameplayView] Cannot restart voice: no match data")
+                        return
+                    }
+                    
+                    try await voiceChatService.startSession(
+                        matchId: matchId,
+                        localUserId: currentUserId,
+                        challengerId: match.challengerId,
+                        receiverId: match.receiverId
+                    )
                     print("✅ [RemoteGameplayView] Voice session restarted")
                 } catch {
                     print("⚠️ [RemoteGameplayView] Failed to restart voice session: \(error)")
@@ -327,17 +338,14 @@ struct RemoteGameplayView: View {
             print("👋 [RemoteGameplayView] onDisappear - skip exitRemoteFlow (navigating to GameEnd)")
             // Cancel reveal timer
             revealState.cancelReveal()
-            // Task 13: Voice session persists to GameEnd, don't end it here
+            // Voice session persists across navigation - flow-owned, not screen-owned
             return
         }
         
         print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
         
-        // Task 14: End voice session when exiting remote flow
-        Task {
-            await voiceChatService.endSession()
-            print("✅ [RemoteGameplayView] Voice session ended on flow exit")
-        }
+        // Voice session will be ended by flow-level teardown
+        // Not by individual screen lifecycle
         
         // Cancel reveal timer
         revealState.cancelReveal()

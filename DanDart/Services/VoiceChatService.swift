@@ -34,10 +34,21 @@ struct VoiceBroadcastMessage<T: Codable>: Codable {
 }
 
 enum VoiceSignallingMessageType: String, Codable {
+    case voice_ready
+    case voice_request_offer
     case voice_offer
     case voice_answer
     case voice_ice_candidate
     case voice_disconnect
+}
+
+struct VoiceReadyPayload: Codable {
+    let sessionId: UUID
+    let role: String // "challenger" or "receiver"
+}
+
+struct VoiceRequestOfferPayload: Codable {
+    let sessionId: UUID
 }
 
 struct VoiceOfferPayload: Codable {
@@ -236,7 +247,12 @@ class VoiceChatService: NSObject, ObservableObject {
     
     // Signalling state
     private var signallingChannel: RealtimeChannelV2?
+    private var broadcastSubscription: RealtimeSubscription?
     private var otherPlayerId: UUID?
+    private var localRole: String? // "challenger" or "receiver"
+    private var isPeerReady: Bool = false
+    private var isLocalReady: Bool = false
+    private var offerRequestTimeout: Task<Void, Never>?
     
     // WebRTC components
     private var peerConnectionFactory: RTCPeerConnectionFactory?
@@ -259,10 +275,19 @@ class VoiceChatService: NSObject, ObservableObject {
     // MARK: - Public Interface
     
     /// Start a voice session for the given remote match
-    /// - Parameter matchId: The UUID of the remote match
+    /// - Parameters:
+    ///   - matchId: The UUID of the remote match
+    ///   - localUserId: The current user's ID
+    ///   - challengerId: The challenger's user ID
+    ///   - receiverId: The receiver's user ID
     /// - Throws: VoiceSessionError if session cannot be started
     @MainActor
-    func startSession(for matchId: UUID) async throws {
+    func startSession(
+        matchId: UUID,
+        localUserId: UUID,
+        challengerId: UUID,
+        receiverId: UUID
+    ) async throws {
         print("🎤 [VoiceChatService] startSession called for match: \(matchId)")
         
         // Validate no existing session for different match
@@ -350,11 +375,68 @@ class VoiceChatService: NSObject, ObservableObject {
             throw error
         }
         
-        // Setup signalling channel (get other player ID from RemoteMatchService)
-        // For now, we'll set this up when we receive the first message
-        // The actual offer will be created by the challenger role
+        // Derive other player ID and role
+        let otherPlayerId = (localUserId == challengerId) ? receiverId : challengerId
+        let isOfferer = (localUserId == challengerId)
+        let role = isOfferer ? "challenger" : "receiver"
         
-        print("✅ [VoiceChatService] Voice session started, waiting for signalling setup")
+        // Store role for later use
+        self.localRole = role
+        self.isPeerReady = false
+        self.isLocalReady = false
+        
+        print("🔊 [VoiceChatService] Role: \(role)")
+        print("🔊 [VoiceChatService] Other player: \(otherPlayerId.uuidString.prefix(8))")
+        
+        // Setup signalling channel immediately
+        do {
+            try await setupSignallingChannel(matchId: matchId, otherPlayerId: otherPlayerId)
+            print("✅ [VoiceSignalling] Signalling channel subscription confirmed")
+        } catch {
+            print("❌ [VoiceChatService] Failed to setup signalling: \(error)")
+            session.connectionState = .failed
+            updateSession(session)
+            throw error
+        }
+        
+        // Send voice_ready to announce presence
+        do {
+            try await sendReady(role: role)
+            self.isLocalReady = true
+            print("✅ [VoiceSignalling] voice_ready sent (role: \(role))")
+        } catch {
+            print("❌ [VoiceChatService] Failed to send ready: \(error)")
+            session.connectionState = .failed
+            updateSession(session)
+            throw error
+        }
+        
+        // Challenger waits for receiver ready before creating offer
+        // Receiver waits for offer (or sends request_offer after timeout)
+        if isOfferer {
+            print("🔊 [VoiceChatService] Challenger waiting for receiver voice_ready before creating offer")
+            // Offer will be created when handleReady() receives receiver's ready message
+        } else {
+            print("🔊 [VoiceChatService] Receiver waiting for voice_offer from challenger")
+            // Start fallback timeout to request offer if not received
+            startOfferRequestTimeout()
+        }
+    }
+    
+    /// Start timeout to request offer if not received
+    @MainActor
+    private func startOfferRequestTimeout() {
+        offerRequestTimeout?.cancel()
+        offerRequestTimeout = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+            guard !Task.isCancelled else { return }
+            
+            // If still no offer received, request one
+            if let session = currentSession, session.connectionState == .connecting {
+                print("⏱️ [VoiceSignalling] No offer received after 5s, sending voice_request_offer")
+                try? await sendRequestOffer()
+            }
+        }
     }
     
     /// End the current voice session
@@ -588,33 +670,56 @@ class VoiceChatService: NSObject, ObservableObject {
     
     /// Setup Realtime channel for voice signalling
     private func setupSignallingChannel(matchId: UUID, otherPlayerId: UUID) async throws {
-        print("🔊 [VoiceSignalling] Setting up channel for match: \(matchId.uuidString.prefix(8))")
+        let localUserId = await authService.currentUser?.id.uuidString ?? "NONE"
+        print("\n🔵🔵🔵 [VoiceSignalling] ========== CHANNEL SETUP ==========")
+        print("🔵 [VoiceSignalling] Match ID (full): \(matchId.uuidString)")
+        print("🔵 [VoiceSignalling] Other player ID: \(otherPlayerId.uuidString)")
+        print("🔵 [VoiceSignalling] Local user ID: \(localUserId)")
         
         // Store other player ID for message routing
         self.otherPlayerId = otherPlayerId
         
         // Create channel name (align with existing remote match pattern if present)
         let channelName = "voice_match_\(matchId.uuidString)"
-        print("🔊 [VoiceSignalling] Channel name: \(channelName)")
+        print("� [VoiceSignalling] Channel name (EXACT): \(channelName)")
+        print("🔵 [VoiceSignalling] Event name (EXACT): 'voice_signal'")
+        print("🔵 [VoiceSignalling] receiveOwnBroadcasts: false")
+        print("🔵 [VoiceSignalling] ============================================\n")
         
         // Create channel
         let channel = supabaseService.client.realtimeV2.channel(channelName) {
             $0.broadcast.receiveOwnBroadcasts = false
         }
         
-        // Listen for voice signalling messages
-        channel.onBroadcast(event: "voice_signal") { [weak self] (message: [String: AnyJSON]) in
-            Task { @MainActor in
-                await self?.handleIncomingMessage(message)
-            }
-        }
-        
-        // Store channel reference
+        // Store channel reference BEFORE subscribing (prevents deallocation during async subscribe)
         signallingChannel = channel
+        print("🔵 [VoiceSignalling] Channel stored in signallingChannel property (pre-subscribe)")
         
-        // Subscribe to channel (fire and forget - errors handled by Realtime layer)
-        await channel.subscribe()
-        print("✅ [VoiceSignalling] Channel subscription initiated")
+        // Subscribe to the channel
+        do {
+            // Register broadcast handler BEFORE subscribing, and retain the subscription token
+            print("🔊 [VoiceSignalling] Attaching onBroadcast listener for event: 'voice_signal'")
+            broadcastSubscription = channel.onBroadcast(event: "voice_signal") { [weak self] (message: [String: AnyJSON]) in
+                print("\n🚨🚨🚨 [VoiceSignalling] BROADCAST CALLBACK FIRED! 🚨🚨🚨")
+                print("🚨 [VoiceSignalling] Callback thread: \(Thread.current)")
+                print("🚨 [VoiceSignalling] Message keys: \(message.keys)")
+                Task { @MainActor in
+                    await self?.handleIncomingMessage(message)
+                }
+            }
+            print("🔊 [VoiceSignalling] onBroadcast listener attached and subscription token retained")
+            
+            // Use the newer subscribe API that throws errors
+            try await channel.subscribeWithError()
+            
+            print("✅ [VoiceSignalling] SUBSCRIPTION ACTIVE")
+            print("✅ [VoiceSignalling] Channel status: \(channel.status)")
+            print("✅ [VoiceSignalling] ========================================")
+        } catch {
+            print("❌ [VoiceSignalling] Subscribe failed: \(error)")
+            print("❌ [VoiceSignalling] ========================================")
+            throw error
+        }
     }
     
     /// Teardown Realtime channel
@@ -627,11 +732,74 @@ class VoiceChatService: NSObject, ObservableObject {
         print("🔊 [VoiceSignalling] Tearing down channel")
         await channel.unsubscribe()
         signallingChannel = nil
+        broadcastSubscription = nil
         otherPlayerId = nil
-        print("✅ [VoiceSignalling] Channel unsubscribed")
+        print("✅ [VoiceSignalling] Channel unsubscribed and subscription token released")
     }
     
     // MARK: - Send Methods
+    
+    /// Send voice_ready to announce presence and role
+    @MainActor
+    private func sendReady(role: String) async throws {
+        guard let session = currentSession else {
+            print("⚠️ [VoiceSignalling] Cannot send ready: no active session")
+            throw VoiceSessionError.sessionNotActive
+        }
+        
+        guard let otherPlayerId = otherPlayerId else {
+            print("⚠️ [VoiceSignalling] Cannot send ready: no other player ID")
+            throw VoiceSessionError.signallingFailed(reason: "No other player ID")
+        }
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            print("⚠️ [VoiceSignalling] Cannot send ready: not authenticated")
+            throw VoiceSessionError.signallingFailed(reason: "Not authenticated")
+        }
+        
+        let payload = VoiceReadyPayload(sessionId: session.id, role: role)
+        
+        try await sendMessage(
+            type: .voice_ready,
+            from: currentUserId,
+            to: otherPlayerId,
+            matchId: session.matchId,
+            payload: payload
+        )
+        
+        print("🔊 [VoiceSignalling] SEND voice_ready to \(otherPlayerId.uuidString.prefix(8)) (role: \(role), session: \(session.id.uuidString.prefix(8)))")
+    }
+    
+    /// Send voice_request_offer to ask challenger to resend offer
+    @MainActor
+    private func sendRequestOffer() async throws {
+        guard let session = currentSession else {
+            print("⚠️ [VoiceSignalling] Cannot send request_offer: no active session")
+            throw VoiceSessionError.sessionNotActive
+        }
+        
+        guard let otherPlayerId = otherPlayerId else {
+            print("⚠️ [VoiceSignalling] Cannot send request_offer: no other player ID")
+            throw VoiceSessionError.signallingFailed(reason: "No other player ID")
+        }
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            print("⚠️ [VoiceSignalling] Cannot send request_offer: not authenticated")
+            throw VoiceSessionError.signallingFailed(reason: "Not authenticated")
+        }
+        
+        let payload = VoiceRequestOfferPayload(sessionId: session.id)
+        
+        try await sendMessage(
+            type: .voice_request_offer,
+            from: currentUserId,
+            to: otherPlayerId,
+            matchId: session.matchId,
+            payload: payload
+        )
+        
+        print("🔊 [VoiceSignalling] SEND voice_request_offer to \(otherPlayerId.uuidString.prefix(8)) (session: \(session.id.uuidString.prefix(8)))")
+    }
     
     /// Send WebRTC offer to other player
     @MainActor
@@ -779,6 +947,13 @@ class VoiceChatService: NSObject, ObservableObject {
             throw VoiceSessionError.signallingFailed(reason: "No channel")
         }
         
+        print("\n🟢🟢🟢 [VoiceSignalling] ========== SENDING MESSAGE ==========")
+        print("🟢 [VoiceSignalling] Type: \(type.rawValue)")
+        print("🟢 [VoiceSignalling] From: \(from.uuidString)")
+        print("🟢 [VoiceSignalling] To: \(to.uuidString)")
+        print("🟢 [VoiceSignalling] Match ID: \(matchId.uuidString)")
+        print("🟢 [VoiceSignalling] Event name: 'voice_signal'")
+        
         // Create message envelope as Codable struct
         let message = VoiceBroadcastMessage(
             type: type.rawValue,
@@ -789,11 +964,14 @@ class VoiceChatService: NSObject, ObservableObject {
             payload: payload
         )
         
+        print("🟢 [VoiceSignalling] Broadcasting on channel...")
         // Send via broadcast (Supabase accepts Codable directly)
         try await channel.broadcast(
             event: "voice_signal",
             message: message
         )
+        print("✅ [VoiceSignalling] Broadcast completed successfully")
+        print("🟢 [VoiceSignalling] ============================================\n")
     }
     
     // MARK: - Receive Methods
@@ -801,29 +979,77 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Handle incoming broadcast message
     @MainActor
     private func handleIncomingMessage(_ message: [String: AnyJSON]) async {
-        print("📥 [VoiceSignalling] Received message: \(message)")
+        // RAW INBOUND MESSAGE LOGGING - BEFORE ANY VALIDATION
+        print("\n🔵 [VoiceSignalling] ========== RAW INBOUND MESSAGE ==========")
+        print("🔵 [VoiceSignalling] Full raw message: \(message)")
         
-        // Extract and validate message envelope
-        guard case let .string(typeString) = message["type"],
-              let type = VoiceSignallingMessageType(rawValue: typeString),
-              case let .string(fromString) = message["from"],
-              let from = UUID(uuidString: fromString),
-              case let .string(toString) = message["to"],
-              let to = UUID(uuidString: toString),
-              case let .string(matchIdString) = message["matchId"],
-              let matchId = UUID(uuidString: matchIdString),
-              case let .object(payloadObject) = message["payload"] else {
-            print("⚠️ [VoiceSignalling] Invalid message envelope, ignoring")
+        // Log local context
+        let localUserId = authService.currentUser?.id.uuidString ?? "NONE"
+        let currentMatchId = currentSession?.matchId.uuidString ?? "NONE"
+        let currentSessionId = currentSession?.id.uuidString ?? "NONE"
+        print("🔵 [VoiceSignalling] Local user ID: \(localUserId)")
+        print("🔵 [VoiceSignalling] Current match ID: \(currentMatchId)")
+        print("🔵 [VoiceSignalling] Current session ID: \(currentSessionId)")
+        print("🔵 [VoiceSignalling] ============================================\n")
+        
+        // Supabase wraps the actual message in a "payload" field
+        // Extract the voice message from the broadcast wrapper
+        guard case let .object(voiceMessage) = message["payload"] else {
+            print("❌ [VoiceSignalling] REJECTED: Missing or invalid payload wrapper")
             return
         }
+        print("✅ [VoiceSignalling] FILTER: Extracted voice message from broadcast payload")
+        
+        // Extract and validate message envelope from the voice message
+        guard case let .string(typeString) = voiceMessage["type"],
+              let type = VoiceSignallingMessageType(rawValue: typeString) else {
+            print("❌ [VoiceSignalling] REJECTED: Invalid or missing type field")
+            return
+        }
+        print("✅ [VoiceSignalling] FILTER: Type parsed: \(type.rawValue)")
+        
+        guard case let .string(fromString) = voiceMessage["from"],
+              let from = UUID(uuidString: fromString) else {
+            print("❌ [VoiceSignalling] REJECTED: Invalid or missing from field")
+            return
+        }
+        print("✅ [VoiceSignalling] FILTER: From parsed: \(from.uuidString.prefix(8))")
+        
+        guard case let .string(toString) = voiceMessage["to"],
+              let to = UUID(uuidString: toString) else {
+            print("❌ [VoiceSignalling] REJECTED: Invalid or missing to field")
+            return
+        }
+        print("✅ [VoiceSignalling] FILTER: To parsed: \(to.uuidString.prefix(8))")
+        
+        guard case let .string(matchIdString) = voiceMessage["matchId"],
+              let matchId = UUID(uuidString: matchIdString) else {
+            print("❌ [VoiceSignalling] REJECTED: Invalid or missing matchId field")
+            return
+        }
+        print("✅ [VoiceSignalling] FILTER: MatchId parsed: \(matchId.uuidString.prefix(8))")
+        
+        guard case let .object(payloadObject) = voiceMessage["payload"] else {
+            print("❌ [VoiceSignalling] REJECTED: Invalid or missing payload field")
+            return
+        }
+        print("✅ [VoiceSignalling] FILTER: Payload parsed successfully")
         
         // Validate message fields
         guard validateMessage(type: type, from: from, to: to, matchId: matchId) else {
             return // Validation logs rejection reason
         }
         
+        print("✅ [VoiceSignalling] ACCEPTED: Dispatching to handler for \(type.rawValue)")
+        
         // Route to appropriate handler based on type
         switch type {
+        case .voice_ready:
+            await handleReady(from: from, payload: payloadObject)
+            
+        case .voice_request_offer:
+            await handleRequestOffer(from: from, payload: payloadObject)
+            
         case .voice_offer:
             await handleOffer(from: from, payload: payloadObject)
             
@@ -846,40 +1072,112 @@ class VoiceChatService: NSObject, ObservableObject {
         to: UUID,
         matchId: UUID
     ) -> Bool {
+        print("\n🔍 [VoiceSignalling] ========== VALIDATION: \(type.rawValue) ==========")
+        
         // Validate matchId matches current session
         guard let session = currentSession else {
-            print("⚠️ [VoiceSignalling] Received \(type.rawValue) but no active session, ignoring")
+            print("❌ [VoiceSignalling] REJECTED: No active session")
+            print("🔍 [VoiceSignalling] ==========================================\n")
             return false
         }
+        print("✅ [VoiceSignalling] VALIDATE: Active session exists")
         
         guard matchId == session.matchId else {
-            print("⚠️ [VoiceSignalling] Received \(type.rawValue) for different match (\(matchId.uuidString.prefix(8)) != \(session.matchId.uuidString.prefix(8))), ignoring")
+            print("❌ [VoiceSignalling] REJECTED: Match ID mismatch")
+            print("   Message match: \(matchId.uuidString)")
+            print("   Session match: \(session.matchId.uuidString)")
+            print("🔍 [VoiceSignalling] ==========================================\n")
             return false
         }
+        print("✅ [VoiceSignalling] VALIDATE: Match ID matches (\(matchId.uuidString.prefix(8)))")
         
         // Validate from matches expected peer
         guard let otherPlayerId = otherPlayerId else {
-            print("⚠️ [VoiceSignalling] Received \(type.rawValue) but no other player ID set, ignoring")
+            print("❌ [VoiceSignalling] REJECTED: No other player ID set")
+            print("🔍 [VoiceSignalling] ==========================================\n")
             return false
         }
+        print("✅ [VoiceSignalling] VALIDATE: Other player ID is set (\(otherPlayerId.uuidString.prefix(8)))")
         
         guard from == otherPlayerId else {
-            print("⚠️ [VoiceSignalling] Received \(type.rawValue) from unexpected sender (\(from.uuidString.prefix(8)) != \(otherPlayerId.uuidString.prefix(8))), ignoring")
+            print("❌ [VoiceSignalling] REJECTED: Sender ID mismatch")
+            print("   Message from: \(from.uuidString)")
+            print("   Expected peer: \(otherPlayerId.uuidString)")
+            print("🔍 [VoiceSignalling] ==========================================\n")
             return false
         }
+        print("✅ [VoiceSignalling] VALIDATE: Sender matches expected peer (\(from.uuidString.prefix(8)))")
         
         // Validate to matches current user
         guard let currentUserId = authService.currentUser?.id else {
-            print("⚠️ [VoiceSignalling] Received \(type.rawValue) but not authenticated, ignoring")
+            print("❌ [VoiceSignalling] REJECTED: Not authenticated")
+            print("🔍 [VoiceSignalling] ==========================================\n")
             return false
         }
+        print("✅ [VoiceSignalling] VALIDATE: Current user authenticated (\(currentUserId.uuidString.prefix(8)))")
         
         guard to == currentUserId else {
-            print("⚠️ [VoiceSignalling] Received \(type.rawValue) for different user (\(to.uuidString.prefix(8)) != \(currentUserId.uuidString.prefix(8))), ignoring")
+            print("❌ [VoiceSignalling] REJECTED: Target user ID mismatch")
+            print("   Message to: \(to.uuidString)")
+            print("   Current user: \(currentUserId.uuidString)")
+            print("🔍 [VoiceSignalling] ==========================================\n")
             return false
         }
+        print("✅ [VoiceSignalling] VALIDATE: Target matches current user (\(to.uuidString.prefix(8)))")
         
+        print("✅ [VoiceSignalling] VALIDATION PASSED: All checks successful")
+        print("🔍 [VoiceSignalling] ==========================================\n")
         return true
+    }
+    
+    /// Handle incoming voice_ready message
+    @MainActor
+    private func handleReady(from: UUID, payload: [String: AnyJSON]) async {
+        print("📥 [VoiceSignalling] RECV voice_ready from \(from.uuidString.prefix(8))")
+        
+        // Extract peer role from payload (sessionId is peer's local session, not validated)
+        guard case let .string(peerRole) = payload["role"] else {
+            print("⚠️ [VoiceSignalling] Invalid ready payload, ignoring")
+            return
+        }
+        
+        print("✅ [VoiceSignalling] voice_ready received (peer role: \(peerRole))")
+        
+        // Mark peer as ready
+        self.isPeerReady = true
+        
+        // If we are challenger and both sides are ready, create and send offer
+        if localRole == "challenger" && isLocalReady && isPeerReady {
+            print("🔊 [VoiceSignalling] Both sides ready, challenger creating offer")
+            do {
+                let offerSDP = try await createOffer()
+                try await sendOffer(offerSDP)
+                print("✅ [VoiceSignalling] Offer sent after readiness confirmed")
+            } catch {
+                print("❌ [VoiceSignalling] Failed to create/send offer: \(error)")
+            }
+        }
+    }
+    
+    /// Handle incoming voice_request_offer message
+    @MainActor
+    private func handleRequestOffer(from: UUID, payload: [String: AnyJSON]) async {
+        print("📥 [VoiceSignalling] RECV voice_request_offer from \(from.uuidString.prefix(8))")
+        print("✅ [VoiceSignalling] voice_request_offer received")
+        
+        // If we are challenger, resend offer
+        if localRole == "challenger" {
+            print("🔊 [VoiceSignalling] Challenger resending offer on request")
+            do {
+                let offerSDP = try await createOffer()
+                try await sendOffer(offerSDP)
+                print("✅ [VoiceSignalling] Offer resent successfully")
+            } catch {
+                print("❌ [VoiceSignalling] Failed to resend offer: \(error)")
+            }
+        } else {
+            print("⚠️ [VoiceSignalling] Received request_offer but not challenger, ignoring")
+        }
     }
     
     /// Handle incoming offer
@@ -887,26 +1185,26 @@ class VoiceChatService: NSObject, ObservableObject {
     private func handleOffer(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_offer from \(from.uuidString.prefix(8))")
         
-        // Extract and validate payload
-        guard case let .string(sdp) = payload["sdp"],
-              case let .string(sessionIdString) = payload["sessionId"],
-              let sessionId = UUID(uuidString: sessionIdString) else {
+        // Cancel offer request timeout if running
+        offerRequestTimeout?.cancel()
+        offerRequestTimeout = nil
+        
+        // Extract SDP from payload (sessionId is peer's local session, not validated)
+        guard case let .string(sdp) = payload["sdp"] else {
             print("⚠️ [VoiceSignalling] Invalid offer payload, ignoring")
             return
         }
         
-        // Validate sessionId matches current session
-        guard let session = currentSession, sessionId == session.id else {
-            print("⚠️ [VoiceSignalling] Offer sessionId mismatch, ignoring (stale/late message)")
-            return
-        }
+        print("✅ [VoiceSignalling] voice_offer received on receiver")
+        print("🔊 [VoiceSignalling] Setting remote offer description")
         
-        print("📥 [VoiceSignalling] Valid offer received (session: \(sessionId.uuidString.prefix(8)))")
-        
-        // Task 9: Pass to WebRTC engine to process offer and create answer
+        // Pass to WebRTC engine to process offer and create answer
         do {
             try await handleRemoteOffer(sdp: sdp)
+            print("✅ [VoiceSignalling] Remote offer set successfully")
+            
             let answerSdp = try await createAnswer()
+            print("✅ [VoiceSignalling] Answer created")
             
             // Send answer back to peer
             guard let currentUserId = authService.currentUser?.id,
@@ -916,7 +1214,7 @@ class VoiceChatService: NSObject, ObservableObject {
             }
             
             try await sendAnswer(answerSdp)
-            print("✅ [VoiceSignalling] Answer sent successfully")
+            print("✅ [VoiceSignalling] Answer sent to challenger")
             
         } catch {
             print("❌ [VoiceSignalling] Failed to handle offer: \(error)")
@@ -927,23 +1225,15 @@ class VoiceChatService: NSObject, ObservableObject {
     private func handleAnswer(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_answer from \(from.uuidString.prefix(8))")
         
-        // Extract and validate payload
-        guard case let .string(sdp) = payload["sdp"],
-              case let .string(sessionIdString) = payload["sessionId"],
-              let sessionId = UUID(uuidString: sessionIdString) else {
+        // Extract SDP from payload (sessionId is peer's local session, not validated)
+        guard case let .string(sdp) = payload["sdp"] else {
             print("⚠️ [VoiceSignalling] Invalid answer payload, ignoring")
             return
         }
         
-        // Validate sessionId matches current session
-        guard let session = currentSession, sessionId == session.id else {
-            print("⚠️ [VoiceSignalling] Answer sessionId mismatch, ignoring (stale/late message)")
-            return
-        }
+        print("✅ [VoiceSignalling] Valid answer received")
         
-        print("📥 [VoiceSignalling] Valid answer received (session: \(sessionId.uuidString.prefix(8)))")
-        
-        // Task 9: Pass to WebRTC engine to process answer
+        // Pass to WebRTC engine to process answer
         do {
             try await handleRemoteAnswer(sdp: sdp)
             print("✅ [VoiceSignalling] Answer processed successfully")
@@ -956,11 +1246,9 @@ class VoiceChatService: NSObject, ObservableObject {
     private func handleICECandidate(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_ice_candidate from \(from.uuidString.prefix(8))")
         
-        // Extract and validate payload
+        // Extract and validate payload (sessionId is peer's local session, not validated)
         guard case let .string(candidate) = payload["candidate"],
-              case let .string(sdpMid) = payload["sdpMid"],
-              case let .string(sessionIdString) = payload["sessionId"],
-              let sessionId = UUID(uuidString: sessionIdString) else {
+              case let .string(sdpMid) = payload["sdpMid"] else {
             print("⚠️ [VoiceSignalling] Invalid ICE candidate payload, ignoring")
             return
         }
@@ -976,15 +1264,9 @@ class VoiceChatService: NSObject, ObservableObject {
             return
         }
         
-        // Validate sessionId matches current session
-        guard let session = currentSession, sessionId == session.id else {
-            print("⚠️ [VoiceSignalling] ICE candidate sessionId mismatch, ignoring (stale/late message)")
-            return
-        }
-        
         print("📥 [VoiceSignalling] Valid ICE candidate received")
         
-        // Task 9: Pass to WebRTC engine to add ICE candidate
+        // Pass to WebRTC engine to add ICE candidate
         await handleRemoteICECandidate(candidate: candidate, sdpMid: sdpMid, sdpMLineIndex: sdpMLineIndex)
     }
     
