@@ -11,6 +11,40 @@
 
 import Foundation
 import SwiftUI
+import Supabase
+
+// MARK: - Signalling Message Types
+
+/// Signalling message type for WebRTC negotiation
+enum SignallingMessageType: String, Codable {
+    case offer = "offer"
+    case answer = "answer"
+    case iceCandidate = "ice-candidate"
+    case error = "error"
+}
+
+/// Signalling message for WebRTC peer connection establishment
+struct SignallingMessage: Codable {
+    let type: SignallingMessageType
+    let from: UUID
+    let to: UUID
+    let matchId: UUID
+    let sessionToken: UUID
+    let timestamp: Date
+    
+    // Type-specific fields
+    let sdp: String?              // For offer/answer
+    let candidate: String?        // For ice-candidate
+    let sdpMid: String?          // For ice-candidate
+    let sdpMLineIndex: Int?      // For ice-candidate
+    let error: String?           // For error
+    let message: String?         // For error
+    
+    enum CodingKeys: String, CodingKey {
+        case type, from, to, matchId, sessionToken, timestamp
+        case sdp, candidate, sdpMid, sdpMLineIndex, error, message
+    }
+}
 
 // MARK: - Voice Session State
 
@@ -74,6 +108,17 @@ class VoiceSessionService: ObservableObject {
     
     /// Reference to RemoteMatchService for flow state observation
     private weak var remoteMatchService: RemoteMatchService?
+    
+    /// Supabase service for Realtime signalling
+    private let supabaseService = SupabaseService.shared
+    
+    /// Auth service for current user ID
+    private let authService = AuthService.shared
+    
+    // MARK: - Realtime Channel
+    
+    /// Active Realtime channel for signalling
+    private var signallingChannel: RealtimeChannelV2?
     
     // MARK: - Feature Flag
     
@@ -156,8 +201,10 @@ class VoiceSessionService: ObservableObject {
         
         print("✅ [VoiceService] Session created - token: \(newSession.sessionToken.uuidString.prefix(8))...")
         
-        // Task 5+ will implement actual signalling/audio/peer connection
-        // For now, this is just the shell
+        // Subscribe to signalling channel
+        Task {
+            await subscribeToSignallingChannel(matchId: matchId)
+        }
     }
     
     /// End the current voice session
@@ -183,9 +230,13 @@ class VoiceSessionService: ObservableObject {
         
         print("✅ [VoiceService] Session ended")
         
+        // Unsubscribe from signalling channel
+        Task {
+            await unsubscribeFromSignallingChannel()
+        }
+        
         // Task 8+ will implement actual cleanup:
         // - Close peer connection
-        // - Unsubscribe from signalling
         // - Deactivate audio session
     }
     
@@ -332,6 +383,347 @@ class VoiceSessionService: ObservableObject {
     func resetVoiceFlag() {
         setVoiceEnabled(true)
         print("🎤 [VoiceService] Feature flag reset to default (enabled)")
+    }
+    
+    // MARK: - Signalling Channel Management (Task 6)
+    
+    /// Subscribe to Supabase Realtime channel for signalling
+    private func subscribeToSignallingChannel(matchId: UUID) async {
+        // Capture session for validation
+        guard let session = activeSession else {
+            print("⚠️ [Signalling] No active session, cannot subscribe")
+            return
+        }
+        
+        let capturedSession = session
+        
+        // Channel name: voice:match:{matchId}
+        let channelName = "voice:match:\(matchId.uuidString)"
+        print("🔊 [Signalling] Subscribing to channel: \(channelName)")
+        
+        // Create channel
+        let channel = supabaseService.client.realtimeV2.channel(channelName) {
+            $0.broadcast.receiveOwnBroadcasts = false
+        }
+        
+        // Store channel reference
+        signallingChannel = channel
+        
+        // Subscribe to broadcast messages using onBroadcast callback
+        channel.onBroadcast(event: "voice-signal") { [weak self] message in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                
+                // Validate session still active
+                guard self.isSessionValid(capturedSession) else {
+                    print("⚠️ [Signalling] Stale message - session changed, ignoring")
+                    return
+                }
+                
+                // Handle signalling message
+                await self.handleSignallingMessage(message)
+            }
+        }
+        
+        // Subscribe to channel
+        await channel.subscribe()
+        
+        print("✅ [Signalling] Subscribed to channel: \(channelName)")
+        
+        // Transition to connecting state
+        await MainActor.run {
+            transitionToConnecting()
+        }
+    }
+    
+    /// Unsubscribe from Supabase Realtime channel
+    private func unsubscribeFromSignallingChannel() async {
+        guard let channel = signallingChannel else {
+            print("⚠️ [Signalling] No active channel to unsubscribe")
+            return
+        }
+        
+        print("🔊 [Signalling] Unsubscribing from channel")
+        
+        // Unsubscribe from channel (callbacks are automatically cleaned up)
+        await channel.unsubscribe()
+        
+        // Clear channel reference
+        signallingChannel = nil
+        
+        print("✅ [Signalling] Unsubscribed from channel")
+    }
+    
+    // MARK: - Signalling Message Handling (Task 6)
+    
+    /// Handle incoming signalling message
+    private func handleSignallingMessage(_ payload: [String: AnyJSON]) async {
+        print("🔊 [Signalling] Received message")
+        
+        // Convert AnyJSON to Any for JSON serialization
+        let convertedPayload = payload.mapValues { $0.value }
+        
+        // Decode message
+        guard let message = try? decodeSignallingMessage(convertedPayload) else {
+            print("❌ [Signalling] Failed to decode message")
+            return
+        }
+        
+        // Validate message
+        guard validateSignallingMessage(message) else {
+            print("⚠️ [Signalling] Message validation failed, ignoring")
+            return
+        }
+        
+        // Handle by type
+        switch message.type {
+        case .offer:
+            await handleOffer(message)
+        case .answer:
+            await handleAnswer(message)
+        case .iceCandidate:
+            await handleIceCandidate(message)
+        case .error:
+            await handleError(message)
+        }
+    }
+    
+    /// Decode signalling message from JSON payload
+    private func decodeSignallingMessage(_ payload: [String: Any]) throws -> SignallingMessage {
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(SignallingMessage.self, from: data)
+    }
+    
+    /// Validate incoming signalling message
+    private func validateSignallingMessage(_ message: SignallingMessage) -> Bool {
+        // Validate session token
+        guard message.sessionToken == activeSession?.sessionToken else {
+            print("⚠️ [Signalling] Invalid session token")
+            return false
+        }
+        
+        // Validate match ID
+        guard message.matchId == activeSession?.matchId else {
+            print("⚠️ [Signalling] Invalid match ID")
+            return false
+        }
+        
+        // Validate recipient (message is for us)
+        guard let currentUserId = authService.currentUser?.id,
+              message.to == currentUserId else {
+            print("⚠️ [Signalling] Message not for current user")
+            return false
+        }
+        
+        // Validate sender (message is from expected peer)
+        guard let match = remoteMatchService?.flowMatch,
+              message.from == match.challengerId || message.from == match.receiverId else {
+            print("⚠️ [Signalling] Message from unknown sender")
+            return false
+        }
+        
+        return true
+    }
+    
+    // MARK: - Signalling Message Handlers (Task 6)
+    
+    /// Handle incoming offer message
+    private func handleOffer(_ message: SignallingMessage) async {
+        print("🔊 [Signalling] Received OFFER from \(message.from.uuidString.prefix(8))...")
+        
+        guard let sdp = message.sdp else {
+            print("❌ [Signalling] Offer missing SDP")
+            return
+        }
+        
+        print("📝 [Signalling] SDP: \(sdp.prefix(100))...")
+        
+        // Task 9+ will handle offer with WebRTC peer connection
+        // For now, just log
+    }
+    
+    /// Handle incoming answer message
+    private func handleAnswer(_ message: SignallingMessage) async {
+        print("🔊 [Signalling] Received ANSWER from \(message.from.uuidString.prefix(8))...")
+        
+        guard let sdp = message.sdp else {
+            print("❌ [Signalling] Answer missing SDP")
+            return
+        }
+        
+        print("📝 [Signalling] SDP: \(sdp.prefix(100))...")
+        
+        // Task 9+ will handle answer with WebRTC peer connection
+        // For now, just log
+    }
+    
+    /// Handle incoming ICE candidate message
+    private func handleIceCandidate(_ message: SignallingMessage) async {
+        print("🔊 [Signalling] Received ICE-CANDIDATE from \(message.from.uuidString.prefix(8))...")
+        
+        guard let candidate = message.candidate else {
+            print("❌ [Signalling] ICE candidate missing candidate string")
+            return
+        }
+        
+        print("📝 [Signalling] Candidate: \(candidate.prefix(50))...")
+        
+        // Task 9+ will add ICE candidate to WebRTC peer connection
+        // For now, just log
+    }
+    
+    /// Handle incoming error message
+    private func handleError(_ message: SignallingMessage) async {
+        print("❌ [Signalling] Received ERROR from \(message.from.uuidString.prefix(8))...")
+        
+        if let error = message.error {
+            print("❌ [Signalling] Error code: \(error)")
+        }
+        
+        if let errorMessage = message.message {
+            print("❌ [Signalling] Error message: \(errorMessage)")
+        }
+        
+        // Transition to unavailable
+        await MainActor.run {
+            transitionToUnavailable()
+        }
+    }
+    
+    // MARK: - Signalling Message Sending (Task 6)
+    
+    /// Send offer to peer
+    func sendOffer(sdp: String) async {
+        guard let session = activeSession else {
+            print("⚠️ [Signalling] No active session, cannot send offer")
+            return
+        }
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            print("❌ [Signalling] No current user")
+            return
+        }
+        
+        guard let match = remoteMatchService?.flowMatch else {
+            print("❌ [Signalling] No active match")
+            return
+        }
+        
+        // Determine recipient (other player)
+        let recipientId = match.challengerId == currentUserId ? match.receiverId : match.challengerId
+        
+        let message = SignallingMessage(
+            type: .offer,
+            from: currentUserId,
+            to: recipientId,
+            matchId: session.matchId,
+            sessionToken: session.sessionToken,
+            timestamp: Date(),
+            sdp: sdp,
+            candidate: nil,
+            sdpMid: nil,
+            sdpMLineIndex: nil,
+            error: nil,
+            message: nil
+        )
+        
+        await sendSignallingMessage(message)
+        print("🔊 [Signalling] Sent OFFER to \(recipientId.uuidString.prefix(8))...")
+    }
+    
+    /// Send answer to peer
+    func sendAnswer(sdp: String) async {
+        guard let session = activeSession else {
+            print("⚠️ [Signalling] No active session, cannot send answer")
+            return
+        }
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            print("❌ [Signalling] No current user")
+            return
+        }
+        
+        guard let match = remoteMatchService?.flowMatch else {
+            print("❌ [Signalling] No active match")
+            return
+        }
+        
+        // Determine recipient (other player)
+        let recipientId = match.challengerId == currentUserId ? match.receiverId : match.challengerId
+        
+        let message = SignallingMessage(
+            type: .answer,
+            from: currentUserId,
+            to: recipientId,
+            matchId: session.matchId,
+            sessionToken: session.sessionToken,
+            timestamp: Date(),
+            sdp: sdp,
+            candidate: nil,
+            sdpMid: nil,
+            sdpMLineIndex: nil,
+            error: nil,
+            message: nil
+        )
+        
+        await sendSignallingMessage(message)
+        print("🔊 [Signalling] Sent ANSWER to \(recipientId.uuidString.prefix(8))...")
+    }
+    
+    /// Send ICE candidate to peer
+    func sendIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int?) async {
+        guard let session = activeSession else {
+            print("⚠️ [Signalling] No active session, cannot send ICE candidate")
+            return
+        }
+        
+        guard let currentUserId = authService.currentUser?.id else {
+            print("❌ [Signalling] No current user")
+            return
+        }
+        
+        guard let match = remoteMatchService?.flowMatch else {
+            print("❌ [Signalling] No active match")
+            return
+        }
+        
+        // Determine recipient (other player)
+        let recipientId = match.challengerId == currentUserId ? match.receiverId : match.challengerId
+        
+        let message = SignallingMessage(
+            type: .iceCandidate,
+            from: currentUserId,
+            to: recipientId,
+            matchId: session.matchId,
+            sessionToken: session.sessionToken,
+            timestamp: Date(),
+            sdp: nil,
+            candidate: candidate,
+            sdpMid: sdpMid,
+            sdpMLineIndex: sdpMLineIndex,
+            error: nil,
+            message: nil
+        )
+        
+        await sendSignallingMessage(message)
+        print("🔊 [Signalling] Sent ICE-CANDIDATE to \(recipientId.uuidString.prefix(8))...")
+    }
+    
+    /// Send signalling message via Realtime broadcast
+    private func sendSignallingMessage(_ message: SignallingMessage) async {
+        guard let channel = signallingChannel else {
+            print("❌ [Signalling] No active channel, cannot send message")
+            return
+        }
+        
+        // Send via broadcast (Supabase handles Codable encoding)
+        do {
+            try await channel.broadcast(event: "voice-signal", message: message)
+        } catch {
+            print("❌ [Signalling] Failed to send message: \(error)")
+        }
     }
 }
 
