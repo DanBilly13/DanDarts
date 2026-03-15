@@ -12,6 +12,7 @@
 import Foundation
 import SwiftUI
 import Supabase
+import AVFoundation
 
 // MARK: - Signalling Message Types
 
@@ -201,6 +202,10 @@ class VoiceSessionService: ObservableObject {
         
         print("✅ [VoiceService] Session created - token: \(newSession.sessionToken.uuidString.prefix(8))...")
         
+        // Configure audio session (Task 8)
+        configureAudioSession()
+        registerAudioNotifications()
+        
         // Subscribe to signalling channel
         Task {
             await subscribeToSignallingChannel(matchId: matchId)
@@ -235,9 +240,12 @@ class VoiceSessionService: ObservableObject {
             await unsubscribeFromSignallingChannel()
         }
         
-        // Task 8+ will implement actual cleanup:
+        // Cleanup audio session (Task 8)
+        unregisterAudioNotifications()
+        deactivateAudioSession()
+        
+        // Task 9+ will implement:
         // - Close peer connection
-        // - Deactivate audio session
     }
     
     /// Toggle local mute state
@@ -383,6 +391,167 @@ class VoiceSessionService: ObservableObject {
     func resetVoiceFlag() {
         setVoiceEnabled(true)
         print("🎤 [VoiceService] Feature flag reset to default (enabled)")
+    }
+    
+    // MARK: - Audio Session Management (Task 8)
+    
+    /// Configure AVAudioSession for voice chat
+    /// 
+    /// Sets up the audio session with:
+    /// - playAndRecord mode (for bidirectional audio)
+    /// - voiceChat category (optimized for voice)
+    /// - allowBluetooth option (for headsets)
+    /// - defaultToSpeaker option (speaker output by default)
+    private func configureAudioSession() {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        do {
+            // Configure for voice chat
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.allowBluetooth, .defaultToSpeaker]
+            )
+            
+            // Activate the audio session
+            try audioSession.setActive(true)
+            
+            print("✅ [AudioSession] Configured for voice chat")
+            print("📊 [AudioSession] Category: playAndRecord, Mode: voiceChat")
+            print("📊 [AudioSession] Options: allowBluetooth, defaultToSpeaker")
+            
+        } catch {
+            print("❌ [AudioSession] Configuration failed: \(error)")
+            transitionToUnavailable(error: .audioSessionFailed)
+        }
+    }
+    
+    /// Deactivate AVAudioSession
+    /// 
+    /// Called when ending voice session to release audio resources
+    private func deactivateAudioSession() {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        do {
+            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            print("✅ [AudioSession] Deactivated")
+        } catch {
+            print("⚠️ [AudioSession] Deactivation failed: \(error)")
+            // Non-fatal - continue cleanup
+        }
+    }
+    
+    /// Handle audio session interruption
+    /// 
+    /// Called when phone call, alarm, or other audio interruption occurs
+    /// Phase 12: Transitions to unavailable (no automatic recovery)
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            print("⚠️ [AudioSession] Interruption began")
+            // Phase 12: No automatic pause/resume
+            // Voice becomes unavailable for remainder of match
+            transitionToUnavailable()
+            
+        case .ended:
+            print("ℹ️ [AudioSession] Interruption ended")
+            // Phase 12: No automatic recovery
+            // User must restart match for voice
+            
+        @unknown default:
+            print("⚠️ [AudioSession] Unknown interruption type")
+        }
+    }
+    
+    /// Handle audio route change
+    /// 
+    /// Called when audio route changes (e.g., headphones plugged/unplugged)
+    /// Phase 12: Logs but doesn't interrupt voice session
+    @objc private func handleRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        switch reason {
+        case .newDeviceAvailable:
+            print("🔊 [AudioSession] New audio device available")
+            
+        case .oldDeviceUnavailable:
+            print("🔇 [AudioSession] Audio device disconnected")
+            
+        case .categoryChange:
+            print("📊 [AudioSession] Category changed")
+            
+        case .override:
+            print("🔀 [AudioSession] Route override")
+            
+        case .wakeFromSleep:
+            print("⏰ [AudioSession] Wake from sleep")
+            
+        case .noSuitableRouteForCategory:
+            print("⚠️ [AudioSession] No suitable route for category")
+            
+        case .routeConfigurationChange:
+            print("🔧 [AudioSession] Route configuration changed")
+            
+        @unknown default:
+            print("⚠️ [AudioSession] Unknown route change reason")
+        }
+        
+        // Phase 12: Continue voice session regardless of route change
+        // Audio will automatically route to new device
+    }
+    
+    /// Register for audio session notifications
+    /// 
+    /// Called when starting voice session
+    private func registerAudioNotifications() {
+        let notificationCenter = NotificationCenter.default
+        
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(handleAudioInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(handleRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+        
+        print("✅ [AudioSession] Registered for notifications")
+    }
+    
+    /// Unregister from audio session notifications
+    /// 
+    /// Called when ending voice session
+    private func unregisterAudioNotifications() {
+        let notificationCenter = NotificationCenter.default
+        
+        notificationCenter.removeObserver(
+            self,
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        
+        notificationCenter.removeObserver(
+            self,
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+        
+        print("✅ [AudioSession] Unregistered from notifications")
     }
     
     // MARK: - Signalling Channel Management (Task 6)
