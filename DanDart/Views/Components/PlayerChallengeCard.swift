@@ -50,21 +50,10 @@ struct PlayerChallengeCard: View {
         print("🧩 Card INIT matchId=\(matchId.uuidString.prefix(8)) state=\(state.displayName) isProcessing=\(isProcessing)")
     }
     
-    /// Freeze card status during navigation to prevent jumping
-    /// Checks BOTH latch AND isProcessing to cover the entire "entering flow" window
+    /// Display the authoritative card state from server
+    /// No overrides needed - staged flow (ready → lobby → in_progress) is now deterministic
     private var displayedStatus: CardPresentationState {
-        // Freeze if either latch is active OR this card is being processed
-        let isEntering = remoteMatchService.isPendingEnterFlow(matchId: matchId) || isProcessing
-        
-        guard isEntering else {
-            return state
-        }
-        
-        // Log when card is frozen
-        FlowDebug.log("CARD OVERRIDE active (entering flow) raw=\(state.displayName)", matchId: matchId)
-        
-        // Freeze to .lobby during transition (feels like "moving forward")
-        return .lobby
+        return state
     }
     
     private var gameInfoText: String {

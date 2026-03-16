@@ -511,8 +511,8 @@ struct RemoteLobbyView: View {
                 
                 print("✅ [Lobby] Authoritative check 1 passed")
                 
-                // Wait 3 seconds (cancellable)
-                try await Task.sleep(nanoseconds: 3_000_000_000)
+                // Wait 1 second (cancellable)
+                try await Task.sleep(nanoseconds: 1_000_000_000)
                 
                 // Check if task was cancelled during sleep
                 guard !Task.isCancelled else {
