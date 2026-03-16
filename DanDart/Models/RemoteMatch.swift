@@ -68,6 +68,12 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
     let challengeExpiresAt: Date?
     let joinWindowExpiresAt: Date?
     
+    // Lobby presence tracking
+    let challengerLobbyJoinedAt: Date?
+    let receiverLobbyJoinedAt: Date?
+    let lobbyCountdownStartedAt: Date?
+    let lobbyCountdownSeconds: Int?
+    
     // Game state
     var lastVisitPayload: LastVisitPayload?
     var playerScores: [UUID: Int]? // Server-authoritative scores {player_id: score}
@@ -99,7 +105,11 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         lhs.lastVisitPayload == rhs.lastVisitPayload &&
         lhs.endedBy == rhs.endedBy &&
         lhs.endedReason == rhs.endedReason &&
-        lhs.winnerId == rhs.winnerId
+        lhs.winnerId == rhs.winnerId &&
+        lhs.challengerLobbyJoinedAt == rhs.challengerLobbyJoinedAt &&
+        lhs.receiverLobbyJoinedAt == rhs.receiverLobbyJoinedAt &&
+        lhs.lobbyCountdownStartedAt == rhs.lobbyCountdownStartedAt &&
+        lhs.lobbyCountdownSeconds == rhs.lobbyCountdownSeconds
         // Note: Ignoring createdAt, updatedAt, debugCounter to prevent churn
     }
     
@@ -169,6 +179,28 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         }
     }
     
+    // MARK: - Lobby Presence Computed Properties
+    
+    var bothPlayersInLobby: Bool {
+        challengerLobbyJoinedAt != nil && receiverLobbyJoinedAt != nil
+    }
+    
+    var countdownStarted: Bool {
+        lobbyCountdownStartedAt != nil
+    }
+    
+    var countdownRemaining: TimeInterval? {
+        guard let countdownStart = lobbyCountdownStartedAt else { return nil }
+        let duration = TimeInterval(lobbyCountdownSeconds ?? 5)
+        let elapsed = Date().timeIntervalSince(countdownStart)
+        return max(0, duration - elapsed)
+    }
+    
+    var countdownElapsed: Bool {
+        guard let remaining = countdownRemaining else { return false }
+        return remaining <= 0
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case matchMode = "match_mode"
@@ -191,6 +223,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         case winnerId = "winner_id"
         case endedAt = "ended_at"
         case debugCounter = "debug_counter"
+        case challengerLobbyJoinedAt = "challenger_lobby_joined_at"
+        case receiverLobbyJoinedAt = "receiver_lobby_joined_at"
+        case lobbyCountdownStartedAt = "lobby_countdown_started_at"
+        case lobbyCountdownSeconds = "lobby_countdown_seconds"
     }
     
     // MARK: - Initializers
@@ -217,7 +253,11 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         endedReason: String? = nil,
         winnerId: UUID? = nil,
         endedAt: Date? = nil,
-        debugCounter: Int? = nil
+        debugCounter: Int? = nil,
+        challengerLobbyJoinedAt: Date? = nil,
+        receiverLobbyJoinedAt: Date? = nil,
+        lobbyCountdownStartedAt: Date? = nil,
+        lobbyCountdownSeconds: Int? = nil
     ) {
         self.id = id
         self.matchMode = matchMode
@@ -240,6 +280,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         self.winnerId = winnerId
         self.endedAt = endedAt
         self.debugCounter = debugCounter
+        self.challengerLobbyJoinedAt = challengerLobbyJoinedAt
+        self.receiverLobbyJoinedAt = receiverLobbyJoinedAt
+        self.lobbyCountdownStartedAt = lobbyCountdownStartedAt
+        self.lobbyCountdownSeconds = lobbyCountdownSeconds
     }
     
     // MARK: - Custom Decodable Implementation
@@ -267,6 +311,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         winnerId = try c.decodeIfPresent(UUID.self, forKey: .winnerId)
         endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
         debugCounter = try c.decodeIfPresent(Int.self, forKey: .debugCounter)
+        challengerLobbyJoinedAt = try c.decodeIfPresent(Date.self, forKey: .challengerLobbyJoinedAt)
+        receiverLobbyJoinedAt = try c.decodeIfPresent(Date.self, forKey: .receiverLobbyJoinedAt)
+        lobbyCountdownStartedAt = try c.decodeIfPresent(Date.self, forKey: .lobbyCountdownStartedAt)
+        lobbyCountdownSeconds = try c.decodeIfPresent(Int.self, forKey: .lobbyCountdownSeconds)
         
         // ✅ Robust decode for player_scores (JSON object with string keys)
         if let raw = try c.decodeIfPresent([String: Int].self, forKey: .playerScores) {

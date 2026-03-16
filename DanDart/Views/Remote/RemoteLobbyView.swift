@@ -57,7 +57,36 @@ struct RemoteLobbyView: View {
     }
     
     private var isBothPlayersReady: Bool {
-        matchStatus == .inProgress
+        matchStatus == .inProgress || (matchStatus == .lobby && bothPlayersPresent)
+    }
+    
+    // Lobby presence computed properties
+    private var bothPlayersPresent: Bool {
+        if let flowMatch = remoteMatchService.flowMatch, flowMatch.id == match.id {
+            return flowMatch.bothPlayersInLobby
+        }
+        return match.bothPlayersInLobby
+    }
+    
+    private var countdownActive: Bool {
+        if let flowMatch = remoteMatchService.flowMatch, flowMatch.id == match.id {
+            return flowMatch.countdownStarted
+        }
+        return match.countdownStarted
+    }
+    
+    private var countdownRemaining: TimeInterval {
+        if let flowMatch = remoteMatchService.flowMatch, flowMatch.id == match.id {
+            return flowMatch.countdownRemaining ?? 0
+        }
+        return match.countdownRemaining ?? 0
+    }
+    
+    private var countdownElapsed: Bool {
+        if let flowMatch = remoteMatchService.flowMatch, flowMatch.id == match.id {
+            return flowMatch.countdownElapsed
+        }
+        return match.countdownElapsed
     }
     
     private var formattedTime: String {
@@ -65,6 +94,11 @@ struct RemoteLobbyView: View {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    private var formattedCountdown: String {
+        let seconds = max(0, Int(countdownRemaining.rounded(.up)))
+        return "\(seconds)"
     }
     
     var body: some View {
@@ -144,6 +178,31 @@ struct RemoteLobbyView: View {
                                 .foregroundColor(AppColor.interactivePrimaryBackground)
                                 .tracking(2)
                                 .opacity(showMatchStarting ? 1.0 : 0.4)
+                            
+                            // Countdown timer when in lobby
+                            if matchStatus == .lobby && countdownActive {
+                                TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                                    let remaining = countdownRemaining
+                                    let elapsed = remaining <= 0
+                                    
+                                    Text(formattedCountdown)
+                                        .font(.system(size: 64, weight: .black, design: .monospaced))
+                                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                                        .onChange(of: elapsed) { _, isElapsed in
+                                            if isElapsed && matchStatus == .lobby && bothPlayersPresent {
+                                                Task {
+                                                    do {
+                                                        print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
+                                                        try await remoteMatchService.startMatchIfReady(matchId: match.id)
+                                                        print("✅ [Lobby] start-match-if-ready succeeded")
+                                                    } catch {
+                                                        print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                }
+                            }
                         }
                     } else {
                         // Waiting for opponent
@@ -319,6 +378,20 @@ struct RemoteLobbyView: View {
                 // Match was removed (cancelled or expired)
                 print("🚨 Match no longer exists in service, navigating back")
                 router.popToRoot()
+            }
+        }
+        .onChange(of: countdownElapsed) { _, elapsed in
+            guard elapsed, matchStatus == .lobby, bothPlayersPresent else { return }
+            
+            print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
+            
+            Task {
+                do {
+                    try await remoteMatchService.startMatchIfReady(matchId: match.id)
+                    print("✅ [Lobby] start-match-if-ready succeeded")
+                } catch {
+                    print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                }
             }
         }
         .onChange(of: matchStatus) { oldStatus, newStatus in

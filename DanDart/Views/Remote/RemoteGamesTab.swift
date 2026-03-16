@@ -671,22 +671,22 @@ struct RemoteGamesTab: View {
                 FlowDebug.log("acceptChallenge EDGE OK", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
-                // Step 2: Auto-join match (ready → lobby)
-                // Guard: Skip auto-join if match was cancelled
+                // Step 2: Enter lobby (receiver joins, ready → lobby)
+                // Guard: Skip if match was cancelled
                 let isCancelled = await MainActor.run { cancelledMatchIds.contains(matchId) }
                 guard !isCancelled else {
-                    print("🚫 [DEBUG] Skipping auto-join - match was cancelled")
+                    print("🚫 [DEBUG] Skipping enter-lobby - match was cancelled")
                     await MainActor.run {
                         remoteMatchService.endEnterFlow(matchId: matchId)
                     }
                     return
                 }
-                FlowDebug.log("joinMatch START", matchId: matchId)
+                FlowDebug.log("enterLobby START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
-                try await remoteMatchService.joinMatch(matchId: matchId, currentUserId: currentUser.id)
+                try await remoteMatchService.enterLobby(matchId: matchId)
                 
-                FlowDebug.log("joinMatch OK", matchId: matchId)
+                FlowDebug.log("enterLobby OK", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 2.5: Fetch updated match with joinWindowExpiresAt
@@ -983,7 +983,13 @@ struct RemoteGamesTab: View {
                     throw RemoteMatchError.notAuthenticated
                 }
                 
-                try await remoteMatchService.joinMatch(matchId: matchId, currentUserId: currentUser.id)
+                // Challenger enters lobby (sets challenger_lobby_joined_at, may start countdown)
+                try await remoteMatchService.enterLobby(matchId: matchId)
+                
+                // Fetch updated match to get latest lobby state
+                guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
+                    throw RemoteMatchError.databaseError("Failed to fetch updated match")
+                }
                 
                 // Success haptic
                 #if canImport(UIKit)

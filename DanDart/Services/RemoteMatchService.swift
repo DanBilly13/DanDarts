@@ -496,6 +496,10 @@ class RemoteMatchService: ObservableObject {
             let turn_index_in_leg: Int?  // 🆕 Server-authoritative turn counter
             let challenge_expires_at: String?
             let join_window_expires_at: String?
+            let challenger_lobby_joined_at: String?  // 🆕 Lobby presence tracking
+            let receiver_lobby_joined_at: String?  // 🆕 Lobby presence tracking
+            let lobby_countdown_started_at: String?  // 🆕 Lobby countdown tracking
+            let lobby_countdown_seconds: Int?  // 🆕 Lobby countdown duration
             let created_at: String
             let updated_at: String
             let ended_by: UUID?
@@ -545,6 +549,10 @@ class RemoteMatchService: ObservableObject {
         print("🧪 [fetchMatch DECODED] receiver_id=\(matchData.receiver_id.uuidString.prefix(8))...")
         print("🧪 [fetchMatch DECODED] player_scores=\(matchData.player_scores?.description ?? "nil")")
         print("🧪 [fetchMatch DECODED] turn_index_in_leg=\(matchData.turn_index_in_leg?.description ?? "nil")")
+        print("🧪 [fetchMatch DECODED] challenger_lobby_joined_at=\(matchData.challenger_lobby_joined_at ?? "nil")")
+        print("🧪 [fetchMatch DECODED] receiver_lobby_joined_at=\(matchData.receiver_lobby_joined_at ?? "nil")")
+        print("🧪 [fetchMatch DECODED] lobby_countdown_started_at=\(matchData.lobby_countdown_started_at ?? "nil")")
+        print("🧪 [fetchMatch DECODED] lobby_countdown_seconds=\(matchData.lobby_countdown_seconds?.description ?? "nil")")
         
         // Convert player_scores from [String: Int] to [UUID: Int]
         var playerScores: [UUID: Int]? = nil
@@ -575,7 +583,11 @@ class RemoteMatchService: ObservableObject {
             endedBy: matchData.ended_by,
             endedReason: matchData.ended_reason,
             winnerId: matchData.winner_id,
-            debugCounter: matchData.debug_counter
+            debugCounter: matchData.debug_counter,
+            challengerLobbyJoinedAt: matchData.challenger_lobby_joined_at.flatMap { formatter.date(from: $0) },
+            receiverLobbyJoinedAt: matchData.receiver_lobby_joined_at.flatMap { formatter.date(from: $0) },
+            lobbyCountdownStartedAt: matchData.lobby_countdown_started_at.flatMap { formatter.date(from: $0) },
+            lobbyCountdownSeconds: matchData.lobby_countdown_seconds
         )
         
         print("✅ [fetchMatch] status=\(match.status?.rawValue ?? "nil") currentPlayerId=\(match.currentPlayerId?.uuidString.prefix(8) ?? "nil")...")
@@ -585,6 +597,9 @@ class RemoteMatchService: ObservableObject {
             if self.flowMatchId == matchId {
                 // Only update if data actually changed (prevents SwiftUI churn)
                 if self.flowMatch != match {
+                    print("🎯 [Flow] flowMatch CHANGED - updating")
+                    print("🔍 [Flow] Old: challengerLobby=\(self.flowMatch?.challengerLobbyJoinedAt != nil), receiverLobby=\(self.flowMatch?.receiverLobbyJoinedAt != nil), countdown=\(self.flowMatch?.lobbyCountdownStartedAt != nil)")
+                    print("🔍 [Flow] New: challengerLobby=\(match.challengerLobbyJoinedAt != nil), receiverLobby=\(match.receiverLobbyJoinedAt != nil), countdown=\(match.lobbyCountdownStartedAt != nil)")
                     self.flowMatch = match
                     print("🎯 [Flow] flowMatch updated (changed) status=\(match.status?.rawValue ?? "nil")")
                     print("✅ [RTGD-SVC] flowMatch.lastVisitPayload = \(String(describing: self.flowMatch?.lastVisitPayload))")
@@ -593,6 +608,7 @@ class RemoteMatchService: ObservableObject {
                     print("✅ [RTGD-SVC] flowMatch.lvp.darts = \(String(describing: self.flowMatch?.lastVisitPayload?.darts))")
                 } else {
                     print("⏭️ [Flow] flowMatch unchanged, skipping update")
+                    print("🔍 [Flow] Comparison: challengerLobby=\(match.challengerLobbyJoinedAt != nil), receiverLobby=\(match.receiverLobbyJoinedAt != nil), countdown=\(match.lobbyCountdownStartedAt != nil)")
                 }
             }
         }
@@ -641,6 +657,61 @@ class RemoteMatchService: ObservableObject {
             ))
         
         print("✅ Challenge accepted: \(matchId)")
+    }
+    
+    // MARK: - Enter Lobby
+    
+    /// Enter the lobby and set lobby presence timestamp (calls Edge Function)
+    func enterLobby(matchId: UUID) async throws {
+        struct EnterLobbyRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = EnterLobbyRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        print("🚪 [EnterLobby] Calling enter-lobby with match_id: \(matchId)")
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("enter-lobby", options: FunctionInvokeOptions(
+                headers: headers,
+                body: request
+            ))
+        
+        print("✅ [EnterLobby] Entered lobby: \(matchId)")
+    }
+    
+    // MARK: - Start Match If Ready
+    
+    /// Attempt to start match if countdown has elapsed (calls Edge Function)
+    func startMatchIfReady(matchId: UUID) async throws {
+        struct StartMatchRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = StartMatchRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        print("🎮 [StartMatch] Calling start-match-if-ready with match_id: \(matchId)")
+        
+        do {
+            let _: EmptyResponse = try await supabaseService.client.functions
+                .invoke("start-match-if-ready", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: request
+                ))
+            
+            print("✅ [StartMatch] Match started: \(matchId)")
+        } catch let error as FunctionsError {
+            // Check if countdown not elapsed yet (425 status)
+            if case .httpError(let code, let data) = error, code == 425 {
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("⏳ [StartMatch] Countdown not elapsed yet: \(responseString)")
+                }
+                throw RemoteMatchError.edgeFunctionError("Countdown not elapsed yet")
+            }
+            throw error
+        }
     }
     
     // MARK: - Decline/Cancel Challenge
