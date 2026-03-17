@@ -71,6 +71,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
     // Lobby presence tracking
     let challengerLobbyJoinedAt: Date?
     let receiverLobbyJoinedAt: Date?
+    let challengerLobbyViewEnteredAt: Date?
+    let receiverLobbyViewEnteredAt: Date?
     let lobbyCountdownStartedAt: Date?
     let lobbyCountdownSeconds: Int?
     
@@ -225,6 +227,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         case debugCounter = "debug_counter"
         case challengerLobbyJoinedAt = "challenger_lobby_joined_at"
         case receiverLobbyJoinedAt = "receiver_lobby_joined_at"
+        case challengerLobbyViewEnteredAt = "challenger_lobby_view_entered_at"
+        case receiverLobbyViewEnteredAt = "receiver_lobby_view_entered_at"
         case lobbyCountdownStartedAt = "lobby_countdown_started_at"
         case lobbyCountdownSeconds = "lobby_countdown_seconds"
     }
@@ -256,6 +260,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         debugCounter: Int? = nil,
         challengerLobbyJoinedAt: Date? = nil,
         receiverLobbyJoinedAt: Date? = nil,
+        challengerLobbyViewEnteredAt: Date? = nil,
+        receiverLobbyViewEnteredAt: Date? = nil,
         lobbyCountdownStartedAt: Date? = nil,
         lobbyCountdownSeconds: Int? = nil
     ) {
@@ -282,6 +288,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         self.debugCounter = debugCounter
         self.challengerLobbyJoinedAt = challengerLobbyJoinedAt
         self.receiverLobbyJoinedAt = receiverLobbyJoinedAt
+        self.challengerLobbyViewEnteredAt = challengerLobbyViewEnteredAt
+        self.receiverLobbyViewEnteredAt = receiverLobbyViewEnteredAt
         self.lobbyCountdownStartedAt = lobbyCountdownStartedAt
         self.lobbyCountdownSeconds = lobbyCountdownSeconds
     }
@@ -313,6 +321,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         debugCounter = try c.decodeIfPresent(Int.self, forKey: .debugCounter)
         challengerLobbyJoinedAt = try c.decodeIfPresent(Date.self, forKey: .challengerLobbyJoinedAt)
         receiverLobbyJoinedAt = try c.decodeIfPresent(Date.self, forKey: .receiverLobbyJoinedAt)
+        challengerLobbyViewEnteredAt = try c.decodeIfPresent(Date.self, forKey: .challengerLobbyViewEnteredAt)
+        receiverLobbyViewEnteredAt = try c.decodeIfPresent(Date.self, forKey: .receiverLobbyViewEnteredAt)
         lobbyCountdownStartedAt = try c.decodeIfPresent(Date.self, forKey: .lobbyCountdownStartedAt)
         lobbyCountdownSeconds = try c.decodeIfPresent(Int.self, forKey: .lobbyCountdownSeconds)
         

@@ -143,11 +143,9 @@ serve(async (req) => {
     const otherPlayerPresent = match[otherLobbyTimestampField] !== null
     const bothPlayersPresent = otherPlayerPresent
 
-    // If both players present and countdown not started, start countdown
-    if (bothPlayersPresent && !match.lobby_countdown_started_at) {
-      updateData.lobby_countdown_started_at = now.toISOString()
-      console.log('Both players present - starting countdown')
-    }
+    // Note: Countdown is now started by confirm-lobby-view-entered
+    // when both players have actually entered the lobby UI
+    console.log(`Both players present: ${bothPlayersPresent} (countdown will start when both confirm lobby view entered)`)
 
     // Update match
     const { error: updateError } = await supabaseClient

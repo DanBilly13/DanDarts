@@ -44,6 +44,9 @@ struct RemoteLobbyView: View {
     @State private var lastRefreshTime: CFTimeInterval = 0
     private let minRefreshInterval: CFTimeInterval = 0.5  // 500ms minimum between refreshes
     
+    // Duplicate start guard - prevents multiple start-match-if-ready calls
+    @State private var hasRequestedMatchStart = false
+    
     private var timeRemaining: TimeInterval {
         guard let expiresAt = match.joinWindowExpiresAt else { return 0 }
         return max(0, expiresAt.timeIntervalSinceNow)
@@ -322,7 +325,12 @@ struct RemoteLobbyView: View {
             }
         }
         .onAppear {
-            print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
+            print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id.uuidString.prefix(8))")
+            
+            // Determine role
+            let isChallenger = currentUser.id == match.challengerId
+            let role = isChallenger ? "challenger" : "receiver"
+            print("🧩 [Lobby] Role: \(role)")
             
             // Skip side effects in preview mode
             guard !isPreview else {
@@ -343,13 +351,30 @@ struct RemoteLobbyView: View {
             
             isViewActive = true
             
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                showContent = true
+            // CRITICAL: Confirm lobby view entered and fetch fresh match state
+            Task {
+                do {
+                    print("🧩 [Lobby] Confirming lobby view entered...")
+                    try await remoteMatchService.confirmLobbyViewEntered(matchId: match.id)
+                    print("✅ [Lobby] Lobby view entered confirmed")
+                    
+                    // Immediately fetch fresh match to get updated countdown state
+                    print("🧩 [Lobby] Fetching fresh match after confirm...")
+                    await requestRefresh(reason: "post-confirm")
+                    
+                    // Log countdown state after confirmation
+                    if let flowMatch = remoteMatchService.flowMatch, flowMatch.id == match.id {
+                        let countdownStarted = flowMatch.countdownStarted
+                        let remaining = flowMatch.countdownRemaining ?? 0
+                        print("🧩 [Lobby] Countdown started: \(countdownStarted), remaining: \(String(format: "%.1f", remaining))s")
+                    }
+                } catch {
+                    print("❌ [Lobby] Failed to confirm lobby view entered: \(error)")
+                }
             }
             
-            // Fetch fresh match state on appear (single-shot, realtime handles updates)
-            Task {
-                await requestRefresh(reason: "onAppear")
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                showContent = true
             }
             
             // Task 13: Start voice session for this match
@@ -411,7 +436,14 @@ struct RemoteLobbyView: View {
         .onChange(of: countdownElapsed) { _, elapsed in
             guard elapsed, matchStatus == .lobby, bothPlayersPresent else { return }
             
-            print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
+            // Guard against duplicate calls
+            guard !hasRequestedMatchStart else {
+                print("⏰ [Lobby] Countdown elapsed but start already requested - skipping")
+                return
+            }
+            
+            hasRequestedMatchStart = true
+            print("⏰ [Lobby] Countdown elapsed - requesting match start (first time)")
             
             Task {
                 do {
@@ -419,6 +451,10 @@ struct RemoteLobbyView: View {
                     print("✅ [Lobby] start-match-if-ready succeeded")
                 } catch {
                     print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                    // Reset flag on error to allow retry
+                    await MainActor.run {
+                        hasRequestedMatchStart = false
+                    }
                 }
             }
         }

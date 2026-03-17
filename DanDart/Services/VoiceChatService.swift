@@ -380,6 +380,9 @@ class VoiceChatService: NSObject, ObservableObject {
             // Configure audio session
             try configureAudioSession()
             
+            // Apply selected audio route
+            setAudioRoute(selectedOutputRoute)
+            
             // Create peer connection
             try createPeerConnection()
             
@@ -575,13 +578,73 @@ class VoiceChatService: NSObject, ObservableObject {
         return session.matchId == matchId
     }
     
-    /// Select output route (Phase 1: UI-only, no actual audio routing)
+    /// Select output route and apply audio routing
     /// - Parameter route: The route to select
     func selectOutputRoute(_ route: VoiceOutputRoute) {
-        print("🎤 [Phase 1] Route selected (UI only): \(route.rawValue)")
+        print("🎤 [Phase 2] Route selected: \(route.rawValue)")
         selectedOutputRoute = route
-        // TODO Phase 2: Implement actual speaker routing
-        // TODO Phase 3: Implement actual Bluetooth routing
+        
+        // Apply audio routing if session is active
+        if currentSession != nil {
+            setAudioRoute(route)
+        }
+    }
+    
+    /// Set audio output route
+    /// - Parameter route: The route to apply
+    private func setAudioRoute(_ route: VoiceOutputRoute) {
+        print("🔊 [AudioRoute] ========== AUDIO ROUTE CHANGE REQUESTED ==========")
+        print("🔊 [AudioRoute] Target route: \(route.rawValue)")
+        
+        // Log current audio session state BEFORE change
+        print("🔊 [AudioRoute] BEFORE - Category: \(audioSession.category.rawValue)")
+        print("🔊 [AudioRoute] BEFORE - Mode: \(audioSession.mode.rawValue)")
+        print("🔊 [AudioRoute] BEFORE - Is active: \(audioSession.isOtherAudioPlaying)")
+        print("🔊 [AudioRoute] BEFORE - Current route outputs:")
+        for output in audioSession.currentRoute.outputs {
+            print("🔊 [AudioRoute]   - \(output.portType.rawValue): \(output.portName)")
+        }
+        print("🔊 [AudioRoute] BEFORE - Current route inputs:")
+        for input in audioSession.currentRoute.inputs {
+            print("🔊 [AudioRoute]   - \(input.portType.rawValue): \(input.portName)")
+        }
+        
+        do {
+            switch route {
+            case .speaker:
+                print("🔊 [AudioRoute] Attempting to override to SPEAKER...")
+                try audioSession.overrideOutputAudioPort(.speaker)
+                print("✅ [AudioRoute] Override command succeeded")
+                
+            case .phone:
+                print("🔊 [AudioRoute] Attempting to clear override (use default earpiece)...")
+                try audioSession.overrideOutputAudioPort(.none)
+                print("✅ [AudioRoute] Override cleared")
+                
+            case .bluetooth:
+                print("🔊 [AudioRoute] Bluetooth selected (Phase 3 - clearing override)")
+                try audioSession.overrideOutputAudioPort(.none)
+                print("ℹ️ [AudioRoute] Override cleared for Bluetooth")
+            }
+            
+            // Small delay to let route change take effect
+            Thread.sleep(forTimeInterval: 0.1)
+            
+            // Log current audio session state AFTER change
+            print("🔊 [AudioRoute] AFTER - Current route outputs:")
+            for output in audioSession.currentRoute.outputs {
+                print("🔊 [AudioRoute]   - \(output.portType.rawValue): \(output.portName)")
+            }
+            print("🔊 [AudioRoute] ========== AUDIO ROUTE CHANGE COMPLETE ==========")
+            
+        } catch {
+            print("❌ [AudioRoute] Failed to set audio route: \(error)")
+            print("❌ [AudioRoute] Error details: \(error.localizedDescription)")
+            if let nsError = error as NSError? {
+                print("❌ [AudioRoute] Error domain: \(nsError.domain)")
+                print("❌ [AudioRoute] Error code: \(nsError.code)")
+            }
+        }
     }
     
     // MARK: - Private State Management

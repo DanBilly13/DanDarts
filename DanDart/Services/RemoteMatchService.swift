@@ -681,6 +681,28 @@ class RemoteMatchService: ObservableObject {
         print("✅ [EnterLobby] Entered lobby: \(matchId)")
     }
     
+    // MARK: - Confirm Lobby View Entered
+    
+    /// Confirm lobby view entered and potentially start countdown (calls Edge Function)
+    func confirmLobbyViewEntered(matchId: UUID) async throws {
+        struct ConfirmRequest: Encodable {
+            let match_id: String
+        }
+        
+        let request = ConfirmRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        print("🧩 [ConfirmLobbyView] Calling confirm-lobby-view-entered with match_id: \(matchId)")
+        
+        let _: EmptyResponse = try await supabaseService.client.functions
+            .invoke("confirm-lobby-view-entered", options: FunctionInvokeOptions(
+                headers: headers,
+                body: request
+            ))
+        
+        print("✅ [ConfirmLobbyView] Lobby view entered confirmed: \(matchId)")
+    }
+    
     // MARK: - Start Match If Ready
     
     /// Attempt to start match if countdown has elapsed (calls Edge Function)

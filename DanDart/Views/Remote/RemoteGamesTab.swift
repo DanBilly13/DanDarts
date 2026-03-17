@@ -636,6 +636,7 @@ struct RemoteGamesTab: View {
     // MARK: - Button Actions
     
     private func acceptChallenge(matchId: UUID) {
+        print("🟢 [RECEIVER FLOW] Accept tapped - matchId=\(matchId.uuidString.prefix(8))")
         
         // Prevent double-accept
         guard remoteMatchService.processingMatchId == nil else {
@@ -644,10 +645,11 @@ struct RemoteGamesTab: View {
         
         // CRITICAL: Capture opponent data NOW before state changes
         guard let matchWithPlayers = remoteMatchService.pendingChallenges.first(where: { $0.match.id == matchId }) else {
-            print("❌ [RemoteGamesTab] acceptChallenge: match not found in pendingChallenges")
+            print("❌ [RECEIVER FLOW] Match not found in pendingChallenges")
             return
         }
         let opponent = matchWithPlayers.opponent
+        print("🟢 [RECEIVER FLOW] Captured opponent: \(opponent.displayName) (\(opponent.nickname))")
         
         // FREEZE LIST SNAPSHOT - capture BEFORE any state changes or network calls
         FlowDebug.log("ACCEPT TAP", matchId: matchId)
@@ -662,12 +664,14 @@ struct RemoteGamesTab: View {
                     throw RemoteMatchError.notAuthenticated
                 }
                 
+                print("🟢 [RECEIVER FLOW] accept-challenge START")
                 FlowDebug.log("acceptChallenge START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 1: Accept challenge (pending → ready)
                 try await remoteMatchService.acceptChallenge(matchId: matchId)
                 
+                print("🟢 [RECEIVER FLOW] accept-challenge SUCCESS")
                 FlowDebug.log("acceptChallenge EDGE OK", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
@@ -681,28 +685,29 @@ struct RemoteGamesTab: View {
                     }
                     return
                 }
+                print("🟢 [RECEIVER FLOW] enter-lobby START")
                 FlowDebug.log("enterLobby START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 try await remoteMatchService.enterLobby(matchId: matchId)
                 
+                print("🟢 [RECEIVER FLOW] enter-lobby SUCCESS")
                 FlowDebug.log("enterLobby OK", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 2.5: Fetch updated match with joinWindowExpiresAt
+                print("🟢 [RECEIVER FLOW] fetchMatch START")
                 FlowDebug.log("fetchMatch BEFORE", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
-                print("🔍 [DEBUG] Fetching updated match data...")
                 guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     throw RemoteMatchError.databaseError("Failed to fetch updated match")
                 }
                 let statusStr = updatedMatch.status?.rawValue ?? "nil"
                 let cpStr = updatedMatch.currentPlayerId?.uuidString.prefix(8) ?? "nil"
+                print("🟢 [RECEIVER FLOW] fetchMatch SUCCESS - status=\(statusStr)")
                 FlowDebug.log("fetchMatch AFTER status=\(statusStr) cp=\(cpStr)", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
-                
-                print("✅ [DEBUG] Updated match fetched")
                 
                 // Success haptic
                 #if canImport(UIKit)
@@ -712,11 +717,9 @@ struct RemoteGamesTab: View {
                 
                 // Step 3: Navigate to lobby with fresh match data (receiver flow)
                 await MainActor.run {
-                    print("🔵 [TIMING] MainActor.run START - processingMatchId: \(String(describing: remoteMatchService.processingMatchId))")
-                    
                     // Guard: Don't navigate if match was cancelled
                     guard !cancelledMatchIds.contains(matchId) else {
-                        print("🚫 [DEBUG] Skipping navigation - match was cancelled")
+                        print("🚫 [RECEIVER FLOW] Skipping navigation - match was cancelled")
                         remoteMatchService.endEnterFlow(matchId: matchId)
                         return
                     }
@@ -727,25 +730,21 @@ struct RemoteGamesTab: View {
                     let token = remoteMatchService.navToken
                     let matchIdLocal = matchId
                     
-                    // Schedule navigation on next runloop to prevent multi-frame updates
-                    Task { @MainActor in
-                        // Let SwiftUI finish current frame
-                        await Task.yield()
+                    // Guard: only push if we're still the active nav request
+                    guard remoteMatchService.navInFlightMatchId == matchIdLocal else {
+                        FlowDebug.log("NAV SKIP (navInFlight changed)", matchId: matchIdLocal)
+                        return
+                    }
+                    guard token == remoteMatchService.navToken else {
+                        FlowDebug.log("NAV SKIP (token changed)", matchId: matchIdLocal)
+                        return
+                    }
+                    
+                    print("🟢 [RECEIVER FLOW] About to push remoteLobby")
+                    FlowDebug.log("NAV PUSH remoteLobby (immediate)", matchId: matchIdLocal)
+                    FlowDebug.log("NAV PUSH .remoteLobby stack=\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))", matchId: matchIdLocal)
                         
-                        // Guard: only push if we're still the active nav request
-                        guard remoteMatchService.navInFlightMatchId == matchIdLocal else {
-                            FlowDebug.log("NAV SKIP (navInFlight changed)", matchId: matchIdLocal)
-                            return
-                        }
-                        guard token == remoteMatchService.navToken else {
-                            FlowDebug.log("NAV SKIP (token changed)", matchId: matchIdLocal)
-                            return
-                        }
-                        
-                        FlowDebug.log("NAV PUSH remoteLobby (scheduled)", matchId: matchIdLocal)
-                        FlowDebug.log("NAV PUSH .remoteLobby stack=\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))", matchId: matchIdLocal)
-                        
-                        router.push(.remoteLobby(
+                    router.push(.remoteLobby(
                         match: updatedMatch,
                         opponent: opponent,
                         currentUser: currentUser,
@@ -804,17 +803,13 @@ struct RemoteGamesTab: View {
                             }
                         },
                         onUnfreeze: unfreezeListSnapshotAfterTransition
-                        ))
-                        
-                        // DO NOT clear latch here - let it stay active until lobby appears
-                        // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
-                        
-                        print("🔵 [TIMING] router.push called - processingMatchId: \(String(describing: remoteMatchService.processingMatchId))")
-                    }
+                    ))
                     
-                    // Keep processing state active until Lobby.onAppear
+                    print("🟢 [RECEIVER FLOW] Pushed remoteLobby successfully")
+                    
+                    // DO NOT clear latch here - let it stay active until lobby appears
+                    // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
                     FlowDebug.log("PROCESSING KEEP (until Lobby onAppear)", matchId: matchId)
-                    print("🔵 [TIMING] MainActor.run END")
                 }
                 
                 // Reload matches in background to update UI state after navigation
@@ -968,11 +963,21 @@ struct RemoteGamesTab: View {
     }
     
     private func joinMatch(matchId: UUID) {
+        print("🔵 [JOIN FLOW] Challenger tapped Join - matchId=\(matchId.uuidString.prefix(8))")
+        
         // Guard: Don't join if match was cancelled
         guard !cancelledMatchIds.contains(matchId) else {
-            print("🚫 [DEBUG] Ignoring join - match was cancelled")
+            print("🚫 [JOIN FLOW] Ignoring join - match was cancelled")
             return
         }
+        
+        // CRITICAL: Capture opponent data NOW before state changes (similar to receiver flow)
+        guard let matchWithPlayers = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId }) else {
+            print("❌ [JOIN FLOW] Match not found in readyMatches - cannot capture opponent")
+            return
+        }
+        let opponent = matchWithPlayers.opponent
+        print("🔵 [JOIN FLOW] Captured opponent: \(opponent.displayName) (\(opponent.nickname))")
         
         // BEGIN LATCH IMMEDIATELY - before realtime updates can arrive (challenger flow)
         remoteMatchService.beginEnterFlow(matchId: matchId)
@@ -984,12 +989,26 @@ struct RemoteGamesTab: View {
                 }
                 
                 // Challenger enters lobby (sets challenger_lobby_joined_at, may start countdown)
+                print("🔵 [JOIN FLOW] enter-lobby START")
                 try await remoteMatchService.enterLobby(matchId: matchId)
+                print("🔵 [JOIN FLOW] enter-lobby SUCCESS")
                 
                 // Fetch updated match to get latest lobby state
+                print("🔵 [JOIN FLOW] fetchMatch START")
                 guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     throw RemoteMatchError.databaseError("Failed to fetch updated match")
                 }
+                let statusStr = updatedMatch.status?.rawValue ?? "nil"
+                print("🔵 [JOIN FLOW] fetchMatch SUCCESS - status=\(statusStr)")
+                
+                // Log lobby timestamps
+                let challengerTs = updatedMatch.challengerLobbyJoinedAt?.description ?? "nil"
+                let receiverTs = updatedMatch.receiverLobbyJoinedAt?.description ?? "nil"
+                let countdownTs = updatedMatch.lobbyCountdownStartedAt?.description ?? "nil"
+                print("🔵 [JOIN FLOW] Lobby timestamps:")
+                print("🔵 [JOIN FLOW]   challenger_lobby_joined_at: \(challengerTs)")
+                print("🔵 [JOIN FLOW]   receiver_lobby_joined_at: \(receiverTs)")
+                print("🔵 [JOIN FLOW]   lobby_countdown_started_at: \(countdownTs)")
                 
                 // Success haptic
                 #if canImport(UIKit)
@@ -1000,85 +1019,82 @@ struct RemoteGamesTab: View {
                 await MainActor.run {
                     // Guard: Don't navigate if match was cancelled
                     guard !cancelledMatchIds.contains(matchId) else {
-                        print("🚫 [DEBUG] Skipping navigation - match was cancelled")
+                        print("🚫 [JOIN FLOW] Skipping navigation - match was cancelled")
+                        remoteMatchService.endEnterFlow(matchId: matchId)
                         return
                     }
                     
-                    // Navigate to lobby
-                    // Find the match in either ready or lobby state
-                    let match = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId })
-                        ?? remoteMatchService.activeMatch
+                    // Navigate to lobby using fetched authoritative match (not service arrays)
+                    print("🔵 [JOIN FLOW] About to push remoteLobby with updatedMatch (status=\(statusStr))")
                     
-                    if let matchWithPlayers = match,
-                       let currentUser = authService.currentUser {
-                        // Latch already active from button tap - just push
-                        FlowDebug.log("NAV PUSH .remoteLobby stack=\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))", matchId: matchId)
-                        router.push(.remoteLobby(
-                            match: matchWithPlayers.match,
-                            opponent: matchWithPlayers.opponent,
-                            currentUser: currentUser,
-                            cancelledMatchIds: $cancelledMatchIds,
-                            onCancel: {
-                                Task {
-                                    do {
-                                        print("🟠 [RemoteTab] onCancel closure called (challenger flow)")
-                                        
-                                        // Fetch current match to determine status
-                                        guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
-                                            print("❌ [RemoteTab] Match not found, navigating back")
-                                            await MainActor.run {
-                                                router.popToRoot()
-                                            }
-                                            return
-                                        }
-                                        
-                                        let matchStatus = currentMatch.status
-                                        print("🟠 [RemoteTab] Current match status: \(matchStatus?.rawValue ?? "nil")")
-                                        
-                                        // Route to correct endpoint based on status
-                                        if matchStatus == .lobby || matchStatus == .inProgress {
-                                            print("🟠 [RemoteTab] Calling abortMatch")
-                                            try await remoteMatchService.abortMatch(matchId: matchId)
-                                        } else {
-                                            print("🟠 [RemoteTab] Calling cancelChallenge")
-                                            try await remoteMatchService.cancelChallenge(matchId: matchId)
-                                        }
-                                        
-                                        print("✅ [RemoteTab] Cancel/abort successful")
-                                        
-                                        // Success haptic
-                                        #if canImport(UIKit)
-                                        let generator = UIImpactFeedbackGenerator(style: .light)
-                                        generator.impactOccurred()
-                                        #endif
-                                        
+                    router.push(.remoteLobby(
+                        match: updatedMatch,
+                        opponent: opponent,
+                        currentUser: currentUser,
+                        cancelledMatchIds: $cancelledMatchIds,
+                        onCancel: {
+                            Task {
+                                do {
+                                    print("🟠 [RemoteTab] onCancel closure called (challenger flow)")
+                                    
+                                    // Fetch current match to determine status
+                                    guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
+                                        print("❌ [RemoteTab] Match not found, navigating back")
                                         await MainActor.run {
                                             router.popToRoot()
                                         }
-                                    } catch {
-                                        print("❌ [RemoteTab] Failed to cancel match: \(error)")
-                                        
-                                        // Error haptic
-                                        #if canImport(UIKit)
-                                        let generator = UINotificationFeedbackGenerator()
-                                        generator.notificationOccurred(.error)
-                                        #endif
-                                        
-                                        // Still navigate back even on error
-                                        await MainActor.run {
-                                            router.popToRoot()
-                                        }
+                                        return
+                                    }
+                                    
+                                    let matchStatus = currentMatch.status
+                                    print("🟠 [RemoteTab] Current match status: \(matchStatus?.rawValue ?? "nil")")
+                                    
+                                    // Route to correct endpoint based on status
+                                    if matchStatus == .lobby || matchStatus == .inProgress {
+                                        print("🟠 [RemoteTab] Calling abortMatch")
+                                        try await remoteMatchService.abortMatch(matchId: matchId)
+                                    } else {
+                                        print("🟠 [RemoteTab] Calling cancelChallenge")
+                                        try await remoteMatchService.cancelChallenge(matchId: matchId)
+                                    }
+                                    
+                                    print("✅ [RemoteTab] Cancel/abort successful")
+                                    
+                                    // Success haptic
+                                    #if canImport(UIKit)
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                    #endif
+                                    
+                                    await MainActor.run {
+                                        router.popToRoot()
+                                    }
+                                } catch {
+                                    print("❌ [RemoteTab] Failed to cancel match: \(error)")
+                                    
+                                    // Error haptic
+                                    #if canImport(UIKit)
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.error)
+                                    #endif
+                                    
+                                    // Still navigate back even on error
+                                    await MainActor.run {
+                                        router.popToRoot()
                                     }
                                 }
-                            },
-                            onUnfreeze: unfreezeListSnapshotAfterTransition
-                        ))
-                        
-                        // DO NOT clear latch here - let it stay active until lobby appears
-                        // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
-                    }
+                            }
+                        },
+                        onUnfreeze: unfreezeListSnapshotAfterTransition
+                    ))
+                    
+                    print("🔵 [JOIN FLOW] Pushed remoteLobby successfully")
+                    
+                    // DO NOT clear latch here - let it stay active until lobby appears
+                    // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
                 }
             } catch {
+                print("❌ [JOIN FLOW] Error: \(error.localizedDescription)")
                 await MainActor.run {
                     // Clear all enter-flow state on error (challenger flow)
                     remoteMatchService.endEnterFlow(matchId: matchId)
