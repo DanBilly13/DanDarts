@@ -298,10 +298,11 @@ struct RemoteLobbyView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            // Task 11: Voice control button (top-left)
-            ToolbarItem(placement: .topBarLeading) {
-                voiceControlButton
-            }
+            // Phase 13: Voice controls moved to gameplay view
+            // Voice status line remains visible in lobby body
+            // ToolbarItem(placement: .topBarLeading) {
+            //     voiceControlButton
+            // }
             
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

@@ -871,9 +871,10 @@ struct RemoteGameplayView: View {
         return gameplayContent(overlayState, using: m, adapter: adapter)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Task 12: Voice control button (top-left)
+                // Phase 13: Voice control menu button (top-left)
                 ToolbarItem(placement: .topBarLeading) {
-                    voiceControlButton
+                    VoiceControlMenuButton()
+                        .environmentObject(voiceChatService)
                 }
                 
                 ToolbarItem(placement: .principal) {
@@ -1118,51 +1119,6 @@ struct RemoteGameplayView: View {
                 print("📦 [LastVisit] Cleared (nil)")
             }
         }
-    }
-}
-
-// MARK: - Voice UI Components (Task 12)
-
-extension RemoteGameplayView {
-    /// Voice control button - top-left toolbar
-    private var voiceControlButton: some View {
-        Button {
-            // Task 12: Toggle mute
-            Task {
-                await voiceChatService.toggleMute()
-            }
-        } label: {
-            Group {
-                switch voiceChatService.connectionState {
-                case .idle, .connecting:
-                    // Show microphone icon but disabled appearance
-                    Image(systemName: "microphone")
-                        .foregroundColor(AppColor.textSecondary)
-                        .opacity(0.5)
-                    
-                case .connected:
-                    // Show mute state
-                    if voiceChatService.muteState == .muted {
-                        Image(systemName: "microphone.slash")
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                    } else {
-                        Image(systemName: "microphone")
-                            .foregroundColor(AppColor.interactiveSecondaryBackground)
-                    }
-                    
-                case .failed, .disconnected, .ended:
-                    // Show unavailable state
-                    Image(systemName: "microphone.slash")
-                        .foregroundColor(AppColor.textSecondary)
-                        .opacity(0.5)
-                }
-            }
-            .font(.system(size: 20))
-            .contentTransition(.symbolEffect(.replace))
-        }
-        .disabled(voiceChatService.connectionState != VoiceSessionState.connected)
-        .animation(.easeInOut(duration: 0.2), value: voiceChatService.connectionState)
-        .animation(.easeInOut(duration: 0.2), value: voiceChatService.muteState)
     }
 }
 

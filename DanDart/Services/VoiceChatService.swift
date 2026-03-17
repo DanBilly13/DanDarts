@@ -11,6 +11,24 @@ import AVFoundation
 import Supabase
 import WebRTC
 
+// MARK: - Voice Output Route (Phase 1 - UI only)
+
+/// Audio output route options for voice chat
+/// Phase 1: UI state only, no actual routing implementation
+enum VoiceOutputRoute: String, CaseIterable {
+    case speaker = "Speaker"
+    case bluetooth = "Bluetooth"
+    case phone = "Phone"
+    
+    var icon: String {
+        switch self {
+        case .speaker: return "speaker.wave.2"
+        case .bluetooth: return "airpodspro"
+        case .phone: return "iphone"
+        }
+    }
+}
+
 // MARK: - Signalling Message Types
 
 /// Message envelope for all voice signalling messages
@@ -271,6 +289,9 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Derived UI states computed from session state
     @Published private(set) var uiState: VoiceUIState = .hidden
     @Published private(set) var iconState: VoiceIconState = .hidden
+    
+    /// Voice control menu state (Phase 1 - UI only, no actual routing)
+    @Published private(set) var selectedOutputRoute: VoiceOutputRoute = .phone
     
     // MARK: - Public Interface
     
@@ -552,6 +573,15 @@ class VoiceChatService: NSObject, ObservableObject {
             return false
         }
         return session.matchId == matchId
+    }
+    
+    /// Select output route (Phase 1: UI-only, no actual audio routing)
+    /// - Parameter route: The route to select
+    func selectOutputRoute(_ route: VoiceOutputRoute) {
+        print("🎤 [Phase 1] Route selected (UI only): \(route.rawValue)")
+        selectedOutputRoute = route
+        // TODO Phase 2: Implement actual speaker routing
+        // TODO Phase 3: Implement actual Bluetooth routing
     }
     
     // MARK: - Private State Management
