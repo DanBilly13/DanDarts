@@ -32,12 +32,31 @@ class SoundManager: ObservableObject {
     // MARK: - Audio Session Setup
     
     private func setupAudioSession() {
+        print("🔊 [SoundManager] setupAudioSession() called")
+        
         do {
-            try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
+            let audioSession = AVAudioSession.sharedInstance()
+            
+            // Log current audio session state
+            print("🔊 [SoundManager] Current category: \(audioSession.category.rawValue)")
+            print("🔊 [SoundManager] Current mode: \(audioSession.mode.rawValue)")
+            
+            // Check if voice chat is active - don't override it
+            if audioSession.category == .playAndRecord && audioSession.mode == .voiceChat {
+                print("🔊 [SoundManager] ⚠️ Voice chat active - SKIPPING audio session reconfiguration")
+                print("🔊 [SoundManager] Preserving .voiceChat mode for speaker routing")
+                isInitialized = true
+                return
+            }
+            
+            // Only configure if not in voice chat mode
+            print("🔊 [SoundManager] No voice chat detected - configuring for sound effects")
+            try audioSession.setCategory(.ambient, mode: .default)
+            try audioSession.setActive(true)
             isInitialized = true
+            print("🔊 [SoundManager] ✅ Audio session configured: .ambient, .default")
         } catch {
-            print("Failed to setup audio session: \(error)")
+            print("❌ [SoundManager] Failed to setup audio session: \(error)")
         }
     }
     
@@ -127,6 +146,15 @@ class SoundManager: ObservableObject {
     
     /// Play boxing sound for pre-game hype
     func playBoxingSound() {
+        print("🔊 [SoundManager] playBoxingSound() called")
+        print("🔊 [SoundManager] isInitialized: \(isInitialized)")
+        
+        // Check if we need to reinitialize (this would trigger setupAudioSession)
+        if !isInitialized {
+            print("🔊 [SoundManager] ⚠️ Not initialized - will call setupAudioSession()")
+            setupAudioSession()
+        }
+        
         playSound(named: "boxing")
     }
     
