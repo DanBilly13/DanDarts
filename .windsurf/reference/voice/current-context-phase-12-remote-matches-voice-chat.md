@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # remote-matches-current-context-phase-12-voice-chat
 
