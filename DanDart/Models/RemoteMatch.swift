@@ -568,6 +568,32 @@ extension RemoteMatch {
         endedReason: nil,
         winnerId: nil
     )
+    
+    static let mockLobbyWithCountdown = RemoteMatch(
+        id: UUID(),
+        matchMode: "remote",
+        gameType: "Remote 301",
+        gameName: "Remote 301",
+        matchFormat: 1,
+        challengerId: UUID(),
+        receiverId: UUID(),
+        status: .lobby,
+        currentPlayerId: nil,
+        challengeExpiresAt: nil,
+        joinWindowExpiresAt: Date().addingTimeInterval(300), // 5 minutes
+        lastVisitPayload: nil,
+        createdAt: Date(),
+        updatedAt: Date(),
+        endedBy: nil,
+        endedReason: nil,
+        winnerId: nil,
+        endedAt: nil,
+        debugCounter: 0,
+        challengerLobbyJoinedAt: Date().addingTimeInterval(-2), // Joined 2 seconds ago
+        receiverLobbyJoinedAt: Date().addingTimeInterval(-1), // Joined 1 second ago
+        lobbyCountdownStartedAt: Date().addingTimeInterval(-2), // Started 2 seconds ago
+        lobbyCountdownSeconds: 5 // 5 second countdown
+    )
 }
 
 // MARK: - Presentation Status Extension

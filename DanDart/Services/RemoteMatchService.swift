@@ -1502,3 +1502,17 @@ class RemoteMatchService: ObservableObject {
     }
     #endif
 }
+
+// MARK: - Preview Support
+
+#if DEBUG
+extension RemoteMatchService {
+    static var preview: RemoteMatchService {
+        let service = RemoteMatchService()
+        // Set up mock flow match for preview
+        service.flowMatch = RemoteMatch.mockLobbyWithCountdown
+        service.flowMatchId = service.flowMatch?.id
+        return service
+    }
+}
+#endif

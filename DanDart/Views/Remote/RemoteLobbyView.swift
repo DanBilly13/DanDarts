@@ -21,6 +21,11 @@ struct RemoteLobbyView: View {
     @EnvironmentObject private var remoteMatchService: RemoteMatchService
     @EnvironmentObject private var voiceChatService: VoiceChatService
     
+    // Preview mode detection - skip side effects in previews
+    private var isPreview: Bool {
+        ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
+    
     @State private var instanceId = UUID()
     
     // Static set to track matches being started across ALL instances
@@ -139,7 +144,7 @@ struct RemoteLobbyView: View {
                             .font(.system(size: 28, weight: .black))
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
-                    .offset(y: -40)
+                    .offset(y: -32)
                 }
                 .padding(.horizontal, 16)
                 .scaleEffect(showContent ? 1.0 : 0.8)
@@ -156,7 +161,8 @@ struct RemoteLobbyView: View {
                                 .foregroundStyle(.red)
                             
                             Text("Match Expired")
-                                .font(.system(size: 24, weight: .bold))
+                                .font(.system(.title2, design: .rounded))
+                                .fontWeight(.semibold)
                                 .foregroundColor(AppColor.textPrimary)
                             
                             Text("The join window has closed")
@@ -167,14 +173,16 @@ struct RemoteLobbyView: View {
                         // Both players ready - show "MATCH STARTING" with flashing animation
                         VStack(spacing: 16) {
                             Text("Players Ready")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(.callout, design: .rounded))
+                                .fontWeight(.semibold)
                                 .foregroundColor(AppColor.interactiveSecondaryBackground)
                             
                             // Task 10: Voice status line
                             voiceStatusLine
                             
                             Text("MATCH STARTING")
-                                .font(.system(size: 32, weight: .black))
+                                .font(.system(.title2, design: .rounded))
+                                .fontWeight(.semibold)
                                 .foregroundColor(AppColor.interactivePrimaryBackground)
                                 .tracking(2)
                                 .opacity(showMatchStarting ? 1.0 : 0.4)
@@ -186,7 +194,8 @@ struct RemoteLobbyView: View {
                                     let elapsed = remaining <= 0
                                     
                                     Text(formattedCountdown)
-                                        .font(.system(size: 64, weight: .black, design: .monospaced))
+                                        .font(.system(.title, design: .monospaced))
+                                        .fontWeight(.semibold)
                                         .foregroundColor(AppColor.interactivePrimaryBackground)
                                         .onChange(of: elapsed) { _, isElapsed in
                                             if isElapsed && matchStatus == .lobby && bothPlayersPresent {
@@ -211,14 +220,16 @@ struct RemoteLobbyView: View {
                                 .tint(AppColor.interactivePrimaryBackground)
                                 .scaleEffect(1.5)
                             
-                            Text("Waiting for \(opponent.displayName) to join...")
-                                .font(.system(size: 20, weight: .semibold))
+                            Text("Waiting for \(opponent.displayName) to join")
+                                .font(.system(.headline, design: .rounded))
+                                .fontWeight(.semibold)
                                 .foregroundColor(AppColor.textPrimary)
                             
                             // Countdown timer
                             TimelineView(.periodic(from: .now, by: 1.0)) { context in
                                 Text(formattedTime)
-                                    .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                    .font(.system(.title, design: .monospaced))
+                                    .fontWeight(.semibold)
                                     .foregroundColor(timeRemaining < 60 ? .red : AppColor.interactivePrimaryBackground)
                             }
                         }
@@ -311,6 +322,16 @@ struct RemoteLobbyView: View {
         }
         .onAppear {
             print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id)")
+            
+            // Skip side effects in preview mode
+            guard !isPreview else {
+                print("🎨 [Lobby] Preview mode - skipping side effects")
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                    showContent = true
+                }
+                return
+            }
+            
             remoteMatchService.enterRemoteFlow(matchId: match.id, initialMatch: match)
             
             // Clear ALL enter-flow state (latch, nav-in-flight, processing)
@@ -348,6 +369,12 @@ struct RemoteLobbyView: View {
         }
         .onDisappear {
             print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
+            
+            // Skip side effects in preview mode
+            guard !isPreview else {
+                print("🎨 [Lobby] Preview mode - skipping onDisappear side effects")
+                return
+            }
             
             // Voice session persists across navigation to gameplay
             // It will be ended by flow-level teardown, not screen lifecycle
@@ -602,7 +629,7 @@ struct RemoteLobbyView: View {
             PlayerAvatarView(
                 avatarURL: user.avatarURL,
                 size: 96,
-                borderColor: isCurrentUser ? AppColor.interactiveSecondaryBackground : AppColor.interactivePrimaryBackground
+                /*borderColor: isCurrentUser ? AppColor.interactiveSecondaryBackground : AppColor.interactivePrimaryBackground*/
             )
             
             Spacer()
@@ -611,12 +638,13 @@ struct RemoteLobbyView: View {
             // Name and nickname
             VStack(spacing: 0) {
                 Text(user.displayName)
-                    .font(.subheadline)
+                    .font(.system(.headline, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(AppColor.textPrimary)
                 
                 Text("@\(user.nickname)")
-                    .font(.footnote)
+                    .font(.system(. subheadline, design: .rounded))
+                    .fontWeight(.medium)
                     .foregroundColor(AppColor.textSecondary)
             }
             
@@ -661,7 +689,8 @@ struct RemoteLobbyView: View {
                         .font(.system(size: 12))
                         .foregroundColor(AppColor.interactiveSecondaryBackground)
                     Text("Voice ready")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(.semibold)
                         .foregroundColor(AppColor.interactiveSecondaryBackground)
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -672,7 +701,8 @@ struct RemoteLobbyView: View {
                         .font(.system(size: 12))
                         .foregroundColor(AppColor.textSecondary)
                     Text("Voice not available")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(.semibold)
                         .foregroundColor(AppColor.textSecondary)
                 }
                 .opacity(0.6)
@@ -730,6 +760,12 @@ struct RemoteLobbyView: View {
     
     /// Single entry point for all refresh requests - prevents competing fetches
     private func requestRefresh(reason: String) async {
+        // Gate 0: Skip network calls in preview mode
+        guard !isPreview else {
+            print("🎨 [Lobby] SKIP refresh (\(reason)) - preview mode")
+            return
+        }
+        
         // Gate 1: Don't refresh if transitioning to gameplay
         guard !isTransitioningToGameplay else {
             print("⏭️ [Lobby] SKIP refresh (\(reason)) - transitioning to gameplay")
@@ -767,21 +803,44 @@ struct RemoteLobbyView: View {
 
 // MARK: - Preview
 
-#Preview {
-    struct PreviewWrapper: View {
-        @State private var cancelledMatchIds: Set<UUID> = []
-        
-        var body: some View {
-            RemoteLobbyView(
-                match: RemoteMatch.mockReady,
-                opponent: User.mockUsers[0],
-                currentUser: User.mockUsers[1],
-                onCancel: {},
-                onUnfreeze: {},
-                cancelledMatchIds: $cancelledMatchIds
-            )
-        }
-    }
-    
-    return PreviewWrapper()
+#Preview("Waiting for Opponent") {
+    RemoteLobbyView(
+        match: RemoteMatch.mockReady,
+        opponent: User.mockUsers[0],
+        currentUser: User.mockUsers[1],
+        onCancel: {},
+        onUnfreeze: {},
+        cancelledMatchIds: .constant([])
+    )
+    .environmentObject(Router.shared)
+    .environmentObject(RemoteMatchService())
+    .environmentObject(VoiceChatService.shared)
+}
+
+#Preview("Both Players Ready - Countdown") {
+    RemoteLobbyView(
+        match: RemoteMatch.mockLobbyWithCountdown,
+        opponent: User.mockUsers[0],
+        currentUser: User.mockUsers[1],
+        onCancel: {},
+        onUnfreeze: {},
+        cancelledMatchIds: .constant([])
+    )
+    .environmentObject(Router.shared)
+    .environmentObject(RemoteMatchService())
+    .environmentObject(VoiceChatService.shared)
+}
+
+#Preview("Match Starting") {
+    RemoteLobbyView(
+        match: RemoteMatch.mockInProgress,
+        opponent: User.mockUsers[0],
+        currentUser: User.mockUsers[1],
+        onCancel: {},
+        onUnfreeze: {},
+        cancelledMatchIds: .constant([])
+    )
+    .environmentObject(Router.shared)
+    .environmentObject(RemoteMatchService())
+    .environmentObject(VoiceChatService.shared)
 }
