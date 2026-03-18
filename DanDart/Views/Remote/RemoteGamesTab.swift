@@ -371,23 +371,34 @@ struct RemoteGamesTab: View {
     
     // Freeze/unfreeze methods
     @MainActor
-    private func freezeListSnapshot() {
-        guard !listFrozen else { return }
+    private func freezeListSnapshot(reason: String, matchId: UUID?) {
+        guard !listFrozen else { 
+            FlowDebug.log("FREEZE: SKIP reason=alreadyFrozen", matchId: matchId)
+            return 
+        }
         // Capture ONCE from the service
         frozenPending = remoteMatchService.pendingChallenges
         frozenReady = remoteMatchService.readyMatches
         frozenSent = remoteMatchService.sentChallenges
         listFrozen = true
-        print("🧊 [ListFreeze] Snapshot captured - pending: \(frozenPending.count), ready: \(frozenReady.count), sent: \(frozenSent.count)")
+        
+        let pendingIds = frozenPending.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+        let readyIds = frozenReady.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+        let sentIds = frozenSent.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+        FlowDebug.log("FREEZE: CAPTURE reason=\(reason) pending=[\(pendingIds)] ready=[\(readyIds)] sent=[\(sentIds)]", matchId: matchId)
     }
     
     @MainActor
-    private func unfreezeListSnapshot() {
+    private func unfreezeListSnapshot(reason: String = "unknown", matchId: UUID? = nil) {
+        guard listFrozen else {
+            FlowDebug.log("FREEZE: SKIP CLEAR reason=notFrozen", matchId: matchId)
+            return
+        }
         listFrozen = false
         frozenPending = []
         frozenReady = []
         frozenSent = []
-        print("🧊 [ListFreeze] Snapshot cleared - list unfrozen")
+        FlowDebug.log("FREEZE: CLEAR reason=\(reason)", matchId: matchId)
     }
 
     // Delay unfreeze to avoid list/section churn during navigation push animations
@@ -636,26 +647,33 @@ struct RemoteGamesTab: View {
     // MARK: - Button Actions
     
     private func acceptChallenge(matchId: UUID) {
-        print("🟢 [RECEIVER FLOW] Accept tapped - matchId=\(matchId.uuidString.prefix(8))")
+        let enteringFlow = remoteMatchService.isEnteringFlow
+        let navInFlight = remoteMatchService.navInFlightMatchId != nil
+        FlowDebug.log("ACCEPT: TAP enteringFlow=\(enteringFlow) navInFlight=\(navInFlight)", matchId: matchId)
+        remoteMatchService.dumpStateSnapshot(reason: "acceptTap", matchId: matchId)
         
         // Prevent double-accept
         guard remoteMatchService.processingMatchId == nil else {
+            FlowDebug.log("ACCEPT: SKIP reason=alreadyProcessing", matchId: matchId)
             return
         }
         
         // CRITICAL: Capture opponent data NOW before state changes
         guard let matchWithPlayers = remoteMatchService.pendingChallenges.first(where: { $0.match.id == matchId }) else {
-            print("❌ [RECEIVER FLOW] Match not found in pendingChallenges")
+            FlowDebug.log("ACCEPT: ERROR match not found in pendingChallenges", matchId: matchId)
             return
         }
         let opponent = matchWithPlayers.opponent
-        print("🟢 [RECEIVER FLOW] Captured opponent: \(opponent.displayName) (\(opponent.nickname))")
+        FlowDebug.log("ACCEPT: opponent captured name=\(opponent.displayName)", matchId: matchId)
+        
+        // BEGIN ACCEPT UI FREEZE - force pending state during flow
+        remoteMatchService.beginAcceptPresentationFreeze(matchId: matchId)
         
         // FREEZE LIST SNAPSHOT - capture BEFORE any state changes or network calls
-        FlowDebug.log("ACCEPT TAP", matchId: matchId)
-        freezeListSnapshot()
+        freezeListSnapshot(reason: "acceptTap", matchId: matchId)
         
         // BEGIN ENTER FLOW - sets processing, latch, and nav-in-flight all at once
+        FlowDebug.log("ACCEPT: BEGIN ENTER FLOW", matchId: matchId)
         remoteMatchService.beginEnterFlow(matchId: matchId)
         
         Task {
@@ -664,16 +682,17 @@ struct RemoteGamesTab: View {
                     throw RemoteMatchError.notAuthenticated
                 }
                 
-                print("🟢 [RECEIVER FLOW] accept-challenge START")
-                FlowDebug.log("acceptChallenge START", matchId: matchId)
+                FlowDebug.log("ACCEPT: acceptChallenge EDGE START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 1: Accept challenge (pending → ready)
                 try await remoteMatchService.acceptChallenge(matchId: matchId)
                 
-                print("🟢 [RECEIVER FLOW] accept-challenge SUCCESS")
-                FlowDebug.log("acceptChallenge EDGE OK", matchId: matchId)
-                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                FlowDebug.log("ACCEPT: acceptChallenge EDGE OK", matchId: matchId)
+                await MainActor.run { 
+                    remoteMatchService.refreshPendingEnterFlow(matchId: matchId)
+                    remoteMatchService.dumpStateSnapshot(reason: "acceptSuccess", matchId: matchId)
+                }
                 
                 // Step 2: Enter lobby (receiver joins, ready → lobby)
                 // Guard: Skip if match was cancelled
@@ -685,19 +704,19 @@ struct RemoteGamesTab: View {
                     }
                     return
                 }
-                print("🟢 [RECEIVER FLOW] enter-lobby START")
-                FlowDebug.log("enterLobby START", matchId: matchId)
+                FlowDebug.log("ACCEPT: enterLobby EDGE START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 try await remoteMatchService.enterLobby(matchId: matchId)
                 
-                print("🟢 [RECEIVER FLOW] enter-lobby SUCCESS")
-                FlowDebug.log("enterLobby OK", matchId: matchId)
-                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
+                FlowDebug.log("ACCEPT: enterLobby EDGE OK", matchId: matchId)
+                await MainActor.run { 
+                    remoteMatchService.refreshPendingEnterFlow(matchId: matchId)
+                    remoteMatchService.dumpStateSnapshot(reason: "enterLobbySuccess", matchId: matchId)
+                }
                 
                 // Step 2.5: Fetch updated match with joinWindowExpiresAt
-                print("🟢 [RECEIVER FLOW] fetchMatch START")
-                FlowDebug.log("fetchMatch BEFORE", matchId: matchId)
+                FlowDebug.log("ACCEPT: fetchMatch START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
@@ -705,8 +724,7 @@ struct RemoteGamesTab: View {
                 }
                 let statusStr = updatedMatch.status?.rawValue ?? "nil"
                 let cpStr = updatedMatch.currentPlayerId?.uuidString.prefix(8) ?? "nil"
-                print("🟢 [RECEIVER FLOW] fetchMatch SUCCESS - status=\(statusStr)")
-                FlowDebug.log("fetchMatch AFTER status=\(statusStr) cp=\(cpStr)", matchId: matchId)
+                FlowDebug.log("ACCEPT: fetchMatch OK status=\(statusStr) cp=\(cpStr)", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Success haptic
@@ -724,7 +742,8 @@ struct RemoteGamesTab: View {
                         return
                     }
                     
-                    FlowDebug.log("NAV REQUEST remoteLobby", matchId: matchId)
+                    let navInFlightId = remoteMatchService.navInFlightMatchId?.uuidString.prefix(8) ?? "none"
+                    FlowDebug.log("ROUTER: REQUEST push remoteLobby navInFlight=\(navInFlightId)", matchId: matchId)
                     
                     // Capture token for guard
                     let token = remoteMatchService.navToken
@@ -732,17 +751,15 @@ struct RemoteGamesTab: View {
                     
                     // Guard: only push if we're still the active nav request
                     guard remoteMatchService.navInFlightMatchId == matchIdLocal else {
-                        FlowDebug.log("NAV SKIP (navInFlight changed)", matchId: matchIdLocal)
+                        FlowDebug.log("ROUTER: SKIP push remoteLobby reason=navInFlightChanged", matchId: matchIdLocal)
                         return
                     }
                     guard token == remoteMatchService.navToken else {
-                        FlowDebug.log("NAV SKIP (token changed)", matchId: matchIdLocal)
+                        FlowDebug.log("ROUTER: SKIP push remoteLobby reason=tokenChanged", matchId: matchIdLocal)
                         return
                     }
                     
-                    print("🟢 [RECEIVER FLOW] About to push remoteLobby")
-                    FlowDebug.log("NAV PUSH remoteLobby (immediate)", matchId: matchIdLocal)
-                    FlowDebug.log("NAV PUSH .remoteLobby stack=\(Thread.callStackSymbols.prefix(12).joined(separator: "\n"))", matchId: matchIdLocal)
+                    FlowDebug.log("ROUTER: PUSH remoteLobby", matchId: matchIdLocal)
                         
                     router.push(.remoteLobby(
                         match: updatedMatch,
@@ -821,6 +838,10 @@ struct RemoteGamesTab: View {
                 }
             } catch {
                 await MainActor.run {
+                    // Clear accept UI freeze on error
+                    remoteMatchService.clearAcceptPresentationFreeze(matchId: matchId)
+                    FlowDebug.log("ACCEPT_UI_FREEZE: CLEAR reason=acceptError", matchId: matchId)
+                    
                     // Clear all enter-flow state on error
                     remoteMatchService.endEnterFlow(matchId: matchId)
                     errorMessage = "Failed to accept challenge: \(error.localizedDescription)"
@@ -916,6 +937,10 @@ struct RemoteGamesTab: View {
         
         print("🟠 [RemoteTab] Guards passed, setting cancellation guard")
         
+        // Clear accept UI freeze on cancel
+        remoteMatchService.clearAcceptPresentationFreeze(matchId: matchId)
+        FlowDebug.log("ACCEPT_UI_FREEZE: CLEAR reason=cancel", matchId: matchId)
+        
         // IMMEDIATELY mark as cancelled (before async call)
         cancelledMatchIds.insert(matchId)
         remoteMatchService.processingMatchId = matchId
@@ -963,23 +988,26 @@ struct RemoteGamesTab: View {
     }
     
     private func joinMatch(matchId: UUID) {
-        print("🔵 [JOIN FLOW] Challenger tapped Join - matchId=\(matchId.uuidString.prefix(8))")
+        let enteringFlow = remoteMatchService.isEnteringFlow
+        let navInFlight = remoteMatchService.navInFlightMatchId != nil
+        FlowDebug.log("JOIN: TAP enteringFlow=\(enteringFlow) navInFlight=\(navInFlight)", matchId: matchId)
         
         // Guard: Don't join if match was cancelled
         guard !cancelledMatchIds.contains(matchId) else {
-            print("🚫 [JOIN FLOW] Ignoring join - match was cancelled")
+            FlowDebug.log("JOIN: SKIP reason=matchCancelled", matchId: matchId)
             return
         }
         
         // CRITICAL: Capture opponent data NOW before state changes (similar to receiver flow)
         guard let matchWithPlayers = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId }) else {
-            print("❌ [JOIN FLOW] Match not found in readyMatches - cannot capture opponent")
+            FlowDebug.log("JOIN: ERROR match not found in readyMatches", matchId: matchId)
             return
         }
         let opponent = matchWithPlayers.opponent
-        print("🔵 [JOIN FLOW] Captured opponent: \(opponent.displayName) (\(opponent.nickname))")
+        FlowDebug.log("JOIN: opponent captured name=\(opponent.displayName)", matchId: matchId)
         
         // BEGIN LATCH IMMEDIATELY - before realtime updates can arrive (challenger flow)
+        FlowDebug.log("JOIN: BEGIN ENTER FLOW", matchId: matchId)
         remoteMatchService.beginEnterFlow(matchId: matchId)
         
         Task {
@@ -989,26 +1017,18 @@ struct RemoteGamesTab: View {
                 }
                 
                 // Challenger enters lobby (sets challenger_lobby_joined_at, may start countdown)
-                print("🔵 [JOIN FLOW] enter-lobby START")
+                FlowDebug.log("JOIN: enterLobby EDGE START", matchId: matchId)
                 try await remoteMatchService.enterLobby(matchId: matchId)
-                print("🔵 [JOIN FLOW] enter-lobby SUCCESS")
+                FlowDebug.log("JOIN: enterLobby EDGE OK", matchId: matchId)
                 
                 // Fetch updated match to get latest lobby state
-                print("🔵 [JOIN FLOW] fetchMatch START")
+                FlowDebug.log("JOIN: fetchMatch START", matchId: matchId)
                 guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     throw RemoteMatchError.databaseError("Failed to fetch updated match")
                 }
                 let statusStr = updatedMatch.status?.rawValue ?? "nil"
-                print("🔵 [JOIN FLOW] fetchMatch SUCCESS - status=\(statusStr)")
-                
-                // Log lobby timestamps
-                let challengerTs = updatedMatch.challengerLobbyJoinedAt?.description ?? "nil"
-                let receiverTs = updatedMatch.receiverLobbyJoinedAt?.description ?? "nil"
-                let countdownTs = updatedMatch.lobbyCountdownStartedAt?.description ?? "nil"
-                print("🔵 [JOIN FLOW] Lobby timestamps:")
-                print("🔵 [JOIN FLOW]   challenger_lobby_joined_at: \(challengerTs)")
-                print("🔵 [JOIN FLOW]   receiver_lobby_joined_at: \(receiverTs)")
-                print("🔵 [JOIN FLOW]   lobby_countdown_started_at: \(countdownTs)")
+                let cpStr = updatedMatch.currentPlayerId?.uuidString.prefix(8) ?? "nil"
+                FlowDebug.log("JOIN: fetchMatch OK status=\(statusStr) cp=\(cpStr)", matchId: matchId)
                 
                 // Success haptic
                 #if canImport(UIKit)
@@ -1019,13 +1039,15 @@ struct RemoteGamesTab: View {
                 await MainActor.run {
                     // Guard: Don't navigate if match was cancelled
                     guard !cancelledMatchIds.contains(matchId) else {
-                        print("🚫 [JOIN FLOW] Skipping navigation - match was cancelled")
+                        FlowDebug.log("JOIN: SKIP navigation reason=matchCancelled", matchId: matchId)
                         remoteMatchService.endEnterFlow(matchId: matchId)
                         return
                     }
                     
-                    // Navigate to lobby using fetched authoritative match (not service arrays)
-                    print("🔵 [JOIN FLOW] About to push remoteLobby with updatedMatch (status=\(statusStr))")
+                    let navInFlightId = remoteMatchService.navInFlightMatchId?.uuidString.prefix(8) ?? "none"
+                    FlowDebug.log("ROUTER: REQUEST push remoteLobby navInFlight=\(navInFlightId)", matchId: matchId)
+                    
+                    FlowDebug.log("ROUTER: PUSH remoteLobby", matchId: matchId)
                     
                     router.push(.remoteLobby(
                         match: updatedMatch,
@@ -1035,7 +1057,7 @@ struct RemoteGamesTab: View {
                         onCancel: {
                             Task {
                                 do {
-                                    print("🟠 [RemoteTab] onCancel closure called (challenger flow)")
+                                    FlowDebug.log("JOIN: onCancel called", matchId: matchId)
                                     
                                     // Fetch current match to determine status
                                     guard let currentMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
@@ -1088,13 +1110,13 @@ struct RemoteGamesTab: View {
                         onUnfreeze: unfreezeListSnapshotAfterTransition
                     ))
                     
-                    print("🔵 [JOIN FLOW] Pushed remoteLobby successfully")
+                    FlowDebug.log("JOIN: navigation complete", matchId: matchId)
                     
                     // DO NOT clear latch here - let it stay active until lobby appears
                     // Latch will be cleared by RemoteLobbyView.onAppear or failsafe timer
                 }
             } catch {
-                print("❌ [JOIN FLOW] Error: \(error.localizedDescription)")
+                FlowDebug.log("JOIN: ERROR \(error.localizedDescription)", matchId: matchId)
                 await MainActor.run {
                     // Clear all enter-flow state on error (challenger flow)
                     remoteMatchService.endEnterFlow(matchId: matchId)
@@ -1188,7 +1210,16 @@ struct RemoteGamesTab: View {
         isExpired: Bool,
         showAsDeclined: Bool
     ) -> CardPresentationState {
-        // Expired takes precedence
+        let matchId = match.match.id
+        
+        // ACCEPT UI FREEZE OVERRIDE: Force pending state during receiver accept flow
+        if remoteMatchService.isAcceptPresentationFrozen(matchId: matchId) {
+            let rawStatus = match.match.status?.rawValue ?? "nil"
+            FlowDebug.log("ACCEPT_UI_FREEZE: USING pending override rawStatus=\(rawStatus)", matchId: matchId)
+            return .pending
+        }
+        
+        // Expired takes precedence (after freeze check)
         if isExpired {
             return .expired
         }

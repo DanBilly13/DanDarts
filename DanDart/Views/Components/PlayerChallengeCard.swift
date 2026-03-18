@@ -374,7 +374,7 @@ struct PlayerChallengeCardFoot: View {
             totalWins: 15,
             totalLosses: 8
         ),
-        state: .sent,
+        state: .lobby,
         gameType: "Remote 501",
         matchFormat: 3,
         expiresAt: Date().addingTimeInterval(300)

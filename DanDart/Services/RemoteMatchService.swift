@@ -71,6 +71,49 @@ class RemoteMatchService: ObservableObject {
     private let reloadThrottleMs = 400
     private let flowFetchThrottleMs = 250
     
+    // MARK: - Accept Presentation Freeze (UI Override)
+    
+    private(set) var acceptPresentationFrozenMatchIds: Set<UUID> = []
+    
+    func beginAcceptPresentationFreeze(matchId: UUID) {
+        acceptPresentationFrozenMatchIds.insert(matchId)
+        FlowDebug.log("ACCEPT_UI_FREEZE: BEGIN", matchId: matchId)
+    }
+    
+    func clearAcceptPresentationFreeze(matchId: UUID) {
+        let wasPresent = acceptPresentationFrozenMatchIds.remove(matchId) != nil
+        if wasPresent {
+            FlowDebug.log("ACCEPT_UI_FREEZE: CLEAR", matchId: matchId)
+        }
+    }
+    
+    func isAcceptPresentationFrozen(matchId: UUID) -> Bool {
+        return acceptPresentationFrozenMatchIds.contains(matchId)
+    }
+    
+    // MARK: - Debug Instrumentation
+    
+    private var loadMatchesRunCounter = 0
+    
+    /// Dump complete state snapshot for debugging
+    @MainActor
+    func dumpStateSnapshot(reason: String, matchId: UUID?) {
+        let flowMatchIdStr = flowMatchId?.uuidString.prefix(8) ?? "none"
+        let flowMatchStatus = flowMatch?.status?.rawValue ?? "nil"
+        let pendingIds = pendingChallenges.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+        let readyIds = readyMatches.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+        let sentIds = sentChallenges.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+        let activeId = activeMatch.map { String($0.match.id.uuidString.prefix(8)) } ?? "none"
+        let navInFlightId = navInFlightMatchId?.uuidString.prefix(8) ?? "none"
+        let processingId = processingMatchId?.uuidString.prefix(8) ?? "none"
+        
+        FlowDebug.log("SNAPSHOT: reason=\(reason)", matchId: matchId)
+        FlowDebug.log("SNAPSHOT: flowMatch id=\(flowMatchIdStr) status=\(flowMatchStatus)", matchId: matchId)
+        FlowDebug.log("SNAPSHOT: pending=[\(pendingIds)] ready=[\(readyIds)] sent=[\(sentIds)] active=\(activeId)", matchId: matchId)
+        FlowDebug.log("SNAPSHOT: isEnteringFlow=\(isEnteringFlow) isInRemoteFlow=\(isInRemoteFlow)", matchId: matchId)
+        FlowDebug.log("SNAPSHOT: navInFlight=\(navInFlightId) processing=\(processingId)", matchId: matchId)
+    }
+    
     // MARK: - Helper Methods
     
     /// Get headers required for Edge Function calls (apikey + auth token)
@@ -97,6 +140,9 @@ class RemoteMatchService: ObservableObject {
         remoteFlowDepth += 1
         flowMatchId = matchId
         if let initialMatch {
+            let oldStatus = flowMatch?.status?.rawValue ?? "nil"
+            let newStatus = initialMatch.status?.rawValue ?? "nil"
+            FlowDebug.log("FLOW_MATCH: SET reason=enterRemoteFlow old.status=\(oldStatus) new.status=\(newStatus)", matchId: matchId)
             flowMatch = initialMatch
         }
         if isInRemoteFlow == false {
@@ -112,6 +158,9 @@ class RemoteMatchService: ObservableObject {
         remoteFlowDepth = max(0, remoteFlowDepth - 1)
         print("🚦 [FlowGate] EXIT depth=\(remoteFlowDepth)")
         if remoteFlowDepth == 0 {
+            let oldMatchId = flowMatchId
+            let oldStatus = flowMatch?.status?.rawValue ?? "nil"
+            FlowDebug.log("FLOW_MATCH: CLEAR reason=exitRemoteFlow old.status=\(oldStatus)", matchId: oldMatchId)
             isInRemoteFlow = false
             flowMatchId = nil
             flowMatch = nil
@@ -224,6 +273,8 @@ class RemoteMatchService: ObservableObject {
         if processingMatchId == matchId {
             processingMatchId = nil
         }
+        // Defensive: Clear accept UI freeze if still set
+        clearAcceptPresentationFreeze(matchId: matchId)
     }
     
     // MARK: - Realtime Subscription
@@ -234,13 +285,22 @@ class RemoteMatchService: ObservableObject {
     
     /// Load all remote matches for the current user
     func loadMatches(userId: UUID) async throws {
-        // CRITICAL: Skip loadMatches while entering flow to prevent list rebuild flash
+        // Increment run counter
         await MainActor.run {
-            if isEnteringFlow {
-                FlowDebug.log("SKIP loadMatches (entering flow)", matchId: processingMatchId!)
-                return
-            }
+            loadMatchesRunCounter += 1
         }
+        let runNumber = await MainActor.run { loadMatchesRunCounter }
+        
+        // CRITICAL: Skip loadMatches while entering flow to prevent list rebuild flash
+        let shouldSkip = await MainActor.run { isEnteringFlow }
+        if shouldSkip {
+            let processingId = await MainActor.run { processingMatchId }
+            FlowDebug.log("LOAD: RUN \(runNumber) SKIP reason=enteringFlow", matchId: processingId)
+            return
+        }
+        
+        let inRemoteFlow = await MainActor.run { isInRemoteFlow }
+        FlowDebug.log("LOAD: RUN \(runNumber) BEGIN inRemoteFlow=\(inRemoteFlow) enteringFlow=false", matchId: nil)
         
         isLoading = true
         defer { isLoading = false }
@@ -256,9 +316,11 @@ class RemoteMatchService: ObservableObject {
                 .execute()
                 .value
             
-            print("📊 [LoadMatches] Query returned \(matches.count) total matches")
+            FlowDebug.log("LOAD: RUN \(runNumber) QUERY returned \(matches.count) matches", matchId: nil)
             for match in matches {
-                print("   - \(match.id.uuidString.prefix(8))... status=\(match.status?.rawValue ?? "nil") updated=\(match.updatedAt)")
+                let statusStr = match.status?.rawValue ?? "nil"
+                let updatedStr = ISO8601DateFormatter().string(from: match.updatedAt)
+                FlowDebug.log("LOAD: RUN \(runNumber) RAW match=\(match.id.uuidString.prefix(8)) status=\(statusStr) updated=\(updatedStr)", matchId: match.id)
             }
             
             // Load user data for all unique user IDs
@@ -301,8 +363,10 @@ class RemoteMatchService: ObservableObject {
                 
                 // Use presentation status to freeze list grouping during enter flow
                 let status = await MainActor.run { debugPresentationStatus(match) }
-                
-                print("🔍 [LoadMatches] Match \(match.id.uuidString.prefix(8))... raw=\(match.status?.rawValue ?? "nil") pres=\(status.rawValue)")
+                let rawStatus = match.status?.rawValue ?? "nil"
+                let presStatus = status.rawValue
+                let freezeActive = await MainActor.run { pendingEnterFlowMatchIds.contains(match.id) }
+                FlowDebug.log("LOAD: RUN \(runNumber) MAP match=\(match.id.uuidString.prefix(8)) raw=\(rawStatus) -> presented=\(presStatus) freeze=\(freezeActive)", matchId: match.id)
                 
                 switch status {
                 case .pending:
@@ -337,14 +401,18 @@ class RemoteMatchService: ObservableObject {
                     // Cancelled: receiver declined it, or user cancelled their own challenge
                     // Completed/Expired: match is finished
                     // Either way, exclude from active lists
-                    print("🚫 [LoadMatches] FILTERED OUT match \(match.id.uuidString.prefix(8))... status=\(status.rawValue)")
+                    FlowDebug.log("LOAD: RUN \(runNumber) FILTER OUT match=\(match.id.uuidString.prefix(8)) status=\(status.rawValue)", matchId: match.id)
                     break
                 }
             }
             
-            // Debug logging to confirm filtering
-            print("🧹 Filtered lists - Pending: \(pending.count), Sent: \(sent.count), Ready: \(ready.count)")
-            print("🧹 Sent challenges:", sent.map { "\($0.match.id.uuidString.prefix(8))... status=\($0.match.status?.rawValue ?? "nil")" })
+            // Publish arrays with detailed logging
+            let pendingIds = pending.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+            let readyIds = ready.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+            let sentIds = sent.map { String($0.match.id.uuidString.prefix(8)) }.joined(separator: ",")
+            let activeId = active.map { String($0.match.id.uuidString.prefix(8)) } ?? "none"
+            
+            FlowDebug.log("LOAD: RUN \(runNumber) PUBLISH pending=[\(pendingIds)] ready=[\(readyIds)] sent=[\(sentIds)] active=\(activeId)", matchId: nil)
             
             self.pendingChallenges = pending
             self.sentChallenges = sent
@@ -352,7 +420,7 @@ class RemoteMatchService: ObservableObject {
             self.activeMatch = active
             
         } catch {
-            print("❌ Failed to load remote matches: \(error)")
+            FlowDebug.log("LOAD: RUN \(runNumber) ERROR \(error.localizedDescription)", matchId: nil)
             // Clear lists to prevent stale UI state from persisting
             await MainActor.run {
                 self.pendingChallenges = []
@@ -597,18 +665,32 @@ class RemoteMatchService: ObservableObject {
             if self.flowMatchId == matchId {
                 // Only update if data actually changed (prevents SwiftUI churn)
                 if self.flowMatch != match {
-                    print("🎯 [Flow] flowMatch CHANGED - updating")
-                    print("🔍 [Flow] Old: challengerLobby=\(self.flowMatch?.challengerLobbyJoinedAt != nil), receiverLobby=\(self.flowMatch?.receiverLobbyJoinedAt != nil), countdown=\(self.flowMatch?.lobbyCountdownStartedAt != nil)")
-                    print("🔍 [Flow] New: challengerLobby=\(match.challengerLobbyJoinedAt != nil), receiverLobby=\(match.receiverLobbyJoinedAt != nil), countdown=\(match.lobbyCountdownStartedAt != nil)")
+                    let oldStatus = self.flowMatch?.status?.rawValue ?? "nil"
+                    let newStatus = match.status?.rawValue ?? "nil"
+                    let oldCp = self.flowMatch?.currentPlayerId?.uuidString.prefix(8) ?? "nil"
+                    let newCp = match.currentPlayerId?.uuidString.prefix(8) ?? "nil"
+                    let oldChallengerJoined = self.flowMatch?.challengerLobbyJoinedAt != nil
+                    let newChallengerJoined = match.challengerLobbyJoinedAt != nil
+                    let oldReceiverJoined = self.flowMatch?.receiverLobbyJoinedAt != nil
+                    let newReceiverJoined = match.receiverLobbyJoinedAt != nil
+                    let oldChallengerViewEntered = self.flowMatch?.challengerLobbyViewEnteredAt != nil
+                    let newChallengerViewEntered = match.challengerLobbyViewEnteredAt != nil
+                    let oldReceiverViewEntered = self.flowMatch?.receiverLobbyViewEnteredAt != nil
+                    let newReceiverViewEntered = match.receiverLobbyViewEnteredAt != nil
+                    let oldCountdown = self.flowMatch?.lobbyCountdownStartedAt != nil
+                    let newCountdown = match.lobbyCountdownStartedAt != nil
+                    
+                    FlowDebug.log("FLOW_MATCH: UPDATE reason=fetchMatch old.status=\(oldStatus) new.status=\(newStatus)", matchId: matchId)
+                    FlowDebug.log("FLOW_MATCH: UPDATE old.cp=\(oldCp) new.cp=\(newCp)", matchId: matchId)
+                    FlowDebug.log("FLOW_MATCH: UPDATE old.challenger_joined=\(oldChallengerJoined) new=\(newChallengerJoined)", matchId: matchId)
+                    FlowDebug.log("FLOW_MATCH: UPDATE old.receiver_joined=\(oldReceiverJoined) new=\(newReceiverJoined)", matchId: matchId)
+                    FlowDebug.log("FLOW_MATCH: UPDATE old.challenger_view_entered=\(oldChallengerViewEntered) new=\(newChallengerViewEntered)", matchId: matchId)
+                    FlowDebug.log("FLOW_MATCH: UPDATE old.receiver_view_entered=\(oldReceiverViewEntered) new=\(newReceiverViewEntered)", matchId: matchId)
+                    FlowDebug.log("FLOW_MATCH: UPDATE old.countdown=\(oldCountdown) new=\(newCountdown)", matchId: matchId)
+                    
                     self.flowMatch = match
-                    print("🎯 [Flow] flowMatch updated (changed) status=\(match.status?.rawValue ?? "nil")")
-                    print("✅ [RTGD-SVC] flowMatch.lastVisitPayload = \(String(describing: self.flowMatch?.lastVisitPayload))")
-                    print("✅ [RTGD-SVC] flowMatch.lvp.ts = \(String(describing: self.flowMatch?.lastVisitPayload?.timestamp))")
-                    print("✅ [RTGD-SVC] flowMatch.lvp.pid = \(String(describing: self.flowMatch?.lastVisitPayload?.playerId))")
-                    print("✅ [RTGD-SVC] flowMatch.lvp.darts = \(String(describing: self.flowMatch?.lastVisitPayload?.darts))")
                 } else {
-                    print("⏭️ [Flow] flowMatch unchanged, skipping update")
-                    print("🔍 [Flow] Comparison: challengerLobby=\(match.challengerLobbyJoinedAt != nil), receiverLobby=\(match.receiverLobbyJoinedAt != nil), countdown=\(match.lobbyCountdownStartedAt != nil)")
+                    FlowDebug.log("FLOW_MATCH: SKIP UPDATE reason=unchanged", matchId: matchId)
                 }
             }
         }

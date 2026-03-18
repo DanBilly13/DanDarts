@@ -330,7 +330,11 @@ struct RemoteLobbyView: View {
             // Determine role
             let isChallenger = currentUser.id == match.challengerId
             let role = isChallenger ? "challenger" : "receiver"
-            print("🧩 [Lobby] Role: \(role)")
+            FlowDebug.log("LOBBY: onAppear role=\(role)", matchId: match.id)
+            
+            // CLEAR ACCEPT UI FREEZE - handoff complete
+            remoteMatchService.clearAcceptPresentationFreeze(matchId: match.id)
+            FlowDebug.log("ACCEPT_UI_FREEZE: CLEAR reason=lobbyOnAppear", matchId: match.id)
             
             // Skip side effects in preview mode
             guard !isPreview else {
@@ -354,22 +358,28 @@ struct RemoteLobbyView: View {
             // CRITICAL: Confirm lobby view entered and fetch fresh match state
             Task {
                 do {
-                    print("🧩 [Lobby] Confirming lobby view entered...")
+                    FlowDebug.log("LOBBY: confirmLobbyViewEntered START", matchId: match.id)
                     try await remoteMatchService.confirmLobbyViewEntered(matchId: match.id)
-                    print("✅ [Lobby] Lobby view entered confirmed")
+                    FlowDebug.log("LOBBY: confirmLobbyViewEntered OK", matchId: match.id)
                     
                     // Immediately fetch fresh match to get updated countdown state
-                    print("🧩 [Lobby] Fetching fresh match after confirm...")
+                    FlowDebug.log("LOBBY: requestRefresh START reason=post-confirm", matchId: match.id)
                     await requestRefresh(reason: "post-confirm")
+                    FlowDebug.log("LOBBY: requestRefresh OK", matchId: match.id)
                     
                     // Log countdown state after confirmation
                     if let flowMatch = remoteMatchService.flowMatch, flowMatch.id == match.id {
                         let countdownStarted = flowMatch.countdownStarted
                         let remaining = flowMatch.countdownRemaining ?? 0
-                        print("🧩 [Lobby] Countdown started: \(countdownStarted), remaining: \(String(format: "%.1f", remaining))s")
+                        FlowDebug.log("LOBBY: countdown state countdownStarted=\(countdownStarted) remaining=\(String(format: "%.1f", remaining))s", matchId: match.id)
+                    }
+                    
+                    // Snapshot after confirm
+                    await MainActor.run {
+                        remoteMatchService.dumpStateSnapshot(reason: "lobbyOnAppear_afterConfirm", matchId: match.id)
                     }
                 } catch {
-                    print("❌ [Lobby] Failed to confirm lobby view entered: \(error)")
+                    FlowDebug.log("LOBBY: confirmLobbyViewEntered ERROR \(error.localizedDescription)", matchId: match.id)
                 }
             }
             
@@ -394,7 +404,7 @@ struct RemoteLobbyView: View {
             }
         }
         .onDisappear {
-            print("🧩 [Lobby] instance=\(instanceId) onDisappear - match=\(match.id)")
+            FlowDebug.log("LOBBY: onDisappear", matchId: match.id)
             
             // Skip side effects in preview mode
             guard !isPreview else {
@@ -429,7 +439,10 @@ struct RemoteLobbyView: View {
             
             if !matchExists && !isStarting {
                 // Match was removed (cancelled or expired)
-                print("🚨 Match no longer exists in service, navigating back")
+                let flowMatchExists = remoteMatchService.flowMatch?.id == match.id
+                let flowMatchStatus = remoteMatchService.flowMatch?.status?.rawValue ?? "nil"
+                FlowDebug.log("LOBBY_EXIT: TRIGGER reason=matchNotInService matchExists=\(matchExists) isStarting=\(isStarting) flowMatchExists=\(flowMatchExists) flowMatchStatus=\(flowMatchStatus)", matchId: match.id)
+                remoteMatchService.dumpStateSnapshot(reason: "lobbyExit_matchNotInService", matchId: match.id)
                 router.popToRoot()
             }
         }
