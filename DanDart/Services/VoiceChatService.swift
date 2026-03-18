@@ -256,6 +256,15 @@ class VoiceChatService: NSObject, ObservableObject {
     private override init() {
         super.init()
         print("🎤 VoiceChatService initialized")
+        
+        // Observe audio route changes (e.g., Bluetooth disconnect)
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleAudioRouteChange(notification)
+        }
     }
     
     // MARK: - Private Properties
@@ -290,8 +299,26 @@ class VoiceChatService: NSObject, ObservableObject {
     @Published private(set) var uiState: VoiceUIState = .hidden
     @Published private(set) var iconState: VoiceIconState = .hidden
     
-    /// Voice control menu state (Phase 1 - UI only, no actual routing)
-    @Published private(set) var selectedOutputRoute: VoiceOutputRoute = .phone
+    /// Voice control menu state (Phase 2 - with routing)
+    @Published private(set) var selectedOutputRoute: VoiceOutputRoute = .speaker
+    
+    // MARK: - Route Preference Persistence
+    
+    private let preferredRouteKey = "voiceChat.preferredOutputRoute"
+    
+    private var userPreferredRoute: VoiceOutputRoute? {
+        get {
+            guard let rawValue = UserDefaults.standard.string(forKey: preferredRouteKey) else { return nil }
+            return VoiceOutputRoute(rawValue: rawValue)
+        }
+        set {
+            if let route = newValue {
+                UserDefaults.standard.set(route.rawValue, forKey: preferredRouteKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: preferredRouteKey)
+            }
+        }
+    }
     
     // MARK: - Public Interface
     
@@ -379,6 +406,21 @@ class VoiceChatService: NSObject, ObservableObject {
             
             // Configure audio session
             try configureAudioSession()
+            
+            // Load user's preferred route if available, otherwise use speaker default
+            if let preferredRoute = userPreferredRoute {
+                // Check if preferred route is available (especially for Bluetooth)
+                if isRouteAvailable(preferredRoute) {
+                    selectedOutputRoute = preferredRoute
+                    print("🎤 [Route] Using saved preferred route: \(preferredRoute.rawValue)")
+                } else {
+                    selectedOutputRoute = .speaker
+                    print("🎤 [Route] Preferred route \(preferredRoute.rawValue) unavailable, falling back to speaker")
+                }
+            } else {
+                selectedOutputRoute = .speaker
+                print("🎤 [Route] No saved preference, using default: speaker")
+            }
             
             // Apply selected audio route
             setAudioRoute(selectedOutputRoute)
@@ -584,6 +626,11 @@ class VoiceChatService: NSObject, ObservableObject {
         print("🎤 [Phase 2] Route selected: \(route.rawValue)")
         selectedOutputRoute = route
         
+        // Save user preference (especially important for Bluetooth)
+        // Only save explicit user selections, not system-driven changes
+        userPreferredRoute = route
+        print("🎤 [Route] Saved user preference: \(route.rawValue)")
+        
         // Apply audio routing if session is active
         if currentSession != nil {
             setAudioRoute(route)
@@ -643,6 +690,59 @@ class VoiceChatService: NSObject, ObservableObject {
             if let nsError = error as NSError? {
                 print("❌ [AudioRoute] Error domain: \(nsError.domain)")
                 print("❌ [AudioRoute] Error code: \(nsError.code)")
+            }
+        }
+    }
+    
+    /// Check if a specific audio route is currently available
+    /// - Parameter route: The route to check
+    /// - Returns: True if the route is available, false otherwise
+    private func isRouteAvailable(_ route: VoiceOutputRoute) -> Bool {
+        switch route {
+        case .speaker, .phone:
+            // Speaker and phone are always available
+            return true
+            
+        case .bluetooth:
+            // Check if any Bluetooth audio devices are connected
+            let availableInputs = audioSession.availableInputs ?? []
+            let hasBluetoothInput = availableInputs.contains { input in
+                input.portType == .bluetoothHFP || 
+                input.portType == .bluetoothA2DP ||
+                input.portType == .bluetoothLE
+            }
+            
+            let currentOutputs = audioSession.currentRoute.outputs
+            let hasBluetoothOutput = currentOutputs.contains { output in
+                output.portType == .bluetoothHFP || 
+                output.portType == .bluetoothA2DP ||
+                output.portType == .bluetoothLE
+            }
+            
+            let isAvailable = hasBluetoothInput || hasBluetoothOutput
+            print("🔊 [Route] Bluetooth availability check: \(isAvailable)")
+            return isAvailable
+        }
+    }
+    
+    /// Handle system audio route changes (e.g., Bluetooth disconnect)
+    private func handleAudioRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        print("🔊 [RouteChange] Audio route changed, reason: \(reason.rawValue)")
+        
+        // If the current route becomes unavailable (e.g., Bluetooth disconnected)
+        if reason == .oldDeviceUnavailable {
+            // Fall back to speaker gracefully
+            if selectedOutputRoute == .bluetooth {
+                print("🔊 [RouteChange] Bluetooth disconnected, falling back to speaker")
+                selectedOutputRoute = .speaker
+                setAudioRoute(.speaker)
+                // Don't update userPreferredRoute - keep Bluetooth as preference for next time
             }
         }
     }
