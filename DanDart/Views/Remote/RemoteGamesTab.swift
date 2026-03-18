@@ -583,9 +583,6 @@ struct RemoteGamesTab: View {
     
     /// Check notification permissions and request if needed (Phase 8)
     private func checkNotificationPermissions() async {
-        // DEBUG: Print JWT token for testing push notifications
-        await authService.printCurrentUserToken()
-        
         // Only request once per session
         guard !hasRequestedPermissions else {
             // Even if we already requested, retry token sync on subsequent visits
@@ -694,6 +691,11 @@ struct RemoteGamesTab: View {
                     remoteMatchService.dumpStateSnapshot(reason: "acceptSuccess", matchId: matchId)
                 }
                 
+                // Step 1.5: Wait 1 second to avoid database lock contention
+                FlowDebug.log("ACCEPT: DELAY 1s before enterLobby to avoid lock contention", matchId: matchId)
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                FlowDebug.log("ACCEPT: DELAY complete", matchId: matchId)
+                
                 // Step 2: Enter lobby (receiver joins, ready → lobby)
                 // Guard: Skip if match was cancelled
                 let isCancelled = await MainActor.run { cancelledMatchIds.contains(matchId) }
@@ -704,10 +706,29 @@ struct RemoteGamesTab: View {
                     }
                     return
                 }
+                // Step 2.1: TIMING INSTRUMENTATION - Start
+                let enterLobbyStartTime = CFAbsoluteTimeGetCurrent()
+                FlowDebug.log("ACCEPT: enterLobby TIMING_START timestamp=\(enterLobbyStartTime)", matchId: matchId)
                 FlowDebug.log("ACCEPT: enterLobby EDGE START", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
+                // Step 2.2: Call enterLobby with timing
+                let requestSentTime = CFAbsoluteTimeGetCurrent()
+                let clientPrepDuration = requestSentTime - enterLobbyStartTime
+                FlowDebug.log("ACCEPT: enterLobby REQUEST_SENT clientPrep=\(String(format: "%.3f", clientPrepDuration))s", matchId: matchId)
+                
                 try await remoteMatchService.enterLobby(matchId: matchId)
+                
+                // Step 2.3: TIMING INSTRUMENTATION - Complete
+                let responseReceivedTime = CFAbsoluteTimeGetCurrent()
+                let networkDuration = responseReceivedTime - requestSentTime
+                let totalDuration = responseReceivedTime - enterLobbyStartTime
+                FlowDebug.log("ACCEPT: enterLobby TIMING_COMPLETE network=\(String(format: "%.3f", networkDuration))s total=\(String(format: "%.3f", totalDuration))s", matchId: matchId)
+                
+                // Log warning if abnormally slow
+                if totalDuration > 2.0 {
+                    FlowDebug.log("ACCEPT: enterLobby SLOW_WARNING duration=\(String(format: "%.3f", totalDuration))s threshold=2.0s", matchId: matchId)
+                }
                 
                 FlowDebug.log("ACCEPT: enterLobby EDGE OK", matchId: matchId)
                 await MainActor.run { 
@@ -727,7 +748,47 @@ struct RemoteGamesTab: View {
                 FlowDebug.log("ACCEPT: fetchMatch OK status=\(statusStr) cp=\(cpStr)", matchId: matchId)
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
-                // Success haptic
+                // Step 2.6: AUTHORITATIVE REVALIDATION GATE
+                // Validate match status before continuing to lobby navigation
+                let status = updatedMatch.status
+                FlowDebug.log("ACCEPT: REVALIDATE status=\(statusStr)", matchId: matchId)
+                
+                // Guard: Only continue for valid lobby states
+                guard status == .lobby || status == .inProgress else {
+                    let reason = "invalidStatus_\(statusStr)"
+                    
+                    await MainActor.run {
+                        // Use centralized abort helper for consistent state cleanup
+                        remoteMatchService.abortReceiverEntry(matchId: matchId, reason: reason)
+                        
+                        // View-level cleanup
+                        unfreezeListSnapshotAfterTransition()
+                        
+                        // Show user-friendly error message
+                        if status == .expired {
+                            errorMessage = "This challenge has expired"
+                        } else if status == .cancelled {
+                            errorMessage = "This challenge was cancelled"
+                        } else if status == .completed {
+                            errorMessage = "This match has already been completed"
+                        } else {
+                            errorMessage = "This challenge is no longer available"
+                        }
+                        showError = true
+                    }
+                    
+                    // Error haptic for invalid state
+                    #if canImport(UIKit)
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                    #endif
+                    
+                    return // STOP - do not continue to navigation
+                }
+                
+                FlowDebug.log("ACCEPT: REVALIDATE OK - continuing to navigation", matchId: matchId)
+                
+                // Success haptic (only if validation passed)
                 #if canImport(UIKit)
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)

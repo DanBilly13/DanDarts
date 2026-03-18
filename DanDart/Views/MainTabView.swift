@@ -424,13 +424,12 @@ struct MainTabView: View {
         
         Task {
             do {
-                print("🎯 [MainTabView] Querying pending requests for user: \(currentUser.id)")
                 let count = try await friendsService.getPendingRequestCount(userId: currentUser.id)
-                print("✅ [MainTabView] Query returned count: \(count)")
                 await MainActor.run {
-                    print("🎯 [MainTabView] Updating badge count from \(pendingRequestCount) to \(count)")
+                    if pendingRequestCount != count {
+                        print("🎯 [MainTabView] Friend badge: \(pendingRequestCount) → \(count)")
+                    }
                     pendingRequestCount = count
-                    print("✅ [MainTabView] Badge count updated successfully")
                 }
             } catch {
                 print("❌ [MainTabView] Failed to load pending request count: \(error)")
@@ -442,24 +441,19 @@ struct MainTabView: View {
     }
     
     private func loadPendingChallengeCount() {
-        print("🎯 [MainTabView] loadPendingChallengeCount() called")
-        print("🎯 [MainTabView] Current user: \(authService.currentUser?.id.uuidString ?? "nil")")
-        
         guard let currentUser = authService.currentUser else {
-            print("⚠️ [MainTabView] No current user, setting challenge badge to 0")
             pendingChallengeCount = 0
             return
         }
         
         Task {
             do {
-                print("🎯 [MainTabView] Querying pending challenges for user: \(currentUser.id)")
                 let count = try await remoteMatchService.getPendingChallengeCount(userId: currentUser.id)
-                print("✅ [MainTabView] Query returned count: \(count)")
                 await MainActor.run {
-                    print("🎯 [MainTabView] Updating challenge badge count from \(pendingChallengeCount) to \(count)")
+                    if pendingChallengeCount != count {
+                        print("🎯 [MainTabView] Challenge badge: \(pendingChallengeCount) → \(count)")
+                    }
                     pendingChallengeCount = count
-                    print("✅ [MainTabView] Challenge badge count updated successfully")
                 }
             } catch {
                 print("❌ [MainTabView] Failed to load pending challenge count: \(error)")

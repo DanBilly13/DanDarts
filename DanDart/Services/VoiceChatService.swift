@@ -287,6 +287,10 @@ class VoiceChatService: NSObject, ObservableObject {
     private var localAudioTrack: RTCAudioTrack?
     private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
     
+    // ICE candidate queue for candidates that arrive before remoteDescription
+    private var pendingRemoteICECandidates: [(candidate: String, sdpMid: String, sdpMLineIndex: Int)] = []
+    private var hasRemoteDescription: Bool = false
+    
     /// Primary source of truth for all session state
     @Published private(set) var currentSession: VoiceSession?
     
@@ -299,26 +303,11 @@ class VoiceChatService: NSObject, ObservableObject {
     @Published private(set) var uiState: VoiceUIState = .hidden
     @Published private(set) var iconState: VoiceIconState = .hidden
     
-    /// Voice control menu state (Phase 2 - with routing)
+    /// Voice control menu state (Phase 3 - Apple-style auto-selection)
     @Published private(set) var selectedOutputRoute: VoiceOutputRoute = .speaker
     
-    // MARK: - Route Preference Persistence
-    
-    private let preferredRouteKey = "voiceChat.preferredOutputRoute"
-    
-    private var userPreferredRoute: VoiceOutputRoute? {
-        get {
-            guard let rawValue = UserDefaults.standard.string(forKey: preferredRouteKey) else { return nil }
-            return VoiceOutputRoute(rawValue: rawValue)
-        }
-        set {
-            if let route = newValue {
-                UserDefaults.standard.set(route.rawValue, forKey: preferredRouteKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: preferredRouteKey)
-            }
-        }
-    }
+    /// Bluetooth availability for UI (updated when route changes)
+    @Published private(set) var isBluetoothAvailable: Bool = false
     
     // MARK: - Public Interface
     
@@ -404,26 +393,26 @@ class VoiceChatService: NSObject, ObservableObject {
                 initializePeerConnectionFactory()
             }
             
-            // Configure audio session
+            // Configure audio session (but don't activate yet)
             try configureAudioSession()
             
-            // Load user's preferred route if available, otherwise use speaker default
-            if let preferredRoute = userPreferredRoute {
-                // Check if preferred route is available (especially for Bluetooth)
-                if isRouteAvailable(preferredRoute) {
-                    selectedOutputRoute = preferredRoute
-                    print("🎤 [Route] Using saved preferred route: \(preferredRoute.rawValue)")
-                } else {
-                    selectedOutputRoute = .speaker
-                    print("🎤 [Route] Preferred route \(preferredRoute.rawValue) unavailable, falling back to speaker")
-                }
+            // Apple-style route selection: prefer Bluetooth if available, else Speaker
+            let bluetoothAvailable = isRouteAvailable(.bluetooth)
+            isBluetoothAvailable = bluetoothAvailable
+            
+            if bluetoothAvailable {
+                selectedOutputRoute = .bluetooth
+                print("🎤 [Route] Auto-selected Bluetooth (available at session start)")
             } else {
                 selectedOutputRoute = .speaker
-                print("🎤 [Route] No saved preference, using default: speaker")
+                print("🎤 [Route] Auto-selected Speaker (Bluetooth not available)")
             }
             
-            // Apply selected audio route
+            // Apply selected audio route (before activation)
             setAudioRoute(selectedOutputRoute)
+            
+            // Activate audio session AFTER route is set
+            try activateAudioSession()
             
             // Create peer connection
             try createPeerConnection()
@@ -621,15 +610,11 @@ class VoiceChatService: NSObject, ObservableObject {
     }
     
     /// Select output route and apply audio routing
+    /// Manual route changes apply only to the current session (no persistence)
     /// - Parameter route: The route to select
     func selectOutputRoute(_ route: VoiceOutputRoute) {
-        print("🎤 [Phase 2] Route selected: \(route.rawValue)")
+        print("🎤 [Route] Manual route change: \(route.rawValue) (session-only)")
         selectedOutputRoute = route
-        
-        // Save user preference (especially important for Bluetooth)
-        // Only save explicit user selections, not system-driven changes
-        userPreferredRoute = route
-        print("🎤 [Route] Saved user preference: \(route.rawValue)")
         
         // Apply audio routing if session is active
         if currentSession != nil {
@@ -735,14 +720,16 @@ class VoiceChatService: NSObject, ObservableObject {
         
         print("🔊 [RouteChange] Audio route changed, reason: \(reason.rawValue)")
         
+        // Update Bluetooth availability whenever routes change
+        isBluetoothAvailable = isRouteAvailable(.bluetooth)
+        
         // If the current route becomes unavailable (e.g., Bluetooth disconnected)
         if reason == .oldDeviceUnavailable {
-            // Fall back to speaker gracefully
+            // Fall back to speaker gracefully (session-only, no persistence)
             if selectedOutputRoute == .bluetooth {
-                print("🔊 [RouteChange] Bluetooth disconnected, falling back to speaker")
+                print("🔊 [RouteChange] Bluetooth disconnected, falling back to speaker (session-only)")
                 selectedOutputRoute = .speaker
                 setAudioRoute(.speaker)
-                // Don't update userPreferredRoute - keep Bluetooth as preference for next time
             }
         }
     }
@@ -1358,15 +1345,21 @@ class VoiceChatService: NSObject, ObservableObject {
         print("📥 [VoiceSignalling] RECV voice_request_offer from \(from.uuidString.prefix(8))")
         print("✅ [VoiceSignalling] voice_request_offer received")
         
-        // If we are challenger, resend offer
+        // If we are challenger, create/resend offer
         if localRole == "challenger" {
-            print("🔊 [VoiceSignalling] Challenger resending offer on request")
+            // Mark peer as ready (request proves they're waiting)
+            if !isPeerReady {
+                print("🔊 [VoiceSignalling] Marking peer ready based on request_offer")
+                isPeerReady = true
+            }
+            
+            print("🔊 [VoiceSignalling] Challenger creating offer on request")
             do {
                 let offerSDP = try await createOffer()
                 try await sendOffer(offerSDP)
-                print("✅ [VoiceSignalling] Offer resent successfully")
+                print("✅ [VoiceSignalling] Offer sent successfully")
             } catch {
-                print("❌ [VoiceSignalling] Failed to resend offer: \(error)")
+                print("❌ [VoiceSignalling] Failed to create/send offer: \(error)")
             }
         } else {
             print("⚠️ [VoiceSignalling] Received request_offer but not challenger, ignoring")
@@ -1511,15 +1504,25 @@ class VoiceChatService: NSObject, ObservableObject {
                 options: [.allowBluetooth, .allowBluetoothA2DP]
             )
             
-            // Activate the audio session
-            try audioSession.setActive(true)
-            
             print("✅ [VoiceEngine] Audio session configured successfully")
             print("   Category: \(audioSession.category.rawValue)")
             print("   Mode: \(audioSession.mode.rawValue)")
             
         } catch {
             print("❌ [VoiceEngine] Failed to configure audio session: \(error)")
+            throw VoiceSessionError.audioSessionConfigurationFailed
+        }
+    }
+    
+    /// Activate audio session (called after route is selected)
+    private func activateAudioSession() throws {
+        print("🔊 [VoiceEngine] Activating audio session")
+        
+        do {
+            try audioSession.setActive(true)
+            print("✅ [VoiceEngine] Audio session activated")
+        } catch {
+            print("❌ [VoiceEngine] Failed to activate audio session: \(error)")
             throw VoiceSessionError.audioSessionConfigurationFailed
         }
     }
@@ -1732,6 +1735,10 @@ class VoiceChatService: NSObject, ObservableObject {
                 continuation.resume()
             }
         }
+        
+        // Mark that remoteDescription is now set and flush queued ICE candidates
+        hasRemoteDescription = true
+        await flushPendingICECandidates()
     }
     
     /// Handle remote answer (Task 9 integration)
@@ -1757,17 +1764,28 @@ class VoiceChatService: NSObject, ObservableObject {
                 continuation.resume()
             }
         }
+        
+        // Mark that remoteDescription is now set and flush queued ICE candidates
+        hasRemoteDescription = true
+        await flushPendingICECandidates()
     }
     
     /// Handle remote ICE candidate (Task 9 integration)
     private func handleRemoteICECandidate(candidate: String, sdpMid: String, sdpMLineIndex: Int) async {
-        print("🔊 [VoiceEngine] Handling remote ICE candidate")
-        
         guard let pc = peerConnection else {
             print("❌ [VoiceEngine] Peer connection not ready")
             return
         }
         
+        // Check if remoteDescription has been set
+        guard hasRemoteDescription else {
+            // Queue the candidate until remoteDescription is set
+            pendingRemoteICECandidates.append((candidate: candidate, sdpMid: sdpMid, sdpMLineIndex: sdpMLineIndex))
+            print("📦 [VoiceEngine] ICE candidate queued (remoteDescription not set yet) - queue size: \(pendingRemoteICECandidates.count)")
+            return
+        }
+        
+        // remoteDescription is set, add candidate immediately
         let iceCandidate = RTCIceCandidate(
             sdp: candidate,
             sdpMLineIndex: Int32(sdpMLineIndex),
@@ -1782,6 +1800,47 @@ class VoiceChatService: NSObject, ObservableObject {
         }
     }
     
+    /// Flush pending ICE candidates after remoteDescription is set
+    private func flushPendingICECandidates() async {
+        guard !pendingRemoteICECandidates.isEmpty else {
+            return
+        }
+        
+        let queueSize = pendingRemoteICECandidates.count
+        print("🔄 [VoiceEngine] Flushing \(queueSize) queued ICE candidate(s)")
+        
+        guard let pc = peerConnection else {
+            print("❌ [VoiceEngine] Cannot flush - peer connection not ready")
+            pendingRemoteICECandidates.removeAll()
+            return
+        }
+        
+        var successCount = 0
+        var failureCount = 0
+        
+        // Process all queued candidates in arrival order
+        for (candidate, sdpMid, sdpMLineIndex) in pendingRemoteICECandidates {
+            let iceCandidate = RTCIceCandidate(
+                sdp: candidate,
+                sdpMLineIndex: Int32(sdpMLineIndex),
+                sdpMid: sdpMid
+            )
+            
+            do {
+                try await pc.add(iceCandidate)
+                successCount += 1
+            } catch {
+                print("❌ [VoiceEngine] Failed to add queued ICE candidate: \(error)")
+                failureCount += 1
+            }
+        }
+        
+        // Clear the queue after processing
+        pendingRemoteICECandidates.removeAll()
+        
+        print("✅ [VoiceEngine] ICE candidate flush complete - success: \(successCount), failed: \(failureCount)")
+    }
+    
     /// Cleanup WebRTC resources
     private func cleanupWebRTC() {
         print("🔊 [VoiceEngine] Cleaning up WebRTC resources")
@@ -1789,6 +1848,10 @@ class VoiceChatService: NSObject, ObservableObject {
         localAudioTrack = nil
         peerConnection?.close()
         peerConnection = nil
+        
+        // Reset ICE candidate queue and remoteDescription flag
+        pendingRemoteICECandidates.removeAll()
+        hasRemoteDescription = false
         
         print("✅ [VoiceEngine] WebRTC resources cleaned up")
     }

@@ -50,20 +50,6 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
 @MainActor
 class AuthService: ObservableObject {
     
-    // MARK: - Debug Helper
-    func printCurrentUserToken() async {
-        do {
-            let session = try await SupabaseService.shared.client.auth.session
-            print("🔑 ========================================")
-            print("🔑 USER JWT TOKEN (for testing)")
-            print("🔑 ========================================")
-            print("🔑 User ID: \(session.user.id)")
-            print("🔑 Token: \(session.accessToken)")
-            print("🔑 ========================================")
-        } catch {
-            print("❌ Could not get session: \(error)")
-        }
-    }
     // MARK: - Singleton
     static let shared = AuthService()
     

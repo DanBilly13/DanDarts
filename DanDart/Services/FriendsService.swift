@@ -52,14 +52,6 @@ class FriendsService: ObservableObject {
             schema: "public",
             table: "friendships"
         ) { [weak self] action in
-            // CRITICAL: Log INSIDE callback to prove events are arriving
-            print("🚨🚨🚨 [Realtime] ========================================")
-            print("🚨🚨🚨 [Realtime] INSERT CALLBACK FIRED!!!")
-            print("🚨🚨🚨 [Realtime] Payload: \(action.record)")
-            print("🚨🚨🚨 [Realtime] Thread: \(Thread.current)")
-            print("🚨🚨🚨 [Realtime] Timestamp: \(Date())")
-            print("🚨🚨🚨 [Realtime] ========================================")
-
             // Client-side filter: only process if user is requester or addressee
             let record = action.record
             guard
@@ -69,11 +61,13 @@ class FriendsService: ObservableObject {
                 let addresseeId = UUID(uuidString: addresseeIdString),
                 requesterId == userId || addresseeId == userId
             else {
-                print("🚨 [Realtime] Skipping - not for user \(userId)")
                 return
             }
-
-            print("🚨 [Realtime] Processing - event is for current user!")
+            
+            // Compact one-liner
+            let idStr = record["id"]?.stringValue.map { String($0.prefix(8)) } ?? "nil"
+            let statusStr = record["status"]?.stringValue ?? "nil"
+            print("� RT INSERT friendship=\(idStr) status=\(statusStr)")
             Task { @MainActor in
                 self?.handleFriendshipInsert(action, userId: userId)
             }
@@ -112,16 +106,7 @@ class FriendsService: ObservableObject {
         ) { [weak self] action in
             guard let self else { return }
             
-            // CRITICAL: Log INSIDE callback to prove events are arriving
-            print("🚨🚨🚨 [Realtime] ========================================")
-            print("🚨🚨🚨 [Realtime] DELETE CALLBACK FIRED!!!")
-            print("🚨🚨🚨 [Realtime] Payload: \(action.oldRecord)")
-            print("🚨🚨🚨 [Realtime] Thread: \(Thread.current)")
-            print("🚨🚨🚨 [Realtime] Timestamp: \(Date())")
-            print("🚨🚨🚨 [Realtime] ========================================")
-            
             let record = action.oldRecord
-            print("🔍 [Realtime] oldRecord keys: \(record.keys.sorted())")
             
             // Try to filter if we have the data
             if let requesterIdString = record["requester_id"]?.stringValue,

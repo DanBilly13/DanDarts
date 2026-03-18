@@ -70,7 +70,22 @@ struct VoiceControlMenuButton: View {
                 }
             }
         }
-        .disabled(voiceChatService.connectionState != .connected)
+        .disabled(isRouteDisabled(route))
+    }
+    
+    /// Check if a route should be disabled
+    private func isRouteDisabled(_ route: VoiceOutputRoute) -> Bool {
+        // Disable all routes if not connected
+        guard voiceChatService.connectionState == .connected else {
+            return true
+        }
+        
+        // Disable Bluetooth if no Bluetooth devices available
+        if route == .bluetooth {
+            return !voiceChatService.isBluetoothAvailable
+        }
+        
+        return false
     }
     
     // MARK: - Mute Toggle

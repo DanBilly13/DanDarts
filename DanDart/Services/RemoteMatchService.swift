@@ -196,16 +196,17 @@ class RemoteMatchService: ObservableObject {
         
         pendingEnterFlowMatchIds.insert(matchId)
         
-        // Cancel any existing auto-clear task
+        // Cancel any existing watchdog task
         enterFlowClearTasks[matchId]?.cancel()
         
-        // Longer TTL to cover accept + join + fetch + push (10s)
+        // Watchdog: log warning if latch active >15s, but do NOT auto-clear
         enterFlowClearTasks[matchId] = Task { @MainActor in
             do {
-                try await Task.sleep(nanoseconds: 10_000_000_000) // 10s
-                FlowDebug.log("EnterFlowLatch AUTO-CLEAR (TTL)", matchId: matchId)
-                pendingEnterFlowMatchIds.remove(matchId)
-                enterFlowClearTasks[matchId] = nil
+                try await Task.sleep(nanoseconds: 15_000_000_000) // 15s
+                if pendingEnterFlowMatchIds.contains(matchId) {
+                    print("⚠️ [EnterFlowLatch] WATCHDOG WARNING: Latch still active after 15s for match \(matchId.uuidString.prefix(8))")
+                    FlowDebug.log("EnterFlowLatch WATCHDOG WARNING (15s elapsed, still active)", matchId: matchId)
+                }
             } catch {
                 // cancelled
             }
@@ -275,6 +276,22 @@ class RemoteMatchService: ObservableObject {
         }
         // Defensive: Clear accept UI freeze if still set
         clearAcceptPresentationFreeze(matchId: matchId)
+    }
+    
+    /// Abort receiver entry flow cleanly when match becomes invalid
+    /// Clears all service-level entry state in one place
+    /// Note: Caller must also handle view-level state (list snapshot unfreeze, error display)
+    @MainActor
+    func abortReceiverEntry(matchId: UUID, reason: String) {
+        FlowDebug.log("ABORT_RECEIVER_ENTRY: reason=\(reason)", matchId: matchId)
+        
+        // Clear all enter-flow state (latch, nav-in-flight, processing)
+        endEnterFlow(matchId: matchId)
+        
+        // Ensure accept UI freeze is cleared (defensive, endEnterFlow also does this)
+        clearAcceptPresentationFreeze(matchId: matchId)
+        
+        FlowDebug.log("ABORT_RECEIVER_ENTRY: complete - all service state cleared", matchId: matchId)
     }
     
     // MARK: - Realtime Subscription
@@ -723,14 +740,9 @@ class RemoteMatchService: ObservableObject {
         }
         
         let request = AcceptRequest(match_id: matchId.uuidString)
-        
-        print("🔍 Getting headers for accept-challenge...")
         let headers = try await getEdgeFunctionHeaders()
-        print("📋 Headers to send:")
-        print("   - apikey: \(String(headers["apikey"]?.prefix(20) ?? "MISSING"))...")
-        print("   - Authorization: \(String(headers["Authorization"]?.prefix(30) ?? "MISSING"))...")
         
-        print("🚀 Calling accept-challenge with match_id: \(matchId)")
+        print("🚀 [acceptChallenge] match=\(matchId.uuidString.prefix(8)) auth=yes")
         
         let _: EmptyResponse = try await supabaseService.client.functions
             .invoke("accept-challenge", options: FunctionInvokeOptions(
@@ -752,15 +764,75 @@ class RemoteMatchService: ObservableObject {
         let request = EnterLobbyRequest(match_id: matchId.uuidString)
         let headers = try await getEdgeFunctionHeaders()
         
+        let startTime = Date()
+        let startISO = ISO8601DateFormatter().string(from: startTime)
+        
+        // Capture initial latch state
+        let latchActiveAtStart = await MainActor.run { pendingEnterFlowMatchIds.contains(matchId) }
+        
+        // Track if TTL fires during request
+        var ttlFiredDuringRequest = false
+        let ttlMonitor = Task { @MainActor in
+            let initialLatchState = pendingEnterFlowMatchIds.contains(matchId)
+            try? await Task.sleep(nanoseconds: 100_000_000) // Check every 100ms
+            while !Task.isCancelled {
+                let currentLatchState = pendingEnterFlowMatchIds.contains(matchId)
+                if initialLatchState && !currentLatchState {
+                    ttlFiredDuringRequest = true
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
+        
         print("🚪 [EnterLobby] Calling enter-lobby with match_id: \(matchId)")
         
-        let _: EmptyResponse = try await supabaseService.client.functions
-            .invoke("enter-lobby", options: FunctionInvokeOptions(
-                headers: headers,
-                body: request
-            ))
-        
-        print("✅ [EnterLobby] Entered lobby: \(matchId)")
+        do {
+            let _: EmptyResponse = try await supabaseService.client.functions
+                .invoke("enter-lobby", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: request
+                ))
+            
+            ttlMonitor.cancel()
+            
+            let endTime = Date()
+            let endISO = ISO8601DateFormatter().string(from: endTime)
+            let durationMs = Int(endTime.timeIntervalSince(startTime) * 1000)
+            let latchActiveAtEnd = await MainActor.run { pendingEnterFlowMatchIds.contains(matchId) }
+            
+            // Determine role
+            let role = await MainActor.run {
+                if let flowMatch = flowMatch, flowMatch.challengerId == authService.currentUser?.id {
+                    return "challenger"
+                } else {
+                    return "receiver"
+                }
+            }
+            
+            print("ENTER_LOBBY_TIMING match=\(matchId.uuidString.prefix(8)) role=\(role) start=\(startISO) end=\(endISO) durationMs=\(durationMs) success=true latchActiveStart=\(latchActiveAtStart) latchActiveEnd=\(latchActiveAtEnd) ttlAutoClearDuringRequest=\(ttlFiredDuringRequest)")
+            
+        } catch {
+            ttlMonitor.cancel()
+            
+            let endTime = Date()
+            let endISO = ISO8601DateFormatter().string(from: endTime)
+            let durationMs = Int(endTime.timeIntervalSince(startTime) * 1000)
+            let latchActiveAtEnd = await MainActor.run { pendingEnterFlowMatchIds.contains(matchId) }
+            
+            let role = await MainActor.run {
+                if let flowMatch = flowMatch, flowMatch.challengerId == authService.currentUser?.id {
+                    return "challenger"
+                } else {
+                    return "receiver"
+                }
+            }
+            
+            print("ENTER_LOBBY_TIMING match=\(matchId.uuidString.prefix(8)) role=\(role) start=\(startISO) end=\(endISO) durationMs=\(durationMs) success=false latchActiveStart=\(latchActiveAtStart) latchActiveEnd=\(latchActiveAtEnd) ttlAutoClearDuringRequest=\(ttlFiredDuringRequest)")
+            print("❌ [EnterLobby] Error: \(error)")
+            
+            throw error
+        }
     }
     
     // MARK: - Confirm Lobby View Entered
@@ -830,12 +902,7 @@ class RemoteMatchService: ObservableObject {
         let headers = try await getEdgeFunctionHeaders()
         
         // Log request details
-        print("🔍 [CancelChallenge] ========================================")
-        print("🔍 [CancelChallenge] Calling cancel-match Edge Function")
-        print("🔍 [CancelChallenge] Match ID: \(matchId)")
-        print("🔍 [CancelChallenge] Request payload: match_id=\(request.match_id)")
-        print("🔍 [CancelChallenge] Headers: apikey=\(headers["apikey"]?.prefix(20) ?? "nil")...")
-        print("🔍 [CancelChallenge] Auth token: \(headers["Authorization"]?.prefix(30) ?? "nil")...")
+        print("🔍 [cancelChallenge] match=\(matchId.uuidString.prefix(8)) auth=yes")
         
         do {
             let _: EmptyResponse = try await supabaseService.client.functions
@@ -882,12 +949,7 @@ class RemoteMatchService: ObservableObject {
         let headers = try await getEdgeFunctionHeaders()
         
         // Log request details
-        print("🟠 [AbortMatch] ========================================")
-        print("🟠 [AbortMatch] Calling abort-match Edge Function")
-        print("🟠 [AbortMatch] Match ID: \(matchId)")
-        print("🟠 [AbortMatch] Request payload: match_id=\(request.match_id)")
-        print("🟠 [AbortMatch] Headers: apikey=\(headers["apikey"]?.prefix(20) ?? "nil")...")
-        print("🟠 [AbortMatch] Auth token: \(headers["Authorization"]?.prefix(30) ?? "nil")...")
+        print("🟠 [abortMatch] match=\(matchId.uuidString.prefix(8)) auth=yes")
         
         do {
             let _: EmptyResponse = try await supabaseService.client.functions
@@ -937,12 +999,7 @@ class RemoteMatchService: ObservableObject {
         
         // Log request details
         print("🏆 [CompleteMatch] ========================================")
-        print("🏆 [CompleteMatch] Calling complete-match Edge Function")
-        print("🏆 [CompleteMatch] Match ID: \(matchId)")
-        print("🏆 [CompleteMatch] Winner ID: \(winnerId)")
-        print("🏆 [CompleteMatch] Request payload: match_id=\(request.match_id), winner_id=\(request.winner_id)")
-        print("🏆 [CompleteMatch] Headers: apikey=\(headers["apikey"]?.prefix(20) ?? "nil")...")
-        print("🏆 [CompleteMatch] Auth token: \(headers["Authorization"]?.prefix(30) ?? "nil")...")
+        print("🏆 [completeMatch] match=\(matchId.uuidString.prefix(8)) winner=\(winnerId.uuidString.prefix(8)) auth=yes")
         
         do {
             let _: EmptyResponse = try await supabaseService.client.functions
@@ -1155,13 +1212,8 @@ class RemoteMatchService: ObservableObject {
         
         let request = JoinRequest(match_id: matchId.uuidString)
         
-        print("🔍 Getting headers for join-match...")
         let headers = try await getEdgeFunctionHeaders()
-        print("📋 Headers to send:")
-        print("   - apikey: \(String(headers["apikey"]?.prefix(20) ?? "MISSING"))...")
-        print("   - Authorization: \(String(headers["Authorization"]?.prefix(30) ?? "MISSING"))...")
-        
-        print("🚀 Calling join-match with match_id: \(matchId), currentUserId: \(currentUserId)")
+        print("� [joinMatch] match=\(matchId.uuidString.prefix(8)) user=\(currentUserId.uuidString.prefix(8)) auth=yes")
         
         do {
             let _: EmptyResponse = try await supabaseService.client.functions
@@ -1347,14 +1399,6 @@ class RemoteMatchService: ObservableObject {
             schema: "public",
             table: "matches"
         ) { [weak self] action in
-            // CRITICAL: Log INSIDE callback to prove events are arriving
-            print("🟢🟢🟢 [RemoteMatch Realtime] ========================================")
-            print("🟢🟢🟢 [RemoteMatch Realtime] INSERT CALLBACK FIRED!!!")
-            print("🟢🟢🟢 [RemoteMatch Realtime] Payload: \(action.record)")
-            print("🟢🟢🟢 [RemoteMatch Realtime] Thread: \(Thread.current)")
-            print("🟢🟢🟢 [RemoteMatch Realtime] Timestamp: \(Date())")
-            print("🟢🟢🟢 [RemoteMatch Realtime] ========================================")
-            
             // Client-side filter: only process remote matches for this user
             let record = action.record
             guard
@@ -1366,18 +1410,20 @@ class RemoteMatchService: ObservableObject {
                 let receiverId = UUID(uuidString: receiverIdString),
                 challengerId == userId || receiverId == userId
             else {
-                print("🟢 [RemoteMatch Realtime] Skipping - not for user \(userId)")
                 return
             }
-            
-            print("🟢 [RemoteMatch Realtime] Processing - event is for current user!")
             
             // Extract matchId for targeted updates
             guard let matchIdString = record["id"]?.stringValue,
                   let matchId = UUID(uuidString: matchIdString) else {
-                print("🟢 [RemoteMatch Realtime] No valid matchId in payload")
                 return
             }
+            
+            // Compact one-liner with key fields
+            let statusStr = record["status"]?.stringValue ?? "nil"
+            let cpStr = record["current_player_id"]?.stringValue.map { String($0.prefix(8)) } ?? "nil"
+            let createdStr = record["created_at"]?.stringValue ?? "nil"
+            print("🟢 RT INSERT match=\(String(matchIdString.prefix(8))) status=\(statusStr) cp=\(cpStr) created=\(createdStr)")
             
             Task { @MainActor in
                 // Safe in flow even if activeMatch is nil (uses flowMatchId)
@@ -1402,14 +1448,6 @@ class RemoteMatchService: ObservableObject {
             schema: "public",
             table: "matches"
         ) { [weak self] action in
-            // CRITICAL: Log INSIDE callback to prove events are arriving
-            print("🚨🚨🚨 [RemoteMatch Realtime] ========================================")
-            print("🚨🚨🚨 [RemoteMatch Realtime] UPDATE CALLBACK FIRED!!!")
-            print("🚨🚨🚨 [RemoteMatch Realtime] Payload: \(action.record)")
-            print("🚨🚨🚨 [RemoteMatch Realtime] Thread: \(Thread.current)")
-            print("🚨🚨🚨 [RemoteMatch Realtime] Timestamp: \(Date())")
-            print("🚨🚨🚨 [RemoteMatch Realtime] ========================================")
-            
             // Client-side filter: only process remote matches for this user
             let record = action.record
             guard
@@ -1421,25 +1459,20 @@ class RemoteMatchService: ObservableObject {
                 let receiverId = UUID(uuidString: receiverIdString),
                 challengerId == userId || receiverId == userId
             else {
-                print("🚨 [RemoteMatch Realtime] Skipping - not for user \(userId)")
                 return
-            }
-            
-            print("🚨 [RemoteMatch Realtime] Processing - event is for current user!")
-            
-            // 🧪 DEBUG STEP 5: Log current_player_id from realtime payload
-            if let currentPlayerIdString = record["current_player_id"]?.stringValue {
-                print("🧪 [Realtime UPDATE] current_player_id in payload: \(String(currentPlayerIdString.prefix(8)))...")
-            } else {
-                print("🧪 [Realtime UPDATE] current_player_id is NIL in payload")
             }
             
             // Extract matchId for targeted updates
             guard let matchIdString = record["id"]?.stringValue,
                   let matchId = UUID(uuidString: matchIdString) else {
-                print("🚨 [RemoteMatch Realtime] No valid matchId in payload")
                 return
             }
+            
+            // Compact one-liner with key fields
+            let statusStr = record["status"]?.stringValue ?? "nil"
+            let cpStr = record["current_player_id"]?.stringValue.map { String($0.prefix(8)) } ?? "nil"
+            let updatedStr = record["updated_at"]?.stringValue ?? "nil"
+            print("🚨 RT UPDATE match=\(String(matchIdString.prefix(8))) status=\(statusStr) cp=\(cpStr) updated=\(updatedStr)")
             
             Task { @MainActor in
                 // Fetch updated match state (includes all fields decoded correctly)

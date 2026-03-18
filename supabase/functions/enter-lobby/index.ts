@@ -26,7 +26,12 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const requestStart = Date.now()
+  let matchId = 'unknown'
+  
   try {
+    console.log(`[TIMING] enter-lobby | step=request_received | ts=${new Date().toISOString()}`)
+    
     const authHeader = req.headers.get('Authorization')
     
     if (!authHeader) {
@@ -38,6 +43,9 @@ serve(async (req) => {
 
     const jwt = authHeader.replace('Bearer ', '').trim()
 
+    const authStart = Date.now()
+    console.log(`[TIMING] enter-lobby | step=auth_start | ts=${new Date().toISOString()}`)
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -52,6 +60,9 @@ serve(async (req) => {
       data: { user },
       error: userError,
     } = await supabaseClient.auth.getUser(jwt)
+    
+    const authDuration = Date.now() - authStart
+    console.log(`[TIMING] enter-lobby | step=auth_end | duration_ms=${authDuration}`)
 
     if (userError || !user) {
       return new Response(
@@ -61,6 +72,8 @@ serve(async (req) => {
     }
 
     const { match_id } = await req.json()
+    matchId = match_id || 'unknown'
+    // console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=body_parsed`)
 
     if (!match_id) {
       return new Response(
@@ -70,13 +83,20 @@ serve(async (req) => {
     }
 
     // Get the match
+    const matchSelectStart = Date.now()
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=match_select_start | ts=${new Date().toISOString()}`)
+    
     const { data: match, error: matchError } = await supabaseClient
       .from('matches')
       .select('*')
       .eq('id', match_id)
       .maybeSingle()
+    
+    const matchSelectDuration = Date.now() - matchSelectStart
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=match_select_end | duration_ms=${matchSelectDuration}`)
 
     if (matchError || !match) {
+      console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=match_not_found | error=${JSON.stringify(matchError)}`)
       return new Response(
         JSON.stringify({ error: 'Match not found' } as ErrorResponse),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -116,7 +136,7 @@ serve(async (req) => {
 
     // Check if this player already joined (idempotency)
     if (match[lobbyTimestampField]) {
-      console.log(`Player ${user.id} already in lobby, returning success`)
+      // console.log(`Player ${user.id} already in lobby, returning success`)
       return new Response(
         JSON.stringify({
           success: true,
@@ -136,7 +156,7 @@ serve(async (req) => {
     // If first player enters, transition to lobby
     if (match.remote_status === 'ready') {
       updateData.remote_status = 'lobby'
-      console.log('First player entering lobby - transitioning to lobby status')
+      // console.log('First player entering lobby - transitioning to lobby status')
     }
 
     // Check if both players are now present
@@ -145,13 +165,19 @@ serve(async (req) => {
 
     // Note: Countdown is now started by confirm-lobby-view-entered
     // when both players have actually entered the lobby UI
-    console.log(`Both players present: ${bothPlayersPresent} (countdown will start when both confirm lobby view entered)`)
+    // console.log(`Both players present: ${bothPlayersPresent} (countdown will start when both confirm lobby view entered)`)
 
     // Update match
+    const matchUpdateStart = Date.now()
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=match_update_start | ts=${new Date().toISOString()} | updateData=${JSON.stringify(updateData)}`)
+    
     const { error: updateError } = await supabaseClient
       .from('matches')
       .update(updateData)
       .eq('id', match_id)
+    
+    const matchUpdateDuration = Date.now() - matchUpdateStart
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=match_update_end | duration_ms=${matchUpdateDuration} | error=${updateError ? JSON.stringify(updateError) : 'null'}`)
 
     if (updateError) {
       console.error('Match update error:', updateError)
@@ -163,6 +189,9 @@ serve(async (req) => {
 
     // Create match_player record for this user if not exists
     const playerOrder = user.id === match.challenger_id ? 0 : 1
+    const playerUpsertStart = Date.now()
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=player_upsert_start | ts=${new Date().toISOString()} | playerOrder=${playerOrder}`)
+    
     const { error: playerInsertError } = await supabaseClient
       .from('match_players')
       .upsert({
@@ -173,13 +202,19 @@ serve(async (req) => {
         onConflict: 'match_id,player_user_id',
         ignoreDuplicates: true
       })
+    
+    const playerUpsertDuration = Date.now() - playerUpsertStart
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=player_upsert_end | duration_ms=${playerUpsertDuration} | error=${playerInsertError ? JSON.stringify(playerInsertError) : 'null'}`)
 
     if (playerInsertError) {
       console.error('Player insert error:', playerInsertError)
       // Non-fatal
     }
 
-    console.log(`✅ Player entered lobby: ${match_id}, user: ${user.id}, role: ${isChallenger ? 'challenger' : 'receiver'}`)
+    // console.log(`✅ Player entered lobby: ${match_id}, user: ${user.id}, role: ${isChallenger ? 'challenger' : 'receiver'}`)
+    
+    const totalDuration = Date.now() - requestStart
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=response_send | total_duration_ms=${totalDuration} | success=true`)
 
     return new Response(
       JSON.stringify({
@@ -194,7 +229,9 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    const totalDuration = Date.now() - requestStart
     console.error('Unexpected error:', error)
+    console.log(`[TIMING] enter-lobby | matchId=${matchId} | step=error_response | total_duration_ms=${totalDuration} | success=false | error=${JSON.stringify(error)}`)
     return new Response(
       JSON.stringify({ error: 'Internal server error' } as ErrorResponse),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

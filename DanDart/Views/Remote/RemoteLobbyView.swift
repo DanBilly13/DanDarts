@@ -238,61 +238,73 @@ struct RemoteLobbyView: View {
                         }
                     }
                     
-                    // Cancel button
-                    AppButton(role: .tertiaryOutline, controlSize: .regular) {
-                        print("🟠 [Lobby] Cancel button tapped - matchId: \(match.id)")
-                        
-                        // CRITICAL: Capture status BEFORE any state changes
-                        let currentStatus = matchStatus
-                        print("🟠 [Lobby] Current status: \(currentStatus.rawValue)")
-                        
-                        // CRITICAL: Set cancellation flag FIRST (synchronous)
-                        cancelledMatchIds.insert(match.id)
-                        
-                        // Cancel any pending navigation
-                        navigationTask?.cancel()
-                        navigationTask = nil
-                        
-                        // Call appropriate cancel method based on status
-                        Task {
-                            do {
-                                if currentStatus == .lobby || currentStatus == .inProgress {
-                                    print("🟠 [Lobby] Calling abortMatch")
-                                    try await remoteMatchService.abortMatch(matchId: match.id)
-                                } else {
-                                    print("🟠 [Lobby] Calling cancelChallenge")
-                                    try await remoteMatchService.cancelChallenge(matchId: match.id)
-                                }
-                                
-                                print("✅ [Lobby] Cancel/abort successful")
-                                
-                                // Light haptic
-                                #if canImport(UIKit)
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                                #endif
-                                
-                                await MainActor.run {
-                                    router.popToRoot()
-                                }
-                            } catch {
-                                print("❌ [Lobby] Failed to cancel/abort match: \(error)")
-                                
-                                // Error haptic
-                                #if canImport(UIKit)
-                                let generator = UINotificationFeedbackGenerator()
-                                generator.notificationOccurred(.error)
-                                #endif
-                                
-                                await MainActor.run {
-                                    router.popToRoot() // Still navigate back on error
+                    // Cancel/Abort button - only show for valid states
+                    // Hide for terminal states (expired, cancelled, completed)
+                    if matchStatus == .lobby || matchStatus == .inProgress {
+                        AppButton(role: .tertiaryOutline, controlSize: .regular) {
+                            print("🟠 [Lobby] Cancel button tapped - matchId: \(match.id)")
+                            
+                            // CRITICAL: Capture status BEFORE any state changes
+                            let currentStatus = matchStatus
+                            print("🟠 [Lobby] Current status: \(currentStatus.rawValue)")
+                            
+                            // CRITICAL: Set cancellation flag FIRST (synchronous)
+                            cancelledMatchIds.insert(match.id)
+                            
+                            // Cancel any pending navigation
+                            navigationTask?.cancel()
+                            navigationTask = nil
+                            
+                            // Call appropriate cancel method based on status
+                            Task {
+                                do {
+                                    if currentStatus == .lobby || currentStatus == .inProgress {
+                                        print("🟠 [Lobby] Calling abortMatch")
+                                        try await remoteMatchService.abortMatch(matchId: match.id)
+                                    } else {
+                                        print("🟠 [Lobby] Calling cancelChallenge")
+                                        try await remoteMatchService.cancelChallenge(matchId: match.id)
+                                    }
+                                    
+                                    print("✅ [Lobby] Cancel/abort successful")
+                                    
+                                    // Light haptic
+                                    #if canImport(UIKit)
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                    #endif
+                                    
+                                    await MainActor.run {
+                                        router.popToRoot()
+                                    }
+                                } catch {
+                                    print("❌ [Lobby] Failed to cancel/abort match: \(error)")
+                                    
+                                    // Error haptic
+                                    #if canImport(UIKit)
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.error)
+                                    #endif
+                                    
+                                    await MainActor.run {
+                                        router.popToRoot() // Still navigate back on error
+                                    }
                                 }
                             }
+                        } label: {
+                            Text("Abort Game")
                         }
-                    } label: {
-                        Text("Abort Game")
+                        .frame(maxWidth: 280)
+                    } else if matchStatus == .expired || matchStatus == .cancelled || matchStatus == .completed {
+                        // For terminal states, show a close/dismiss button instead
+                        AppButton(role: .tertiaryOutline, controlSize: .regular) {
+                            print("🟠 [Lobby] Close button tapped for terminal state - matchId: \(match.id)")
+                            router.popToRoot()
+                        } label: {
+                            Text("Close")
+                        }
+                        .frame(maxWidth: 280)
                     }
-                    .frame(maxWidth: 280)
                 }
                 .padding(.bottom, 60)
                 .opacity(showContent ? 1.0 : 0.0)
@@ -331,6 +343,29 @@ struct RemoteLobbyView: View {
             let isChallenger = currentUser.id == match.challengerId
             let role = isChallenger ? "challenger" : "receiver"
             FlowDebug.log("LOBBY: onAppear role=\(role)", matchId: match.id)
+            
+            // TERMINAL STATE GUARD: Exit immediately if match is already terminal
+            // This provides defense-in-depth even if revalidation gate is bypassed
+            let status = match.status
+            let statusStr = status?.rawValue ?? "nil"
+            FlowDebug.log("LOBBY: TERMINAL_GUARD status=\(statusStr)", matchId: match.id)
+            
+            guard status == .lobby || status == .inProgress else {
+                FlowDebug.log("LOBBY: TERMINAL_GUARD ABORT reason=terminalStatus_\(statusStr)", matchId: match.id)
+                
+                // Clean up any entry-flow state that might still be set
+                remoteMatchService.clearAcceptPresentationFreeze(matchId: match.id)
+                remoteMatchService.endEnterFlow(matchId: match.id)
+                
+                // Unfreeze list snapshot
+                onUnfreeze()
+                
+                // Exit lobby immediately - do not run side effects
+                router.popToRoot()
+                return
+            }
+            
+            FlowDebug.log("LOBBY: TERMINAL_GUARD OK - continuing with side effects", matchId: match.id)
             
             // CLEAR ACCEPT UI FREEZE - handoff complete
             remoteMatchService.clearAcceptPresentationFreeze(matchId: match.id)
@@ -428,9 +463,10 @@ struct RemoteLobbyView: View {
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
             
-            // Check if match still exists in service
+            // Check if match still exists in service (including flowMatch for in-flow state)
             let matchExists = remoteMatchService.activeMatch?.match.id == match.id ||
-                             remoteMatchService.readyMatches.contains(where: { $0.match.id == match.id })
+                             remoteMatchService.readyMatches.contains(where: { $0.match.id == match.id }) ||
+                             remoteMatchService.flowMatch?.id == match.id
             
             // Check if match is being started (thread-safe)
             Self.matchesLock.lock()
