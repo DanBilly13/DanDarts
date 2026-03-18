@@ -407,38 +407,14 @@ class MatchService: ObservableObject {
         
         // NOTE: We do NOT write to matches table - edge function already completed it
         
-        // Delete old child records if this is a re-save (handles duplicates)
-        try? await supabaseService.client
-            .from("match_players")
-            .delete()
-            .eq("match_id", value: matchId.uuidString)
-            .execute()
+        // 1. match_players creation is now handled by database trigger
+        // Migration 082 added a trigger that automatically creates match_players rows
+        // when a match transitions to 'completed' status. This eliminates client-side
+        // RLS dependency and makes participant creation server-authoritative.
+        print("ℹ️ [RemoteDetails] Skipping match_players upsert (handled by DB trigger)")
         
-        try? await supabaseService.client
-            .from("match_throws")
-            .delete()
-            .eq("match_id", value: matchId.uuidString)
-            .execute()
-        
-        // 1. Insert match_players records
-        print("🔍 [RemoteDetails] Inserting match_players records")
-        for (index, player) in playersToSave.enumerated() {
-            let playerRecord = MatchPlayerRecord(
-                match_id: matchId.uuidString,
-                player_user_id: player.userId?.uuidString,
-                guest_name: player.userId == nil ? player.displayName : nil,
-                player_order: index
-            )
-            
-            try await supabaseService.client
-                .from("match_players")
-                .insert(playerRecord)
-                .execute()
-        }
-        print("✅ [RemoteDetails] match_players inserted")
-        
-        // 2. Insert match_throws records (bulk insert)
-        print("🔍 [RemoteDetails] Inserting match_throws records")
+        // 2. Upsert match_throws records (idempotent - safe to run multiple times)
+        print("🔍 [RemoteDetails] Upserting match_throws records")
         var throwRecords: [MatchThrowRecord] = []
         
         for turn in turnHistory {
@@ -461,19 +437,21 @@ class MatchService: ObservableObject {
         }
         
         if !throwRecords.isEmpty {
-            print("🔍 [RemoteDetails] About to insert \(throwRecords.count) throw records")
+            print("🔍 [RemoteDetails] About to upsert \(throwRecords.count) throw records")
             do {
+                // Use upsert with conflict on (match_id, player_order, turn_index) constraint
+                // This makes the operation idempotent - safe to call multiple times
                 try await supabaseService.client
                     .from("match_throws")
-                    .insert(throwRecords)
+                    .upsert(throwRecords, onConflict: "match_id,player_order,turn_index")
                     .execute()
-                print("✅ [RemoteDetails] match_throws inserted: \(throwRecords.count) records")
+                print("✅ [RemoteDetails] match_throws upserted (idempotent): \(throwRecords.count) records")
             } catch {
-                print("❌ [RemoteDetails] match_throws insert FAILED: \(error)")
+                print("❌ [RemoteDetails] match_throws upsert FAILED: \(error)")
                 throw error
             }
         } else {
-            print("⚠️ [RemoteDetails] No throwRecords to insert")
+            print("⚠️ [RemoteDetails] No throwRecords to upsert")
         }
         
         // 3. Insert into match_participants table for fast queries
@@ -623,7 +601,7 @@ class MatchService: ObservableObject {
     ///   - matchId: The match ID
     ///   - players: Array of players in the match
     private func insertMatchParticipants(matchId: UUID, players: [Player]) async throws {
-        print("🔵 [Participants] Inserting \(players.count) participants for match \(matchId)")
+        print("🔵 [Participants] Upserting \(players.count) participants for match \(matchId)")
         
         struct MatchParticipantInsert: Codable {
             let matchId: String
@@ -639,13 +617,6 @@ class MatchService: ObservableObject {
             }
         }
         
-        // Delete old participants if this is a re-save
-        try? await supabaseService.client
-            .from("match_participants")
-            .delete()
-            .eq("match_id", value: matchId.uuidString)
-            .execute()
-        
         let participants = players.map { player in
             let userId = player.userId ?? player.id // Use userId for connected, player.id for guests
             print("   - \(player.displayName) (ID: \(userId), Guest: \(player.isGuest))")
@@ -658,15 +629,17 @@ class MatchService: ObservableObject {
         }
         
         do {
+            // Use upsert with conflict on (match_id, user_id) primary key
+            // This makes the operation idempotent - safe to call multiple times
             let response = try await supabaseService.client
                 .from("match_participants")
-                .insert(participants)
+                .upsert(participants, onConflict: "match_id,user_id")
                 .execute()
             
-            print("   ✅ Inserted \(participants.count) participants into match_participants table")
+            print("   ✅ Upserted (idempotent) \(participants.count) participants into match_participants table")
             print("   Response status: \(response.response.statusCode)")
         } catch {
-            print("   ❌ Failed to insert match participants: \(error)")
+            print("   ❌ Failed to upsert match participants: \(error)")
             print("   Error details: \(error.localizedDescription)")
             // Don't throw - this is not critical for match sync
         }

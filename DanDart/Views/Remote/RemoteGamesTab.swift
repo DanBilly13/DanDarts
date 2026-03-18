@@ -231,39 +231,45 @@ struct RemoteGamesTab: View {
                 sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
                 
                 ForEach(sentForUIWithDeclined) { matchWithPlayers in
-                    let isExpired = matchWithPlayers.isExpired
                     let isFading = fadingMatchIds.contains(matchWithPlayers.id)
                     let showAsDeclined = showDeclinedForMatchIds.contains(matchWithPlayers.match.id)
-                    let presentationState = cardPresentationState(
-                        for: matchWithPlayers,
-                        isExpired: isExpired,
-                        showAsDeclined: showAsDeclined
-                    )
+                    
                     if !expiredMatchIds.contains(matchWithPlayers.id) &&
                        matchWithPlayers.id != remoteMatchService.activeMatch?.id {
-                        PlayerChallengeCard(
-                            matchId: matchWithPlayers.match.id,
-                            player: player(from: matchWithPlayers),
-                            state: presentationState,
-                            gameType: matchWithPlayers.match.gameType,
-                            matchFormat: matchWithPlayers.match.matchFormat,
-                            isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
-                            expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
-                            onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
-                        )
-                        .id(matchWithPlayers.match.id)
-                        .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
-                        .onAppear {
-                            print("🧪 [DeclineRow] APPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
-                        }
-                        .onDisappear {
-                            print("🧪 [DeclineRow] DISAPPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
-                        }
-                        .opacity(isFading ? 0 : 1)
-                        .animation(.easeOut(duration: 0.5), value: isFading)
-                        .onChange(of: isExpired) { _, newValue in
-                            if newValue {
-                                handleExpiration(matchId: matchWithPlayers.id)
+                        
+                        // Client-side expiry monitoring for sent challenges
+                        TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                            let isExpiredNow = checkClientSideExpiry(for: matchWithPlayers, at: context.date)
+                            let presentationState = cardPresentationState(
+                                for: matchWithPlayers,
+                                isExpired: isExpiredNow,
+                                showAsDeclined: showAsDeclined
+                            )
+                            
+                            PlayerChallengeCard(
+                                matchId: matchWithPlayers.match.id,
+                                player: player(from: matchWithPlayers),
+                                state: presentationState,
+                                gameType: matchWithPlayers.match.gameType,
+                                matchFormat: matchWithPlayers.match.matchFormat,
+                                isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
+                                expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
+                                onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
+                            )
+                            .id(matchWithPlayers.match.id)
+                            .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
+                            .onAppear {
+                                print("🧪 [DeclineRow] APPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
+                            }
+                            .onDisappear {
+                                print("🧪 [DeclineRow] DISAPPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
+                            }
+                            .opacity(isFading ? 0 : 1)
+                            .animation(.easeOut(duration: 0.5), value: isFading)
+                            .onChange(of: isExpiredNow) { _, newValue in
+                                if newValue {
+                                    handleExpiration(matchId: matchWithPlayers.id)
+                                }
                             }
                         }
                     }
@@ -647,7 +653,6 @@ struct RemoteGamesTab: View {
         let enteringFlow = remoteMatchService.isEnteringFlow
         let navInFlight = remoteMatchService.navInFlightMatchId != nil
         FlowDebug.log("ACCEPT: TAP enteringFlow=\(enteringFlow) navInFlight=\(navInFlight)", matchId: matchId)
-        remoteMatchService.dumpStateSnapshot(reason: "acceptTap", matchId: matchId)
         
         // Prevent double-accept
         guard remoteMatchService.processingMatchId == nil else {
@@ -680,16 +685,11 @@ struct RemoteGamesTab: View {
                 }
                 
                 FlowDebug.log("ACCEPT: acceptChallenge EDGE START", matchId: matchId)
-                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 1: Accept challenge (pending → ready)
                 try await remoteMatchService.acceptChallenge(matchId: matchId)
                 
                 FlowDebug.log("ACCEPT: acceptChallenge EDGE OK", matchId: matchId)
-                await MainActor.run { 
-                    remoteMatchService.refreshPendingEnterFlow(matchId: matchId)
-                    remoteMatchService.dumpStateSnapshot(reason: "acceptSuccess", matchId: matchId)
-                }
                 
                 // Step 1.5: Wait 1 second to avoid database lock contention
                 FlowDebug.log("ACCEPT: DELAY 1s before enterLobby to avoid lock contention", matchId: matchId)
@@ -710,6 +710,7 @@ struct RemoteGamesTab: View {
                 let enterLobbyStartTime = CFAbsoluteTimeGetCurrent()
                 FlowDebug.log("ACCEPT: enterLobby TIMING_START timestamp=\(enterLobbyStartTime)", matchId: matchId)
                 FlowDebug.log("ACCEPT: enterLobby EDGE START", matchId: matchId)
+                // Refresh watchdog before potentially slow enterLobby call
                 await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 2.2: Call enterLobby with timing
@@ -731,14 +732,9 @@ struct RemoteGamesTab: View {
                 }
                 
                 FlowDebug.log("ACCEPT: enterLobby EDGE OK", matchId: matchId)
-                await MainActor.run { 
-                    remoteMatchService.refreshPendingEnterFlow(matchId: matchId)
-                    remoteMatchService.dumpStateSnapshot(reason: "enterLobbySuccess", matchId: matchId)
-                }
                 
                 // Step 2.5: Fetch updated match with joinWindowExpiresAt
                 FlowDebug.log("ACCEPT: fetchMatch START", matchId: matchId)
-                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 guard let updatedMatch = try await remoteMatchService.fetchMatch(matchId: matchId) else {
                     throw RemoteMatchError.databaseError("Failed to fetch updated match")
@@ -746,7 +742,6 @@ struct RemoteGamesTab: View {
                 let statusStr = updatedMatch.status?.rawValue ?? "nil"
                 let cpStr = updatedMatch.currentPlayerId?.uuidString.prefix(8) ?? "nil"
                 FlowDebug.log("ACCEPT: fetchMatch OK status=\(statusStr) cp=\(cpStr)", matchId: matchId)
-                await MainActor.run { remoteMatchService.refreshPendingEnterFlow(matchId: matchId) }
                 
                 // Step 2.6: AUTHORITATIVE REVALIDATION GATE
                 // Validate match status before continuing to lobby navigation
@@ -1393,6 +1388,24 @@ struct RemoteGamesTab: View {
             // Preserve match data and trigger declined display
             handleDecline(match: removedMatch)
         }
+    }
+    
+    /// Client-side expiry check for sent challenges
+    /// Returns true if the challenge has expired based on current time
+    private func checkClientSideExpiry(for match: RemoteMatchWithPlayers, at currentTime: Date) -> Bool {
+        // For sent challenges, check against challengeExpiresAt
+        guard let expiresAt = match.match.challengeExpiresAt else {
+            return false
+        }
+        
+        let isExpired = currentTime > expiresAt
+        
+        // Only log when expiry state changes to avoid spam
+        if isExpired && !expiredMatchIds.contains(match.id) {
+            print("⏰ [ClientExpiry] Sent challenge expired - matchId=\(match.match.id.uuidString.prefix(8)) expiresAt=\(expiresAt) now=\(currentTime)")
+        }
+        
+        return isExpired
     }
     
     /// Handle decline event - show declined state and schedule cleanup

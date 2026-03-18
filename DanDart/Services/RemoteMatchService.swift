@@ -437,8 +437,18 @@ class RemoteMatchService: ObservableObject {
             self.activeMatch = active
             
         } catch {
+            // Check if this is a cancellation error
+            let isCancelled = (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled
+            
+            if isCancelled {
+                // Cancellation is expected control flow - preserve current UI state
+                FlowDebug.log("LOAD: RUN \(runNumber) CANCELLED - preserving current UI state", matchId: nil)
+                // Don't clear lists, don't throw - just return quietly
+                return
+            }
+            
+            // For real errors, clear lists and propagate
             FlowDebug.log("LOAD: RUN \(runNumber) ERROR \(error.localizedDescription)", matchId: nil)
-            // Clear lists to prevent stale UI state from persisting
             await MainActor.run {
                 self.pendingChallenges = []
                 self.sentChallenges = []
