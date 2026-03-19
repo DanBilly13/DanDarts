@@ -692,74 +692,12 @@ struct RemoteGameplayView: View {
             bottomSection
                 .allowsHitTesting(!overlayState.isVisible)
 
-            if overlayState.isVisible {
-                Color.black.opacity(0.70)
-                    .ignoresSafeArea(.container, edges: .bottom)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Image(systemName: overlayIconName(for: overlayState))
-                        .font(.system(size: 40, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-
-                    Text(bottomOverlayTitle(for: overlayState, adapter: adapter))
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(AppColor.textPrimary)
-                        .multilineTextAlignment(.center)
-
-                    if let subtitle = bottomOverlaySubtitle(for: overlayState, adapter: adapter) {
-                        Text(subtitle)
-                            .font(.body)
-                            .foregroundColor(AppColor.textSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 28)
-            }
+            RemoteGameplayOverlay(
+                overlayState: overlayState,
+                opponentName: adapter.opponent.displayName,
+                didOpponentBust: didOpponentBust
+            )
         }
-    }
-
-    private func overlayIconName(for overlayState: RemoteGameStateAdapter.OverlayState) -> String {
-        switch overlayState {
-        case .none: return ""
-        case .inactiveLockout: return "hourglass"
-        case .saving: return "arrow.up.circle.fill"
-        case .revealing: return "checkmark.circle.fill"
-        }
-    }
-
-    private func bottomOverlayTitle(for overlayState: RemoteGameStateAdapter.OverlayState, adapter: RemoteGameStateAdapter) -> String {
-        switch overlayState {
-        case .none:
-            return ""
-        case .inactiveLockout:
-            return "\(adapter.opponent.displayName) is throwing"
-        case .saving:
-            return "Saving visit..."
-        case .revealing:
-            return "Visit saved"
-        }
-    }
-
-    private func bottomOverlaySubtitle(for overlayState: RemoteGameStateAdapter.OverlayState, adapter: RemoteGameStateAdapter) -> String? {
-        let subtitle: String?
-        
-        switch overlayState {
-        case .none:
-            subtitle = nil
-        case .inactiveLockout:
-            // Only show "Bust" if opponent busted
-            let bustCheck = didOpponentBust
-            subtitle = bustCheck ? "Bust" : nil
-            print("📝 [Subtitle] overlayState: .inactiveLockout, didOpponentBust: \(bustCheck), subtitle: \(subtitle ?? "nil")")
-        case .saving:
-            subtitle = "Please wait"
-        case .revealing:
-            subtitle = nil
-        }
-        
-        return subtitle
     }
     
     init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {

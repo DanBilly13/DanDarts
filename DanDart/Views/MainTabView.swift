@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AudioToolbox
 
 struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
@@ -428,6 +429,10 @@ struct MainTabView: View {
                 await MainActor.run {
                     if pendingRequestCount != count {
                         print("🎯 [MainTabView] Friend badge: \(pendingRequestCount) → \(count)")
+                        // Play sound if badge count increased
+                        if count > pendingRequestCount {
+                            AudioServicesPlaySystemSound(1007) // Default notification sound
+                        }
                     }
                     pendingRequestCount = count
                 }
@@ -452,6 +457,10 @@ struct MainTabView: View {
                 await MainActor.run {
                     if pendingChallengeCount != count {
                         print("🎯 [MainTabView] Challenge badge: \(pendingChallengeCount) → \(count)")
+                        // Play sound if badge count increased
+                        if count > pendingChallengeCount {
+                            AudioServicesPlaySystemSound(1007) // Default notification sound
+                        }
                     }
                     pendingChallengeCount = count
                 }

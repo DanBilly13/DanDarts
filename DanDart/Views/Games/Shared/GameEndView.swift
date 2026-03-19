@@ -127,7 +127,7 @@ struct GameEndView: View {
                             HStack(spacing: 8) {
                                 if isLoadingMatch {
                                     ProgressView()
-                                        .scaleEffect(0.8)
+                                        .controlSize(.small)
                                 }
                                 Text(isLoadingMatch ? "Loading..." : "View Match Details")
                                     .font(.system(size: 16, weight: .semibold))

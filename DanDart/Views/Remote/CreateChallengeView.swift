@@ -80,21 +80,22 @@ struct CreateChallengeView: View {
                         
                         // Create Challenge Button
                         AppButton(role: .primary, controlSize: .large) {
+                            guard !isCreating else { return }
                             createChallenge()
                         } label: {
                             if isCreating {
-                                    HStack(spacing: 8) {
-                                        Text("Sending Challenge")
-                                        
-                                        ProgressView()
-                                            .tint(.white)
-                                            .frame(width: 16, height: 16)
-                                    }
-                                } else {
-                                    Text("Send Challenge")
+                                HStack(spacing: 8) {
+                                    Text("Sending Challenge")
+                                    
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.white)
                                 }
+                            } else {
+                                Text("Send Challenge")
+                            }
                         }
-                        .disabled(selectedFriend == nil || isCreating)
+                        .disabled(selectedFriend == nil)
                         .padding(.top, 16)
                     }
                     .padding(16)

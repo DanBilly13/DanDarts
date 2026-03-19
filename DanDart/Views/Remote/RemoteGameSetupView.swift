@@ -233,20 +233,21 @@ struct RemoteGameSetupView: View {
                 Spacer()
                 BottomActionContainer {
                     if selectedOpponent != nil {
-                        AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canSendChallenge) {
+                        AppButton(role: .primary, controlSize: .extraLarge, isDisabled: selectedOpponent == nil) {
+                            guard !isCreating else { return }
                             sendChallenge()
                         } label: {
                             if isCreating {
-                                    HStack(spacing: 8) {
-                                        Text("Sending Challenge")
-                                        
-                                        ProgressView()
+                                HStack(spacing: 8) {
+                                    Text("Sending Challenge")
+                                    
+                                    ProgressView()
+                                            .controlSize(.small)
                                             .tint(.white)
-                                            .frame(width: 16, height: 16)
-                                    }
-                                } else {
-                                    Text("Send Challenge")
                                 }
+                            } else {
+                                Text("Send Challenge")
+                            }
                         }
                     }
                 }

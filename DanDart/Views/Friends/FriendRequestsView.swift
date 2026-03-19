@@ -404,6 +404,7 @@ struct ReceivedRequestCard: View {
                 } label: {
                     if isProcessing {
                         ProgressView()
+                            .controlSize(.small)
                             .tint(AppColor.interactivePrimaryBackground)
                     } else {
                         Label("Deny", systemImage: "xmark")
@@ -416,6 +417,7 @@ struct ReceivedRequestCard: View {
                 } label: {
                     if isProcessing {
                         ProgressView()
+                            .controlSize(.small)
                             .tint(AppColor.textOnPrimary)
                     } else {
                         Label("Accept", systemImage: "checkmark")

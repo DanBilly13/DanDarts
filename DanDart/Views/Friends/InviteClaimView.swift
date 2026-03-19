@@ -55,6 +55,7 @@ struct InviteClaimView: View {
                         if isClaiming {
                             HStack(spacing: 10) {
                                 ProgressView()
+                                    .controlSize(.small)
                                     .tint(AppColor.interactivePrimaryForeground)
                                 Text("Sending…")
                             }

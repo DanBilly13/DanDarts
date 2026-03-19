@@ -192,6 +192,7 @@ struct RemoteGameplayPlaceholderView: View {
                         HStack {
                             if isBumping {
                                 ProgressView()
+                                    .controlSize(.small)
                                     .tint(.white)
                             }
                             Text(isBumping ? "Bumping..." : "Bump Debug Counter")

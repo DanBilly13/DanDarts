@@ -327,6 +327,7 @@ struct RemoteLobbyView: View {
                 } label: {
                     if isRefreshInProgress {
                         ProgressView()
+                            .controlSize(.small)
                             .tint(AppColor.interactivePrimaryBackground)
                     } else {
                         Image(systemName: "arrow.clockwise")

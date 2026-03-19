@@ -222,10 +222,10 @@ struct PlayerChallengeCardFoot: View {
                     HStack(spacing: 8) {
                         // Green dot indicator
                         Circle()
-                            .fill(Color.green)
+                            .fill(Color.green) 
                             .frame(width: 8, height: 8)
                         
-                        Text("Match ready - \(player.displayName) accepted")
+                        Text("Match ready - challenge accepted")
                             .font(.system(.subheadline, design: .rounded))
                             .fontWeight(.semibold)
                             .foregroundStyle(AppColor.textPrimary)

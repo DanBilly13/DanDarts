@@ -370,6 +370,7 @@ struct FriendSearchResultCard: View {
                 if isLoading {
                     AppButton(role: .primary, controlSize: .small, isDisabled: true, compact: true, action: {}) {
                         ProgressView()
+                            .controlSize(.small)
                             .tint(.white)
                     }
                     .frame(width: buttonWidth)
