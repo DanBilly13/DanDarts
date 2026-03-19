@@ -156,16 +156,19 @@ class RemoteGameSyncManager: ObservableObject {
         
         print("🔄 [SyncManager] Match status changed: \(oldStatus?.rawValue ?? "nil") → \(newStatus?.rawValue ?? "nil")")
         
+        // Log terminal state detection (view layer will handle exit)
+        if let status = newStatus, remoteMatchService?.isTerminalStatus(status) == true {
+            print("🚨 [SyncManager] Terminal status detected: \(status.rawValue) - view layer will handle exit")
+        }
+        
+        // Only sync winner for natural completion (not abort/expiry)
         if newStatus == .completed {
-            // Match ended on server - sync winner
             if let winnerId = renderMatch?.winnerId {
                 if let winnerPlayer = vm.players.first(where: { $0.id == winnerId }) {
-                    // Only set if not already set (avoid duplicate navigation)
                     if vm.winner == nil {
                         vm.winner = winnerPlayer
                         print("🏆 [SyncManager] Server reported winner: \(winnerPlayer.displayName)")
                         
-                        // Play win sound for opponent (winner already played it when they saved)
                         if winnerId != currentUserId {
                             SoundManager.shared.playCountdownWinner()
                         }

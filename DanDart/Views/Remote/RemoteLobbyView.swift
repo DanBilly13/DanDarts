@@ -524,10 +524,26 @@ struct RemoteLobbyView: View {
                 return
             }
             
-            // BRANCH 1: Handle cancelled status (mutually exclusive with start)
-            if newStatus == .cancelled {
-                print("🚨 [Lobby] Status is CANCELLED")
-                abortAndNavigateBack()
+            // BRANCH 1: Handle terminal states (cancelled/expired) - force exit
+            let shouldForceExit = (newStatus == .cancelled || newStatus == .expired)
+            if shouldForceExit {
+                print("🚨 [Lobby] Abnormal terminal status detected: \(newStatus.rawValue)")
+                
+                // Don't exit if we're already transitioning to gameplay
+                guard !Self.matchesBeingStarted.contains(match.id) else {
+                    print("⏭️ [Lobby] Already transitioning to gameplay, skipping terminal exit")
+                    return
+                }
+                
+                print("🚨 [Lobby] Force-exiting lobby due to: \(newStatus.rawValue)")
+                
+                // Call centralized unwind helper (handles cleanup + navigation)
+                remoteMatchService.unwindRemoteFlowForTerminalState(
+                    matchId: match.id,
+                    status: newStatus,
+                    reason: "lobby_abnormal_terminal",
+                    router: router
+                )
                 return
             }
             

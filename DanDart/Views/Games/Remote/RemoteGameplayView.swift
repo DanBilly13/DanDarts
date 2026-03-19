@@ -850,7 +850,41 @@ struct RemoteGameplayView: View {
                     .onChange(of: serverScores, handleServerScoresChange)
                     .onChange(of: serverCurrentPlayerId, handleCurrentPlayerChange)
                     .onChange(of: renderMatch?.lastVisitPayload?.timestamp, handleLastVisitTimestampChange)
-                    .onChange(of: renderMatch?.status, handleMatchStatusChange)
+                    .onChange(of: renderMatch?.status) { oldStatus, newStatus in
+                        // First, call existing handler for SyncManager
+                        handleMatchStatusChange(oldStatus: oldStatus, newStatus: newStatus)
+                        
+                        // Terminal state guard - only force-exit for cancelled/expired
+                        // Natural completion (.completed) continues to normal game end flow
+                        guard let status = newStatus else { return }
+                        
+                        // Only force-exit for abnormal terminal states
+                        let shouldForceExit = (status == .cancelled || status == .expired)
+                        
+                        if shouldForceExit {
+                            print("🚨 [RemoteGameplayView] Abnormal terminal status detected: \(status.rawValue)")
+                            
+                            // Don't exit if we're already navigating to game end
+                            guard !isNavigatingToGameEnd else {
+                                print("⏭️ [RemoteGameplayView] Already navigating, skipping terminal exit")
+                                return
+                            }
+                            
+                            // Abnormal termination - force exit
+                            print("🚨 [RemoteGameplayView] Force-exiting gameplay due to: \(status.rawValue)")
+                            
+                            // Call centralized unwind helper (handles cleanup + navigation)
+                            remoteMatchService.unwindRemoteFlowForTerminalState(
+                                matchId: matchId,
+                                status: status,
+                                reason: "gameplay_abnormal_terminal",
+                                router: router
+                            )
+                        } else if status == .completed {
+                            // Natural completion - let existing game-end flow handle it
+                            print("✅ [RemoteGameplayView] Natural completion detected, continuing to game end flow")
+                        }
+                    }
                     .onChange(of: (serverCurrentPlayerId ?? liveMatch?.currentPlayerId)) { oldId, newId in
                         dbg("onChange(currentPlayerId) old=\(oldId?.uuidString.prefix(8) ?? "nil") new=\(newId?.uuidString.prefix(8) ?? "nil")")
                         dbgMatchSnapshot("CP_CHANGE")
@@ -883,16 +917,54 @@ struct RemoteGameplayView: View {
                     print("🟠 [ExitGame] Abort Game button tapped - matchId: \(matchId)")
                     Task {
                         do {
+                            // Call abort edge function
                             try await remoteMatchService.abortMatch(matchId: matchId)
                             print("✅ [ExitGame] Match aborted successfully")
+                            
+                            // Brief delay for realtime to propagate
+                            try? await Task.sleep(for: .milliseconds(200))
+                            
+                            // Fetch authoritative state to confirm terminal
+                            if let match = try? await remoteMatchService.fetchMatch(matchId: matchId) {
+                                if remoteMatchService.isTerminalStatus(match.status) {
+                                    print("✅ [ExitGame] Confirmed terminal status: \(match.status?.rawValue ?? "nil")")
+                                } else {
+                                    print("⚠️ [ExitGame] Abort succeeded but status not terminal yet: \(match.status?.rawValue ?? "nil")")
+                                }
+                            }
+                            
+                            // Call centralized unwind helper (handles cleanup + navigation)
                             await MainActor.run {
-                                router.popToRoot()
+                                remoteMatchService.unwindRemoteFlowForTerminalState(
+                                    matchId: matchId,
+                                    status: .cancelled,
+                                    reason: "user_abort_success",
+                                    router: router
+                                )
                             }
                         } catch {
                             print("❌ [ExitGame] Failed to abort match: \(error)")
-                            // Still navigate back even on error
-                            await MainActor.run {
-                                router.popToRoot()
+                            
+                            // Fetch authoritative state before deciding
+                            if let match = try? await remoteMatchService.fetchMatch(matchId: matchId),
+                               remoteMatchService.isTerminalStatus(match.status) {
+                                // Abort failed but match is already terminal - exit anyway
+                                print("⚠️ [ExitGame] Abort failed but match already terminal: \(match.status?.rawValue ?? "nil")")
+                                await MainActor.run {
+                                    remoteMatchService.unwindRemoteFlowForTerminalState(
+                                        matchId: matchId,
+                                        status: match.status!,
+                                        reason: "abort_failed_but_terminal",
+                                        router: router
+                                    )
+                                }
+                            } else {
+                                // Abort failed and match still active - stay in gameplay, show error
+                                print("❌ [ExitGame] Abort failed, match still active - staying in gameplay")
+                                await MainActor.run {
+                                    // TODO: Show error alert to user
+                                    // For now, just log - user can try again or use other exit methods
+                                }
                             }
                         }
                     }

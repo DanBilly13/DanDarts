@@ -91,6 +91,24 @@ class RemoteMatchService: ObservableObject {
         return acceptPresentationFrozenMatchIds.contains(matchId)
     }
     
+    // MARK: - Terminal State Tracking (for idempotency)
+    
+    /// Track matches that have already been unwound to prevent duplicate unwind/pop
+    private var unwoundMatchIds: Set<UUID> = []
+    
+    /// Check if a match status is terminal (requires flow exit)
+    func isTerminalStatus(_ status: RemoteMatchStatus?) -> Bool {
+        guard let status = status else { return false }
+        return status == .cancelled || status == .completed || status == .expired
+    }
+    
+    /// Clear unwound tracking when starting a new match
+    /// Call this when entering a new remote flow
+    func clearUnwoundTracking() {
+        unwoundMatchIds.removeAll()
+        print("🧹 [TerminalUnwind] Cleared unwound tracking")
+    }
+    
     // MARK: - Debug Instrumentation
     
     private var loadMatchesRunCounter = 0
@@ -139,6 +157,11 @@ class RemoteMatchService: ObservableObject {
     func enterRemoteFlow(matchId: UUID, initialMatch: RemoteMatch? = nil) {
         remoteFlowDepth += 1
         flowMatchId = matchId
+        
+        // Clear unwound tracking when entering a new flow
+        // This allows the same match to be unwound again if re-entered
+        clearUnwoundTracking()
+        
         if let initialMatch {
             let oldStatus = flowMatch?.status?.rawValue ?? "nil"
             let newStatus = initialMatch.status?.rawValue ?? "nil"
@@ -186,6 +209,64 @@ class RemoteMatchService: ObservableObject {
                 print("🔄 [FlowGate] Delayed loadMatches() complete")
             }
         }
+    }
+    
+    /// Unwind remote flow when match becomes terminal
+    /// This is the single exit path for terminal states detected during active flow
+    /// IMPORTANT: This helper is explicitly idempotent - safe to call multiple times
+    @MainActor
+    func unwindRemoteFlowForTerminalState(matchId: UUID, status: RemoteMatchStatus, reason: String, router: Router) {
+        print("🚨 [TerminalUnwind] Called for match \(matchId.uuidString.prefix(8)) status=\(status.rawValue) reason=\(reason)")
+        
+        // IDEMPOTENCY GUARD 1: Check if already unwound
+        guard !unwoundMatchIds.contains(matchId) else {
+            print("⏭️ [TerminalUnwind] Already unwound this match, skipping (idempotent)")
+            return
+        }
+        
+        // IDEMPOTENCY GUARD 2: Only unwind if this is the active flow match
+        guard flowMatchId == matchId else {
+            print("⏭️ [TerminalUnwind] Not the active flow match, skipping")
+            return
+        }
+        
+        // IDEMPOTENCY GUARD 3: Only unwind if we're actually in remote flow
+        guard isInRemoteFlow else {
+            print("⏭️ [TerminalUnwind] Not in remote flow, skipping")
+            return
+        }
+        
+        // Mark as unwound FIRST (prevents re-entry during async operations)
+        unwoundMatchIds.insert(matchId)
+        print("🔒 [TerminalUnwind] Match marked as unwound (idempotency lock)")
+        
+        // 1. Stop voice session if active
+        if voiceChatService.currentSession?.matchId == matchId {
+            print("🔇 [TerminalUnwind] Stopping voice session")
+            Task {
+                await voiceChatService.endSession()
+            }
+        }
+        
+        // 2. Clear all flow state
+        print("🧹 [TerminalUnwind] Clearing flow state")
+        exitRemoteFlow()
+        
+        // 3. Clear processing/nav markers
+        processingMatchId = nil
+        navInFlightMatchId = nil
+        
+        // 4. Clear enter-flow latches
+        clearPendingEnterFlow(matchId: matchId)
+        
+        // 5. Clear accept freeze
+        clearAcceptPresentationFreeze(matchId: matchId)
+        
+        // 6. Navigate to root (centralized exit)
+        print("🚪 [TerminalUnwind] Navigating to root")
+        router.popToRoot()
+        
+        print("✅ [TerminalUnwind] Flow unwound successfully")
     }
     
     // MARK: - Pending Enter Flow Latch Methods
