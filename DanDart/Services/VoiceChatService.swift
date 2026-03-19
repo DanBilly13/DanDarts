@@ -408,11 +408,15 @@ class VoiceChatService: NSObject, ObservableObject {
                 print("🎤 [Route] Auto-selected Speaker (Bluetooth not available)")
             }
             
-            // Apply selected audio route (before activation)
-            setAudioRoute(selectedOutputRoute)
-            
-            // Activate audio session AFTER route is set
+            // Activate audio session first
             try activateAudioSession()
+            print("🔊 [VoiceEngine] Audio session activated, applying route...")
+            
+            // Apply route AFTER activation to ensure it sticks
+            // Small delay allows iOS to complete activation process
+            Thread.sleep(forTimeInterval: 0.15)
+            print("🔊 [VoiceEngine] Re-applying route: \(selectedOutputRoute.rawValue)")
+            setAudioRoute(selectedOutputRoute)
             
             // Create peer connection
             try createPeerConnection()
@@ -729,6 +733,15 @@ class VoiceChatService: NSObject, ObservableObject {
             if selectedOutputRoute == .bluetooth {
                 print("🔊 [RouteChange] Bluetooth disconnected, falling back to speaker (session-only)")
                 selectedOutputRoute = .speaker
+                setAudioRoute(.speaker)
+            }
+        }
+        
+        // Re-enforce Speaker when iOS makes automatic routing decisions during audio startup.
+        // This helps when WebRTC begins flowing audio and iOS flips output back to Receiver.
+        if reason == .newDeviceAvailable || reason == .oldDeviceUnavailable || reason == .categoryChange {
+            if selectedOutputRoute == .speaker {
+                print("🔊 [RouteChange] Re-enforcing Speaker route after automatic iOS change")
                 setAudioRoute(.speaker)
             }
         }
