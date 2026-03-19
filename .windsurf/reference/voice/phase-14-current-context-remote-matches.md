@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 # Remote Matches — Current Context (Phase 14)
 
