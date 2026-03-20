@@ -47,6 +47,40 @@ struct RemoteLobbyView: View {
     // Duplicate start guard - prevents multiple start-match-if-ready calls
     @State private var hasRequestedMatchStart = false
     
+    // Voice connection state
+    @State private var hasReportedVoiceReady = false
+    @State private var voiceWindowTimer: Timer?
+    
+    // Lobby phase enum
+    enum LobbyPhase {
+        case waiting      // waiting for both players
+        case connecting   // voice window active (< 20s)
+        case timedOut     // deadline passed, countdown imminent
+        case countdown    // match countdown active
+    }
+    
+    // Derive phase from authoritative match data
+    private var lobbyPhase: LobbyPhase {
+        // Source of truth: flowMatch or match
+        let currentMatch = remoteMatchService.flowMatch ?? match
+        
+        // Countdown started = final phase
+        if currentMatch.lobbyCountdownStartedAt != nil {
+            return .countdown
+        }
+        
+        // Voice window active
+        if let deadline = currentMatch.voiceConnectDeadline {
+            if Date() >= deadline {
+                return .timedOut  // deadline passed, waiting for countdown
+            }
+            return .connecting  // within 20s window
+        }
+        
+        // Waiting for both players to enter
+        return .waiting
+    }
+    
     private var timeRemaining: TimeInterval {
         guard let expiresAt = match.joinWindowExpiresAt else { return 0 }
         return max(0, expiresAt.timeIntervalSinceNow)
@@ -172,68 +206,110 @@ struct RemoteLobbyView: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(AppColor.textSecondary)
                         }
-                    } else if isBothPlayersReady {
-                        // Both players ready - show "MATCH STARTING" with flashing animation
-                        VStack(spacing: 16) {
-                            Text("Players Ready")
-                                .font(.system(.callout, design: .rounded))
-                                .fontWeight(.semibold)
-                                .foregroundColor(AppColor.interactiveSecondaryBackground)
-                            
-                            // Task 10: Voice status line
-                            voiceStatusLine
-                            
-                            Text("MATCH STARTING")
-                                .font(.system(.title2, design: .rounded))
-                                .fontWeight(.semibold)
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
-                                .tracking(2)
-                                .opacity(showMatchStarting ? 1.0 : 0.4)
-                            
-                            // Countdown timer when in lobby
-                            if matchStatus == .lobby && countdownActive {
-                                TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                                    let remaining = countdownRemaining
-                                    let elapsed = remaining <= 0
-                                    
-                                    Text(formattedCountdown)
+                    } else {
+                        // Phase-aware lobby UI
+                        switch lobbyPhase {
+                        case .waiting:
+                            // Waiting for opponent to join
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .tint(AppColor.interactivePrimaryBackground)
+                                    .scaleEffect(1.5)
+                                
+                                Text("Waiting for \(opponent.displayName) to join")
+                                    .font(.system(.headline, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(AppColor.textPrimary)
+                                
+                                // Countdown timer
+                                TimelineView(.periodic(from: .now, by: 1.0)) { context in
+                                    Text(formattedTime)
                                         .font(.system(.title, design: .monospaced))
                                         .fontWeight(.semibold)
-                                        .foregroundColor(AppColor.interactivePrimaryBackground)
-                                        .onChange(of: elapsed) { _, isElapsed in
-                                            if isElapsed && matchStatus == .lobby && bothPlayersPresent {
-                                                Task {
-                                                    do {
-                                                        print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
-                                                        try await remoteMatchService.startMatchIfReady(matchId: match.id)
-                                                        print("✅ [Lobby] start-match-if-ready succeeded")
-                                                    } catch {
-                                                        print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                                        .foregroundColor(timeRemaining < 60 ? .red : AppColor.interactivePrimaryBackground)
+                                }
+                            }
+                            
+                        case .connecting:
+                            // Voice connection window active
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .tint(AppColor.interactivePrimaryBackground)
+                                    .scaleEffect(1.5)
+                                
+                                Text("Connecting voice…")
+                                    .font(.system(.headline, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(AppColor.textPrimary)
+                                
+                                Text("Starting match automatically in 20s if voice doesn't connect.")
+                                    .font(.caption)
+                                    .foregroundColor(AppColor.textSecondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                                
+                                // Show time remaining in voice window
+                                if let flowMatch = remoteMatchService.flowMatch, 
+                                   let timeRemaining = flowMatch.voiceTimeRemaining {
+                                    Text("\(Int(timeRemaining))s")
+                                        .font(.system(.title3, design: .monospaced))
+                                        .foregroundColor(AppColor.textSecondary)
+                                }
+                            }
+                            
+                        case .timedOut:
+                            // Voice timeout - fallback message
+                            VStack(spacing: 12) {
+                                Text("Voice couldn't connect. Starting match anyway.")
+                                    .font(.subheadline)
+                                    .foregroundColor(AppColor.textSecondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                            }
+                            
+                        case .countdown:
+                            // Match countdown active
+                            VStack(spacing: 16) {
+                                Text("Players Ready")
+                                    .font(.system(.callout, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(AppColor.interactiveSecondaryBackground)
+                                
+                                // Task 10: Voice status line
+                                voiceStatusLine
+                                
+                                Text("MATCH STARTING")
+                                    .font(.system(.title2, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                                    .tracking(2)
+                                    .opacity(showMatchStarting ? 1.0 : 0.4)
+                                
+                                // Countdown timer
+                                if matchStatus == .lobby && countdownActive {
+                                    TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                                        let remaining = countdownRemaining
+                                        let elapsed = remaining <= 0
+                                        
+                                        Text(formattedCountdown)
+                                            .font(.system(.title, design: .monospaced))
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                                            .onChange(of: elapsed) { _, isElapsed in
+                                                if isElapsed && matchStatus == .lobby && bothPlayersPresent {
+                                                    Task {
+                                                        do {
+                                                            print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
+                                                            try await remoteMatchService.startMatchIfReady(matchId: match.id)
+                                                            print("✅ [Lobby] start-match-if-ready succeeded")
+                                                        } catch {
+                                                            print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                                                        }
                                                     }
                                                 }
                                             }
-                                        }
+                                    }
                                 }
-                            }
-                        }
-                    } else {
-                        // Waiting for opponent
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .tint(AppColor.interactivePrimaryBackground)
-                                .scaleEffect(1.5)
-                            
-                            Text("Waiting for \(opponent.displayName) to join")
-                                .font(.system(.headline, design: .rounded))
-                                .fontWeight(.semibold)
-                                .foregroundColor(AppColor.textPrimary)
-                            
-                            // Countdown timer
-                            TimelineView(.periodic(from: .now, by: 1.0)) { context in
-                                Text(formattedTime)
-                                    .font(.system(.title, design: .monospaced))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(timeRemaining < 60 ? .red : AppColor.interactivePrimaryBackground)
                             }
                         }
                     }
@@ -338,11 +414,15 @@ struct RemoteLobbyView: View {
             }
         }
         .onAppear {
-            print("🧩 [Lobby] instance=\(instanceId) onAppear - match=\(match.id.uuidString.prefix(8))")
+            print("🔵 [Lifecycle] RemoteLobbyView.onAppear() - viewInstanceId: \(instanceId)")
+            print("🔵 [Lifecycle]   - matchId: \(match.id)")
+            print("🔵 [Lifecycle]   - match status: \(match.status?.rawValue ?? "nil")")
+            print("🔵 [Lifecycle]   - isViewActive: \(isViewActive)")
             
             // Determine role
             let isChallenger = currentUser.id == match.challengerId
             let role = isChallenger ? "challenger" : "receiver"
+            print("🔵 [Lifecycle]   - role: \(role)")
             FlowDebug.log("LOBBY: onAppear role=\(role)", matchId: match.id)
             
             // TERMINAL STATE GUARD: Exit immediately if match is already terminal
@@ -408,6 +488,14 @@ struct RemoteLobbyView: View {
                         let countdownStarted = flowMatch.countdownStarted
                         let remaining = flowMatch.countdownRemaining ?? 0
                         FlowDebug.log("LOBBY: countdown state countdownStarted=\(countdownStarted) remaining=\(String(format: "%.1f", remaining))s", matchId: match.id)
+                        
+                        // If voice window started, begin monitoring
+                        if let deadline = flowMatch.voiceConnectDeadline {
+                            print("🎤 [VoiceWindow] Voice connection window started, deadline: \(deadline)")
+                            await MainActor.run {
+                                startVoiceWindowMonitoring(deadline: deadline)
+                            }
+                        }
                     }
                     
                     // Snapshot after confirm
@@ -440,7 +528,14 @@ struct RemoteLobbyView: View {
             }
         }
         .onDisappear {
+            print("🔴 [Lifecycle] RemoteLobbyView.onDisappear() - viewInstanceId: \(instanceId)")
+            print("🔴 [Lifecycle]   - matchId: \(match.id)")
+            print("🔴 [Lifecycle]   - isViewActive: \(isViewActive)")
             FlowDebug.log("LOBBY: onDisappear", matchId: match.id)
+            
+            // Clean up voice window timer
+            voiceWindowTimer?.invalidate()
+            voiceWindowTimer = nil
             
             // Skip side effects in preview mode
             guard !isPreview else {
@@ -453,6 +548,7 @@ struct RemoteLobbyView: View {
             
             // Exit remote flow to maintain correct depth tracking
             // This ensures loadMatches() runs when the entire stack is popped
+            print("🔴 [Lifecycle] RemoteLobbyView calling exitRemoteFlow()")
             remoteMatchService.exitRemoteFlow()
             
             Self.matchesLock.lock()
@@ -460,6 +556,27 @@ struct RemoteLobbyView: View {
             Self.matchesLock.unlock()
             isViewActive = false
             navigationTask?.cancel()
+            
+            print("🔴 [Lifecycle] RemoteLobbyView.onDisappear() COMPLETE")
+        }
+        .onChange(of: voiceChatService.connectionState) { _, newState in
+            guard !hasReportedVoiceReady else { return }
+            guard lobbyPhase == .connecting else { return }
+            
+            // Only report when ICE connection truly established
+            if newState == .connected {
+                hasReportedVoiceReady = true
+                print("🎤 [VoiceReady] Voice connection established, reporting to server")
+                Task {
+                    do {
+                        try await remoteMatchService.confirmVoiceReady(matchId: match.id)
+                        // Refresh to get updated countdown state
+                        await requestRefresh(reason: "voice-ready")
+                    } catch {
+                        print("❌ [VoiceReady] Failed to confirm voice ready: \(error)")
+                    }
+                }
+            }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
@@ -857,6 +974,36 @@ struct RemoteLobbyView: View {
         .disabled(voiceChatService.connectionState != VoiceSessionState.connected)
         .animation(.easeInOut(duration: 0.2), value: voiceChatService.connectionState)
         .animation(.easeInOut(duration: 0.2), value: voiceChatService.muteState)
+    }
+    
+    // MARK: - Voice Connection Monitoring
+    
+    /// Start monitoring voice connection window with 0.5s polling
+    private func startVoiceWindowMonitoring(deadline: Date) {
+        voiceWindowTimer?.invalidate()
+        
+        voiceWindowTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            // Stop timer if we left connecting phase
+            guard self.lobbyPhase == .connecting else {
+                self.voiceWindowTimer?.invalidate()
+                return
+            }
+            
+            // Check if deadline passed or countdown started
+            Task { @MainActor in
+                await self.requestRefresh(reason: "voice-window-poll")
+                
+                // If deadline passed, call maybe-start-countdown
+                if Date() >= deadline && self.lobbyPhase == .connecting {
+                    do {
+                        try await self.remoteMatchService.maybeStartCountdown(matchId: self.match.id)
+                        await self.requestRefresh(reason: "deadline-check")
+                    } catch {
+                        print("❌ [VoiceWindow] Failed to check countdown: \(error)")
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Centralized Refresh

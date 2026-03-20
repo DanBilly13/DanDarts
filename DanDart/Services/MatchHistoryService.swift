@@ -69,7 +69,7 @@ class MatchHistoryService: ObservableObject {
     
     /// Preload last 20 matches in background (called on sign-in)
     func preloadMatches(userId: UUID) async {
-        print("📥 Preloading match history in background...")
+        // print("📥 Preloading match history in background...")
         
         // Don't show loading indicator for background preload
         do {
@@ -89,9 +89,9 @@ class MatchHistoryService: ObservableObject {
             matches = allMatches.sorted { $0.timestamp > $1.timestamp }
             lastLoadedTime = Date()
             
-            print("✅ Preloaded \(matches.count) matches in background (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
+            // print("✅ Preloaded \(matches.count) matches in background (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
         } catch {
-            print("⚠️ Background preload failed: \(error)")
+            // print("⚠️ Background preload failed: \(error)")
             // Don't show error for background preload, just use local data
             let localMatches = storageManager.loadMatches()
             matches = localMatches.sorted { $0.timestamp > $1.timestamp }
@@ -121,17 +121,17 @@ class MatchHistoryService: ObservableObject {
             lastLoadedTime = Date()
             isLoading = false
             
-            print("✅ Refreshed \(matches.count) matches (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
-            print("📊 [RefreshMatches] Match details:")
-            for (index, match) in matches.prefix(3).enumerated() {
-                let turnCount = match.players.first?.turns.count ?? 0
-                let isRemote = match.metadata?["isRemote"] == "true"
-                print("   [\(index)] \(match.gameName) - \(isRemote ? "REMOTE" : "LOCAL") - \(turnCount) turns")
-            }
+            // print("✅ Refreshed \(matches.count) matches (local: \(localMatches.count), supabase: \(supabaseMatches.count), remote: \(remoteMatches.count))")
+            // print("📊 [RefreshMatches] Match details:")
+            // for (index, match) in matches.prefix(3).enumerated() {
+            //     let turnCount = match.players.first?.turns.count ?? 0
+            //     let isRemote = match.metadata?["isRemote"] == "true"
+            //     print("   [\(index)] \(match.gameName) - \(isRemote ? \"REMOTE\" : \"LOCAL\") - \(turnCount) turns")
+            // }
         } catch {
             isLoading = false
             loadError = "Couldn't sync with cloud"
-            print("❌ Refresh error: \(error)")
+            // print("❌ Refresh error: \(error)")
             
             // Fall back to local matches on error
             let localMatches = storageManager.loadMatches()
@@ -142,11 +142,11 @@ class MatchHistoryService: ObservableObject {
     /// Refresh matches in background (called on match completed notification)
     private func refreshMatchesInBackground() async {
         guard !isLoading else {
-            print("⏭️ Skipping background refresh - already loading")
+            // print("⏭️ Skipping background refresh - already loading")
             return
         }
         
-        print("🔔 Match completed - refreshing history in background")
+        // print("🔔 Match completed - refreshing history in background")
         
         // Get current user ID from AuthService
         guard let userId = AuthService.shared.currentUser?.id else {
@@ -164,9 +164,9 @@ class MatchHistoryService: ObservableObject {
             matches = allMatches.sorted { $0.timestamp > $1.timestamp }
             lastLoadedTime = Date()
             
-            print("✅ Background refresh complete: \(matches.count) matches")
+            // print("✅ Background refresh complete: \(matches.count) matches")
         } catch {
-            print("⚠️ Background refresh failed: \(error)")
+            // print("⚠️ Background refresh failed: \(error)")
         }
     }
     
@@ -174,14 +174,14 @@ class MatchHistoryService: ObservableObject {
     func loadLocalMatches() {
         let localMatches = storageManager.loadMatches()
         matches = localMatches.sorted { $0.timestamp > $1.timestamp }
-        print("📱 Loaded \(matches.count) matches from local storage")
+        // print("📱 Loaded \(matches.count) matches from local storage")
     }
     
     // MARK: - Private Methods
     
     /// Load completed remote matches from Supabase and convert to MatchResult
     private func loadRemoteMatches(userId: UUID) async throws -> [MatchResult] {
-        print("📡 Loading remote matches for user \(userId.uuidString.prefix(8))...")
+        // print("📡 Loading remote matches for user \(userId.uuidString.prefix(8))...")
         
         // Define response structure for remote matches
         struct RemoteMatchResponse: Decodable {
@@ -211,7 +211,7 @@ class MatchHistoryService: ObservableObject {
             .execute()
             .value
         
-        print("📡 Found \(response.count) completed remote matches")
+        // print("📡 Found \(response.count) completed remote matches")
         
         // Convert to RemoteMatch objects and then to MatchResult
         var matchResults: [MatchResult] = []
@@ -220,7 +220,7 @@ class MatchHistoryService: ObservableObject {
             // Fetch user data for challenger and receiver
             guard let challenger = try? await fetchUser(id: matchData.challenger_id),
                   let receiver = try? await fetchUser(id: matchData.receiver_id) else {
-                print("⚠️ Skipping remote match \(matchData.id.uuidString.prefix(8))... - couldn't fetch user data")
+                // print("⚠️ Skipping remote match \(matchData.id.uuidString.prefix(8))... - couldn't fetch user data")
                 continue
             }
             
@@ -231,7 +231,7 @@ class MatchHistoryService: ObservableObject {
             guard let createdAt = dateFormatter.date(from: matchData.created_at),
                   let endedAtString = matchData.ended_at,
                   let endedAt = dateFormatter.date(from: endedAtString) else {
-                print("⚠️ Skipping remote match \(matchData.id.uuidString.prefix(8))... - invalid dates")
+                // print("⚠️ Skipping remote match \(matchData.id.uuidString.prefix(8))... - invalid dates")
                 continue
             }
             
@@ -277,19 +277,19 @@ class MatchHistoryService: ObservableObject {
                 challenger: challenger,
                 receiver: receiver
             ) {
-                print("✅ [RemoteMatchAdapter] Converted remote match \(matchData.id.uuidString.prefix(8))... to MatchResult")
-                print("   - ID: \(matchResult.id)")
-                print("   - isRemote: \(matchResult.metadata?["isRemote"] ?? "nil")")
-                print("   - Game: \(matchResult.gameName)")
-                print("   - Winner: \(matchResult.winner?.displayName ?? "nil")")
-                print("   - Turns loaded: \(matchResult.players.first?.turns.count ?? 0)")
+                // print("✅ [RemoteMatchAdapter] Converted remote match \(matchData.id.uuidString.prefix(8))... to MatchResult")
+                // print("   - ID: \(matchResult.id)")
+                // print("   - isRemote: \(matchResult.metadata?[\"isRemote\"] ?? \"nil\")")
+                // print("   - Game: \(matchResult.gameName)")
+                // print("   - Winner: \(matchResult.winner?.displayName ?? \"nil\")")
+                // print("   - Turns loaded: \(matchResult.players.first?.turns.count ?? 0)")
                 matchResults.append(matchResult)
             } else {
-                print("❌ [RemoteMatchAdapter] Failed to convert remote match \(matchData.id.uuidString.prefix(8))...")
+                // print("❌ [RemoteMatchAdapter] Failed to convert remote match \(matchData.id.uuidString.prefix(8))...")
             }
         }
         
-        print("✅ Converted \(matchResults.count) remote matches to MatchResult")
+        // print("✅ Converted \(matchResults.count) remote matches to MatchResult")
         return matchResults
     }
     
@@ -312,10 +312,10 @@ class MatchHistoryService: ObservableObject {
     
     /// Merge local, Supabase, and remote matches, removing duplicates
     private func mergeMatches(local: [MatchResult], supabase: [MatchResult], remote: [MatchResult] = []) -> [MatchResult] {
-        print("🔄 [MergeMatches] Starting merge:")
-        print("   - Local: \(local.count) matches")
-        print("   - Supabase: \(supabase.count) matches")
-        print("   - Remote: \(remote.count) matches")
+        // print("🔄 [MergeMatches] Starting merge:")
+        // print("   - Local: \(local.count) matches")
+        // print("   - Supabase: \(supabase.count) matches")
+        // print("   - Remote: \(remote.count) matches")
         
         func totalTurns(_ m: MatchResult) -> Int {
             m.players.reduce(0) { $0 + $1.turns.count }
@@ -327,7 +327,7 @@ class MatchHistoryService: ObservableObject {
         // Store local matches in a separate dictionary to preserve turn data
         for match in local {
             let turnCount = match.players.first?.turns.count ?? 0
-            print("🔄 [MergeMatches] Adding LOCAL match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns)")
+            // print("🔄 [MergeMatches] Adding LOCAL match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns)")
             matchesById[match.id] = match
             localMatchesById[match.id] = match
         }
@@ -336,17 +336,18 @@ class MatchHistoryService: ObservableObject {
         for match in supabase {
             let turnCount = match.players.first?.turns.count ?? 0
             let wasLocal = matchesById[match.id] != nil
-            print("🔄 [MergeMatches] Adding SUPABASE match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns) \(wasLocal ? "[OVERWRITES LOCAL]" : "")")
+            // print("🔄 [MergeMatches] Adding SUPABASE match \(match.id.uuidString.prefix(8))... (\(match.gameName), \(turnCount) turns) \(wasLocal ? \"[OVERWRITES LOCAL]\" : \"\")")
 
             // If we have a local version with turn data, prefer it to avoid losing turns
             if let localMatch = localMatchesById[match.id] {
                 let localTurns = totalTurns(localMatch)
                 let supabaseTurns = totalTurns(match)
+                // print("🧩 [MatchDBG] [merge] id=\(match.id.uuidString.prefix(8)) localTurns=\(localTurns) supabaseTurns=\(supabaseTurns) -> keeping \(localTurns >= supabaseTurns ? \"LOCAL\" : \"SUPABASE\")")
                 let keeping = localTurns >= supabaseTurns ? "LOCAL" : "SUPABASE"
-                print("🧩 [MatchDBG] [merge] id=\(match.id.uuidString.prefix(8)) localTurns=\(localTurns) supabaseTurns=\(supabaseTurns) -> keeping \(keeping)")
+                // print("🧩 [MatchDBG] [merge] id=\(match.id.uuidString.prefix(8)) localTurns=\(localTurns) supabaseTurns=\(supabaseTurns) -> keeping \(keeping)")
                 
                 if localTurns > 0 {
-                    print("   ✅ Keeping LOCAL version to preserve \(localTurns) turns (Supabase version has \(supabaseTurns) turns)")
+                    // print("   ✅ Keeping LOCAL version to preserve \(localTurns) turns (Supabase version has \(supabaseTurns) turns)")
                     matchesById[match.id] = localMatch
                 } else {
                     matchesById[match.id] = match
@@ -390,22 +391,22 @@ class MatchHistoryService: ObservableObject {
             // Clear detail cache on refresh
             detailCache.removeAll()
             
-            print("✅ Refreshed \(summaries.count) match summaries")
+            // print("✅ Refreshed \(summaries.count) match summaries")
         } catch {
             isLoading = false
             loadError = "Couldn't sync with cloud"
-            print("❌ Refresh summaries error: \(error)")
+            // print("❌ Refresh summaries error: \(error)")
         }
     }
     
     /// Refresh summaries in background (called on match completed notification)
     private func refreshSummariesInBackground() async {
         guard !isLoading else {
-            print("⏭️ Skipping background summary refresh - already loading")
+            // print("⏭️ Skipping background summary refresh - already loading")
             return
         }
         
-        print("🔔 Match completed - refreshing summaries in background")
+        // print("🔔 Match completed - refreshing summaries in background")
         
         guard let userId = AuthService.shared.currentUser?.id else {
             print("⚠️ No current user for background refresh")
@@ -417,9 +418,9 @@ class MatchHistoryService: ObservableObject {
             summaries = allSummaries
             lastLoadedTime = Date()
             
-            print("✅ Background summary refresh complete: \(summaries.count) summaries")
+            // print("✅ Background summary refresh complete: \(summaries.count) summaries")
         } catch {
-            print("⚠️ Background summary refresh failed: \(error)")
+            // print("⚠️ Background summary refresh failed: \(error)")
         }
     }
     
@@ -427,58 +428,58 @@ class MatchHistoryService: ObservableObject {
     
     /// Load full match detail by ID (with caching)
     func loadFullDetail(matchId: UUID) async throws -> MatchResult {
-        print("� [LoadFullDetail] Starting load for match \(matchId.uuidString.prefix(8))")
+        // print("� [LoadFullDetail] Starting load for match \(matchId.uuidString.prefix(8))")
         
         // Check cache first
         if let cached = detailCache[matchId] {
-            print("✅ [Cache Hit] Returning cached detail for \(matchId.uuidString.prefix(8))")
-            print("   - Game: \(cached.gameName)")
-            print("   - Type: \(cached.gameType)")
-            print("   - Players: \(cached.players.count)")
-            print("   - Turns: \(cached.players.map { $0.turns.count })")
+            // print("✅ [Cache Hit] Returning cached detail for \(matchId.uuidString.prefix(8))")
+            // print("   - Game: \(cached.gameName)")
+            // print("   - Type: \(cached.gameType)")
+            // print("   - Players: \(cached.players.count)")
+            // print("   - Turns: \(cached.players.map { $0.turns.count })")
             return cached
         }
         
-        print("🔍 [Cache Miss] Loading full detail for \(matchId.uuidString.prefix(8))")
+        // print("🔍 [Cache Miss] Loading full detail for \(matchId.uuidString.prefix(8))")
         
         // Try device-stored first (instant)
-        print("🔍 [LoadFullDetail] Checking device storage...")
+        // print("🔍 [LoadFullDetail] Checking device storage...")
         let localMatches = storageManager.loadMatches()
         if let localMatch = localMatches.first(where: { $0.id == matchId }) {
-            print("✅ [LoadFullDetail] Found in device storage")
-            print("   - Source: deviceStored")
-            print("   - Game: \(localMatch.gameName)")
-            print("   - Type: \(localMatch.gameType)")
-            print("   - Players: \(localMatch.players.count)")
-            print("   - Turns: \(localMatch.players.map { $0.turns.count })")
+            // print("✅ [LoadFullDetail] Found in device storage")
+            // print("   - Source: deviceStored")
+            // print("   - Game: \(localMatch.gameName)")
+            // print("   - Type: \(localMatch.gameType)")
+            // print("   - Players: \(localMatch.players.count)")
+            // print("   - Turns: \(localMatch.players.map { $0.turns.count })")
             detailCache[matchId] = localMatch
             return localMatch
         }
-        print("⚠️ [LoadFullDetail] Not found in device storage, trying Supabase...")
+        // print("⚠️ [LoadFullDetail] Not found in device storage, trying Supabase...")
         
         // Try Supabase
-        print("🔍 [LoadFullDetail] Querying Supabase for match \(matchId.uuidString.prefix(8))...")
+        // print("🔍 [LoadFullDetail] Querying Supabase for match \(matchId.uuidString.prefix(8))...")
         do {
             if let match = try await matchesService.loadMatchById(matchId) {
-                print("✅ [LoadFullDetail] Loaded from Supabase")
-                print("   - Source: supabase (local or remote)")
-                print("   - Game: \(match.gameName)")
-                print("   - Type: \(match.gameType)")
-                print("   - Players: \(match.players.count)")
-                print("   - Turns per player: \(match.players.map { $0.turns.count })")
-                print("   - Total turns: \(match.players.map { $0.turns.count }.reduce(0, +))")
+                // print("✅ [LoadFullDetail] Loaded from Supabase")
+                // print("   - Source: supabase (local or remote)")
+                // print("   - Game: \(match.gameName)")
+                // print("   - Type: \(match.gameType)")
+                // print("   - Players: \(match.players.count)")
+                // print("   - Turns per player: \(match.players.map { $0.turns.count })")
+                // print("   - Total turns: \(match.players.map { $0.turns.count }.reduce(0, +))")
                 
                 // CRITICAL CHECK: Verify turn data was loaded
                 let totalTurns = match.players.map { $0.turns.count }.reduce(0, +)
                 if totalTurns == 0 {
-                    print("❌ [LoadFullDetail] CRITICAL: Match loaded but has ZERO turns!")
-                    print("   - This indicates RLS policy is blocking match_throws access")
-                    print("   - Match ID: \(matchId.uuidString)")
-                    print("   - Game Type: \(match.gameType)")
-                    print("   - Game Name: \(match.gameName)")
-                    print("   - Players: \(match.players.map { $0.displayName })")
-                    print("   - Check match_throws_select_participants RLS policy")
-                    print("   - Verify match_players table has records for this match")
+                    // print("❌ [LoadFullDetail] CRITICAL: Match loaded but has ZERO turns!")
+                    // print("   - This indicates RLS policy is blocking match_throws access")
+                    // print("   - Match ID: \(matchId.uuidString)")
+                    // print("   - Game Type: \(match.gameType)")
+                    // print("   - Game Name: \(match.gameName)")
+                    // print("   - Players: \(match.players.map { $0.displayName })")
+                    // print("   - Check match_throws_select_participants RLS policy")
+                    // print("   - Verify match_players table has records for this match")
                     
                     throw NSError(
                         domain: "MatchHistoryService",
@@ -497,9 +498,9 @@ class MatchHistoryService: ObservableObject {
                 detailCache[matchId] = match
                 return match
             } else {
-                print("❌ [LoadFullDetail] Supabase returned nil")
-                print("   - Match ID: \(matchId.uuidString)")
-                print("   - This means the query succeeded but returned no match")
+                // print("❌ [LoadFullDetail] Supabase returned nil")
+                // print("   - Match ID: \(matchId.uuidString)")
+                // print("   - This means the query succeeded but returned no match")
                 throw NSError(
                     domain: "MatchHistoryService",
                     code: 404,
@@ -512,10 +513,10 @@ class MatchHistoryService: ObservableObject {
                 )
             }
         } catch {
-            print("❌ [LoadFullDetail] Supabase query failed with error")
-            print("   - Match ID: \(matchId.uuidString)")
-            print("   - Error: \(error)")
-            print("   - Error type: \(type(of: error))")
+            // print("❌ [LoadFullDetail] Supabase query failed with error")
+            // print("   - Match ID: \(matchId.uuidString)")
+            // print("   - Error: \(error)")
+            // print("   - Error type: \(type(of: error))")
             throw error
         }
     }
@@ -523,17 +524,17 @@ class MatchHistoryService: ObservableObject {
     /// Seed the cache with a pre-loaded MatchResult (called from End Game path)
     func seedDetailCache(match: MatchResult) {
         detailCache[match.id] = match
-        print("🌱 [Cache Seed] Cached detail for \(match.id.uuidString.prefix(8)) from End Game")
+        // print("🌱 [Cache Seed] Cached detail for \(match.id.uuidString.prefix(8)) from End Game")
     }
     
     /// Invalidate detail cache
     func invalidateDetailCache(matchId: UUID? = nil) {
         if let matchId = matchId {
             detailCache.removeValue(forKey: matchId)
-            print("🗑️ Invalidated cache for match \(matchId.uuidString.prefix(8))")
+            // print("🗑️ Invalidated cache for match \(matchId.uuidString.prefix(8))")
         } else {
             detailCache.removeAll()
-            print("🗑️ Cleared entire detail cache")
+            // print("🗑️ Cleared entire detail cache")
         }
     }
 }

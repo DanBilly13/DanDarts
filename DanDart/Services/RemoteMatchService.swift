@@ -14,6 +14,19 @@ class RemoteMatchService: ObservableObject {
     private let authService = AuthService.shared
     private let voiceChatService = VoiceChatService.shared
     
+    // MARK: - Phase 15-A Investigation
+    
+    /// Instance ID for tracking ownership and lifecycle
+    private let instanceId = UUID()
+    
+    init() {
+        print("🔵 [Lifecycle] RemoteMatchService.init() - instanceId: \(instanceId)")
+    }
+    
+    deinit {
+        print("🔴 [Lifecycle] RemoteMatchService.deinit - instanceId: \(instanceId)")
+    }
+    
     // MARK: - Configuration Constants
     
     private let challengeExpirySeconds: TimeInterval = 86400 // 24 hours
@@ -155,6 +168,12 @@ class RemoteMatchService: ObservableObject {
     
     @MainActor
     func enterRemoteFlow(matchId: UUID, initialMatch: RemoteMatch? = nil) {
+        print("⚪️ [Flow] enterRemoteFlow() START - matchId: \(matchId), instanceId: \(instanceId)")
+        print("⚪️ [Flow]   - current depth: \(remoteFlowDepth)")
+        print("⚪️ [Flow]   - current flowMatchId: \(flowMatchId?.uuidString ?? "nil")")
+        print("⚪️ [Flow]   - isInRemoteFlow: \(isInRemoteFlow)")
+        print("⚪️ [Flow]   - initialMatch provided: \(initialMatch != nil)")
+        
         remoteFlowDepth += 1
         flowMatchId = matchId
         
@@ -170,29 +189,42 @@ class RemoteMatchService: ObservableObject {
         }
         if isInRemoteFlow == false {
             isInRemoteFlow = true
-            print("🚦 [FlowGate] ENTER depth=\(remoteFlowDepth) match=\(matchId.uuidString.prefix(8))")
+            print("⚪️ [Flow] ENTER - isInRemoteFlow set to TRUE, depth=\(remoteFlowDepth)")
         } else {
-            print("🚦 [FlowGate] ENTER depth=\(remoteFlowDepth) match=\(matchId.uuidString.prefix(8))")
+            print("⚪️ [Flow] ENTER - already in flow, depth=\(remoteFlowDepth)")
         }
     }
     
     @MainActor
     func exitRemoteFlow() {
+        print("⚪️ [Flow] exitRemoteFlow() START - instanceId: \(instanceId)")
+        print("⚪️ [Flow]   - current depth: \(remoteFlowDepth)")
+        print("⚪️ [Flow]   - flowMatchId: \(flowMatchId?.uuidString ?? "nil")")
+        print("⚪️ [Flow]   - isInRemoteFlow: \(isInRemoteFlow)")
+        
         remoteFlowDepth = max(0, remoteFlowDepth - 1)
-        print("🚦 [FlowGate] EXIT depth=\(remoteFlowDepth)")
+        print("⚪️ [Flow] EXIT - new depth: \(remoteFlowDepth)")
+        
         if remoteFlowDepth == 0 {
             let oldMatchId = flowMatchId
             let oldStatus = flowMatch?.status?.rawValue ?? "nil"
             FlowDebug.log("FLOW_MATCH: CLEAR reason=exitRemoteFlow old.status=\(oldStatus)", matchId: oldMatchId)
+            
+            print("🔴 [Cleanup] exitRemoteFlow() - depth reached 0, clearing flow state")
             isInRemoteFlow = false
             flowMatchId = nil
             flowMatch = nil
-            print("🚦 [FlowGate] isInRemoteFlow = false (depth=0)")
+            
+            print("� [Cleanup] Flow state verification:")
+            print("   - isInRemoteFlow: \(isInRemoteFlow)")
+            print("   - flowMatchId: \(flowMatchId == nil ? "nil ✅" : "NOT NIL ⚠️")")
+            print("   - flowMatch: \(flowMatch == nil ? "nil ✅" : "NOT NIL ⚠️")")
             
             // End voice session on true flow exit
             Task {
+                print("🔴 [Cleanup] Ending voice session on flow exit")
                 await voiceChatService.endSession()
-                print("✅ [FlowGate] Voice session ended on flow exit")
+                print("✅ [Cleanup] Voice session ended on flow exit")
             }
             
             // Refresh match lists to filter out completed/cancelled matches
@@ -676,11 +708,16 @@ class RemoteMatchService: ObservableObject {
             let receiver_lobby_joined_at: String?  // 🆕 Lobby presence tracking
             let lobby_countdown_started_at: String?  // 🆕 Lobby countdown tracking
             let lobby_countdown_seconds: Int?  // 🆕 Lobby countdown duration
+            let voice_connect_window_started_at: String?  // 🆕 Voice window tracking
+            let voice_connect_deadline: String?  // 🆕 Voice window deadline
+            let challenger_voice_ready_at: String?  // 🆕 Challenger voice ready timestamp
+            let receiver_voice_ready_at: String?  // 🆕 Receiver voice ready timestamp
             let created_at: String
             let updated_at: String
             let ended_by: UUID?
             let ended_reason: String?
             let winner_id: UUID?
+            let ended_at: String?
             let debug_counter: Int?
             let last_visit_payload: LastVisitPayload?  // 🎯 Pre-Turn Reveal: opponent's last 3 darts
         }
@@ -729,6 +766,10 @@ class RemoteMatchService: ObservableObject {
         print("🧪 [fetchMatch DECODED] receiver_lobby_joined_at=\(matchData.receiver_lobby_joined_at ?? "nil")")
         print("🧪 [fetchMatch DECODED] lobby_countdown_started_at=\(matchData.lobby_countdown_started_at ?? "nil")")
         print("🧪 [fetchMatch DECODED] lobby_countdown_seconds=\(matchData.lobby_countdown_seconds?.description ?? "nil")")
+        print("🧪 [fetchMatch DECODED] voice_connect_window_started_at=\(matchData.voice_connect_window_started_at ?? "nil")")
+        print("🧪 [fetchMatch DECODED] voice_connect_deadline=\(matchData.voice_connect_deadline ?? "nil")")
+        print("🧪 [fetchMatch DECODED] challenger_voice_ready_at=\(matchData.challenger_voice_ready_at ?? "nil")")
+        print("🧪 [fetchMatch DECODED] receiver_voice_ready_at=\(matchData.receiver_voice_ready_at ?? "nil")")
         
         // Convert player_scores from [String: Int] to [UUID: Int]
         var playerScores: [UUID: Int]? = nil
@@ -759,11 +800,16 @@ class RemoteMatchService: ObservableObject {
             endedBy: matchData.ended_by,
             endedReason: matchData.ended_reason,
             winnerId: matchData.winner_id,
+            endedAt: matchData.ended_at.flatMap { formatter.date(from: $0) },
             debugCounter: matchData.debug_counter,
             challengerLobbyJoinedAt: matchData.challenger_lobby_joined_at.flatMap { formatter.date(from: $0) },
             receiverLobbyJoinedAt: matchData.receiver_lobby_joined_at.flatMap { formatter.date(from: $0) },
             lobbyCountdownStartedAt: matchData.lobby_countdown_started_at.flatMap { formatter.date(from: $0) },
-            lobbyCountdownSeconds: matchData.lobby_countdown_seconds
+            lobbyCountdownSeconds: matchData.lobby_countdown_seconds,
+            voiceConnectWindowStartedAt: matchData.voice_connect_window_started_at.flatMap { formatter.date(from: $0) },
+            voiceConnectDeadline: matchData.voice_connect_deadline.flatMap { formatter.date(from: $0) },
+            challengerVoiceReadyAt: matchData.challenger_voice_ready_at.flatMap { formatter.date(from: $0) },
+            receiverVoiceReadyAt: matchData.receiver_voice_ready_at.flatMap { formatter.date(from: $0) }
         )
         
         print("✅ [fetchMatch] status=\(match.status?.rawValue ?? "nil") currentPlayerId=\(match.currentPlayerId?.uuidString.prefix(8) ?? "nil")...")
@@ -946,6 +992,73 @@ class RemoteMatchService: ObservableObject {
             ))
         
         print("✅ [ConfirmLobbyView] Lobby view entered confirmed: \(matchId)")
+    }
+    
+    // MARK: - Voice Connection
+    
+    /// Report that this player's voice is connected and ready
+    func confirmVoiceReady(matchId: UUID) async throws {
+        struct VoiceReadyRequest: Encodable {
+            let match_id: String
+        }
+        
+        struct VoiceReadyResponse: Decodable {
+            let success: Bool
+            let voice_ready_recorded: Bool
+            let message: String
+        }
+        
+        let request = VoiceReadyRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        print("🎤 [VoiceReady] Calling confirm-voice-ready with match_id: \(matchId)")
+        
+        let response: VoiceReadyResponse = try await supabaseService.client.functions
+            .invoke("confirm-voice-ready", options: FunctionInvokeOptions(
+                headers: headers,
+                body: request
+            ))
+        
+        print("✅ [VoiceReady] Voice ready confirmed: \(response.voice_ready_recorded)")
+        
+        // Fetch updated match to get latest state
+        _ = try await fetchMatch(matchId: matchId)
+    }
+    
+    /// Check if countdown should start (voice ready or timeout)
+    func maybeStartCountdown(matchId: UUID) async throws {
+        struct CountdownRequest: Encodable {
+            let match_id: String
+        }
+        
+        struct CountdownResponse: Decodable {
+            let success: Bool
+            let countdown_started: Bool
+            let already_started: Bool?
+            let reason: String?
+            let waiting_for: String?
+            let message: String
+        }
+        
+        let request = CountdownRequest(match_id: matchId.uuidString)
+        let headers = try await getEdgeFunctionHeaders()
+        
+        print("⏱️ [MaybeStartCountdown] Calling maybe-start-countdown with match_id: \(matchId)")
+        
+        let response: CountdownResponse = try await supabaseService.client.functions
+            .invoke("maybe-start-countdown", options: FunctionInvokeOptions(
+                headers: headers,
+                body: request
+            ))
+        
+        if response.countdown_started {
+            print("✅ [MaybeStartCountdown] Countdown started: \(response.reason ?? "unknown")")
+        } else {
+            print("⏳ [MaybeStartCountdown] Waiting for: \(response.waiting_for ?? "unknown")")
+        }
+        
+        // Fetch updated match to get latest state
+        _ = try await fetchMatch(matchId: matchId)
     }
     
     // MARK: - Start Match If Ready

@@ -253,9 +253,14 @@ class VoiceChatService: NSObject, ObservableObject {
     
     static let shared = VoiceChatService()
     
+    // MARK: - Phase 15-A Investigation
+    
+    /// Instance ID for tracking ownership and lifecycle
+    private let instanceId = UUID()
+    
     private override init() {
         super.init()
-        print("🎤 VoiceChatService initialized")
+        print("🔵 [Lifecycle] VoiceChatService.init() - instanceId: \(instanceId)")
         
         // Observe audio route changes (e.g., Bluetooth disconnect)
         NotificationCenter.default.addObserver(
@@ -265,6 +270,10 @@ class VoiceChatService: NSObject, ObservableObject {
         ) { [weak self] notification in
             self?.handleAudioRouteChange(notification)
         }
+    }
+    
+    deinit {
+        print("🔴 [Lifecycle] VoiceChatService.deinit - instanceId: \(instanceId)")
     }
     
     // MARK: - Private Properties
@@ -325,17 +334,19 @@ class VoiceChatService: NSObject, ObservableObject {
         challengerId: UUID,
         receiverId: UUID
     ) async throws {
-        print("🎤 [VoiceChatService] startSession called for match: \(matchId)")
+        print("🟡 [Voice] startSession() START - matchId: \(matchId), instanceId: \(instanceId)")
+        print("🟡 [Voice]   localUserId: \(localUserId), challenger: \(challengerId), receiver: \(receiverId)")
         
         // Validate no existing session for different match
         if let existing = currentSession, existing.matchId != matchId {
-            print("⚠️ [VoiceChatService] Terminating stale session for different match")
+            print("⚠️ [Voice] STALE SESSION DETECTED - existing matchId: \(existing.matchId), new matchId: \(matchId)")
+            print("🔴 [Cleanup] Terminating stale session before starting new one")
             await endSession()
         }
         
         // Check if session already exists for this match
         if let existing = currentSession, existing.matchId == matchId {
-            print("ℹ️ [VoiceChatService] Session already exists for this match")
+            print("⚠️ [Voice] Session already exists for this match - sessionId: \(existing.id)")
             return
         }
         
@@ -374,8 +385,9 @@ class VoiceChatService: NSObject, ObservableObject {
         }
         
         // Create session in connecting state
+        let sessionId = UUID()
         var session = VoiceSession(
-            id: UUID(),
+            id: sessionId,
             matchId: matchId,
             connectionState: .connecting,
             muteState: .unmuted,
@@ -383,8 +395,8 @@ class VoiceChatService: NSObject, ObservableObject {
             createdAt: Date()
         )
         
+        print("🟡 [Voice] Creating new session - sessionId: \(sessionId), matchId: \(matchId)")
         updateSession(session)
-        print("✅ [VoiceChatService] Session created for match: \(matchId)")
         
         // Initialize WebRTC components
         do {
@@ -502,27 +514,31 @@ class VoiceChatService: NSObject, ObservableObject {
     @MainActor
     func endSession() async {
         guard let session = currentSession else {
-            print("ℹ️ [VoiceChatService] No active session to end")
+            print("🔴 [Cleanup] endSession() called but no active session - instanceId: \(instanceId)")
             return
         }
         
-        print("🎤 [VoiceChatService] Ending session: \(session.id)")
+        print("🔴 [Cleanup] endSession() START - sessionId: \(session.id), matchId: \(session.matchId), instanceId: \(instanceId)")
         
         // Send disconnect signal to peer (best-effort)
         do {
+            print("🔴 [Cleanup] Sending disconnect signal to peer")
             try await sendDisconnect(reason: .session_ended)
         } catch {
-            print("⚠️ [VoiceChatService] Failed to send disconnect signal: \(error)")
+            print("⚠️ [Cleanup] Failed to send disconnect signal: \(error)")
             // Continue cleanup even if signal fails
         }
         
         // Teardown signalling channel
+        print("🔴 [Cleanup] Tearing down signalling channel")
         await teardownSignallingChannel()
         
         // Close WebRTC peer connection
+        print("🔴 [Cleanup] Cleaning up WebRTC components")
         cleanupWebRTC()
         
         // Deactivate audio session
+        print("🔴 [Cleanup] Deactivating audio session")
         deactivateAudioSession()
         
         var updatedSession = session
@@ -536,7 +552,13 @@ class VoiceChatService: NSObject, ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             currentSession = nil
             updateDerivedStates()
-            print("✅ [VoiceChatService] Session cleared")
+            print("🔴 [Cleanup] endSession() COMPLETE - session cleared, instanceId: \(instanceId)")
+            print("🔴 [Cleanup] State verification:")
+            print("   - currentSession: \(currentSession == nil ? "nil ✅" : "NOT NIL ⚠️")")
+            print("   - signallingChannel: \(signallingChannel == nil ? "nil ✅" : "NOT NIL ⚠️")")
+            print("   - peerConnection: \(peerConnection == nil ? "nil ✅" : "NOT NIL ⚠️")")
+            print("   - isPeerReady: \(isPeerReady)")
+            print("   - isLocalReady: \(isLocalReady)")
         }
     }
     
@@ -864,20 +886,22 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Setup Realtime channel for voice signalling
     private func setupSignallingChannel(matchId: UUID, otherPlayerId: UUID) async throws {
         let localUserId = await authService.currentUser?.id.uuidString ?? "NONE"
-        print("\n🔵🔵🔵 [VoiceSignalling] ========== CHANNEL SETUP ==========")
-        print("🔵 [VoiceSignalling] Match ID (full): \(matchId.uuidString)")
-        print("🔵 [VoiceSignalling] Other player ID: \(otherPlayerId.uuidString)")
-        print("🔵 [VoiceSignalling] Local user ID: \(localUserId)")
+        print("\n� [Subscribe] ========== CHANNEL SETUP START ==========")
+        print("� [Subscribe] instanceId: \(instanceId)")
+        print("🟢 [Subscribe] Match ID: \(matchId.uuidString)")
+        print("� [Subscribe] Other player ID: \(otherPlayerId.uuidString)")
+        print("� [Subscribe] Local user ID: \(localUserId)")
+        print("🟢 [Subscribe] Existing channel: \(signallingChannel == nil ? "nil" : "EXISTS ⚠️")")
+        print("🟢 [Subscribe] Existing subscription: \(broadcastSubscription == nil ? "nil" : "EXISTS ⚠️")")
         
         // Store other player ID for message routing
         self.otherPlayerId = otherPlayerId
         
         // Create channel name (align with existing remote match pattern if present)
         let channelName = "voice_match_\(matchId.uuidString)"
-        print("� [VoiceSignalling] Channel name (EXACT): \(channelName)")
-        print("🔵 [VoiceSignalling] Event name (EXACT): 'voice_signal'")
-        print("🔵 [VoiceSignalling] receiveOwnBroadcasts: false")
-        print("🔵 [VoiceSignalling] ============================================\n")
+        print("🟢 [Subscribe] Channel name: \(channelName)")
+        print("� [Subscribe] Event name: 'voice_signal'")
+        print("� [Subscribe] ============================================\n")
         
         // Create channel
         let channel = supabaseService.client.realtimeV2.channel(channelName) {
@@ -886,7 +910,7 @@ class VoiceChatService: NSObject, ObservableObject {
         
         // Store channel reference BEFORE subscribing (prevents deallocation during async subscribe)
         signallingChannel = channel
-        print("🔵 [VoiceSignalling] Channel stored in signallingChannel property (pre-subscribe)")
+        print("� [Subscribe] Channel stored in signallingChannel property")
         
         // Subscribe to the channel
         do {
@@ -918,16 +942,28 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Teardown Realtime channel
     private func teardownSignallingChannel() async {
         guard let channel = signallingChannel else {
-            print("ℹ️ [VoiceSignalling] No channel to teardown")
+            print("🔴 [Cleanup] teardownSignallingChannel() - no channel to teardown, instanceId: \(instanceId)")
             return
         }
         
-        print("🔊 [VoiceSignalling] Tearing down channel")
+        print("� [Cleanup] teardownSignallingChannel() START - instanceId: \(instanceId)")
+        print("🔴 [Cleanup]   - channel exists: YES")
+        print("🔴 [Cleanup]   - broadcastSubscription exists: \(broadcastSubscription != nil ? "YES" : "NO")")
+        print("🔴 [Cleanup]   - otherPlayerId: \(otherPlayerId?.uuidString ?? "nil")")
+        
         await channel.unsubscribe()
         signallingChannel = nil
         broadcastSubscription = nil
         otherPlayerId = nil
-        print("✅ [VoiceSignalling] Channel unsubscribed and subscription token released")
+        isPeerReady = false
+        isLocalReady = false
+        
+        print("🔴 [Cleanup] teardownSignallingChannel() COMPLETE")
+        print("🔴 [Cleanup]   - signallingChannel: \(signallingChannel == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("🔴 [Cleanup]   - broadcastSubscription: \(broadcastSubscription == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("🔴 [Cleanup]   - otherPlayerId: \(otherPlayerId == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("🔴 [Cleanup]   - isPeerReady: \(isPeerReady)")
+        print("🔴 [Cleanup]   - isLocalReady: \(isLocalReady)")
     }
     
     // MARK: - Send Methods
@@ -1173,17 +1209,22 @@ class VoiceChatService: NSObject, ObservableObject {
     @MainActor
     private func handleIncomingMessage(_ message: [String: AnyJSON]) async {
         // RAW INBOUND MESSAGE LOGGING - BEFORE ANY VALIDATION
-        print("\n🔵 [VoiceSignalling] ========== RAW INBOUND MESSAGE ==========")
-        print("🔵 [VoiceSignalling] Full raw message: \(message)")
+        print("\n� [Signal] ========== INCOMING MESSAGE ==========")
+        print("� [Signal] instanceId: \(instanceId)")
+        print("🟣 [Signal] Full raw message: \(message)")
         
         // Log local context
         let localUserId = authService.currentUser?.id.uuidString ?? "NONE"
         let currentMatchId = currentSession?.matchId.uuidString ?? "NONE"
         let currentSessionId = currentSession?.id.uuidString ?? "NONE"
-        print("🔵 [VoiceSignalling] Local user ID: \(localUserId)")
-        print("🔵 [VoiceSignalling] Current match ID: \(currentMatchId)")
-        print("🔵 [VoiceSignalling] Current session ID: \(currentSessionId)")
-        print("🔵 [VoiceSignalling] ============================================\n")
+        print("� [Signal] Local context:")
+        print("🟣 [Signal]   - localUserId: \(localUserId)")
+        print("� [Signal]   - currentMatchId: \(currentMatchId)")
+        print("� [Signal]   - currentSessionId: \(currentSessionId)")
+        print("� [Signal]   - signallingChannel exists: \(signallingChannel != nil)")
+        print("🟣 [Signal]   - isPeerReady: \(isPeerReady)")
+        print("🟣 [Signal]   - isLocalReady: \(isLocalReady)")
+        print("🟣 [Signal] ============================================\n")
         
         // Supabase wraps the actual message in a "payload" field
         // Extract the voice message from the broadcast wrapper

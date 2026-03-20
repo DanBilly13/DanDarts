@@ -76,6 +76,12 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
     let lobbyCountdownStartedAt: Date?
     let lobbyCountdownSeconds: Int?
     
+    // Voice connection tracking
+    let voiceConnectWindowStartedAt: Date?
+    let voiceConnectDeadline: Date?
+    let challengerVoiceReadyAt: Date?
+    let receiverVoiceReadyAt: Date?
+    
     // Game state
     var lastVisitPayload: LastVisitPayload?
     var playerScores: [UUID: Int]? // Server-authoritative scores {player_id: score}
@@ -111,7 +117,11 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         lhs.challengerLobbyJoinedAt == rhs.challengerLobbyJoinedAt &&
         lhs.receiverLobbyJoinedAt == rhs.receiverLobbyJoinedAt &&
         lhs.lobbyCountdownStartedAt == rhs.lobbyCountdownStartedAt &&
-        lhs.lobbyCountdownSeconds == rhs.lobbyCountdownSeconds
+        lhs.lobbyCountdownSeconds == rhs.lobbyCountdownSeconds &&
+        lhs.voiceConnectWindowStartedAt == rhs.voiceConnectWindowStartedAt &&
+        lhs.voiceConnectDeadline == rhs.voiceConnectDeadline &&
+        lhs.challengerVoiceReadyAt == rhs.challengerVoiceReadyAt &&
+        lhs.receiverVoiceReadyAt == rhs.receiverVoiceReadyAt
         // Note: Ignoring createdAt, updatedAt, debugCounter to prevent churn
     }
     
@@ -203,6 +213,21 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         return remaining <= 0
     }
     
+    // Voice connection computed properties
+    var bothVoiceReady: Bool {
+        challengerVoiceReadyAt != nil && receiverVoiceReadyAt != nil
+    }
+    
+    var voiceDeadlinePassed: Bool {
+        guard let deadline = voiceConnectDeadline else { return false }
+        return Date() >= deadline
+    }
+    
+    var voiceTimeRemaining: TimeInterval? {
+        guard let deadline = voiceConnectDeadline else { return nil }
+        return max(0, deadline.timeIntervalSinceNow)
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case matchMode = "match_mode"
@@ -231,6 +256,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         case receiverLobbyViewEnteredAt = "receiver_lobby_view_entered_at"
         case lobbyCountdownStartedAt = "lobby_countdown_started_at"
         case lobbyCountdownSeconds = "lobby_countdown_seconds"
+        case voiceConnectWindowStartedAt = "voice_connect_window_started_at"
+        case voiceConnectDeadline = "voice_connect_deadline"
+        case challengerVoiceReadyAt = "challenger_voice_ready_at"
+        case receiverVoiceReadyAt = "receiver_voice_ready_at"
     }
     
     // MARK: - Initializers
@@ -263,7 +292,11 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         challengerLobbyViewEnteredAt: Date? = nil,
         receiverLobbyViewEnteredAt: Date? = nil,
         lobbyCountdownStartedAt: Date? = nil,
-        lobbyCountdownSeconds: Int? = nil
+        lobbyCountdownSeconds: Int? = nil,
+        voiceConnectWindowStartedAt: Date? = nil,
+        voiceConnectDeadline: Date? = nil,
+        challengerVoiceReadyAt: Date? = nil,
+        receiverVoiceReadyAt: Date? = nil
     ) {
         self.id = id
         self.matchMode = matchMode
@@ -292,6 +325,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         self.receiverLobbyViewEnteredAt = receiverLobbyViewEnteredAt
         self.lobbyCountdownStartedAt = lobbyCountdownStartedAt
         self.lobbyCountdownSeconds = lobbyCountdownSeconds
+        self.voiceConnectWindowStartedAt = voiceConnectWindowStartedAt
+        self.voiceConnectDeadline = voiceConnectDeadline
+        self.challengerVoiceReadyAt = challengerVoiceReadyAt
+        self.receiverVoiceReadyAt = receiverVoiceReadyAt
     }
     
     // MARK: - Custom Decodable Implementation
@@ -325,6 +362,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         receiverLobbyViewEnteredAt = try c.decodeIfPresent(Date.self, forKey: .receiverLobbyViewEnteredAt)
         lobbyCountdownStartedAt = try c.decodeIfPresent(Date.self, forKey: .lobbyCountdownStartedAt)
         lobbyCountdownSeconds = try c.decodeIfPresent(Int.self, forKey: .lobbyCountdownSeconds)
+        voiceConnectWindowStartedAt = try c.decodeIfPresent(Date.self, forKey: .voiceConnectWindowStartedAt)
+        voiceConnectDeadline = try c.decodeIfPresent(Date.self, forKey: .voiceConnectDeadline)
+        challengerVoiceReadyAt = try c.decodeIfPresent(Date.self, forKey: .challengerVoiceReadyAt)
+        receiverVoiceReadyAt = try c.decodeIfPresent(Date.self, forKey: .receiverVoiceReadyAt)
         
         // ✅ Robust decode for player_scores (JSON object with string keys)
         if let raw = try c.decodeIfPresent([String: Int].self, forKey: .playerScores) {

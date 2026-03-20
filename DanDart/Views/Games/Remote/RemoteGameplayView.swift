@@ -15,6 +15,11 @@ struct RemoteGameplayView: View {
     let currentUserId: UUID
     @Binding var selectedTab: Int
     
+    // MARK: - Phase 15-A Investigation
+    
+    /// Instance ID for tracking ownership and lifecycle
+    @State private var viewInstanceId = UUID()
+    
     // Game state managed by ViewModel
     @StateObject private var gameViewModel: RemoteGameViewModel
     @StateObject private var syncManager: RemoteGameSyncManager
@@ -216,9 +221,10 @@ struct RemoteGameplayView: View {
     // MARK: - Setup & Lifecycle Helpers
     
     private func setupGameplayView() {
+        print("🔵 [Lifecycle] RemoteGameplayView.onAppear() - viewInstanceId: \(viewInstanceId)")
+        print("� [Lifecycle]   - matchId: \(matchId)")
         dbg("onAppear")
         dbgMatchSnapshot("APPEAR")
-        print("👁️ [RemoteGameplayView] onAppear - matchId: \(matchId.uuidString.prefix(8))...")
         
         // Task 13: Validate voice session matches current match
         if !voiceChatService.isSessionValid(for: matchId) {
@@ -333,16 +339,20 @@ struct RemoteGameplayView: View {
     }
     
     private func cleanupGameplayView() {
+        print("🔴 [Lifecycle] RemoteGameplayView.onDisappear() - viewInstanceId: \(viewInstanceId)")
+        print("🔴 [Lifecycle]   - matchId: \(matchId)")
+        print("🔴 [Lifecycle]   - isNavigatingToGameEnd: \(isNavigatingToGameEnd)")
+        
         // Skip exitRemoteFlow if navigating to GameEnd
         if isNavigatingToGameEnd {
-            print("👋 [RemoteGameplayView] onDisappear - skip exitRemoteFlow (navigating to GameEnd)")
+            print("� [Lifecycle] Skipping exitRemoteFlow (navigating to GameEnd)")
             // Cancel reveal timer
             revealState.cancelReveal()
             // Voice session persists across navigation - flow-owned, not screen-owned
             return
         }
         
-        print("👋 [RemoteGameplayView] onDisappear - exiting remote flow")
+        print("� [Lifecycle] RemoteGameplayView calling exitRemoteFlow()")
         
         // Voice session will be ended by flow-level teardown
         // Not by individual screen lifecycle
@@ -352,6 +362,8 @@ struct RemoteGameplayView: View {
         
         // Exit remote flow
         remoteMatchService.exitRemoteFlow()
+        
+        print("🔴 [Lifecycle] RemoteGameplayView.onDisappear() COMPLETE")
     }
     
     // MARK: - Server Sync Handlers (delegated to SyncManager)
@@ -701,13 +713,16 @@ struct RemoteGameplayView: View {
     }
     
     init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {
+        let instanceId = UUID()
+        self._viewInstanceId = State(initialValue: instanceId)
         self.matchId = matchId
         self.challenger = challenger
         self.receiver = receiver
         self.currentUserId = currentUserId
         self._selectedTab = selectedTab
         
-        print("🎯 [RemoteGameplayView] Init - matchId: \(matchId.uuidString.prefix(8))...")
+        print("🔵 [Lifecycle] RemoteGameplayView.init() - viewInstanceId: \(instanceId)")
+        print("🔵 [Lifecycle]   - matchId: \(matchId)")
         
         // Create temporary adapter for initialization (will use live match later)
         let tempAdapter = RemoteGameStateAdapter(
