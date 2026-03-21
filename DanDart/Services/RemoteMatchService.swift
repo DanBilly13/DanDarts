@@ -145,6 +145,77 @@ class RemoteMatchService: ObservableObject {
         FlowDebug.log("SNAPSHOT: navInFlight=\(navInFlightId) processing=\(processingId)", matchId: matchId)
     }
     
+    // MARK: - Bucket Classification
+    
+    private enum MatchBucket {
+        case receivedChallenge  // pending + amReceiver
+        case sentChallenge      // pending + amChallenger
+        case readyToJoin        // ready (any role)
+        case active             // lobby (needs join check)
+        case activeInProgress   // inProgress
+        case hidden             // terminal/invalid states
+    }
+    
+    /// Single source of truth for match bucket classification
+    /// EXCLUSIVE: A match can only be in ONE bucket
+    /// ROLE-AWARE: Challenger vs Receiver matters for pending state
+    private func classifyMatchBucket(
+        match: RemoteMatch,
+        status: RemoteMatchStatus,
+        userId: UUID,
+        runNumber: Int
+    ) -> MatchBucket {
+        let amChallenger = match.challengerId == userId
+        let amReceiver = match.receiverId == userId
+        
+        let bucket: MatchBucket
+        
+        switch status {
+        case .pending:
+            if amReceiver {
+                bucket = .receivedChallenge
+            } else if amChallenger {
+                bucket = .sentChallenge
+            } else {
+                // Should never happen - user not involved in match
+                bucket = .hidden
+            }
+            
+        case .sent:
+            // UI-only state, database uses .pending
+            bucket = amChallenger ? .sentChallenge : .hidden
+            
+        case .ready:
+            bucket = .readyToJoin
+            
+        case .lobby:
+            bucket = .active
+            
+        case .inProgress:
+            bucket = .activeInProgress
+            
+        case .cancelled, .completed, .expired:
+            bucket = .hidden
+        }
+        
+        // Debug logging
+        print("[SectionDebug] matchId=\(match.id.uuidString.prefix(8)) status=\(status.rawValue) currentUserId=\(userId.uuidString.prefix(8)) challengerId=\(match.challengerId.uuidString.prefix(8)) receiverId=\(match.receiverId.uuidString.prefix(8)) amChallenger=\(amChallenger) amReceiver=\(amReceiver) bucket=\(bucket)")
+        
+        // CRITICAL GUARD: Challenger match must NEVER appear in receiver section
+        if bucket == .receivedChallenge && amChallenger {
+            print("❌ [SectionDebug] VIOLATION: Challenger match in receiver bucket! matchId=\(match.id.uuidString.prefix(8))")
+            assertionFailure("Challenger match cannot be in receiver section")
+        }
+        
+        // CRITICAL GUARD: Receiver match must NEVER appear in challenger section
+        if bucket == .sentChallenge && amReceiver {
+            print("❌ [SectionDebug] VIOLATION: Receiver match in challenger bucket! matchId=\(match.id.uuidString.prefix(8))")
+            assertionFailure("Receiver match cannot be in challenger section")
+        }
+        
+        return bucket
+    }
+    
     // MARK: - Helper Methods
     
     /// Get headers required for Edge Function calls (apikey + auth token)
@@ -493,29 +564,24 @@ class RemoteMatchService: ObservableObject {
                 
                 // Use presentation status to freeze list grouping during enter flow
                 let status = await MainActor.run { debugPresentationStatus(match) }
-                let rawStatus = match.status?.rawValue ?? "nil"
-                let presStatus = status.rawValue
-                let freezeActive = await MainActor.run { pendingEnterFlowMatchIds.contains(match.id) }
-                FlowDebug.log("LOAD: RUN \(runNumber) MAP match=\(match.id.uuidString.prefix(8)) raw=\(rawStatus) -> presented=\(presStatus) freeze=\(freezeActive)", matchId: match.id)
                 
-                switch status {
-                case .pending:
-                    if match.receiverId == userId {
-                        pending.append(matchWithPlayers)
-                    } else {
-                        sent.append(matchWithPlayers)
-                    }
-                case .sent:
-                    // This should never come from database, but handle it for completeness
-                    // .sent is UI-only state, database always uses .pending
+                // Classify into exclusive bucket with role-awareness
+                let bucket = classifyMatchBucket(
+                    match: match,
+                    status: status,
+                    userId: userId,
+                    runNumber: runNumber
+                )
+                
+                switch bucket {
+                case .receivedChallenge:
+                    pending.append(matchWithPlayers)
+                case .sentChallenge:
                     sent.append(matchWithPlayers)
-                case .ready:
+                case .readyToJoin:
                     ready.append(matchWithPlayers)
-                case .lobby:
+                case .active:
                     // For lobby state, check if current user has joined
-                    // If not joined → show as ready (challenger waiting to join)
-                    // If joined → show as active (user is in lobby)
-                    // Check synchronously to ensure activeMatch is set before loadMatches returns
                     let hasJoined = await checkIfUserJoinedMatch(matchId: match.id, userId: userId)
                     await MainActor.run {
                         if hasJoined {
@@ -524,14 +590,10 @@ class RemoteMatchService: ObservableObject {
                             ready.append(matchWithPlayers)
                         }
                     }
-                case .inProgress:
+                case .activeInProgress:
                     active = matchWithPlayers
-                case .cancelled, .completed, .expired:
-                    // Terminal states - don't show in any list
-                    // Cancelled: receiver declined it, or user cancelled their own challenge
-                    // Completed/Expired: match is finished
-                    // Either way, exclude from active lists
-                    FlowDebug.log("LOAD: RUN \(runNumber) FILTER OUT match=\(match.id.uuidString.prefix(8)) status=\(status.rawValue)", matchId: match.id)
+                case .hidden:
+                    // Terminal or invalid states - don't show
                     break
                 }
             }

@@ -467,10 +467,14 @@ struct RemoteLobbyView: View {
             // Clear ALL enter-flow state (latch, nav-in-flight, processing)
             remoteMatchService.endEnterFlow(matchId: match.id)
             
-            // Unfreeze list snapshot in RemoteGamesTab
-            onUnfreeze()
-            
             isViewActive = true
+            
+            // Unfreeze list snapshot AFTER navigation transition completes
+            // Delay prevents list rebuild during push animation
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s
+                onUnfreeze()
+            }
             
             // CRITICAL: Confirm lobby view entered and fetch fresh match state
             Task {

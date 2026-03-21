@@ -187,6 +187,13 @@ struct RemoteGamesTab: View {
                 sectionHeader("You've been challenged", systemImage: "envelope.fill", color: .orange)
                 
                 ForEach(pendingForUIStable) { matchWithPlayers in
+                    // CRITICAL GUARD: This section is ONLY for received challenges
+                    let _ = {
+                        if let currentUserId = authService.currentUser?.id,
+                           matchWithPlayers.match.challengerId == currentUserId {
+                            print("❌ [UI-GUARD] Challenger match rendered in receiver section! matchId=\(matchWithPlayers.match.id.uuidString.prefix(8))")
+                        }
+                    }()
                     let isExpired = matchWithPlayers.isExpired
                     let isFading = fadingMatchIds.contains(matchWithPlayers.id)
                     if !expiredMatchIds.contains(matchWithPlayers.id) &&
@@ -231,6 +238,13 @@ struct RemoteGamesTab: View {
                 sectionHeader("Challenges sent", systemImage: "paperplane.fill", color: .blue)
                 
                 ForEach(sentForUIWithDeclined) { matchWithPlayers in
+                    // CRITICAL GUARD: This section is ONLY for sent challenges
+                    let _ = {
+                        if let currentUserId = authService.currentUser?.id,
+                           matchWithPlayers.match.receiverId == currentUserId {
+                            print("❌ [UI-GUARD] Receiver match rendered in challenger section! matchId=\(matchWithPlayers.match.id.uuidString.prefix(8))")
+                        }
+                    }()
                     let isFading = fadingMatchIds.contains(matchWithPlayers.id)
                     let showAsDeclined = showDeclinedForMatchIds.contains(matchWithPlayers.match.id)
                     
@@ -317,49 +331,60 @@ struct RemoteGamesTab: View {
         listFrozen ? frozenSent : remoteMatchService.sentChallenges
     }
     
-    // STABLE arrays: Prevent section migration during processing
-    // While processingMatchId is set, keep the match in its original section
+    // STABLE arrays: Hide matches during join/navigation flow
+    // EXCLUSIVE: A match appears in only ONE section based on role
     private var readyForUIStable: [RemoteMatchWithPlayers] {
-        guard let processingId = remoteMatchService.processingMatchId else {
-            return readyForUI
-        }
-        // Exclude processing match from ready section
-        return readyForUI.filter { $0.match.id != processingId }
+        readyForUI.filter { shouldShowInList(matchId: $0.match.id) }
     }
     
     private var pendingForUIStable: [RemoteMatchWithPlayers] {
-        guard let processingId = remoteMatchService.processingMatchId else {
-            return pendingForUI
+        let filtered = pendingForUI.filter { shouldShowInList(matchId: $0.match.id) }
+        
+        // CRITICAL GUARD: Verify all matches are receiver-owned
+        if let currentUserId = authService.currentUser?.id {
+            for match in filtered {
+                if match.match.receiverId != currentUserId {
+                    print("❌ [SectionGuard] VIOLATION: Challenger match in receiver section! matchId=\(match.match.id.uuidString.prefix(8)) challengerId=\(match.match.challengerId.uuidString.prefix(8)) receiverId=\(match.match.receiverId.uuidString.prefix(8)) currentUserId=\(currentUserId.uuidString.prefix(8))")
+                }
+            }
         }
         
-        // If processing match is already in pending, keep it there
-        if pendingForUI.contains(where: { $0.match.id == processingId }) {
-            return pendingForUI
-        }
-        
-        // If processing match moved to ready, add it back to pending for display
-        if let processingMatch = readyForUI.first(where: { $0.match.id == processingId }) {
-            var stable = pendingForUI
-            stable.append(processingMatch)
-            return stable
-        }
-        
-        // If processing match moved to sent, add it back to pending for display
-        if let processingMatch = sentForUI.first(where: { $0.match.id == processingId }) {
-            var stable = pendingForUI
-            stable.append(processingMatch)
-            return stable
-        }
-        
-        return pendingForUI
+        return filtered
     }
     
     private var sentForUIStable: [RemoteMatchWithPlayers] {
-        guard let processingId = remoteMatchService.processingMatchId else {
-            return sentForUI
+        let filtered = sentForUI.filter { shouldShowInList(matchId: $0.match.id) }
+        
+        // CRITICAL GUARD: Verify all matches are challenger-owned
+        if let currentUserId = authService.currentUser?.id {
+            for match in filtered {
+                if match.match.challengerId != currentUserId {
+                    print("❌ [SectionGuard] VIOLATION: Receiver match in challenger section! matchId=\(match.match.id.uuidString.prefix(8)) challengerId=\(match.match.challengerId.uuidString.prefix(8)) receiverId=\(match.match.receiverId.uuidString.prefix(8)) currentUserId=\(currentUserId.uuidString.prefix(8))")
+                }
+            }
         }
-        // Exclude processing match from sent section
-        return sentForUI.filter { $0.match.id != processingId }
+        
+        return filtered
+    }
+    
+    /// Determine if a match should be shown in any list
+    /// Only hide when the match is actively in remote flow (destination has taken over)
+    /// Keep visible during pre-navigation work (processing, nav-in-flight, entering flow)
+    private func shouldShowInList(matchId: UUID) -> Bool {
+        // Only suppress once destination has taken over
+        if remoteMatchService.isInRemoteFlow && remoteMatchService.flowMatchId == matchId {
+            print("🚫 [ListSuppress] matchId=\(matchId.uuidString.prefix(8)) HIDDEN: isInRemoteFlow && flowMatchId (destination active)")
+            return false
+        }
+        
+        // Keep visible during pre-navigation states:
+        // - navInFlightMatchId: navigation starting
+        // - pendingEnterFlowMatchIds: enter flow latch
+        // - isEnteringFlow: async work before destination
+        // - processingMatchId: processing/loading
+        // These states show the card as locked/processing but keep it visible
+        
+        return true
     }
     
     // Helper to create Player from match data
@@ -1061,6 +1086,9 @@ struct RemoteGamesTab: View {
         }
         let opponent = matchWithPlayers.opponent
         FlowDebug.log("JOIN: opponent captured name=\(opponent.displayName)", matchId: matchId)
+        
+        // FREEZE LIST SNAPSHOT - capture BEFORE any state changes or network calls
+        freezeListSnapshot(reason: "joinTap", matchId: matchId)
         
         // BEGIN LATCH IMMEDIATELY - before realtime updates can arrive (challenger flow)
         FlowDebug.log("JOIN: BEGIN ENTER FLOW", matchId: matchId)
