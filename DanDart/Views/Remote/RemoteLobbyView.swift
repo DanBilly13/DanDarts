@@ -50,9 +50,10 @@ struct RemoteLobbyView: View {
     // Voice connection state
     @State private var hasReportedVoiceReady = false
     @State private var voiceWindowTimer: Timer?
+    @State private var lastObservedPhase: LobbyPhase = .waiting
     
     // Lobby phase enum
-    enum LobbyPhase {
+    enum LobbyPhase: Equatable {
         case waiting      // waiting for both players
         case connecting   // voice window active (< 20s)
         case timedOut     // deadline passed, countdown imminent
@@ -561,15 +562,22 @@ struct RemoteLobbyView: View {
         }
         .onChange(of: voiceChatService.connectionState) { _, newState in
             guard !hasReportedVoiceReady else { return }
-            guard lobbyPhase == .connecting else { return }
+            
+            // Allow reporting during lobby flow, but not after gameplay/terminal states
+            let currentPhase = lobbyPhase
+            guard currentPhase == .waiting || currentPhase == .connecting || currentPhase == .timedOut || currentPhase == .countdown else {
+                print("⚠️ [VoiceReady] Skipping - phase is \(currentPhase) (not in lobby flow)")
+                return
+            }
             
             // Only report when ICE connection truly established
             if newState == .connected {
                 hasReportedVoiceReady = true
-                print("🎤 [VoiceReady] Voice connection established, reporting to server")
+                print("🎤 [VoiceReady] Voice connection established (phase=\(currentPhase)), reporting to server")
                 Task {
                     do {
                         try await remoteMatchService.confirmVoiceReady(matchId: match.id)
+                        print("✅ [VoiceReady] Successfully confirmed voice ready to server")
                         // Refresh to get updated countdown state
                         await requestRefresh(reason: "voice-ready")
                     } catch {
@@ -580,6 +588,21 @@ struct RemoteLobbyView: View {
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
+            
+            // Track phase changes
+            let currentPhase = lobbyPhase
+            if currentPhase != lastObservedPhase {
+                print("🔄 [LobbyPhase] Transition: \(lastObservedPhase) → \(currentPhase)")
+                
+                if currentPhase == .timedOut {
+                    print("⚠️ [LobbyPhase] Entered TIMED_OUT phase - voice deadline passed, waiting for countdown")
+                    let currentMatch = remoteMatchService.flowMatch ?? match
+                    print("   - voiceConnectDeadline: \(currentMatch.voiceConnectDeadline?.description ?? "nil")")
+                    print("   - lobbyCountdownStartedAt: \(currentMatch.lobbyCountdownStartedAt?.description ?? "nil")")
+                }
+                
+                lastObservedPhase = currentPhase
+            }
             
             // Check if match still exists in service (including flowMatch for in-flow state)
             let matchExists = remoteMatchService.activeMatch?.match.id == match.id ||
@@ -982,25 +1005,60 @@ struct RemoteLobbyView: View {
     private func startVoiceWindowMonitoring(deadline: Date) {
         voiceWindowTimer?.invalidate()
         
+        print("🎤 [VoiceWindow] Starting monitoring, deadline: \(deadline)")
+        
+        var didRequestTimeoutRecovery = false
+        
         voiceWindowTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-            // Stop timer if we left connecting phase
-            guard self.lobbyPhase == .connecting else {
-                self.voiceWindowTimer?.invalidate()
-                return
+            let now = Date()
+            let timeUntilDeadline = deadline.timeIntervalSince(now)
+            let deadlinePassed = now >= deadline
+            let currentPhase = self.lobbyPhase
+            
+            print("⏱️ [VoiceWindow] Timer tick | phase=\(currentPhase) | timeUntilDeadline=\(String(format: "%.1f", timeUntilDeadline))s")
+            
+            // Before deadline: timer should only run while still connecting
+            if !deadlinePassed {
+                guard currentPhase == .connecting else {
+                    print("🛑 [VoiceWindow] Timer stopping | phase=\(currentPhase) (not connecting)")
+                    self.voiceWindowTimer?.invalidate()
+                    return
+                }
             }
             
-            // Check if deadline passed or countdown started
             Task { @MainActor in
                 await self.requestRefresh(reason: "voice-window-poll")
                 
-                // If deadline passed, call maybe-start-countdown
-                if Date() >= deadline && self.lobbyPhase == .connecting {
+                let phaseAfterRefresh = self.lobbyPhase
+                print("🔍 [VoiceWindow] After refresh | deadlinePassed=\(deadlinePassed) | phase=\(phaseAfterRefresh)")
+                
+                // Timeout recovery path - attempt once
+                if deadlinePassed && !didRequestTimeoutRecovery {
+                    didRequestTimeoutRecovery = true
+                    print("⏰ [VoiceWindow] Deadline passed (phase=\(phaseAfterRefresh)), calling maybe-start-countdown")
+                    
                     do {
                         try await self.remoteMatchService.maybeStartCountdown(matchId: self.match.id)
-                        await self.requestRefresh(reason: "deadline-check")
+                        print("✅ [VoiceWindow] maybe-start-countdown succeeded")
+                        
+                        await self.requestRefresh(reason: "post-countdown-start")
+                        
+                        let finalPhase = self.lobbyPhase
+                        if finalPhase == .countdown {
+                            print("✅ [VoiceWindow] Countdown confirmed, stopping timer")
+                            self.voiceWindowTimer?.invalidate()
+                        } else {
+                            print("⚠️ [VoiceWindow] maybe-start-countdown returned but finalPhase is \(finalPhase)")
+                        }
                     } catch {
-                        print("❌ [VoiceWindow] Failed to check countdown: \(error)")
+                        print("❌ [VoiceWindow] Failed to start countdown: \(error)")
                     }
+                }
+                
+                // Normal path: stop once countdown has already begun
+                if phaseAfterRefresh == .countdown {
+                    print("✅ [VoiceWindow] Countdown detected, stopping timer")
+                    self.voiceWindowTimer?.invalidate()
                 }
             }
         }

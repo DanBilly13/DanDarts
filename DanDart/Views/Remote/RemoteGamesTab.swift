@@ -1317,6 +1317,7 @@ struct RemoteGamesTab: View {
     }
     
     /// Detect declined matches when sent challenges list changes
+    /// Uses verification-based approach instead of inference
     private func detectDeclinedMatches(
         old: [RemoteMatchWithPlayers],
         new: [RemoteMatchWithPlayers]
@@ -1328,65 +1329,114 @@ struct RemoteGamesTab: View {
         print("🧪 [DeclineDetect] old=\(oldIds.map { String($0.uuidString.prefix(8)) }.sorted()) new=\(newIds.map { String($0.uuidString.prefix(8)) }.sorted()) removed=\(removedIds.map { String($0.uuidString.prefix(8)) }.sorted())")
         
         for removedId in removedIds {
+            print("📤 SENT REMOVAL DETECTED match=\(removedId.uuidString.prefix(8))")
+            
             // Find the removed match in OLD snapshot
             guard let removedMatch = old.first(where: { $0.match.id == removedId }) else {
                 continue
             }
             
-            // 7-CONDITION RULE for showing as declined:
-            
-            // 1. It was previously visible in the sent section (implicit - we found it in old)
-            
-            // 2. Its previous authoritative status was .pending
+            // GUARD: Previous status was .pending
             guard removedMatch.match.status == .pending else {
-                print("⚠️ Skip decline - status was \(removedMatch.match.status?.rawValue ?? "nil"), not .pending")
+                print("⚠️ Skip - status was \(removedMatch.match.status?.rawValue ?? "nil"), not .pending")
                 continue
             }
             
-            // 3. It disappears from sent (implicit - we detected removal)
-            
-            // 4. It does not appear in ready/lobby/inProgress AND is not in an active enter/accept flow
-            let movedToActive = remoteMatchService.readyMatches.contains(where: { $0.match.id == removedId }) ||
-                               remoteMatchService.activeMatch?.match.id == removedId
-            let isBeingProcessed = remoteMatchService.processingMatchId == removedId
-            
-            guard !movedToActive && !isBeingProcessed else {
-                if isBeingProcessed {
-                    print("⚠️ Skip decline - match is being processed by accept/join flow")
-                } else {
-                    print("⚠️ Skip decline - match moved to ready/active")
-                }
-                continue
-            }
-            
-            // 5. It is not being removed by timeout/expiry
+            // GUARD: Not expired locally
             guard !expiredMatchIds.contains(removedId) else {
-                print("⚠️ Skip decline - match already expired")
+                print("⚠️ Skip - match already expired")
                 continue
             }
             
-            // 6. It was not locally cancelled by the challenger
+            // GUARD: Not self-cancelled (CRITICAL: preserve this distinction)
             guard !cancelledMatchIds.contains(removedId) else {
-                print("⚠️ Skip decline - match was self-cancelled")
+                print("✅ DECLINED UI SKIPPED - this was self-cancel")
                 continue
             }
             
-            // 7. We have an authoritative cancel signal (check via realtime or fetch)
-            // For now, we infer this from: match disappeared from sent + wasn't moved + wasn't self-cancelled
-            // The service filters .cancelled matches, so disappearance after passing above checks = declined
-            
-            // Prevent duplicate handling
+            // GUARD: Not already handled
             guard !declineHandledMatchIds.contains(removedId),
                   !showDeclinedForMatchIds.contains(removedId),
                   !fadingMatchIds.contains(removedId) else {
-                print("⚠️ Skip decline - already handled")
+                print("⚠️ Skip - already handled")
                 continue
             }
             
-            print("✅ All 7 conditions met - showing as declined: \(removedId)")
+            // PRIORITY 1: Check local authoritative buckets FIRST
             
-            // Preserve match data and trigger declined display
-            handleDecline(match: removedMatch)
+            // Check if moved to readyMatches (normal accept flow)
+            if remoteMatchService.readyMatches.contains(where: { $0.match.id == removedId }) {
+                print("✅ VERIFIED VIA READY BUCKET match=\(removedId.uuidString.prefix(8))")
+                continue  // Not declined, moved to ready section
+            }
+            
+            // Check if became active
+            if remoteMatchService.activeMatch?.match.id == removedId {
+                print("✅ VERIFIED VIA ACTIVE MATCH match=\(removedId.uuidString.prefix(8))")
+                continue
+            }
+            
+            // Check if being processed (accept/join in flight)
+            if remoteMatchService.processingMatchId == removedId {
+                print("✅ VERIFIED VIA PROCESSING STATE match=\(removedId.uuidString.prefix(8))")
+                continue
+            }
+            
+            // PRIORITY 2: If local state unclear, verify via network
+            Task {
+                await classifySentRemoval(matchId: removedId, removedMatch: removedMatch)
+            }
+        }
+    }
+    
+    /// Classify a sent challenge removal by fetching authoritative status
+    /// Only shows declined UI for verified terminal decline-like states
+    private func classifySentRemoval(
+        matchId: UUID,
+        removedMatch: RemoteMatchWithPlayers
+    ) async {
+        print("🔍 VERIFYING TERMINAL REASON match=\(matchId.uuidString.prefix(8))")
+        
+        // Fetch current authoritative status
+        // Note: fetchMatch may mutate flow state, but we're only reading the status
+        guard let currentMatch = try? await remoteMatchService.fetchMatch(matchId: matchId) else {
+            print("⚠️ DECLINED UI SKIPPED - could not fetch match for verification")
+            return
+        }
+        
+        let status = currentMatch.status
+        print("🔍 VERIFIED STATUS = \(status?.rawValue ?? "nil")")
+        
+        await MainActor.run {
+            // Double-check self-cancel state hasn't changed
+            if cancelledMatchIds.contains(matchId) {
+                print("✅ DECLINED UI SKIPPED - this was self-cancel")
+                return
+            }
+            
+            // Only show declined UI for truly terminal decline-like states
+            switch status {
+            case .expired:
+                print("✅ DECLINED UI SHOWN - verified terminal state: expired")
+                handleDecline(match: removedMatch)
+                
+            case .cancelled:
+                // CRITICAL: Only show decline if NOT self-cancelled
+                // Self-cancel is already excluded above, but be explicit
+                print("✅ DECLINED UI SHOWN - verified terminal state: cancelled (receiver-declined)")
+                handleDecline(match: removedMatch)
+                
+            case .ready, .lobby, .inProgress:
+                print("✅ DECLINED UI SKIPPED - status became \(status?.rawValue ?? "nil")")
+                // Normal transition, no declined UI needed
+                
+            case .completed:
+                print("✅ DECLINED UI SKIPPED - status became completed")
+                
+            case .pending, .sent, .none:
+                print("⚠️ DECLINED UI SKIPPED - state was ambiguous: \(status?.rawValue ?? "nil")")
+                // Unclear state, don't show declined
+            }
         }
     }
     
