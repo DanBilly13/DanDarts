@@ -137,13 +137,45 @@ struct RemoteGameplayView: View {
     /// CurrentThrowDisplay should show:
     /// - Opponent's darts sequentially during reveal window - PRIORITY
     /// - My input when it's my turn
+    /// - Opponent's final throw when game is won (so non-winner sees what winner threw)
     /// - Otherwise empty []
     private var renderThrowForCurrentThrowDisplay: [ScoredThrow] {
+        // Priority 1: Show reveal animation if active
         if revealState.preTurnRevealIsActive {
             // Show only revealed darts (sequential reveal)
             return Array(revealState.fullOpponentDarts.prefix(revealState.revealedDartCount))
         }
+        
+        // Priority 2: Show my input when it's my turn
         if isMyTurn { return gameViewModel.currentThrow }
+        
+        // Priority 3: If game is won, show the winning throw (opponent's final throw)
+        // This ensures the non-winning player sees what the winner threw
+        if let winner = gameViewModel.winner {
+            print("🎯 [FinalThrow] Winner detected: \(winner.displayName)")
+            
+            if let lastVisit = renderMatch?.lastVisitPayload {
+                print("🎯 [FinalThrow] lastVisitPayload exists - playerId: \(lastVisit.playerId.uuidString.prefix(8))..., darts: \(lastVisit.darts), dartCount: \(lastVisit.darts.count)")
+                print("🎯 [FinalThrow] currentUserId: \(currentUserId.uuidString.prefix(8))...")
+                print("🎯 [FinalThrow] isOpponentThrow: \(lastVisit.playerId != currentUserId)")
+                
+                if lastVisit.playerId != currentUserId {
+                    if lastVisit.darts.count == 3 {
+                        print("🎯 [FinalThrow] ✅ Showing opponent's final throw")
+                        return lastVisit.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
+                    } else {
+                        print("🎯 [FinalThrow] ❌ Dart count != 3, count: \(lastVisit.darts.count)")
+                    }
+                } else {
+                    print("🎯 [FinalThrow] ❌ lastVisit is MY throw, not opponent's")
+                }
+            } else {
+                print("🎯 [FinalThrow] ❌ No lastVisitPayload available")
+                print("🎯 [FinalThrow] renderMatch exists: \(renderMatch != nil)")
+            }
+        }
+        
+        // Default: empty
         return []
     }
     
@@ -1015,7 +1047,13 @@ struct RemoteGameplayView: View {
                     // This prevents using a stale reference if liveMatch changes due to realtime updates
                     completedMatchId = m.id
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    // Different delays: winner sees end screen quickly, loser gets time to see final throw
+                    let isWinner = winner.id == currentUserId
+                    let navigationDelay = isWinner ? 0.3 : 2.0
+                    
+                    print("🏆 [GameEnd] Winner: \(winner.displayName), isWinner: \(isWinner), delay: \(navigationDelay)s")
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + navigationDelay) {
                         // Set flag to prevent exitRemoteFlow in onDisappear
                         isNavigatingToGameEnd = true
                         
