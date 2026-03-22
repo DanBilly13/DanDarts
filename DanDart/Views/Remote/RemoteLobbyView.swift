@@ -144,6 +144,52 @@ struct RemoteLobbyView: View {
         return "\(seconds)"
     }
     
+    // MARK: - UI-Only Status Presentation
+    
+    /// Single status text that updates based on lobby state
+    private var statusText: String {
+        // Check voice connection state first (takes precedence when connected)
+        if voiceChatService.connectionState == .connected {
+            return "Voice connected"
+        }
+        
+        // Then check lobby phase
+        switch lobbyPhase {
+        case .waiting:
+            if bothPlayersPresent {
+                return "Players ready"
+            }
+            return "Waiting for \(opponent.displayName)"
+            
+        case .connecting:
+            return "Connecting voice"
+            
+        case .timedOut:
+            return "Voice unavailable"
+            
+        case .countdown:
+            // During countdown, show voice status or players ready
+            if voiceChatService.connectionState == .connected {
+                return "Voice connected"
+            } else if voiceChatService.connectionState == .failed || voiceChatService.connectionState == .disconnected {
+                return "Voice unavailable"
+            }
+            return "Players ready"
+        }
+    }
+    
+    /// Whether the status text should pulse (waiting/connecting states)
+    private var shouldPulseStatus: Bool {
+        switch lobbyPhase {
+        case .waiting:
+            return !bothPlayersPresent  // Pulse while waiting for opponent
+        case .connecting:
+            return voiceChatService.connectionState != .connected  // Pulse while connecting
+        case .timedOut, .countdown:
+            return false  // No pulsing for static states
+        }
+    }
+    
     var body: some View {
         ZStack {
             AppColor.backgroundPrimary
@@ -151,18 +197,11 @@ struct RemoteLobbyView: View {
             
             VStack(spacing: 0) {
                 // Game name at top
-                VStack(spacing: 8) {
-                    Text(match.gameType.uppercased())
-                        .font(.system(size: 28, weight: .bold, design: .default))
-                        .foregroundColor(AppColor.textPrimary)
-                    
-                    Text("MATCH STARTING")
-                        .font(.system(size: 14, weight: .semibold, design: .default))
-                        .foregroundColor(AppColor.interactivePrimaryBackground)
-                        .tracking(2)
-                }
-                .padding(.top, 60)
-                .opacity(showContent ? 1.0 : 0.0)
+                Text(match.gameType.uppercased())
+                    .font(.system(size: 28, weight: .bold, design: .default))
+                    .foregroundColor(AppColor.textPrimary)
+                    .padding(.top, 60)
+                    .opacity(showContent ? 1.0 : 0.0)
                 
                 Spacer()
                 
@@ -190,7 +229,7 @@ struct RemoteLobbyView: View {
                 
                 Spacer()
                 
-                // Waiting section - conditional based on match status
+                // Status and match starting section
                 VStack(spacing: 24) {
                     if isExpired {
                         VStack(spacing: 12) {
@@ -208,111 +247,65 @@ struct RemoteLobbyView: View {
                                 .foregroundColor(AppColor.textSecondary)
                         }
                     } else {
-                        // Phase-aware lobby UI
-                        switch lobbyPhase {
-                        case .waiting:
-                            // Waiting for opponent to join
-                            VStack(spacing: 16) {
-                                ProgressView()
-                                    .tint(AppColor.interactivePrimaryBackground)
-                                    .scaleEffect(1.5)
-                                
-                                Text("Waiting for \(opponent.displayName) to join")
-                                    .font(.system(.headline, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(AppColor.textPrimary)
-                                
-                                // Countdown timer
-                                TimelineView(.periodic(from: .now, by: 1.0)) { context in
-                                    Text(formattedTime)
-                                        .font(.system(.title, design: .monospaced))
+                        // Single status line with smooth transitions
+                        Text(statusText)
+                            .font(.system(.headline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundColor(AppColor.textPrimary)
+                            .opacity(shouldPulseStatus ? 0.6 : 1.0)
+                            .animation(
+                                shouldPulseStatus 
+                                    ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true)
+                                    : .easeInOut(duration: 0.3),
+                                value: shouldPulseStatus
+                            )
+                            .transition(.opacity)
+                            .id(statusText)  // Force view recreation on text change for smooth transition
+                            .animation(.easeInOut(duration: 0.3), value: statusText)
+                        
+                        // Fixed-height container for match starting area
+                        ZStack {
+                            if lobbyPhase == .countdown && countdownActive {
+                                // MATCH STARTING + countdown on one line
+                                HStack(spacing: 12) {
+                                    Text("MATCH STARTING")
+                                        .font(.system(.title2, design: .rounded))
                                         .fontWeight(.semibold)
-                                        .foregroundColor(timeRemaining < 60 ? .red : AppColor.interactivePrimaryBackground)
-                                }
-                            }
-                            
-                        case .connecting:
-                            // Voice connection window active
-                            VStack(spacing: 12) {
-                                ProgressView()
-                                    .tint(AppColor.interactivePrimaryBackground)
-                                    .scaleEffect(1.5)
-                                
-                                Text("Connecting voice…")
-                                    .font(.system(.headline, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(AppColor.textPrimary)
-                                
-                                Text("Starting match automatically in 20s if voice doesn't connect.")
-                                    .font(.caption)
-                                    .foregroundColor(AppColor.textSecondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 32)
-                                
-                                // Show time remaining in voice window
-                                if let flowMatch = remoteMatchService.flowMatch, 
-                                   let timeRemaining = flowMatch.voiceTimeRemaining {
-                                    Text("\(Int(timeRemaining))s")
-                                        .font(.system(.title3, design: .monospaced))
-                                        .foregroundColor(AppColor.textSecondary)
-                                }
-                            }
-                            
-                        case .timedOut:
-                            // Voice timeout - fallback message
-                            VStack(spacing: 12) {
-                                Text("Voice couldn't connect. Starting match anyway.")
-                                    .font(.subheadline)
-                                    .foregroundColor(AppColor.textSecondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 32)
-                            }
-                            
-                        case .countdown:
-                            // Match countdown active
-                            VStack(spacing: 16) {
-                                Text("Players Ready")
-                                    .font(.system(.callout, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(AppColor.interactiveSecondaryBackground)
-                                
-                                // Task 10: Voice status line
-                                voiceStatusLine
-                                
-                                Text("MATCH STARTING")
-                                    .font(.system(.title2, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                                    .tracking(2)
-                                    .opacity(showMatchStarting ? 1.0 : 0.4)
-                                
-                                // Countdown timer
-                                if matchStatus == .lobby && countdownActive {
-                                    TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                                        let remaining = countdownRemaining
-                                        let elapsed = remaining <= 0
-                                        
-                                        Text(formattedCountdown)
-                                            .font(.system(.title, design: .monospaced))
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                                            .onChange(of: elapsed) { _, isElapsed in
-                                                if isElapsed && matchStatus == .lobby && bothPlayersPresent {
-                                                    Task {
-                                                        do {
-                                                            print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
-                                                            try await remoteMatchService.startMatchIfReady(matchId: match.id)
-                                                            print("✅ [Lobby] start-match-if-ready succeeded")
-                                                        } catch {
-                                                            print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                                        .tracking(1)
+                                    
+                                    // Countdown timer
+                                    if matchStatus == .lobby {
+                                        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                                            let remaining = countdownRemaining
+                                            let elapsed = remaining <= 0
+                                            
+                                            Text(formattedCountdown)
+                                                .font(.system(.title, design: .monospaced))
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                                .onChange(of: elapsed) { _, isElapsed in
+                                                    if isElapsed && matchStatus == .lobby && bothPlayersPresent {
+                                                        Task {
+                                                            do {
+                                                                print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
+                                                                try await remoteMatchService.startMatchIfReady(matchId: match.id)
+                                                                print("✅ [Lobby] start-match-if-ready succeeded")
+                                                            } catch {
+                                                                print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                                                            }
                                                         }
                                                     }
                                                 }
-                                            }
+                                        }
                                     }
                                 }
+                                .opacity(showMatchStarting ? 1.0 : 0.4)
+                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
                             }
                         }
+                        .frame(height: 80)  // Fixed height prevents layout jumps
+                        .animation(.easeInOut(duration: 0.3), value: lobbyPhase)
                     }
                     
                     // Cancel/Abort button - only show for valid states
@@ -391,28 +384,7 @@ struct RemoteLobbyView: View {
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             // Phase 13: Voice controls moved to gameplay view
-            // Voice status line remains visible in lobby body
-            // ToolbarItem(placement: .topBarLeading) {
-            //     voiceControlButton
-            // }
-            
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task {
-                        await requestRefresh(reason: "manual_button")
-                    }
-                } label: {
-                    if isRefreshInProgress {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(AppColor.interactivePrimaryBackground)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
-                    }
-                }
-                .disabled(isRefreshInProgress)
-            }
+            // Reload button removed for cleaner UI
         }
         .onAppear {
             print("🔵 [Lifecycle] RemoteLobbyView.onAppear() - viewInstanceId: \(instanceId)")
