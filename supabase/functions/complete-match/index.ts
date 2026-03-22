@@ -149,6 +149,19 @@ serve(async (req) => {
     // This prevents race-condition failures.
     if (match.remote_status === 'cancelled' || match.remote_status === 'completed') {
       console.log(`✅ [CompleteMatch] Match already in terminal state: ${match.remote_status}`)
+      
+      // STILL clean up locks (idempotent operation - safe to run multiple times)
+      const { error: lockError } = await supabaseClient
+        .from('remote_match_locks')
+        .delete()
+        .in('user_id', [match.challenger_id, match.receiver_id])
+
+      if (lockError) {
+        console.error('🏆 [CompleteMatch] Lock cleanup failed (idempotent path):', lockError)
+      } else {
+        console.log(`🏆 [CompleteMatch] Locks cleared for both users (idempotent cleanup - challenger: ${match.challenger_id}, receiver: ${match.receiver_id})`)
+      }
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -235,16 +248,18 @@ serve(async (req) => {
     // -------------------------------
     // 4️⃣ Clear locks (non-fatal)
     // -------------------------------
+    // Delete locks for both users (challenger and receiver)
+    // Locks are keyed by user_id, so we need to delete for both participants
     const { error: lockError } = await supabaseClient
       .from('remote_match_locks')
       .delete()
-      .eq('match_id', normalizedMatchId)
+      .in('user_id', [match.challenger_id, match.receiver_id])
 
     if (lockError) {
       console.error('🏆 [CompleteMatch] Lock cleanup failed:', lockError)
       // Do not fail request — match is already completed
     } else {
-      console.log(`🏆 [CompleteMatch] Lock cleared for match ${normalizedMatchId}`)
+      console.log(`🏆 [CompleteMatch] Locks cleared for both users (challenger: ${match.challenger_id}, receiver: ${match.receiver_id})`)
     }
 
     console.log(`✅ [CompleteMatch] Match completed: ${normalizedMatchId}, winner: ${normalizedWinnerId}, by user: ${user.id}`)
