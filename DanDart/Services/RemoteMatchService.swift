@@ -1178,6 +1178,18 @@ class RemoteMatchService: ObservableObject {
                 ))
             
             print("✅ [CancelChallenge] Challenge cancelled: \(matchId)")
+            
+            // Immediate local cleanup - remove from all published arrays
+            await MainActor.run {
+                readyMatches.removeAll { $0.match.id == matchId }
+                pendingChallenges.removeAll { $0.match.id == matchId }
+                sentChallenges.removeAll { $0.match.id == matchId }
+                if activeMatch?.match.id == matchId {
+                    activeMatch = nil
+                }
+                print("🧹 [CancelChallenge] Local cleanup complete - removed from all arrays")
+            }
+            
             print("🔍 [CancelChallenge] ========================================")
         } catch let error as FunctionsError {
             // Detailed error logging
@@ -1225,6 +1237,18 @@ class RemoteMatchService: ObservableObject {
                 ))
             
             print("✅ [AbortMatch] Match aborted: \(matchId)")
+            
+            // Immediate local cleanup - remove from all published arrays
+            await MainActor.run {
+                readyMatches.removeAll { $0.match.id == matchId }
+                pendingChallenges.removeAll { $0.match.id == matchId }
+                sentChallenges.removeAll { $0.match.id == matchId }
+                if activeMatch?.match.id == matchId {
+                    activeMatch = nil
+                }
+                print("🧹 [AbortMatch] Local cleanup complete - removed from all arrays")
+            }
+            
             print("🟠 [AbortMatch] ========================================")
         } catch let error as FunctionsError {
             // Detailed error logging
