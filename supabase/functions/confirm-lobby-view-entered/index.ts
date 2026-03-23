@@ -26,6 +26,9 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const t0 = performance.now()
+  console.log(`⏱️ [enter-lobby] START`)
+
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -33,7 +36,11 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
+    const t1 = performance.now()
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    const t2 = performance.now()
+    console.log(`⏱️ [enter-lobby] AUTH: ${(t2-t1).toFixed(0)}ms`)
+    
     if (userError || !user) {
       console.error('Auth error:', userError)
       return new Response(
@@ -47,11 +54,14 @@ Deno.serve(async (req) => {
     console.log(`[confirm-lobby-view-entered] User ${user.id} confirming for match ${match_id}`)
 
     // Fetch match
+    const t3 = performance.now()
     const { data: match, error: matchError } = await supabaseClient
       .from('matches')
       .select('*')
       .eq('id', match_id)
       .single()
+    const t4 = performance.now()
+    console.log(`⏱️ [enter-lobby] FETCH: ${(t4-t3).toFixed(0)}ms`)
 
     if (matchError || !match) {
       console.error('Match fetch error:', matchError)
@@ -122,10 +132,13 @@ Deno.serve(async (req) => {
     }
 
     // Update match
+    const t5 = performance.now()
     const { error: updateError } = await supabaseClient
       .from('matches')
       .update(updateData)
       .eq('id', match_id)
+    const t6 = performance.now()
+    console.log(`⏱️ [enter-lobby] UPDATE: ${(t6-t5).toFixed(0)}ms`)
 
     if (updateError) {
       console.error('Match update error:', updateError)
@@ -136,6 +149,9 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[confirm-lobby-view-entered] ✅ Success for ${role}, voice_window_started=${voiceWindowStarted}`)
+
+    const t7 = performance.now()
+    console.log(`⏱️ [enter-lobby] TOTAL: ${(t7-t0).toFixed(0)}ms`)
 
     return new Response(
       JSON.stringify({

@@ -899,9 +899,6 @@ class VoiceChatService: NSObject, ObservableObject {
         
         // Create channel name (align with existing remote match pattern if present)
         let channelName = "voice_match_\(matchId.uuidString)"
-        print("🟢 [Subscribe] Channel name: \(channelName)")
-        print("� [Subscribe] Event name: 'voice_signal'")
-        print("� [Subscribe] ============================================\n")
         
         // Create channel
         let channel = supabaseService.client.realtimeV2.channel(channelName) {
@@ -910,31 +907,22 @@ class VoiceChatService: NSObject, ObservableObject {
         
         // Store channel reference BEFORE subscribing (prevents deallocation during async subscribe)
         signallingChannel = channel
-        print("� [Subscribe] Channel stored in signallingChannel property")
         
         // Subscribe to the channel
         do {
             // Register broadcast handler BEFORE subscribing, and retain the subscription token
-            print("🔊 [VoiceSignalling] Attaching onBroadcast listener for event: 'voice_signal'")
             broadcastSubscription = channel.onBroadcast(event: "voice_signal") { [weak self] (message: [String: AnyJSON]) in
-                print("\n🚨🚨🚨 [VoiceSignalling] BROADCAST CALLBACK FIRED! 🚨🚨🚨")
-                print("🚨 [VoiceSignalling] Callback thread: \(Thread.current)")
-                print("🚨 [VoiceSignalling] Message keys: \(message.keys)")
                 Task { @MainActor in
                     await self?.handleIncomingMessage(message)
                 }
             }
-            print("🔊 [VoiceSignalling] onBroadcast listener attached and subscription token retained")
             
             // Use the newer subscribe API that throws errors
             try await channel.subscribeWithError()
             
-            print("✅ [VoiceSignalling] SUBSCRIPTION ACTIVE")
-            print("✅ [VoiceSignalling] Channel status: \(channel.status)")
-            print("✅ [VoiceSignalling] ========================================")
+            print("✅ [VoiceSignalling] Subscription active")
         } catch {
             print("❌ [VoiceSignalling] Subscribe failed: \(error)")
-            print("❌ [VoiceSignalling] ========================================")
             throw error
         }
     }
@@ -942,14 +930,8 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Teardown Realtime channel
     private func teardownSignallingChannel() async {
         guard let channel = signallingChannel else {
-            print("🔴 [Cleanup] teardownSignallingChannel() - no channel to teardown, instanceId: \(instanceId)")
             return
         }
-        
-        print("� [Cleanup] teardownSignallingChannel() START - instanceId: \(instanceId)")
-        print("🔴 [Cleanup]   - channel exists: YES")
-        print("🔴 [Cleanup]   - broadcastSubscription exists: \(broadcastSubscription != nil ? "YES" : "NO")")
-        print("🔴 [Cleanup]   - otherPlayerId: \(otherPlayerId?.uuidString ?? "nil")")
         
         await channel.unsubscribe()
         signallingChannel = nil
@@ -958,12 +940,7 @@ class VoiceChatService: NSObject, ObservableObject {
         isPeerReady = false
         isLocalReady = false
         
-        print("🔴 [Cleanup] teardownSignallingChannel() COMPLETE")
-        print("🔴 [Cleanup]   - signallingChannel: \(signallingChannel == nil ? "nil ✅" : "NOT NIL ⚠️")")
-        print("🔴 [Cleanup]   - broadcastSubscription: \(broadcastSubscription == nil ? "nil ✅" : "NOT NIL ⚠️")")
-        print("🔴 [Cleanup]   - otherPlayerId: \(otherPlayerId == nil ? "nil ✅" : "NOT NIL ⚠️")")
-        print("🔴 [Cleanup]   - isPeerReady: \(isPeerReady)")
-        print("🔴 [Cleanup]   - isLocalReady: \(isLocalReady)")
+        print("🔴 [Cleanup] Voice signalling channel closed")
     }
     
     // MARK: - Send Methods
@@ -995,8 +972,6 @@ class VoiceChatService: NSObject, ObservableObject {
             matchId: session.matchId,
             payload: payload
         )
-        
-        print("🔊 [VoiceSignalling] SEND voice_ready to \(otherPlayerId.uuidString.prefix(8)) (role: \(role), session: \(session.id.uuidString.prefix(8)))")
     }
     
     /// Send voice_request_offer to ask challenger to resend offer
@@ -1026,8 +1001,6 @@ class VoiceChatService: NSObject, ObservableObject {
             matchId: session.matchId,
             payload: payload
         )
-        
-        print("🔊 [VoiceSignalling] SEND voice_request_offer to \(otherPlayerId.uuidString.prefix(8)) (session: \(session.id.uuidString.prefix(8)))")
     }
     
     /// Send WebRTC offer to other player
@@ -1124,8 +1097,6 @@ class VoiceChatService: NSObject, ObservableObject {
             matchId: session.matchId,
             payload: payload
         )
-        
-        print("🔊 [VoiceSignalling] SEND voice_ice_candidate to \(otherPlayerId.uuidString.prefix(8))")
     }
     
     /// Send disconnect signal to other player
@@ -1358,9 +1329,6 @@ class VoiceChatService: NSObject, ObservableObject {
             return false
         }
         print("✅ [VoiceSignalling] VALIDATE: Target matches current user (\(to.uuidString.prefix(8)))")
-        
-        print("✅ [VoiceSignalling] VALIDATION PASSED: All checks successful")
-        print("🔍 [VoiceSignalling] ==========================================\n")
         return true
     }
     
@@ -1484,8 +1452,6 @@ class VoiceChatService: NSObject, ObservableObject {
     
     /// Handle incoming ICE candidate
     private func handleICECandidate(from: UUID, payload: [String: AnyJSON]) async {
-        print("📥 [VoiceSignalling] RECV voice_ice_candidate from \(from.uuidString.prefix(8))")
-        
         // Extract and validate payload (sessionId is peer's local session, not validated)
         guard case let .string(candidate) = payload["candidate"],
               case let .string(sdpMid) = payload["sdpMid"] else {
@@ -1503,8 +1469,6 @@ class VoiceChatService: NSObject, ObservableObject {
             print("⚠️ [VoiceSignalling] Invalid sdpMLineIndex type, ignoring")
             return
         }
-        
-        print("📥 [VoiceSignalling] Valid ICE candidate received")
         
         // Pass to WebRTC engine to add ICE candidate
         await handleRemoteICECandidate(candidate: candidate, sdpMid: sdpMid, sdpMLineIndex: sdpMLineIndex)
@@ -1835,7 +1799,6 @@ class VoiceChatService: NSObject, ObservableObject {
         guard hasRemoteDescription else {
             // Queue the candidate until remoteDescription is set
             pendingRemoteICECandidates.append((candidate: candidate, sdpMid: sdpMid, sdpMLineIndex: sdpMLineIndex))
-            print("📦 [VoiceEngine] ICE candidate queued (remoteDescription not set yet) - queue size: \(pendingRemoteICECandidates.count)")
             return
         }
         
@@ -1848,7 +1811,6 @@ class VoiceChatService: NSObject, ObservableObject {
         
         do {
             try await pc.add(iceCandidate)
-            print("✅ [VoiceEngine] ICE candidate added")
         } catch {
             print("❌ [VoiceEngine] Failed to add ICE candidate: \(error)")
         }
@@ -1861,10 +1823,9 @@ class VoiceChatService: NSObject, ObservableObject {
         }
         
         let queueSize = pendingRemoteICECandidates.count
-        print("🔄 [VoiceEngine] Flushing \(queueSize) queued ICE candidate(s)")
         
         guard let pc = peerConnection else {
-            print("❌ [VoiceEngine] Cannot flush - peer connection not ready")
+            print("❌ [VoiceEngine] Cannot flush \(queueSize) ICE candidates - peer connection not ready")
             pendingRemoteICECandidates.removeAll()
             return
         }
@@ -1892,7 +1853,9 @@ class VoiceChatService: NSObject, ObservableObject {
         // Clear the queue after processing
         pendingRemoteICECandidates.removeAll()
         
-        print("✅ [VoiceEngine] ICE candidate flush complete - success: \(successCount), failed: \(failureCount)")
+        if failureCount > 0 {
+            print("⚠️ [VoiceEngine] ICE flush: \(successCount) ok, \(failureCount) failed")
+        }
     }
     
     /// Cleanup WebRTC resources
@@ -1988,8 +1951,6 @@ extension VoiceChatService: RTCPeerConnectionDelegate {
     
     /// Called when a new ICE candidate is generated (Task 12: Send to peer)
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
-        print("🔊 [PeerConnection] ICE candidate generated")
-        
         // Task 12: Send ICE candidate to remote peer via signalling
         Task {
             do {
@@ -1998,7 +1959,6 @@ extension VoiceChatService: RTCPeerConnectionDelegate {
                     sdpMid: candidate.sdpMid ?? "",
                     sdpMLineIndex: Int(candidate.sdpMLineIndex)
                 )
-                print("✅ [PeerConnection] ICE candidate sent to peer")
             } catch {
                 print("❌ [PeerConnection] Failed to send ICE candidate: \(error)")
             }
@@ -2007,7 +1967,7 @@ extension VoiceChatService: RTCPeerConnectionDelegate {
     
     /// Called when ICE candidates are removed
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {
-        print("🔊 [PeerConnection] ICE candidates removed: \(candidates.count)")
+        // ICE candidates removed (normal operation)
     }
     
     /// Called when the peer connection is opened

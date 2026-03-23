@@ -198,9 +198,6 @@ class RemoteMatchService: ObservableObject {
             bucket = .hidden
         }
         
-        // Debug logging
-        print("[SectionDebug] matchId=\(match.id.uuidString.prefix(8)) status=\(status.rawValue) currentUserId=\(userId.uuidString.prefix(8)) challengerId=\(match.challengerId.uuidString.prefix(8)) receiverId=\(match.receiverId.uuidString.prefix(8)) amChallenger=\(amChallenger) amReceiver=\(amReceiver) bucket=\(bucket)")
-        
         // CRITICAL GUARD: Challenger match must NEVER appear in receiver section
         if bucket == .receivedChallenge && amChallenger {
             print("❌ [SectionDebug] VIOLATION: Challenger match in receiver bucket! matchId=\(match.id.uuidString.prefix(8))")
@@ -518,11 +515,6 @@ class RemoteMatchService: ObservableObject {
                 .value
             
             FlowDebug.log("LOAD: RUN \(runNumber) QUERY returned \(matches.count) matches", matchId: nil)
-            for match in matches {
-                let statusStr = match.status?.rawValue ?? "nil"
-                let updatedStr = ISO8601DateFormatter().string(from: match.updatedAt)
-                FlowDebug.log("LOAD: RUN \(runNumber) RAW match=\(match.id.uuidString.prefix(8)) status=\(statusStr) updated=\(updatedStr)", matchId: match.id)
-            }
             
             // Load user data for all unique user IDs
             var userIds = Set<UUID>()

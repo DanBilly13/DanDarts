@@ -991,8 +991,6 @@ struct RemoteLobbyView: View {
             let deadlinePassed = now >= deadline
             let currentPhase = self.lobbyPhase
             
-            print("⏱️ [VoiceWindow] Timer tick | phase=\(currentPhase) | timeUntilDeadline=\(String(format: "%.1f", timeUntilDeadline))s")
-            
             // Before deadline: timer should only run while still connecting
             if !deadlinePassed {
                 guard currentPhase == .connecting else {
@@ -1006,7 +1004,6 @@ struct RemoteLobbyView: View {
                 await self.requestRefresh(reason: "voice-window-poll")
                 
                 let phaseAfterRefresh = self.lobbyPhase
-                print("🔍 [VoiceWindow] After refresh | deadlinePassed=\(deadlinePassed) | phase=\(phaseAfterRefresh)")
                 
                 // Timeout recovery path - attempt once
                 if deadlinePassed && !didRequestTimeoutRecovery {

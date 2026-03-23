@@ -111,36 +111,35 @@ Deno.serve(async (req) => {
 
     console.log(`[confirm-voice-ready] ✅ Success for ${role}`)
 
-    // Check if both players are now voice ready and trigger countdown if so
-    const { data: updatedMatch } = await supabaseClient
-      .from('matches')
-      .select('challenger_voice_ready_at, receiver_voice_ready_at')
-      .eq('id', match_id)
-      .single()
+    // Check if both players are now voice ready
+    const otherVoiceReadyField = isChallenger ? 'receiver_voice_ready_at' : 'challenger_voice_ready_at'
+    const bothVoiceReady = match[otherVoiceReadyField] !== null // Other player already ready
 
-    if (updatedMatch?.challenger_voice_ready_at && updatedMatch?.receiver_voice_ready_at) {
-      console.log('[confirm-voice-ready] Both players voice ready - triggering countdown check')
+    if (bothVoiceReady) {
+      console.log('[confirm-voice-ready] Both players voice ready - checking if countdown should start')
       
-      // Call maybe-start-countdown
-      try {
-        const countdownUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/maybe-start-countdown`
-        const countdownResponse = await fetch(countdownUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': req.headers.get('Authorization')!,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ match_id })
-        })
+      // Fetch fresh match data to check countdown status
+      const { data: freshMatch } = await supabaseClient
+        .from('matches')
+        .select('lobby_countdown_started_at')
+        .eq('id', match_id)
+        .single()
+      
+      // Only start countdown if not already started (idempotent)
+      if (freshMatch && freshMatch.lobby_countdown_started_at === null) {
+        const { error: countdownError } = await supabaseClient
+          .from('matches')
+          .update({ lobby_countdown_started_at: now.toISOString() })
+          .eq('id', match_id)
+          .is('lobby_countdown_started_at', null) // Race condition guard
         
-        if (!countdownResponse.ok) {
-          console.error('[confirm-voice-ready] Failed to trigger countdown check:', await countdownResponse.text())
+        if (countdownError) {
+          console.error('[confirm-voice-ready] Failed to start countdown:', countdownError)
         } else {
-          console.log('[confirm-voice-ready] ✅ Countdown check triggered successfully')
+          console.log('[confirm-voice-ready] ✅ Countdown started (both voice ready)')
         }
-      } catch (countdownError) {
-        console.error('[confirm-voice-ready] Error calling maybe-start-countdown:', countdownError)
-        // Don't fail the voice-ready confirmation if countdown trigger fails
+      } else {
+        console.log('[confirm-voice-ready] Countdown already started')
       }
     }
 

@@ -154,19 +154,6 @@ struct RemoteGamesTab: View {
                         )
                         .id(matchWithPlayers.match.id)
                         .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
-                        .onAppear {
-                            let presentationState = cardPresentationState(for: matchWithPlayers, isExpired: isExpired, showAsDeclined: false)
-                            print("🟢 [ReadyCard] APPEAR matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) state=\(presentationState.displayName) isProcessing=\(remoteMatchService.processingMatchId == matchWithPlayers.match.id) hasOnDecline=true")
-                        }
-                        .onDisappear {
-                            print("🟢 [ReadyCard] DISAPPEAR matchId=\(matchWithPlayers.match.id.uuidString.prefix(8))")
-                        }
-                        .onChange(of: cardPresentationState(for: matchWithPlayers, isExpired: isExpired, showAsDeclined: false)) { oldState, newState in
-                            print("🟢 [ReadyCard] STATE CHANGE matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) old=\(oldState.displayName) new=\(newState.displayName)")
-                        }
-                        .onChange(of: remoteMatchService.processingMatchId == matchWithPlayers.match.id) { oldValue, newValue in
-                            print("🟢 [ReadyCard] isProcessing CHANGE matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) old=\(oldValue) new=\(newValue)")
-                        }
                         .opacity(isFading ? 0 : 1)
                         .animation(.easeOut(duration: 0.5), value: isFading)
                         .onChange(of: isExpired) { _, newValue in
@@ -272,12 +259,6 @@ struct RemoteGamesTab: View {
                             )
                             .id(matchWithPlayers.match.id)
                             .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
-                            .onAppear {
-                                print("🧪 [DeclineRow] APPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
-                            }
-                            .onDisappear {
-                                print("🧪 [DeclineRow] DISAPPEAR wrapperId=\(matchWithPlayers.id.uuidString.prefix(8)) matchId=\(matchWithPlayers.match.id.uuidString.prefix(8)) showAsDeclined=\(showAsDeclined) state=\(String(describing: presentationState))")
-                            }
                             .opacity(isFading ? 0 : 1)
                             .animation(.easeOut(duration: 0.5), value: isFading)
                             .onChange(of: isExpiredNow) { _, newValue in
@@ -373,7 +354,6 @@ struct RemoteGamesTab: View {
     private func shouldShowInList(matchId: UUID) -> Bool {
         // Only suppress once destination has taken over
         if remoteMatchService.isInRemoteFlow && remoteMatchService.flowMatchId == matchId {
-            print("🚫 [ListSuppress] matchId=\(matchId.uuidString.prefix(8)) HIDDEN: isInRemoteFlow && flowMatchId (destination active)")
             return false
         }
         
@@ -445,11 +425,6 @@ struct RemoteGamesTab: View {
     private var matchListView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                Color.clear
-                    .frame(height: 0)
-                    .onAppear {
-                        print("🧪 [DeclineTopLevel] showing matchListView")
-                    }
                 VStack(spacing: 24) {
                     readyMatchesSection
                     receivedChallengesSection
@@ -467,21 +442,14 @@ struct RemoteGamesTab: View {
                 }
             }
             .onReceive(remoteMatchService.$sentChallenges) { newValue in
-                let oldIds = previousSentChallenges.map { String($0.match.id.uuidString.prefix(8)) }.sorted()
-                let newIds = newValue.map { String($0.match.id.uuidString.prefix(8)) }.sorted()
-                print("🧪 [DeclineDebug] sentChallenges publisher old=\(oldIds) new=\(newIds)")
-
                 detectDeclinedMatches(old: previousSentChallenges, new: newValue)
                 previousSentChallenges = newValue
-
-                logDeclineDebugSnapshot("after sentChallenges publisher update")
             }
             .onReceive(remoteMatchService.$readyMatches) { newReadyMatches in
                 // Clean up any cached declined matches that have become ready
                 for readyMatch in newReadyMatches {
                     let matchId = readyMatch.match.id
                     if declinedMatchesCache[matchId] != nil {
-                        print("🧹 Cleaning up declined cache - match became ready: \(matchId.uuidString.prefix(8))")
                         declinedMatchesCache.removeValue(forKey: matchId)
                         showDeclinedForMatchIds.remove(matchId)
                         declineHandledMatchIds.remove(matchId)
@@ -493,7 +461,6 @@ struct RemoteGamesTab: View {
             .onChange(of: remoteMatchService.activeMatch?.match.id) { _, newActiveMatchId in
                 // Clean up any cached declined matches that have become active
                 if let matchId = newActiveMatchId, declinedMatchesCache[matchId] != nil {
-                    print("🧹 Cleaning up declined cache - match became active: \(matchId.uuidString.prefix(8))")
                     declinedMatchesCache.removeValue(forKey: matchId)
                     showDeclinedForMatchIds.remove(matchId)
                     declineHandledMatchIds.remove(matchId)
@@ -546,12 +513,6 @@ struct RemoteGamesTab: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 24) {
-            Color.clear
-                .frame(height: 0)
-                .onAppear {
-                    print("🧪 [DeclineTopLevel] showing emptyStateView")
-                }
-            
             Spacer()
             
             Image(systemName: "network")
