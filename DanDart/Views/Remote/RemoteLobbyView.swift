@@ -281,7 +281,7 @@ struct RemoteLobbyView: View {
                                             let elapsed = remaining <= 0
                                             
                                             Text(formattedCountdown)
-                                                .font(.system(.title, design: .monospaced))
+                                                .font(.system(.title2, design: .rounded))
                                                 .fontWeight(.semibold)
                                                 .foregroundColor(AppColor.interactivePrimaryBackground)
                                                 .onChange(of: elapsed) { _, isElapsed in

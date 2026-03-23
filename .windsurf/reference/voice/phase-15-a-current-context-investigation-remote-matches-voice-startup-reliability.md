@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 
 # phase-15-a-current-context-investigation-remote-matches—voice-startup-reliability

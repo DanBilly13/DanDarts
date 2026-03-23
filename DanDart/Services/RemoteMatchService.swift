@@ -1299,6 +1299,18 @@ class RemoteMatchService: ObservableObject {
                 ))
             
             print("✅ [CompleteMatch] Match completed successfully: \(matchId), winner: \(winnerId)")
+            
+            // Immediate local cleanup - remove from all published arrays
+            await MainActor.run {
+                readyMatches.removeAll { $0.match.id == matchId }
+                pendingChallenges.removeAll { $0.match.id == matchId }
+                sentChallenges.removeAll { $0.match.id == matchId }
+                if activeMatch?.match.id == matchId {
+                    activeMatch = nil
+                }
+                print("🧹 [CompleteMatch] Local cleanup complete - removed from all arrays")
+            }
+            
             print("🏆 [CompleteMatch] ========================================")
         } catch let error as FunctionsError {
             // Detailed error logging
