@@ -34,6 +34,7 @@ enum Destination: Hashable {
     
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?, matchResult: MatchResult?)
+    case remoteGameEnd(game: Game, winner: Player, players: [Player], onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?, matchResult: MatchResult?)
     
     // Note: We can't include closures in Hashable, so gameEnd will need special handling
     static func == (lhs: Destination, rhs: Destination) -> Bool {
@@ -59,6 +60,8 @@ enum Destination: Hashable {
         case (.remoteGameplay(let id1, let ch1, let r1, let u1), .remoteGameplay(let id2, let ch2, let r2, let u2)):
             return id1 == id2 && ch1.id == ch2.id && r1.id == r2.id && u1 == u2
         case (.gameEnd, .gameEnd):
+            return true // Special case - can't compare closures
+        case (.remoteGameEnd, .remoteGameEnd):
             return true // Special case - can't compare closures
         default:
             return false
@@ -117,6 +120,8 @@ enum Destination: Hashable {
             hasher.combine(currentUserId)
         case .gameEnd:
             hasher.combine("gameEnd")
+        case .remoteGameEnd:
+            hasher.combine("remoteGameEnd")
         }
     }
 }
@@ -243,6 +248,18 @@ class Router: ObservableObject {
                 matchId: matchId,
                 matchResult: matchResult
             )
+            
+        case .remoteGameEnd(let game, let winner, let players, let onBackToGames, let matchFormat, let legsWon, let matchId, let matchResult):
+            EndGameViewRemote(
+                game: game,
+                winner: winner,
+                players: players,
+                onBackToGames: onBackToGames,
+                matchFormat: matchFormat,
+                legsWon: legsWon,
+                matchId: matchId,
+                matchResult: matchResult
+            )
         }
     }
     
@@ -274,6 +291,7 @@ class Router: ObservableObject {
         case .remoteLobby: return "remoteLobby"
         case .remoteGameplay: return "remoteGameplay"
         case .gameEnd: return "gameEnd"
+        case .remoteGameEnd: return "remoteGameEnd"
         }
     }
 }

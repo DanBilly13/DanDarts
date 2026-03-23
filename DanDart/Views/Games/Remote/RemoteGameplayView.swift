@@ -1064,17 +1064,11 @@ struct RemoteGameplayView: View {
                             instructions: ""
                         )
                         
-                        router.push(.gameEnd(
+                        // PHASE 16 TASK 1: Route to dedicated remote end-game view
+                        router.push(.remoteGameEnd(
                             game: tempGame,
                             winner: winner,
                             players: gameViewModel.players,
-                            onPlayAgain: {
-                                // Exit remote flow before restarting
-                                remoteMatchService.exitRemoteFlow()
-                                
-                                gameViewModel.restartGame()
-                                router.pop()
-                            },
                             onBackToGames: {
                                 // CRITICAL: Exit remote flow to clear state and trigger list refresh
                                 remoteMatchService.exitRemoteFlow()
