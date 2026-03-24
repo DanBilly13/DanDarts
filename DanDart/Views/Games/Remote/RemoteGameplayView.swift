@@ -1043,6 +1043,15 @@ struct RemoteGameplayView: View {
             }
             .onChange(of: gameViewModel.winner) { _, newValue in
                 if let winner = newValue, let m = liveMatch {
+                    // Guard: Only execute if this instance's match is the current flow match
+                    guard remoteMatchService.flowMatchId == m.id else {
+                        // This is a stale instance - do not navigate to end game
+                        print("⏭️ [RemoteGameplayView] Stale instance detected - skipping end game navigation")
+                        print("   - myMatchId: \(m.id.uuidString.prefix(8))")
+                        print("   - flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")")
+                        return
+                    }
+                    
                     // ✅ Freeze the match ID immediately when game completes
                     // This prevents using a stale reference if liveMatch changes due to realtime updates
                     completedMatchId = m.id

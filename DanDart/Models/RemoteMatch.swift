@@ -97,6 +97,10 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
     let winnerId: UUID? // Winner of the match (set when status = completed)
     let endedAt: Date?
     
+    // Replay fields (optional for safe migration)
+    let isReplay: Bool?
+    let replaySourceMatchId: UUID?
+    
     // Debug counter for Phase 2 testing (DEBUG only)
     var debugCounter: Int?
     
@@ -260,6 +264,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         case voiceConnectDeadline = "voice_connect_deadline"
         case challengerVoiceReadyAt = "challenger_voice_ready_at"
         case receiverVoiceReadyAt = "receiver_voice_ready_at"
+        case isReplay = "is_replay"
+        case replaySourceMatchId = "replay_source_match_id"
     }
     
     // MARK: - Initializers
@@ -296,7 +302,9 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         voiceConnectWindowStartedAt: Date? = nil,
         voiceConnectDeadline: Date? = nil,
         challengerVoiceReadyAt: Date? = nil,
-        receiverVoiceReadyAt: Date? = nil
+        receiverVoiceReadyAt: Date? = nil,
+        isReplay: Bool? = nil,
+        replaySourceMatchId: UUID? = nil
     ) {
         self.id = id
         self.matchMode = matchMode
@@ -329,6 +337,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         self.voiceConnectDeadline = voiceConnectDeadline
         self.challengerVoiceReadyAt = challengerVoiceReadyAt
         self.receiverVoiceReadyAt = receiverVoiceReadyAt
+        self.isReplay = isReplay
+        self.replaySourceMatchId = replaySourceMatchId
     }
     
     // MARK: - Custom Decodable Implementation
@@ -366,6 +376,8 @@ struct RemoteMatch: Identifiable, Equatable, Decodable {
         voiceConnectDeadline = try c.decodeIfPresent(Date.self, forKey: .voiceConnectDeadline)
         challengerVoiceReadyAt = try c.decodeIfPresent(Date.self, forKey: .challengerVoiceReadyAt)
         receiverVoiceReadyAt = try c.decodeIfPresent(Date.self, forKey: .receiverVoiceReadyAt)
+        isReplay = try c.decodeIfPresent(Bool.self, forKey: .isReplay)
+        replaySourceMatchId = try c.decodeIfPresent(UUID.self, forKey: .replaySourceMatchId)
         
         // ✅ Robust decode for player_scores (JSON object with string keys)
         if let raw = try c.decodeIfPresent([String: Int].self, forKey: .playerScores) {
@@ -435,13 +447,20 @@ struct PushToken: Codable {
 
 // MARK: - Remote Match with Players
 
-struct RemoteMatchWithPlayers: Identifiable {
+struct RemoteMatchWithPlayers: Identifiable, Equatable {
     let match: RemoteMatch
     let challenger: User
     let receiver: User
     let currentUserId: UUID
     
     var id: UUID { match.id }
+    
+    static func == (lhs: RemoteMatchWithPlayers, rhs: RemoteMatchWithPlayers) -> Bool {
+        lhs.match == rhs.match &&
+        lhs.challenger.id == rhs.challenger.id &&
+        lhs.receiver.id == rhs.receiver.id &&
+        lhs.currentUserId == rhs.currentUserId
+    }
     
     var opponent: User {
         currentUserId == match.challengerId ? receiver : challenger

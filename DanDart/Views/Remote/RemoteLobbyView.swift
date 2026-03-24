@@ -565,6 +565,14 @@ struct RemoteLobbyView: View {
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
             
+            // Guard: Only execute exit logic if this instance's match is the current flow match
+            // This prevents stale instances from hijacking navigation
+            guard remoteMatchService.flowMatchId == match.id else {
+                // This is a stale instance from a previous match - become inert
+                // Do not execute any destructive navigation logic
+                return
+            }
+            
             // Track phase changes
             let currentPhase = lobbyPhase
             if currentPhase != lastObservedPhase {
@@ -602,6 +610,12 @@ struct RemoteLobbyView: View {
         .onChange(of: countdownElapsed) { _, elapsed in
             guard elapsed, matchStatus == .lobby, bothPlayersPresent else { return }
             
+            // Guard: Only execute if this instance's match is the current flow match
+            guard remoteMatchService.flowMatchId == match.id else {
+                // This is a stale instance - do not trigger match start
+                return
+            }
+            
             // Guard against duplicate calls
             guard !hasRequestedMatchStart else {
                 print("⏰ [Lobby] Countdown elapsed but start already requested - skipping")
@@ -634,9 +648,16 @@ struct RemoteLobbyView: View {
                 return
             }
             
-            // Guard 1: Cancelled match
+            // Guard 1: Only execute if this instance's match is the current flow match
+            guard remoteMatchService.flowMatchId == match.id else {
+                // This is a stale instance - do not execute navigation or state changes
+                print("🚫 [Lobby] Guard 1: Stale instance (flowMatchId=\(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil"), myMatchId=\(match.id.uuidString.prefix(8)))")
+                return
+            }
+            
+            // Guard 2: Cancelled match
             guard !cancelledMatchIds.contains(match.id) else {
-                print("🚫 [Lobby] Guard 1: Match in cancelled set")
+                print("🚫 [Lobby] Guard 2: Match in cancelled set")
                 return
             }
             

@@ -636,6 +636,15 @@ struct RemoteGamesTab: View {
     // MARK: - Button Actions
     
     private func acceptChallenge(matchId: UUID) {
+        // Guard: Skip if EndGameViewRemote owns this replay
+        if let activeReplayId = remoteMatchService.activeReplayMatchId,
+           activeReplayId == matchId {
+            print("⏭️ [RemoteGamesTab] Suppressing accept - EndGameViewRemote owns replay \(matchId.uuidString.prefix(8))")
+            return
+        }
+        
+        print("🎮 [GENERIC NAV] acceptChallenge() called - generic flow for match \(matchId.uuidString.prefix(8))")
+        
         let enteringFlow = remoteMatchService.isEnteringFlow
         let navInFlight = remoteMatchService.navInFlightMatchId != nil
         FlowDebug.log("ACCEPT: TAP enteringFlow=\(enteringFlow) navInFlight=\(navInFlight)", matchId: matchId)
@@ -801,6 +810,15 @@ struct RemoteGamesTab: View {
                         return
                     }
                     
+                    // Guard: Skip if EndGameViewRemote owns this replay
+                    if let activeReplayId = remoteMatchService.activeReplayMatchId,
+                       activeReplayId == matchIdLocal {
+                        print("⏭️ [RemoteGamesTab] Suppressing navigation - EndGameViewRemote owns replay")
+                        remoteMatchService.endEnterFlow(matchId: matchIdLocal)
+                        return
+                    }
+                    
+                    print("🎮 [GENERIC NAV] Pushing to remoteLobby from RemoteGamesTab (accept flow)")
                     FlowDebug.log("ROUTER: PUSH remoteLobby", matchId: matchIdLocal)
                         
                     router.push(.remoteLobby(
@@ -1030,6 +1048,15 @@ struct RemoteGamesTab: View {
     }
     
     private func joinMatch(matchId: UUID) {
+        // Guard: Skip if EndGameViewRemote owns this replay
+        if let activeReplayId = remoteMatchService.activeReplayMatchId,
+           activeReplayId == matchId {
+            print("⏭️ [RemoteGamesTab] Suppressing join - EndGameViewRemote owns replay \(matchId.uuidString.prefix(8))")
+            return
+        }
+        
+        print("🎮 [GENERIC NAV] joinMatch() called - generic flow for match \(matchId.uuidString.prefix(8))")
+        
         let enteringFlow = remoteMatchService.isEnteringFlow
         let navInFlight = remoteMatchService.navInFlightMatchId != nil
         FlowDebug.log("JOIN: TAP enteringFlow=\(enteringFlow) navInFlight=\(navInFlight)", matchId: matchId)
@@ -1092,6 +1119,15 @@ struct RemoteGamesTab: View {
                     let navInFlightId = remoteMatchService.navInFlightMatchId?.uuidString.prefix(8) ?? "none"
                     FlowDebug.log("ROUTER: REQUEST push remoteLobby navInFlight=\(navInFlightId)", matchId: matchId)
                     
+                    // Guard: Skip if EndGameViewRemote owns this replay
+                    if let activeReplayId = remoteMatchService.activeReplayMatchId,
+                       activeReplayId == matchId {
+                        print("⏭️ [RemoteGamesTab] Suppressing navigation - EndGameViewRemote owns replay")
+                        remoteMatchService.endEnterFlow(matchId: matchId)
+                        return
+                    }
+                    
+                    print("🎮 [GENERIC NAV] Pushing to remoteLobby from RemoteGamesTab (join flow)")
                     FlowDebug.log("ROUTER: PUSH remoteLobby", matchId: matchId)
                     
                     router.push(.remoteLobby(

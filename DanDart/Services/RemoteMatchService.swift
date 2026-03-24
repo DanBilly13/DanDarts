@@ -41,6 +41,10 @@ class RemoteMatchService: ObservableObject {
     @Published var isLoading = false
     @Published var error: RemoteMatchError?
     
+    /// Active replay match being controlled by EndGameViewRemote
+    /// When set, RemoteGamesTab must not perform any navigation for this match
+    @Published var activeReplayMatchId: UUID? = nil
+    
     // MARK: - Flow Gate (Depth-based)
     
     @Published private(set) var isInRemoteFlow: Bool = false
@@ -633,7 +637,9 @@ class RemoteMatchService: ObservableObject {
         receiverId: UUID,
         gameType: String,
         matchFormat: Int,
-        currentUserId: UUID
+        currentUserId: UUID,
+        isReplay: Bool = false,
+        replaySourceMatchId: UUID? = nil
     ) async throws -> UUID {
         // Validate not challenging self
         guard receiverId != currentUserId else {
@@ -650,6 +656,8 @@ class RemoteMatchService: ObservableObject {
             let receiver_id: String
             let game_type: String
             let match_format: Int
+            let is_replay: Bool?
+            let replay_source_match_id: String?
         }
         
         struct CreateChallengeResponse: Decodable {
@@ -665,7 +673,9 @@ class RemoteMatchService: ObservableObject {
         let request = CreateChallengeRequest(
             receiver_id: receiverId.uuidString,
             game_type: gameType,
-            match_format: matchFormat
+            match_format: matchFormat,
+            is_replay: isReplay ? true : nil,
+            replay_source_match_id: replaySourceMatchId?.uuidString
         )
         
         let headers = try await getEdgeFunctionHeaders()
@@ -674,6 +684,10 @@ class RemoteMatchService: ObservableObject {
         print("   - receiver_id: \(receiverId)")
         print("   - game_type: \(gameType)")
         print("   - match_format: \(matchFormat)")
+        if isReplay {
+            print("   - is_replay: true")
+            print("   - replay_source_match_id: \(replaySourceMatchId?.uuidString ?? "nil")")
+        }
         
         do {
             let response: CreateChallengeResponse = try await supabaseService.client.functions
@@ -1629,16 +1643,24 @@ class RemoteMatchService: ObservableObject {
     // MARK: - Throttling Methods
     
     @MainActor
-    private func scheduleListReload(userId: UUID) {
+    private func scheduleListReload(userId: UUID, forceReload: Bool = false) {
         pendingReloads[userId]?.cancel()
         let task = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(reloadThrottleMs))
             guard !Task.isCancelled, let self else { return }
-            guard self.isInRemoteFlow == false else {
-                print("⏭️ [Realtime] Skipping loadMatches (in remote flow)")
+            
+            // Skip if in remote flow UNLESS forceReload is true (for replay requests)
+            if self.isInRemoteFlow && !forceReload {
+                print("⏭️ [Realtime] Skipping loadMatches (in remote flow, forceReload=false)")
                 return
             }
-            print("🔄 [Realtime] loadMatches (throttled) user=\(userId.uuidString.prefix(8))")
+            
+            if forceReload {
+                print("🎮 [Realtime] loadMatches (FORCED for replay) user=\(userId.uuidString.prefix(8))")
+            } else {
+                print("🔄 [Realtime] loadMatches (throttled) user=\(userId.uuidString.prefix(8))")
+            }
+            
             try? await self.loadMatches(userId: userId)
             print("✅ [Realtime] loadMatches complete")
             self.pendingReloads.removeValue(forKey: userId)
@@ -1717,14 +1739,35 @@ class RemoteMatchService: ObservableObject {
             let statusStr = record["status"]?.stringValue ?? "nil"
             let cpStr = record["current_player_id"]?.stringValue.map { String($0.prefix(8)) } ?? "nil"
             let createdStr = record["created_at"]?.stringValue ?? "nil"
-            print("🟢 RT INSERT match=\(String(matchIdString.prefix(8))) status=\(statusStr) cp=\(cpStr) created=\(createdStr)")
+            let isReplay = record["is_replay"]?.boolValue ?? false
+            let receiverIdStr = record["receiver_id"]?.stringValue
+            print("🟢 RT INSERT match=\(String(matchIdString.prefix(8))) status=\(statusStr) cp=\(cpStr) created=\(createdStr) isReplay=\(isReplay)")
             
             Task { @MainActor in
                 // Safe in flow even if activeMatch is nil (uses flowMatchId)
                 self?.scheduleFlowMatchFetch(matchId: matchId)
                 
-                // Will no-op if in remote flow
-                self?.scheduleListReload(userId: userId)
+                // Check if this is a replay request for the current user
+                print("🔍 [Realtime] Replay check:")
+                print("🔍 [Realtime]   - isReplay: \(isReplay)")
+                print("🔍 [Realtime]   - receiverIdStr: \(receiverIdStr ?? "nil")")
+                print("🔍 [Realtime]   - userId: \(userId.uuidString)")
+                
+                // Case-insensitive UUID comparison (database may return lowercase)
+                let receiverMatches = receiverIdStr?.lowercased() == userId.uuidString.lowercased()
+                print("🔍 [Realtime]   - match: \(receiverMatches)")
+                
+                let isReplayForMe = isReplay && receiverMatches
+                print("🔍 [Realtime]   - isReplayForMe: \(isReplayForMe)")
+                
+                if isReplayForMe {
+                    // Force reload even in remote flow for replay requests
+                    print("🎮 [Realtime] Replay request detected for current user - forcing reload")
+                    self?.scheduleListReload(userId: userId, forceReload: true)
+                } else {
+                    // Will no-op if in remote flow
+                    self?.scheduleListReload(userId: userId)
+                }
                 
                 // Keep badge notification
                 NotificationCenter.default.post(
@@ -1772,8 +1815,29 @@ class RemoteMatchService: ObservableObject {
                 // Fetch updated match state (includes all fields decoded correctly)
                 self?.scheduleFlowMatchFetch(matchId: matchId)
                 
-                // Will no-op if in remote flow
-                self?.scheduleListReload(userId: userId)
+                // Check if this is a replay request status change (pending -> ready)
+                let isReplay = record["is_replay"]?.boolValue ?? false
+                let remoteStatus = record["remote_status"]?.stringValue
+                let receiverIdStr = record["receiver_id"]?.stringValue
+                
+                print("🔍 [Realtime UPDATE] Replay check:")
+                print("🔍 [Realtime UPDATE]   - isReplay: \(isReplay)")
+                print("🔍 [Realtime UPDATE]   - remoteStatus: \(remoteStatus ?? "nil")")
+                print("🔍 [Realtime UPDATE]   - receiverIdStr: \(receiverIdStr ?? "nil")")
+                print("🔍 [Realtime UPDATE]   - userId: \(userId.uuidString)")
+                
+                let receiverMatches = receiverIdStr?.lowercased() == userId.uuidString.lowercased()
+                let isReplayStatusChange = isReplay && remoteStatus == "ready"
+                print("🔍 [Realtime UPDATE]   - receiverMatches: \(receiverMatches)")
+                print("🔍 [Realtime UPDATE]   - isReplayStatusChange: \(isReplayStatusChange)")
+                
+                if isReplayStatusChange {
+                    print("🎮 [Realtime UPDATE] Replay status changed to ready - forcing reload")
+                    self?.scheduleListReload(userId: userId, forceReload: true)
+                } else {
+                    // Will no-op if in remote flow
+                    self?.scheduleListReload(userId: userId)
+                }
                 
                 // Keep badge notification
                 NotificationCenter.default.post(

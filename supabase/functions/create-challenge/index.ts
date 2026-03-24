@@ -72,7 +72,13 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { receiver_id, game_type, match_format } = await req.json()
+    const { 
+      receiver_id, 
+      game_type, 
+      match_format,
+      is_replay,              // NEW - optional
+      replay_source_match_id  // NEW - optional
+    } = await req.json()
 
     // Validate inputs
     if (!receiver_id || !game_type || !match_format) {
@@ -206,6 +212,8 @@ serve(async (req) => {
       challenge_expires_at: expiresAt.toISOString(),
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
+      is_replay: is_replay ?? false,                    // NEW
+      replay_source_match_id: replay_source_match_id,   // NEW
     }
 
     const { data: match, error: matchError } = await supabaseClient
