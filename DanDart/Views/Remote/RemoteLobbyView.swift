@@ -562,6 +562,47 @@ struct RemoteLobbyView: View {
                 }
             }
         }
+        .onChange(of: match.id) { oldId, newId in
+            if oldId != newId {
+                print("🔄 [VoiceReady] Match changed (\(oldId.uuidString.prefix(8)) -> \(newId.uuidString.prefix(8))), resetting hasReportedVoiceReady")
+                hasReportedVoiceReady = false
+            }
+        }
+        .onChange(of: voiceChatService.replayReadyMatchId) { _, replayMatchId in
+            // Only process if this is for our match
+            guard let replayMatchId = replayMatchId,
+                  replayMatchId == match.id else {
+                return
+            }
+            
+            // Only report once per match
+            guard !hasReportedVoiceReady else {
+                print("⚠️ [ReplayVoice] Already reported for this match")
+                return
+            }
+            
+            // Allow reporting during lobby flow, but not after gameplay/terminal states
+            let currentPhase = lobbyPhase
+            guard currentPhase == .waiting || currentPhase == .connecting || currentPhase == .timedOut || currentPhase == .countdown else {
+                print("⚠️ [ReplayVoice] Skipping - phase is \(currentPhase) (not in lobby flow)")
+                return
+            }
+            
+            hasReportedVoiceReady = true
+            print("🔄 [ReplayVoice] Replay-ready event received for match \(match.id.uuidString.prefix(8))")
+            print("🔄 [ReplayVoice] Calling confirmVoiceReady for replay match")
+            
+            Task {
+                do {
+                    try await remoteMatchService.confirmVoiceReady(matchId: match.id)
+                    print("✅ [ReplayVoice] confirmVoiceReady succeeded for replay match")
+                    // Refresh to get updated countdown state
+                    await requestRefresh(reason: "replay-voice-ready")
+                } catch {
+                    print("❌ [ReplayVoice] Failed to confirm voice ready: \(error)")
+                }
+            }
+        }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { time in
             currentTime = time
             

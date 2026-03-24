@@ -688,21 +688,31 @@ struct EndGameViewRemote: View {
                     
                     print("🎮 [REPLAY NAV] Pushing to remoteLobby with status=\(statusStr)")
                     
-                    // Navigate to RemoteLobbyView with replay match
-                    // Reuse existing lobby flow (countdown, voice-ready, etc.)
-                    router.push(.remoteLobby(
-                        match: updatedMatch,  // Use fresh match from fetchMatch (status = lobby)
-                        opponent: opponentUser,
-                        currentUser: currentUser,
-                        cancelledMatchIds: .constant(Set()),
-                        onCancel: {
-                            // Handle lobby cancellation - pop back to end game view
-                            self.router.pop()
-                        },
-                        onUnfreeze: {
-                            // No-op for replay flow - no freeze state to handle
-                        }
-                    ))
+                    // CRITICAL: Pop to root first to clear old gameplay/lobby views from stack
+                    // This prevents stale RemoteGameplayView instances from being re-initialized
+                    // Stack before: RemoteGamesTab → Lobby(old) → Gameplay(old) → EndGameViewRemote
+                    // Stack after pop: RemoteGamesTab
+                    // Stack after push: RemoteGamesTab → Lobby(replay)
+                    router.popToRoot()
+                    
+                    // Small delay to ensure pop completes before push
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        // Navigate to RemoteLobbyView with replay match
+                        // Reuse existing lobby flow (countdown, voice-ready, etc.)
+                        self.router.push(.remoteLobby(
+                            match: updatedMatch,  // Use fresh match from fetchMatch (status = lobby)
+                            opponent: opponentUser,
+                            currentUser: currentUser,
+                            cancelledMatchIds: .constant(Set()),
+                            onCancel: {
+                                // Handle lobby cancellation - pop back to end game view
+                                self.router.pop()
+                            },
+                            onUnfreeze: {
+                                // No-op for replay flow - no freeze state to handle
+                            }
+                        ))
+                    }
                 }
             } catch {
                 print("❌ [EndGameViewRemote] Failed to enter lobby: \(error)")

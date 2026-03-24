@@ -206,7 +206,10 @@ enum VoiceSessionError: Error {
 struct VoiceSession {
     // Identity
     let id: UUID
-    let matchId: UUID
+    var matchId: UUID  // Changed from let to var for replay rebinding
+    let challengerId: UUID  // Track participants for replay detection
+    let receiverId: UUID    // Track participants for replay detection
+    let generation: Int     // Track session generation to detect stale callbacks
     
     // State
     var connectionState: VoiceSessionState
@@ -290,6 +293,9 @@ class VoiceChatService: NSObject, ObservableObject {
     private var isLocalReady: Bool = false
     private var offerRequestTimeout: Task<Void, Never>?
     
+    /// Session generation counter to detect stale async callbacks
+    private var sessionGeneration: Int = 0
+    
     // WebRTC components
     private var peerConnectionFactory: RTCPeerConnectionFactory?
     private var peerConnection: RTCPeerConnection?
@@ -307,6 +313,10 @@ class VoiceChatService: NSObject, ObservableObject {
     @Published private(set) var connectionState: VoiceSessionState = .idle
     @Published private(set) var muteState: VoiceMuteState = .unmuted
     @Published private(set) var availability: VoiceAvailability = .notApplicable
+    
+    /// Replay-ready event: matchId when readiness re-announced after replay rebind
+    /// RemoteLobbyView observes this to trigger confirmVoiceReady for replay match
+    @Published private(set) var replayReadyMatchId: UUID? = nil
     
     /// Derived UI states computed from session state
     @Published private(set) var uiState: VoiceUIState = .hidden
@@ -337,17 +347,46 @@ class VoiceChatService: NSObject, ObservableObject {
         print("🟡 [Voice] startSession() START - matchId: \(matchId), instanceId: \(instanceId)")
         print("🟡 [Voice]   localUserId: \(localUserId), challenger: \(challengerId), receiver: \(receiverId)")
         
-        // Validate no existing session for different match
-        if let existing = currentSession, existing.matchId != matchId {
-            print("⚠️ [Voice] STALE SESSION DETECTED - existing matchId: \(existing.matchId), new matchId: \(matchId)")
-            print("🔴 [Cleanup] Terminating stale session before starting new one")
-            await endSession()
-        }
-        
-        // Check if session already exists for this match
-        if let existing = currentSession, existing.matchId == matchId {
-            print("⚠️ [Voice] Session already exists for this match - sessionId: \(existing.id)")
-            return
+        // Check for existing session
+        if let existing = currentSession {
+            // Same match - already handled
+            if existing.matchId == matchId {
+                print("⚠️ [Voice] Session already exists for this match - sessionId: \(existing.id)")
+                return
+            }
+            
+            // Different match - check if replay scenario
+            if canReuseSessionForReplay(
+                existing: existing,
+                challengerId: challengerId,
+                receiverId: receiverId
+            ) {
+                // REPLAY PATH: Reuse session
+                print("🔄 [Voice] REPLAY DETECTED - reusing session")
+                print("   - Old matchId: \(existing.matchId)")
+                print("   - New matchId: \(matchId)")
+                
+                do {
+                    try await rebindSessionForReplay(
+                        newMatchId: matchId,
+                        challengerId: challengerId,
+                        receiverId: receiverId
+                    )
+                    return
+                } catch {
+                    print("❌ [Rebind] Failed to rebind session: \(error)")
+                    print("🔄 [Rebind] Falling back to full session restart")
+                    await endSession()
+                    // Continue with normal startSession flow below
+                }
+            } else {
+                // STALE PATH: Cannot reuse - full teardown
+                print("⚠️ [Voice] STALE SESSION DETECTED")
+                print("   - Old matchId: \(existing.matchId)")
+                print("   - New matchId: \(matchId)")
+                print("🔴 [Cleanup] Terminating stale session before starting new one")
+                await endSession()
+            }
         }
         
         // Check if voice is usable (permission + preference)
@@ -358,13 +397,19 @@ class VoiceChatService: NSObject, ObservableObject {
             print("   - App preference: \(VoicePermissionManager.shared.isVoiceEnabledInApp)")
             print("   - Match will continue without voice")
             
+            // Increment generation for unavailable session
+            sessionGeneration += 1
+            let currentGeneration = sessionGeneration
+            print("🟡 [Voice] Creating unavailable session - generation: \(currentGeneration)")
+            
             let availability: VoiceAvailability = {
                 switch VoicePermissionManager.shared.microphoneAuthorizationStatus {
-                case .granted:
-                    return .systemUnavailable // App disabled
                 case .denied:
                     return .permissionDenied
                 case .undetermined:
+                    return .systemUnavailable
+                case .granted:
+                    // Permission granted but voice disabled in app
                     return .systemUnavailable
                 @unknown default:
                     return .systemUnavailable
@@ -374,6 +419,9 @@ class VoiceChatService: NSObject, ObservableObject {
             let session = VoiceSession(
                 id: UUID(),
                 matchId: matchId,
+                challengerId: challengerId,
+                receiverId: receiverId,
+                generation: currentGeneration,
                 connectionState: .idle,
                 muteState: .unmuted,
                 availability: availability,
@@ -384,11 +432,19 @@ class VoiceChatService: NSObject, ObservableObject {
             return
         }
         
+        // Increment session generation for new session
+        sessionGeneration += 1
+        let currentGeneration = sessionGeneration
+        print("🟡 [Voice] Starting new session - generation: \(currentGeneration)")
+        
         // Create session in connecting state
         let sessionId = UUID()
         var session = VoiceSession(
             id: sessionId,
             matchId: matchId,
+            challengerId: challengerId,
+            receiverId: receiverId,
+            generation: currentGeneration,
             connectionState: .connecting,
             muteState: .unmuted,
             availability: .available,
@@ -510,7 +566,221 @@ class VoiceChatService: NSObject, ObservableObject {
         }
     }
     
+    // MARK: - Replay Session Reuse
+    
+    /// Check if existing session can be safely reused for replay
+    /// - Parameters:
+    ///   - existing: The current voice session
+    ///   - challengerId: New match challenger ID
+    ///   - receiverId: New match receiver ID
+    /// - Returns: True if session can be reused
+    @MainActor
+    private func canReuseSessionForReplay(
+        existing: VoiceSession,
+        challengerId: UUID,
+        receiverId: UUID
+    ) -> Bool {
+        // Layer 1: Ordered participants (same roles)
+        let sameOrderedParticipants = 
+            existing.challengerId == challengerId &&
+            existing.receiverId == receiverId
+        
+        // Layer 2: Unordered participants (same humans, possibly swapped roles)
+        let sameUnorderedParticipants = 
+            Set([existing.challengerId, existing.receiverId]) ==
+            Set([challengerId, receiverId])
+        
+        // Case 1: Different humans
+        if !sameUnorderedParticipants {
+            print("❌ [Reuse] Different humans - cannot reuse")
+            print("   - Old: challenger=\(existing.challengerId.uuidString.prefix(8)), receiver=\(existing.receiverId.uuidString.prefix(8))")
+            print("   - New: challenger=\(challengerId.uuidString.prefix(8)), receiver=\(receiverId.uuidString.prefix(8))")
+            return false
+        }
+        
+        // Case 2: Same humans but swapped roles
+        if !sameOrderedParticipants {
+            print("⚠️ [Reuse] Same humans but SWAPPED ROLES - cannot reuse (policy)")
+            print("   - Old: challenger=\(existing.challengerId.uuidString.prefix(8)), receiver=\(existing.receiverId.uuidString.prefix(8))")
+            print("   - New: challenger=\(challengerId.uuidString.prefix(8)), receiver=\(receiverId.uuidString.prefix(8))")
+            print("   - Reason: Role swap affects offer/answer responsibilities and ready flow")
+            return false
+        }
+        
+        // Case 3: Same humans + same roles
+        print("✅ [Reuse] Same humans + same roles")
+        print("   - challenger=\(challengerId.uuidString.prefix(8)), receiver=\(receiverId.uuidString.prefix(8))")
+        
+        // Peer connection must exist
+        guard peerConnection != nil else {
+            print("❌ [Reuse] No peer connection - cannot reuse")
+            return false
+        }
+        
+        // Session must not be ending or ended
+        guard existing.connectionState != .ended,
+              existing.connectionState != .disconnected,
+              existing.connectionState != .failed else {
+            print("❌ [Reuse] Session in terminal state: \(existing.connectionState) - cannot reuse")
+            return false
+        }
+        
+        // Must be connected or connecting
+        guard existing.connectionState == .connected ||
+              existing.connectionState == .connecting else {
+            print("❌ [Reuse] Session not connected/connecting: \(existing.connectionState) - cannot reuse")
+            return false
+        }
+        
+        print("   - Peer connection exists: true")
+        print("   - Connection state: \(existing.connectionState)")
+        return true
+    }
+    
+    /// Rebind existing voice session to new replay match
+    /// Preserves peer connection and audio, rebinds match-scoped signaling
+    /// - Parameters:
+    ///   - newMatchId: The new replay match ID
+    ///   - challengerId: Challenger ID (for validation)
+    ///   - receiverId: Receiver ID (for validation)
+    @MainActor
+    private func rebindSessionForReplay(
+        newMatchId: UUID,
+        challengerId: UUID,
+        receiverId: UUID
+    ) async throws {
+        guard var session = currentSession else {
+            throw VoiceSessionError.sessionNotActive
+        }
+        
+        print("🔄 [Rebind] ========== REPLAY SESSION REBIND START ==========")
+        print("🔄 [Rebind] Old matchId: \(session.matchId)")
+        print("🔄 [Rebind] New matchId: \(newMatchId)")
+        print("🔄 [Rebind] Session state: \(session.connectionState)")
+        print("🔄 [Rebind] Participants: challenger=\(challengerId), receiver=\(receiverId)")
+        
+        // Validate participants match session
+        guard session.challengerId == challengerId,
+              session.receiverId == receiverId else {
+            throw VoiceSessionError.signallingFailed(reason: "Participant mismatch")
+        }
+        
+        // CRITICAL: Preserve otherPlayerId before teardown
+        // teardownSignallingChannel() clears this, but we need it for setup
+        guard let preservedOtherPlayerId = otherPlayerId else {
+            throw VoiceSessionError.signallingFailed(reason: "No other player ID")
+        }
+        
+        // Step 1: Update session matchId
+        let oldMatchId = session.matchId
+        session.matchId = newMatchId
+        updateSession(session)
+        print("✅ [Rebind] Session matchId updated")
+        
+        // Step 2: Rebind signaling channel
+        // Channel is match-scoped (voice_match_{matchId}), must rebind
+        
+        print("🔄 [Rebind] Tearing down old signaling channel (match: \(oldMatchId))")
+        await teardownSignallingChannel()
+        // Note: teardownSignallingChannel() clears otherPlayerId, isPeerReady, isLocalReady
+        
+        print("🔄 [Rebind] Setting up new signaling channel (match: \(newMatchId))")
+        // Restore otherPlayerId that was cleared by teardown
+        self.otherPlayerId = preservedOtherPlayerId
+        
+        try await setupSignallingChannel(matchId: newMatchId, otherPlayerId: preservedOtherPlayerId)
+        
+        // Step 3: Peer connection and audio preserved (no changes)
+        // - peerConnection: still valid for same peer
+        // - localAudioTrack: still valid
+        // - audioSession: still active
+        // - muteState: preserved in session
+        
+        // Step 4: Reset peer ready flags (new signaling channel)
+        // These were cleared by teardownSignallingChannel()
+        // Will be re-established through new signaling handshake
+        isPeerReady = false
+        isLocalReady = false
+        
+        // Step 5: Re-announce readiness on new channel
+        // This triggers the ready handshake flow for the replay match
+        print("🔄 [Rebind] Re-announcing readiness for replay match")
+        do {
+            try await reannounceReadyAfterRebind()
+        } catch {
+            print("❌ [Rebind] Failed to re-announce readiness: \(error)")
+            throw error
+        }
+        
+        print("✅ [Rebind] ========== REPLAY SESSION REBIND COMPLETE ==========")
+        print("   - Peer connection: PRESERVED")
+        print("   - Audio session: PRESERVED")
+        print("   - Local audio track: PRESERVED")
+        print("   - Mute state: PRESERVED")
+        print("   - Signaling channel: REBOUND to new match")
+        print("   - Session matchId: \(session.matchId)")
+        print("   - Peer ready flags: RESET and RE-ANNOUNCED")
+    }
+    
+    /// Re-announce voice readiness after replay rebind
+    /// Sends voice_ready signal on new channel and waits for peer response
+    @MainActor
+    private func reannounceReadyAfterRebind() async throws {
+        guard let session = currentSession else {
+            throw VoiceSessionError.sessionNotActive
+        }
+        
+        guard let role = localRole else {
+            throw VoiceSessionError.signallingFailed(reason: "No local role")
+        }
+        
+        print("🔄 [ReplayVoice] ========== RE-ANNOUNCING READINESS ==========")
+        print("🔄 [ReplayVoice] Match: \(session.matchId)")
+        print("🔄 [ReplayVoice] Role: \(role)")
+        print("🔄 [ReplayVoice] Connection state: \(session.connectionState)")
+        
+        // Send voice_ready on new channel
+        do {
+            try await sendReady(role: role)
+            self.isLocalReady = true
+            print("✅ [ReplayVoice] voice_ready sent on rebound channel")
+        } catch {
+            print("❌ [ReplayVoice] Failed to send ready: \(error)")
+            throw error
+        }
+        
+        // If challenger and peer becomes ready, trigger offer
+        // (Peer will send their ready after receiving ours)
+        if role == "challenger" {
+            // Wait briefly for peer ready response
+            // In practice, handleReady() will set isPeerReady when peer responds
+            print("🔊 [ReplayVoice] Challenger waiting for peer ready response")
+            
+            // Check if both ready after brief delay
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+            
+            if isLocalReady && isPeerReady {
+                print("🔊 [ReplayVoice] Both sides ready, creating offer")
+                do {
+                    let offerSDP = try await createOffer()
+                    try await sendOffer(offerSDP)
+                    print("✅ [ReplayVoice] Offer sent after replay ready")
+                } catch {
+                    print("⚠️ [ReplayVoice] Failed to create/send offer: \(error)")
+                    // Non-fatal - connection may already be established
+                }
+            }
+        }
+        
+        // Publish replay-ready event for this match
+        // RemoteLobbyView will observe this and call confirmVoiceReady
+        self.replayReadyMatchId = session.matchId
+        print("✅ [ReplayVoice] replay-ready achieved for match \(session.matchId.uuidString.prefix(8))")
+        print("✅ [ReplayVoice] ========== READINESS RE-ANNOUNCED ==========")
+    }
+    
     /// End the current voice session
+    /// CRITICAL: Must fully clear all session state before returning
     @MainActor
     func endSession() async {
         guard let session = currentSession else {
@@ -518,7 +788,7 @@ class VoiceChatService: NSObject, ObservableObject {
             return
         }
         
-        print("🔴 [Cleanup] endSession() START - sessionId: \(session.id), matchId: \(session.matchId), instanceId: \(instanceId)")
+        print("🔴 [Cleanup] endSession() START - sessionId: \(session.id), matchId: \(session.matchId), generation: \(session.generation), instanceId: \(instanceId)")
         
         // Send disconnect signal to peer (best-effort)
         do {
@@ -529,11 +799,16 @@ class VoiceChatService: NSObject, ObservableObject {
             // Continue cleanup even if signal fails
         }
         
-        // Teardown signalling channel
+        // Cancel any in-flight timeouts
+        print("🔴 [Cleanup] Cancelling in-flight timeouts")
+        offerRequestTimeout?.cancel()
+        offerRequestTimeout = nil
+        
+        // Teardown signalling channel (sets signallingChannel = nil, broadcastSubscription = nil)
         print("🔴 [Cleanup] Tearing down signalling channel")
         await teardownSignallingChannel()
         
-        // Close WebRTC peer connection
+        // Close WebRTC peer connection (sets peerConnection = nil, localAudioTrack = nil)
         print("🔴 [Cleanup] Cleaning up WebRTC components")
         cleanupWebRTC()
         
@@ -541,25 +816,31 @@ class VoiceChatService: NSObject, ObservableObject {
         print("🔴 [Cleanup] Deactivating audio session")
         deactivateAudioSession()
         
+        // Clear replay-ready flags
+        print("🔴 [Cleanup] Clearing replay-ready flags")
+        replayReadyMatchId = nil
+        
+        // Update session state to ended
         var updatedSession = session
         updatedSession.connectionState = .ended
         updatedSession.endedAt = Date()
-        
         updateSession(updatedSession)
         
-        // Clear session after brief delay to allow UI to show ended state
-        Task {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-            currentSession = nil
-            updateDerivedStates()
-            print("🔴 [Cleanup] endSession() COMPLETE - session cleared, instanceId: \(instanceId)")
-            print("🔴 [Cleanup] State verification:")
-            print("   - currentSession: \(currentSession == nil ? "nil ✅" : "NOT NIL ⚠️")")
-            print("   - signallingChannel: \(signallingChannel == nil ? "nil ✅" : "NOT NIL ⚠️")")
-            print("   - peerConnection: \(peerConnection == nil ? "nil ✅" : "NOT NIL ⚠️")")
-            print("   - isPeerReady: \(isPeerReady)")
-            print("   - isLocalReady: \(isLocalReady)")
-        }
+        // CRITICAL: Clear session IMMEDIATELY (no delayed Task)
+        // This must happen synchronously before endSession() returns
+        currentSession = nil
+        updateDerivedStates()
+        
+        print("🔴 [Cleanup] endSession() COMPLETE - session cleared, instanceId: \(instanceId)")
+        print("🔴 [Cleanup] State verification:")
+        print("   - currentSession: \(currentSession == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("   - signallingChannel: \(signallingChannel == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("   - broadcastSubscription: \(broadcastSubscription == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("   - peerConnection: \(peerConnection == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("   - localAudioTrack: \(localAudioTrack == nil ? "nil ✅" : "NOT NIL ⚠️")")
+        print("   - isPeerReady: \(isPeerReady)")
+        print("   - isLocalReady: \(isLocalReady)")
+        print("   - replayReadyMatchId: \(replayReadyMatchId == nil ? "nil ✅" : "NOT NIL ⚠️")")
     }
     
     /// Toggle mute state
@@ -1337,6 +1618,17 @@ class VoiceChatService: NSObject, ObservableObject {
     private func handleReady(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_ready from \(from.uuidString.prefix(8))")
         
+        // Guard: Check session generation
+        guard let session = currentSession else {
+            print("⚠️ [Stale] Ignoring ready - no active session")
+            return
+        }
+        
+        guard session.generation == sessionGeneration else {
+            print("⚠️ [Stale] Ignoring ready from old session generation (session: \(session.generation), current: \(sessionGeneration))")
+            return
+        }
+        
         // Extract peer role from payload (sessionId is peer's local session, not validated)
         guard case let .string(peerRole) = payload["role"] else {
             print("⚠️ [VoiceSignalling] Invalid ready payload, ignoring")
@@ -1347,6 +1639,11 @@ class VoiceChatService: NSObject, ObservableObject {
         
         // Mark peer as ready
         self.isPeerReady = true
+        
+        // Log if this is part of replay rebind
+        if session.connectionState == .connected {
+            print("✅ [ReplayVoice] peer ready received for replay match \(session.matchId.uuidString.prefix(8))")
+        }
         
         // If we are challenger and both sides are ready, create and send offer
         if localRole == "challenger" && isLocalReady && isPeerReady {
@@ -1366,6 +1663,13 @@ class VoiceChatService: NSObject, ObservableObject {
     private func handleRequestOffer(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_request_offer from \(from.uuidString.prefix(8))")
         print("✅ [VoiceSignalling] voice_request_offer received")
+        
+        // Guard: Check session generation
+        guard let session = currentSession,
+              session.generation == sessionGeneration else {
+            print("⚠️ [Stale] Ignoring request_offer from old session generation")
+            return
+        }
         
         // If we are challenger, create/resend offer
         if localRole == "challenger" {
@@ -1392,6 +1696,13 @@ class VoiceChatService: NSObject, ObservableObject {
     @MainActor
     private func handleOffer(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_offer from \(from.uuidString.prefix(8))")
+        
+        // Guard: Check session generation
+        guard let session = currentSession,
+              session.generation == sessionGeneration else {
+            print("⚠️ [Stale] Ignoring offer from old session generation")
+            return
+        }
         
         // Cancel offer request timeout if running
         offerRequestTimeout?.cancel()
@@ -1433,6 +1744,13 @@ class VoiceChatService: NSObject, ObservableObject {
     private func handleAnswer(from: UUID, payload: [String: AnyJSON]) async {
         print("📥 [VoiceSignalling] RECV voice_answer from \(from.uuidString.prefix(8))")
         
+        // Guard: Check session generation
+        guard let session = currentSession,
+              session.generation == sessionGeneration else {
+            print("⚠️ [Stale] Ignoring answer from old session generation")
+            return
+        }
+        
         // Extract SDP from payload (sessionId is peer's local session, not validated)
         guard case let .string(sdp) = payload["sdp"] else {
             print("⚠️ [VoiceSignalling] Invalid answer payload, ignoring")
@@ -1452,6 +1770,15 @@ class VoiceChatService: NSObject, ObservableObject {
     
     /// Handle incoming ICE candidate
     private func handleICECandidate(from: UUID, payload: [String: AnyJSON]) async {
+        print("📥 [VoiceSignalling] RECV ice_candidate from \(from.uuidString.prefix(8))")
+        
+        // Guard: Check session generation
+        guard let session = currentSession,
+              session.generation == sessionGeneration else {
+            print("⚠️ [Stale] Ignoring ICE candidate from old session generation")
+            return
+        }
+        
         // Extract and validate payload (sessionId is peer's local session, not validated)
         guard case let .string(candidate) = payload["candidate"],
               case let .string(sdpMid) = payload["sdpMid"] else {
