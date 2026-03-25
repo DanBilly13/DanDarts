@@ -75,71 +75,92 @@ Deno.serve(async (req) => {
     const role = isChallenger ? 'challenger' : 'receiver'
     const voiceReadyField = isChallenger ? 'challenger_voice_ready_at' : 'receiver_voice_ready_at'
 
-    // IDEMPOTENT: Check if already set
-    if (match[voiceReadyField] !== null) {
-      console.log(`[confirm-voice-ready] ${role} voice already confirmed - returning success (idempotent)`)
-      return new Response(
-        JSON.stringify({
-          success: true,
-          voice_ready_recorded: true,
-          message: 'Voice ready already confirmed (idempotent)'
-        } as SuccessResponse),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     const now = new Date()
-    const updateData: any = {}
+    
+    // IDEMPOTENT: Check if already set
+    const alreadyVoiceReady = match[voiceReadyField] !== null
 
-    // Set this player's voice-ready timestamp
-    updateData[voiceReadyField] = now.toISOString()
-    console.log(`[confirm-voice-ready] Setting ${voiceReadyField} for ${role}`)
+    if (alreadyVoiceReady) {
+      console.log(`[confirm-voice-ready] ${role} voice already confirmed - skipping write, continuing countdown evaluation`)
+    } else {
+      const updateData: any = {}
+      updateData[voiceReadyField] = now.toISOString()
+      console.log(`[confirm-voice-ready] Setting ${voiceReadyField} for ${role}`)
 
-    // Update match
-    const { error: updateError } = await supabaseClient
-      .from('matches')
-      .update(updateData)
-      .eq('id', match_id)
+      // Update match
+      const { error: updateError } = await supabaseClient
+        .from('matches')
+        .update(updateData)
+        .eq('id', match_id)
 
-    if (updateError) {
-      console.error('Match update error:', updateError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to confirm voice ready', details: updateError } as ErrorResponse),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      if (updateError) {
+        console.error('Match update error:', updateError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to confirm voice ready', details: updateError } as ErrorResponse),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log(`[confirm-voice-ready] ✅ Voice ready recorded for ${role}`)
     }
 
-    console.log(`[confirm-voice-ready] ✅ Success for ${role}`)
+    // COUNTDOWN EVALUATOR (INLINED) - ONLY place allowed to write lobby_countdown_started_at
+    const matchIdShort = match_id.substring(0, 8)
+    console.log(`[COUNTDOWN_AUTH] ENTER trigger=immediate_voice_ready match=${matchIdShort}`)
 
-    // Check if both players are now voice ready
-    const otherVoiceReadyField = isChallenger ? 'receiver_voice_ready_at' : 'challenger_voice_ready_at'
-    const bothVoiceReady = match[otherVoiceReadyField] !== null // Other player already ready
+    // Fetch fresh authoritative match state
+    const { data: freshMatch, error: fetchError } = await supabaseClient
+      .from('matches')
+      .select('remote_status, challenger_id, challenger_lobby_joined_at, receiver_lobby_joined_at, challenger_lobby_view_entered_at, receiver_lobby_view_entered_at, challenger_voice_ready_at, receiver_voice_ready_at, lobby_countdown_started_at')
+      .eq('id', match_id)
+      .single()
 
-    if (bothVoiceReady) {
-      console.log('[confirm-voice-ready] Both players voice ready - checking if countdown should start')
-      
-      // Fetch fresh match data to check countdown status
-      const { data: freshMatch } = await supabaseClient
-        .from('matches')
-        .select('lobby_countdown_started_at')
-        .eq('id', match_id)
-        .single()
-      
-      // Only start countdown if not already started (idempotent)
-      if (freshMatch && freshMatch.lobby_countdown_started_at === null) {
-        const { error: countdownError } = await supabaseClient
+    if (fetchError || !freshMatch) {
+      console.error(`[COUNTDOWN_AUTH] ERROR match=${matchIdShort} error=${fetchError?.message || 'no match found'}`)
+    } else {
+      console.log(`[COUNTDOWN_AUTH] FRESH_STATE remote_status=${freshMatch.remote_status || 'nil'} challenger_joined=${freshMatch.challenger_lobby_joined_at || 'nil'} receiver_joined=${freshMatch.receiver_lobby_joined_at || 'nil'} challenger_view=${freshMatch.challenger_lobby_view_entered_at || 'nil'} receiver_view=${freshMatch.receiver_lobby_view_entered_at || 'nil'} challenger_voice=${freshMatch.challenger_voice_ready_at || 'nil'} receiver_voice=${freshMatch.receiver_voice_ready_at || 'nil'} countdown_started=${freshMatch.lobby_countdown_started_at || 'nil'}`)
+
+      // Evaluate core prerequisites
+      const isLobby = freshMatch.remote_status === 'lobby'
+      const bothJoined = freshMatch.challenger_lobby_joined_at !== null && freshMatch.receiver_lobby_joined_at !== null
+      const bothViewed = freshMatch.challenger_lobby_view_entered_at !== null && freshMatch.receiver_lobby_view_entered_at !== null
+      const bothVoiceReady = freshMatch.challenger_voice_ready_at !== null && freshMatch.receiver_voice_ready_at !== null
+      const alreadyStarted = freshMatch.lobby_countdown_started_at !== null
+
+      console.log(`[COUNTDOWN_AUTH] DERIVED isLobby=${isLobby} bothJoined=${bothJoined} bothViewed=${bothViewed} bothVoiceReady=${bothVoiceReady} alreadyStarted=${alreadyStarted}`)
+
+      // Check blockers
+      const blockers: string[] = []
+      if (!isLobby) blockers.push('match_not_lobby')
+      if (!bothJoined) blockers.push('both_joined_false')
+      if (!bothViewed) blockers.push('both_viewed_false')
+      if (!bothVoiceReady) blockers.push('both_voice_ready_false')
+      if (alreadyStarted) blockers.push('countdown_already_started')
+
+      const action = blockers.length === 0 ? 'start_countdown' : 'blocked'
+      console.log(`[COUNTDOWN_AUTH] DECISION action=${action} blockers=[${blockers.join(', ')}]`)
+
+      // Attempt guarded write if not blocked
+      if (blockers.length === 0) {
+        console.log(`[COUNTDOWN_AUTH] WRITE_ATTEMPT guarded=true setting_current_player_id=${freshMatch.challenger_id}`)
+
+        const { data: updateResult, error: updateError } = await supabaseClient
           .from('matches')
-          .update({ lobby_countdown_started_at: now.toISOString() })
+          .update({ 
+            lobby_countdown_started_at: now.toISOString(),
+            current_player_id: freshMatch.challenger_id
+          })
           .eq('id', match_id)
-          .is('lobby_countdown_started_at', null) // Race condition guard
-        
-        if (countdownError) {
-          console.error('[confirm-voice-ready] Failed to start countdown:', countdownError)
+          .is('lobby_countdown_started_at', null)
+          .select()
+
+        if (updateError) {
+          console.error(`[COUNTDOWN_AUTH] WRITE_ERROR match=${matchIdShort} error=${updateError.message}`)
+        } else if (!updateResult || updateResult.length === 0) {
+          console.log(`[COUNTDOWN_AUTH] WRITE_RESULT result=already_started (race condition)`)
         } else {
-          console.log('[confirm-voice-ready] ✅ Countdown started (both voice ready)')
+          console.log(`[COUNTDOWN_AUTH] WRITE_RESULT result=started ✅`)
         }
-      } else {
-        console.log('[confirm-voice-ready] Countdown already started')
       }
     }
 
