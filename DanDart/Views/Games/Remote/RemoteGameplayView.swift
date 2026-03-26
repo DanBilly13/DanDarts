@@ -167,11 +167,9 @@ struct RemoteGameplayView: View {
                 RemoteLog.log(.finalThrow, "🎯 [FinalThrow] isOpponentThrow: \(lastVisit.playerId != currentUserId)")
                 
                 if lastVisit.playerId != currentUserId {
-                    if lastVisit.darts.count == 3 {
+                    if !lastVisit.darts.isEmpty {
                         RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ✅ Showing opponent's final throw")
-                        return lastVisit.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
-                    } else {
-                        RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ❌ Dart count != 3, count: \(lastVisit.darts.count)")
+                        return Array(lastVisit.darts.prefix(3)).map { ScoredThrow(baseValue: $0, scoreType: .single) }
                     }
                 } else {
                     RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ❌ lastVisit is MY throw, not opponent's")
