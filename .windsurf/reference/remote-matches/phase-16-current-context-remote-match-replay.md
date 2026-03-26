@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # phase-16-current-context-remote-match-replay
 
