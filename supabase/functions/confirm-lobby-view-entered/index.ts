@@ -53,11 +53,11 @@ Deno.serve(async (req) => {
 
     console.log(`[confirm-lobby-view-entered] User ${user.id} confirming for match ${match_id}`)
 
-    // Fetch match
+    // Fetch match with all authoritative fields
     const t3 = performance.now()
     const { data: match, error: matchError } = await supabaseClient
       .from('matches')
-      .select('*')
+      .select('remote_status, current_player_id, lobby_countdown_started_at, challenger_lobby_joined_at, receiver_lobby_joined_at, challenger_voice_ready_at, receiver_voice_ready_at, voice_connect_window_started_at, voice_connect_deadline, challenger_lobby_view_entered_at, receiver_lobby_view_entered_at, challenger_id, receiver_id')
       .eq('id', match_id)
       .single()
     const t4 = performance.now()
@@ -86,6 +86,9 @@ Deno.serve(async (req) => {
     const role = isChallenger ? 'challenger' : 'receiver'
     const viewEnteredField = isChallenger ? 'challenger_lobby_view_entered_at' : 'receiver_lobby_view_entered_at'
     const otherViewEnteredField = isChallenger ? 'receiver_lobby_view_entered_at' : 'challenger_lobby_view_entered_at'
+    
+    const matchIdShort = match_id.substring(0, 8)
+    const timestamp = new Date().toISOString()
 
     // IDEMPOTENT: Check if already set
     if (match[viewEnteredField] !== null) {
@@ -131,24 +134,63 @@ Deno.serve(async (req) => {
       console.log('[confirm-lobby-view-entered] Waiting for other player to enter lobby UI')
     }
 
+    // Log old values before update
+    const oldValue = match[viewEnteredField]
+    console.log(`[LOBBY_STATE] PRE-UPDATE match=${matchIdShort} ${viewEnteredField}: ${oldValue || 'nil'} → ${updateData[viewEnteredField]}`)
+    
     // Update match
     const t5 = performance.now()
-    const { error: updateError } = await supabaseClient
+    const { data: updateResult, error: updateError, count } = await supabaseClient
       .from('matches')
       .update(updateData)
       .eq('id', match_id)
+      .select()
     const t6 = performance.now()
     console.log(`⏱️ [enter-lobby] UPDATE: ${(t6-t5).toFixed(0)}ms`)
 
     if (updateError) {
       console.error('Match update error:', updateError)
+      console.log(`[COUNTDOWN_AUTH] LOBBY_VIEW_ENTER_ERROR match=${matchIdShort} error=${updateError.message}`)
       return new Response(
         JSON.stringify({ error: 'Failed to confirm lobby view entered', details: updateError } as ErrorResponse),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    
+    // Validate that update actually affected a row
+    if (!updateResult || updateResult.length === 0) {
+      console.error('[confirm-lobby-view-entered] Update succeeded but affected 0 rows - state not persisted!')
+      console.log(`[COUNTDOWN_AUTH] LOBBY_VIEW_ENTER_ERROR match=${matchIdShort} error="zero rows affected"`)
+      return new Response(
+        JSON.stringify({ error: 'Failed to persist lobby view entered state', details: 'No rows affected' } as ErrorResponse),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    // Log new values after update to prove state changed
+    const updatedMatch = updateResult[0]
+    const newValue = updatedMatch[viewEnteredField]
+    console.log(`[LOBBY_STATE] POST-UPDATE match=${matchIdShort} ${viewEnteredField}: ${oldValue || 'nil'} → ${newValue || 'nil'} (PERSISTED)`)
+    console.log(`[LOBBY_STATE] POST-UPDATE match=${matchIdShort} voice_window_started_at: ${match.voice_connect_window_started_at || 'nil'} → ${updatedMatch.voice_connect_window_started_at || 'nil'}`)
+    
+    // Validate that the value actually changed (not a no-op)
+    if (oldValue === null && newValue === null) {
+      console.error('[confirm-lobby-view-entered] Update succeeded but value unchanged (nil → nil) - fake success!')
+      console.log(`[COUNTDOWN_AUTH] LOBBY_VIEW_ENTER_ERROR match=${matchIdShort} error="value unchanged"`)
+      return new Response(
+        JSON.stringify({ error: 'Failed to change lobby view entered state', details: 'Value remained null' } as ErrorResponse),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     console.log(`[confirm-lobby-view-entered] ✅ Success for ${role}, voice_window_started=${voiceWindowStarted}`)
+    
+    // Event H: LOBBY_VIEW_ENTER_CONFIRM - authoritative lobby view entered persisted
+    console.log(`[COUNTDOWN_AUTH] LOBBY_VIEW_ENTER_CONFIRM match=${matchIdShort} timestamp=${timestamp} evaluator_function=confirm_lobby_view_entered`)
+    console.log(`[COUNTDOWN_AUTH]   side=${role} challenger_joined=${match.challenger_lobby_joined_at !== null} receiver_joined=${match.receiver_lobby_joined_at !== null}`)
+    console.log(`[COUNTDOWN_AUTH]   challenger_voice_ready=${match.challenger_voice_ready_at !== null} receiver_voice_ready=${match.receiver_voice_ready_at !== null}`)
+    console.log(`[COUNTDOWN_AUTH]   challenger_view_entered=${isChallenger || match.challenger_lobby_view_entered_at !== null} receiver_view_entered=${!isChallenger || match.receiver_lobby_view_entered_at !== null}`)
+    console.log(`[COUNTDOWN_AUTH]   countdown_started_at=${match.lobby_countdown_started_at || 'nil'} match_status=${match.remote_status} voice_window_started=${voiceWindowStarted}`)
 
     const t7 = performance.now()
     console.log(`⏱️ [enter-lobby] TOTAL: ${(t7-t0).toFixed(0)}ms`)

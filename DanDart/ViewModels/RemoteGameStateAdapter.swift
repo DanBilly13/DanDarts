@@ -119,32 +119,28 @@ struct RemoteGameStateAdapter {
     /// Overlay state for the current user
     func overlayState(isSaving: Bool, isRevealing: Bool) -> OverlayState {
         // 🧪 DEBUG STEP 3: Log adapter logic
-        print("🔍 [Adapter.overlayState] currentPlayerId=\(match.currentPlayerId?.uuidString.prefix(8) ?? "nil")... currentUserId=\(currentUserId.uuidString.prefix(8))...")
-        print("🔍 [Adapter.overlayState] isMyTurn=\(isMyTurn) isSaving=\(isSaving) isRevealing=\(isRevealing)")
+        RemoteLog.log(.overlay, "🔍 [Adapter.overlayState] currentPlayerId=\(match.currentPlayerId?.uuidString.prefix(8) ?? "nil")... currentUserId=\(currentUserId.uuidString.prefix(8))...")
+        RemoteLog.log(.overlay, "🔍 [Adapter.overlayState] isMyTurn=\(isMyTurn) isSaving=\(isSaving) isRevealing=\(isRevealing)")
         
         let result: OverlayState
         if isSaving {
-            // Both players see "Saving {player}'s visit" overlay
             result = .saving
         } else if isRevealing {
-            // Both players see reveal window with scored visit
             result = .revealing
-        } else if !isMyTurn {
-            // Inactive player sees lockout overlay
-            result = .inactiveLockout
-        } else {
-            // Active player, no overlay
+        } else if isMyTurn {
             result = .none
+        } else {
+            result = .inactiveLockout
         }
         
-        print("🔍 [Adapter.overlayState] result=\(result)")
+        RemoteLog.log(.overlay, "🔍 [Adapter.overlayState] result=\(result)")
         
         // VALIDATION: Check for inverted logic
         if isMyTurn && result == .inactiveLockout {
-            print("⚠️ [Adapter.overlayState] WARNING: isMyTurn=true but result=inactiveLockout - LOGIC INVERTED!")
+            RemoteLog.log(.overlay, "⚠️ [Adapter.overlayState] WARNING: isMyTurn=true but result=inactiveLockout - LOGIC INVERTED!")
         }
         if !isMyTurn && result == .none {
-            print("⚠️ [Adapter.overlayState] WARNING: isMyTurn=false but result=none - LOGIC INVERTED!")
+            RemoteLog.log(.overlay, "⚠️ [Adapter.overlayState] WARNING: isMyTurn=false but result=none - LOGIC INVERTED!")
         }
         
         return result

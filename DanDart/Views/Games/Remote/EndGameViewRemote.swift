@@ -242,6 +242,9 @@ struct EndGameViewRemote: View {
                             onDecline: {
                                 declineReplayRequest()
                             },
+                            onCancel: {
+                                declineReplayRequest()
+                            },
                             onJoin: {
                                 navigateToLobby()
                             }
@@ -457,6 +460,8 @@ struct EndGameViewRemote: View {
         
         print("🔄 [EndGameViewRemote] Starting replay match subscription for \(matchId)")
         
+        var notFoundCount = 0
+        
         // Poll for match updates (RemoteMatchService already handles realtime subscriptions)
         while showReplayOverlay {
             // Search across all RemoteMatchService arrays for the replay match
@@ -468,12 +473,72 @@ struct EndGameViewRemote: View {
                 if let matchWithPlayers = allMatches.first(where: { $0.match.id == matchId }) {
                     print("✅ [EndGameViewRemote] Found replay match in service arrays - status: \(matchWithPlayers.match.status?.rawValue ?? "nil")")
                     replayMatch = matchWithPlayers.match
+                    notFoundCount = 0
+                    
+                    // Check if match was cancelled
+                    if matchWithPlayers.match.status == .cancelled {
+                        print("❌ [EndGameViewRemote] Replay cancelled remotely - dismissing overlay")
+                        print("   Clearing: replayMatch, replayMatchId, showReplayOverlay")
+                        
+                        // Release ownership
+                        if let currentReplayId = replayMatchId {
+                            remoteMatchService.activeReplayMatchId = nil
+                            print("🔓 [EndGameViewRemote] Released replay ownership for match \(currentReplayId.uuidString.prefix(8))")
+                        }
+                        
+                        replayMatch = nil
+                        replayMatchId = nil
+                        showReplayOverlay = false
+                    }
                 } else if let activeMatch = remoteMatchService.activeMatch, activeMatch.match.id == matchId {
                     print("✅ [EndGameViewRemote] Found replay match in activeMatch - status: \(activeMatch.match.status?.rawValue ?? "nil")")
                     replayMatch = activeMatch.match
+                    notFoundCount = 0
+                    
+                    // Check if match was cancelled
+                    if activeMatch.match.status == .cancelled {
+                        print("❌ [EndGameViewRemote] Replay cancelled remotely - dismissing overlay")
+                        print("   Clearing: replayMatch, replayMatchId, showReplayOverlay")
+                        
+                        // Release ownership
+                        if let currentReplayId = replayMatchId {
+                            remoteMatchService.activeReplayMatchId = nil
+                            print("🔓 [EndGameViewRemote] Released replay ownership for match \(currentReplayId.uuidString.prefix(8))")
+                        }
+                        
+                        replayMatch = nil
+                        replayMatchId = nil
+                        showReplayOverlay = false
+                    }
                 } else {
-                    print("⚠️ [EndGameViewRemote] Replay match \(matchId) not found in RemoteMatchService yet")
+                    notFoundCount += 1
+                    print("⚠️ [EndGameViewRemote] Replay match not found count=\(notFoundCount)")
+                    print("   pendingChallenges: \(remoteMatchService.pendingChallenges.map { $0.match.id.uuidString.prefix(8) })")
+                    print("   sentChallenges: \(remoteMatchService.sentChallenges.map { $0.match.id.uuidString.prefix(8) })")
+                    print("   readyMatches: \(remoteMatchService.readyMatches.map { $0.match.id.uuidString.prefix(8) })")
+                    print("   activeMatch: \(remoteMatchService.activeMatch?.match.id.uuidString.prefix(8) ?? "nil")")
+                    
+                    // If match has disappeared for multiple polls, dismiss overlay
+                    if notFoundCount >= 3 {
+                        print("❌ [EndGameViewRemote] Replay disappeared remotely - dismissing overlay")
+                        print("   Clearing: replayMatch, replayMatchId, showReplayOverlay")
+                        
+                        // Release ownership
+                        if let currentReplayId = replayMatchId {
+                            remoteMatchService.activeReplayMatchId = nil
+                            print("🔓 [EndGameViewRemote] Released replay ownership for match \(currentReplayId.uuidString.prefix(8))")
+                        }
+                        
+                        replayMatch = nil
+                        replayMatchId = nil
+                        showReplayOverlay = false
+                    }
                 }
+            }
+            
+            // Break if overlay was dismissed
+            if !showReplayOverlay {
+                break
             }
             
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s polling
@@ -553,14 +618,24 @@ struct EndGameViewRemote: View {
                 try await remoteMatchService.cancelChallenge(matchId: matchId)
                 print("✅ [EndGameViewRemote] Replay cancelled")
                 
+                // Light haptic
+                #if canImport(UIKit)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                #endif
+                
                 await MainActor.run {
-                    // Dismiss overlay after brief delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        dismissReplayOverlay()
-                    }
+                    // Dismiss overlay immediately
+                    dismissReplayOverlay()
                 }
             } catch {
                 print("❌ [EndGameViewRemote] Failed to cancel replay: \(error)")
+                
+                // Error haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
             }
         }
     }
@@ -789,6 +864,12 @@ struct EndGameViewRemote: View {
         }
         
         print("❌ [EndGameViewRemote] No matching replay request found")
+        
+        // If overlay is currently showing but no matching request exists, dismiss it
+        if showReplayOverlay {
+            print("🔴 [EndGameViewRemote] Overlay is showing but replay request disappeared - dismissing")
+            dismissReplayOverlay()
+        }
     }
     
     /// Handle incoming replay request (Player B)

@@ -774,6 +774,8 @@ class RemoteMatchService: ObservableObject {
             let join_window_expires_at: String?
             let challenger_lobby_joined_at: String?  // 🆕 Lobby presence tracking
             let receiver_lobby_joined_at: String?  // 🆕 Lobby presence tracking
+            let challenger_lobby_view_entered_at: String?  // 🆕 Lobby view entered tracking
+            let receiver_lobby_view_entered_at: String?  // 🆕 Lobby view entered tracking
             let lobby_countdown_started_at: String?  // 🆕 Lobby countdown tracking
             let lobby_countdown_seconds: Int?  // 🆕 Lobby countdown duration
             let voice_connect_window_started_at: String?  // 🆕 Voice window tracking
@@ -812,32 +814,34 @@ class RemoteMatchService: ObservableObject {
         }
         
         // 🧪 DEBUG STEP 3: Log last_visit_payload decode
-        print("🧪 [fetchMatch DECODED] last_visit_payload=\(matchData.last_visit_payload != nil ? "present" : "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] last_visit_payload=\(matchData.last_visit_payload != nil ? "present" : "nil")")
         if let lvp = matchData.last_visit_payload {
-            print("🧪 [fetchMatch DECODED] lvp.timestamp=\(lvp.timestamp)")
-            print("🧪 [fetchMatch DECODED] lvp.darts=\(lvp.darts)")
-            print("🧪 [fetchMatch DECODED] lvp.playerId=\(lvp.playerId.uuidString.prefix(8))...")
+            RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] lvp.timestamp=\(lvp.timestamp)")
+            RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] lvp.darts=\(lvp.darts)")
+            RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] lvp.playerId=\(lvp.playerId.uuidString.prefix(8))...")
         }
         
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
         // 🧪 DEBUG STEP 2: Log decoded fields
-        print("🧪 [fetchMatch DECODED] id=\(matchData.id.uuidString.prefix(8))...")
-        print("🧪 [fetchMatch DECODED] status=\(matchData.remote_status ?? "nil")")
-        print("🧪 [fetchMatch DECODED] current_player_id=\(matchData.current_player_id?.uuidString.prefix(8) ?? "nil")...")
-        print("🧪 [fetchMatch DECODED] challenger_id=\(matchData.challenger_id.uuidString.prefix(8))...")
-        print("🧪 [fetchMatch DECODED] receiver_id=\(matchData.receiver_id.uuidString.prefix(8))...")
-        print("🧪 [fetchMatch DECODED] player_scores=\(matchData.player_scores?.description ?? "nil")")
-        print("🧪 [fetchMatch DECODED] turn_index_in_leg=\(matchData.turn_index_in_leg?.description ?? "nil")")
-        print("🧪 [fetchMatch DECODED] challenger_lobby_joined_at=\(matchData.challenger_lobby_joined_at ?? "nil")")
-        print("🧪 [fetchMatch DECODED] receiver_lobby_joined_at=\(matchData.receiver_lobby_joined_at ?? "nil")")
-        print("🧪 [fetchMatch DECODED] lobby_countdown_started_at=\(matchData.lobby_countdown_started_at ?? "nil")")
-        print("🧪 [fetchMatch DECODED] lobby_countdown_seconds=\(matchData.lobby_countdown_seconds?.description ?? "nil")")
-        print("🧪 [fetchMatch DECODED] voice_connect_window_started_at=\(matchData.voice_connect_window_started_at ?? "nil")")
-        print("🧪 [fetchMatch DECODED] voice_connect_deadline=\(matchData.voice_connect_deadline ?? "nil")")
-        print("🧪 [fetchMatch DECODED] challenger_voice_ready_at=\(matchData.challenger_voice_ready_at ?? "nil")")
-        print("🧪 [fetchMatch DECODED] receiver_voice_ready_at=\(matchData.receiver_voice_ready_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] id=\(matchData.id.uuidString.prefix(8))...")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] status=\(matchData.remote_status ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] current_player_id=\(matchData.current_player_id?.uuidString.prefix(8) ?? "nil")...")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] challenger_id=\(matchData.challenger_id.uuidString.prefix(8))...")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] receiver_id=\(matchData.receiver_id.uuidString.prefix(8))...")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] player_scores=\(matchData.player_scores?.description ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] turn_index_in_leg=\(matchData.turn_index_in_leg?.description ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] challenger_lobby_joined_at=\(matchData.challenger_lobby_joined_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] receiver_lobby_joined_at=\(matchData.receiver_lobby_joined_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] challenger_lobby_view_entered_at=\(matchData.challenger_lobby_view_entered_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] receiver_lobby_view_entered_at=\(matchData.receiver_lobby_view_entered_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] lobby_countdown_started_at=\(matchData.lobby_countdown_started_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] lobby_countdown_seconds=\(matchData.lobby_countdown_seconds?.description ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] voice_connect_window_started_at=\(matchData.voice_connect_window_started_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] voice_connect_deadline=\(matchData.voice_connect_deadline ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] challenger_voice_ready_at=\(matchData.challenger_voice_ready_at ?? "nil")")
+        RemoteLog.log(.fetchMatchVerbose, "🧪 [fetchMatch DECODED] receiver_voice_ready_at=\(matchData.receiver_voice_ready_at ?? "nil")")
         
         // Convert player_scores from [String: Int] to [UUID: Int]
         var playerScores: [UUID: Int]? = nil
@@ -872,6 +876,8 @@ class RemoteMatchService: ObservableObject {
             debugCounter: matchData.debug_counter,
             challengerLobbyJoinedAt: matchData.challenger_lobby_joined_at.flatMap { formatter.date(from: $0) },
             receiverLobbyJoinedAt: matchData.receiver_lobby_joined_at.flatMap { formatter.date(from: $0) },
+            challengerLobbyViewEnteredAt: matchData.challenger_lobby_view_entered_at.flatMap { formatter.date(from: $0) },
+            receiverLobbyViewEnteredAt: matchData.receiver_lobby_view_entered_at.flatMap { formatter.date(from: $0) },
             lobbyCountdownStartedAt: matchData.lobby_countdown_started_at.flatMap { formatter.date(from: $0) },
             lobbyCountdownSeconds: matchData.lobby_countdown_seconds,
             voiceConnectWindowStartedAt: matchData.voice_connect_window_started_at.flatMap { formatter.date(from: $0) },
@@ -971,6 +977,7 @@ class RemoteMatchService: ObservableObject {
         
         let startTime = Date()
         let startISO = ISO8601DateFormatter().string(from: startTime)
+        print("⏱️ [VoiceTiming] CHECKPOINT 1: Lobby entered for match \(matchId.uuidString.prefix(8))")
         
         // Capture initial latch state
         let latchActiveAtStart = await MainActor.run { pendingEnterFlowMatchIds.contains(matchId) }
@@ -1827,12 +1834,12 @@ class RemoteMatchService: ObservableObject {
                 print("🔍 [Realtime UPDATE]   - userId: \(userId.uuidString)")
                 
                 let receiverMatches = receiverIdStr?.lowercased() == userId.uuidString.lowercased()
-                let isReplayStatusChange = isReplay && remoteStatus == "ready"
+                let isReplayStatusChange = isReplay && (remoteStatus == "ready" || remoteStatus == "cancelled")
                 print("🔍 [Realtime UPDATE]   - receiverMatches: \(receiverMatches)")
                 print("🔍 [Realtime UPDATE]   - isReplayStatusChange: \(isReplayStatusChange)")
                 
                 if isReplayStatusChange {
-                    print("🎮 [Realtime UPDATE] Replay status changed to ready - forcing reload")
+                    print("🎮 [Realtime UPDATE] Replay status changed to \(remoteStatus ?? "nil") - forcing reload")
                     self?.scheduleListReload(userId: userId, forceReload: true)
                 } else {
                     // Will no-op if in remote flow

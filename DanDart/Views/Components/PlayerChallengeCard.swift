@@ -22,6 +22,7 @@ struct PlayerChallengeCard: View {
     let expiresAt: Date?
     let onAccept: (() -> Void)?
     let onDecline: (() -> Void)?
+    let onCancel: (() -> Void)?
     let onJoin: (() -> Void)?
     
     init(
@@ -34,6 +35,7 @@ struct PlayerChallengeCard: View {
         expiresAt: Date? = nil,
         onAccept: (() -> Void)? = nil,
         onDecline: (() -> Void)? = nil,
+        onCancel: (() -> Void)? = nil,
         onJoin: (() -> Void)? = nil
     ) {
         self.matchId = matchId
@@ -45,9 +47,10 @@ struct PlayerChallengeCard: View {
         self.expiresAt = expiresAt
         self.onAccept = onAccept
         self.onDecline = onDecline
+        self.onCancel = onCancel
         self.onJoin = onJoin
         
-        print("🧩 Card INIT matchId=\(matchId.uuidString.prefix(8)) state=\(state.displayName) isProcessing=\(isProcessing)")
+        RemoteLog.log(.cardLifecycle, "🧩 Card INIT matchId=\(matchId.uuidString.prefix(8)) state=\(state.displayName) isProcessing=\(isProcessing)")
     }
     
     /// Display the authoritative card state from server
@@ -99,6 +102,7 @@ struct PlayerChallengeCard: View {
                 expiresAt: expiresAt,
                 onAccept: onAccept,
                 onDecline: onDecline,
+                onCancel: onCancel,
                 onJoin: onJoin
             )
             
@@ -107,10 +111,10 @@ struct PlayerChallengeCard: View {
         .background(AppColor.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
         .onAppear {
-            print("🧩 Card APPEAR matchId=\(matchId.uuidString.prefix(8)) displayedStatus=\(displayedStatus.displayName)")
+            RemoteLog.log(.cardLifecycle, "🧩 Card APPEAR matchId=\(matchId.uuidString.prefix(8)) displayedStatus=\(displayedStatus.displayName)")
         }
         .onDisappear {
-            print("🧩 Card DISAPPEAR matchId=\(matchId.uuidString.prefix(8))")
+            RemoteLog.log(.cardLifecycle, "🧩 Card DISAPPEAR matchId=\(matchId.uuidString.prefix(8))")
         }
     }
 }
@@ -123,6 +127,7 @@ struct PlayerChallengeCardFoot: View {
     let expiresAt: Date?
     let onAccept: (() -> Void)?
     let onDecline: (() -> Void)?
+    let onCancel: (() -> Void)?
     let onJoin: (() -> Void)?
     
     @ViewBuilder
@@ -197,7 +202,7 @@ struct PlayerChallengeCardFoot: View {
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundStyle(AppColor.textPrimary)
-                    Spacer()
+                    
                     
                     if let expiresAt = expiresAt {
                         TimelineView(.periodic(from: .now, by: 1.0)) { context in
@@ -205,7 +210,7 @@ struct PlayerChallengeCardFoot: View {
                             let _ = print("⏱️ TimelineView tick - expiresAt: \(expiresAt), now: \(context.date), timeRemaining: \(timeString)")
                             
                             Text(timeString)
-                                .font(.system(.subheadline, design: .rounded))
+                                .font(.system(.subheadline, design: .monospaced))
                                 .fontWeight(.semibold)
                                 .foregroundStyle(AppColor.textPrimary)
                         }
@@ -215,6 +220,15 @@ struct PlayerChallengeCardFoot: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(AppColor.textPrimary)
                     }
+                    
+                    AppButton(role: .tertiaryOutline, controlSize: .small, compact: true) {
+                        onCancel?()
+                    } label: {
+                        Text("Cancel")
+                    }
+                    .frame(width: 80)
+                    .padding(.leading, 16)
+                    .disabled(isProcessing)
                 }
                 
             case .ready:
@@ -374,7 +388,7 @@ struct PlayerChallengeCardFoot: View {
             totalWins: 15,
             totalLosses: 8
         ),
-        state: .pending,
+        state: .cancelled,
         gameType: "Remote 501",
         matchFormat: 3,
         expiresAt: Date().addingTimeInterval(300)

@@ -255,7 +255,7 @@ struct RemoteGamesTab: View {
                                 matchFormat: matchWithPlayers.match.matchFormat,
                                 isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
                                 expiresAt: matchWithPlayers.match.joinWindowExpiresAt ?? matchWithPlayers.match.challengeExpiresAt,
-                                onDecline: { cancelMatch(matchId: matchWithPlayers.match.id) }
+                                onCancel: { cancelSentChallenge(matchId: matchWithPlayers.match.id) }
                             )
                             .id(matchWithPlayers.match.id)
                             .remoteCardHighlight(isHighlighted: highlightedMatchId == matchWithPlayers.match.id)
@@ -1035,6 +1035,57 @@ struct RemoteGamesTab: View {
                     cancelledMatchIds.remove(matchId)
                     remoteMatchService.processingMatchId = nil
                     errorMessage = "Failed to cancel match: \(error.localizedDescription)"
+                    showError = true
+                }
+                
+                // Error haptic
+                #if canImport(UIKit)
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+                #endif
+            }
+        }
+    }
+    
+    private func cancelSentChallenge(matchId: UUID) {
+        print("🟠 [RemoteTab] cancelSentChallenge called with matchId: \(matchId)")
+        
+        // Guard: Not already processing
+        guard remoteMatchService.processingMatchId == nil else {
+            print("🟠 [RemoteTab] Already processing another match")
+            return
+        }
+        
+        // Guard: Match exists in sent challenges
+        guard remoteMatchService.sentChallenges.contains(where: { $0.match.id == matchId }) else {
+            print("🟠 [RemoteTab] Match not found in sentChallenges")
+            return
+        }
+        
+        // Set processing state immediately
+        remoteMatchService.processingMatchId = matchId
+        
+        Task {
+            do {
+                try await remoteMatchService.cancelChallenge(matchId: matchId)
+                print("✅ [RemoteTab] Cancel successful")
+                
+                // Light haptic
+                #if canImport(UIKit)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                #endif
+                
+                await MainActor.run {
+                    remoteMatchService.processingMatchId = nil
+                    // Card will fade/remove naturally via realtime update
+                }
+            } catch {
+                print("❌ [RemoteTab] Failed to cancel: \(error)")
+                
+                await MainActor.run {
+                    remoteMatchService.processingMatchId = nil
+                    errorMessage = "Failed to cancel challenge: \(error.localizedDescription)"
                     showError = true
                 }
                 

@@ -23,7 +23,7 @@ enum VoiceOutputRoute: String, CaseIterable {
     var icon: String {
         switch self {
         case .speaker: return "speaker.wave.2"
-        case .bluetooth: return "airpodspro"
+        case .bluetooth: return "headphones"
         case .phone: return "iphone"
         }
     }
@@ -517,7 +517,10 @@ class VoiceChatService: NSObject, ObservableObject {
         
         // Setup signalling channel immediately
         do {
+            let signallingStart = Date()
             try await setupSignallingChannel(matchId: matchId, otherPlayerId: otherPlayerId)
+            let signallingDuration = Date().timeIntervalSince(signallingStart)
+            print("⏱️ [VoiceTiming] CHECKPOINT 2: Signalling subscription active (took \(String(format: "%.3f", signallingDuration))s)")
             print("✅ [VoiceSignalling] Signalling channel subscription confirmed")
         } catch {
             print("❌ [VoiceChatService] Failed to setup signalling: \(error)")
@@ -528,8 +531,11 @@ class VoiceChatService: NSObject, ObservableObject {
         
         // Send voice_ready to announce presence
         do {
+            let readyStart = Date()
             try await sendReady(role: role)
             self.isLocalReady = true
+            let readyDuration = Date().timeIntervalSince(readyStart)
+            print("⏱️ [VoiceTiming] CHECKPOINT 3: Local voice_ready sent (took \(String(format: "%.3f", readyDuration))s)")
             print("✅ [VoiceSignalling] voice_ready sent (role: \(role))")
         } catch {
             print("❌ [VoiceChatService] Failed to send ready: \(error)")
@@ -1616,6 +1622,7 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Handle incoming voice_ready message
     @MainActor
     private func handleReady(from: UUID, payload: [String: AnyJSON]) async {
+        print("⏱️ [VoiceTiming] CHECKPOINT 4: Peer voice_ready received from \(from.uuidString.prefix(8))")
         print("📥 [VoiceSignalling] RECV voice_ready from \(from.uuidString.prefix(8))")
         
         // Guard: Check session generation
@@ -1649,7 +1656,10 @@ class VoiceChatService: NSObject, ObservableObject {
         if localRole == "challenger" && isLocalReady && isPeerReady {
             print("🔊 [VoiceSignalling] Both sides ready, challenger creating offer")
             do {
+                let offerStart = Date()
                 let offerSDP = try await createOffer()
+                let offerDuration = Date().timeIntervalSince(offerStart)
+                print("⏱️ [VoiceTiming] CHECKPOINT 5: Offer created (took \(String(format: "%.3f", offerDuration))s)")
                 try await sendOffer(offerSDP)
                 print("✅ [VoiceSignalling] Offer sent after readiness confirmed")
             } catch {
@@ -1661,6 +1671,7 @@ class VoiceChatService: NSObject, ObservableObject {
     /// Handle incoming voice_request_offer message
     @MainActor
     private func handleRequestOffer(from: UUID, payload: [String: AnyJSON]) async {
+        print("⏱️ [VoiceTiming] CHECKPOINT 4: Peer request_offer received from \(from.uuidString.prefix(8))")
         print("📥 [VoiceSignalling] RECV voice_request_offer from \(from.uuidString.prefix(8))")
         print("✅ [VoiceSignalling] voice_request_offer received")
         
@@ -1681,7 +1692,10 @@ class VoiceChatService: NSObject, ObservableObject {
             
             print("🔊 [VoiceSignalling] Challenger creating offer on request")
             do {
+                let offerStart = Date()
                 let offerSDP = try await createOffer()
+                let offerDuration = Date().timeIntervalSince(offerStart)
+                print("⏱️ [VoiceTiming] CHECKPOINT 5: Offer created (took \(String(format: "%.3f", offerDuration))s)")
                 try await sendOffer(offerSDP)
                 print("✅ [VoiceSignalling] Offer sent successfully")
             } catch {
@@ -1742,6 +1756,7 @@ class VoiceChatService: NSObject, ObservableObject {
     
     /// Handle incoming answer
     private func handleAnswer(from: UUID, payload: [String: AnyJSON]) async {
+        print("⏱️ [VoiceTiming] CHECKPOINT 6: Answer received from \(from.uuidString.prefix(8))")
         print("📥 [VoiceSignalling] RECV voice_answer from \(from.uuidString.prefix(8))")
         
         // Guard: Check session generation
@@ -2243,6 +2258,7 @@ extension VoiceChatService: RTCPeerConnectionDelegate {
         Task { @MainActor in
             switch newState {
             case .connected, .completed:
+                print("⏱️ [VoiceTiming] CHECKPOINT 7: ICE connected")
                 print("✅ [PeerConnection] ICE connected")
                 connectionState = .connected
                 

@@ -152,26 +152,26 @@ struct RemoteGameplayView: View {
         // Priority 3: If game is won, show the winning throw (opponent's final throw)
         // This ensures the non-winning player sees what the winner threw
         if let winner = gameViewModel.winner {
-            print("🎯 [FinalThrow] Winner detected: \(winner.displayName)")
+            RemoteLog.log(.finalThrow, "🎯 [FinalThrow] Winner detected: \(winner.displayName)")
             
             if let lastVisit = renderMatch?.lastVisitPayload {
-                print("🎯 [FinalThrow] lastVisitPayload exists - playerId: \(lastVisit.playerId.uuidString.prefix(8))..., darts: \(lastVisit.darts), dartCount: \(lastVisit.darts.count)")
-                print("🎯 [FinalThrow] currentUserId: \(currentUserId.uuidString.prefix(8))...")
-                print("🎯 [FinalThrow] isOpponentThrow: \(lastVisit.playerId != currentUserId)")
+                RemoteLog.log(.finalThrow, "🎯 [FinalThrow] lastVisitPayload exists - playerId: \(lastVisit.playerId.uuidString.prefix(8))..., darts: \(lastVisit.darts), dartCount: \(lastVisit.darts.count)")
+                RemoteLog.log(.finalThrow, "🎯 [FinalThrow] currentUserId: \(currentUserId.uuidString.prefix(8))...")
+                RemoteLog.log(.finalThrow, "🎯 [FinalThrow] isOpponentThrow: \(lastVisit.playerId != currentUserId)")
                 
                 if lastVisit.playerId != currentUserId {
                     if lastVisit.darts.count == 3 {
-                        print("🎯 [FinalThrow] ✅ Showing opponent's final throw")
+                        RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ✅ Showing opponent's final throw")
                         return lastVisit.darts.map { ScoredThrow(baseValue: $0, scoreType: .single) }
                     } else {
-                        print("🎯 [FinalThrow] ❌ Dart count != 3, count: \(lastVisit.darts.count)")
+                        RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ❌ Dart count != 3, count: \(lastVisit.darts.count)")
                     }
                 } else {
-                    print("🎯 [FinalThrow] ❌ lastVisit is MY throw, not opponent's")
+                    RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ❌ lastVisit is MY throw, not opponent's")
                 }
             } else {
-                print("🎯 [FinalThrow] ❌ No lastVisitPayload available")
-                print("🎯 [FinalThrow] renderMatch exists: \(renderMatch != nil)")
+                RemoteLog.log(.finalThrow, "🎯 [FinalThrow] ❌ No lastVisitPayload available")
+                RemoteLog.log(.finalThrow, "🎯 [FinalThrow] renderMatch exists: \(renderMatch != nil)")
             }
         }
         
@@ -487,19 +487,19 @@ struct RemoteGameplayView: View {
     /// so we just check if the last visit (by opponent) was a bust
     private var didOpponentBust: Bool {
         guard let payload = serverLastVisitPayload else {
-            print("🔍 [BustCheck] No serverLastVisitPayload")
+            RemoteLog.log(.bustCheck, "🔍 [BustCheck] No serverLastVisitPayload")
             return false
         }
         
         // Check if last visit was by opponent (not us)
         guard payload.playerId != currentUserId else {
-            print("🔍 [BustCheck] Last visit was by us, not opponent")
+            RemoteLog.log(.bustCheck, "🔍 [BustCheck] Last visit was by us, not opponent")
             return false
         }
         
         let isBust = payload.scoreBefore == payload.scoreAfter
         
-        print("🔍 [BustCheck] opponent visit - playerId: \(payload.playerId.uuidString.prefix(8))..., scoreBefore: \(payload.scoreBefore), scoreAfter: \(payload.scoreAfter), isBust: \(isBust)")
+        RemoteLog.log(.bustCheck, "🔍 [BustCheck] opponent visit - playerId: \(payload.playerId.uuidString.prefix(8))..., scoreBefore: \(payload.scoreBefore), scoreAfter: \(payload.scoreAfter), isBust: \(isBust)")
         
         return isBust
     }
@@ -596,13 +596,13 @@ struct RemoteGameplayView: View {
         VStack(spacing: 0) {
             // 🧪 Render Source Debug Logging
             let _ = {
-                print("📊 [RenderSource] serverScores=\(serverScores?.description ?? "nil")")
-                print("📊 [RenderSource] renderScores=\(renderScores)")
-                print("📊 [RenderSource] serverCurrentPlayerId=\(serverCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
-                print("📊 [RenderSource] renderCurrentPlayerIndex=\(renderCurrentPlayerIndex)")
-                print("📊 [RenderSource] renderVisitNumber=\(renderVisitNumber)")
+                RemoteLog.log(.render, "📊 [RenderSource] serverScores=\(serverScores?.description ?? "nil")")
+                RemoteLog.log(.render, "📊 [RenderSource] renderScores=\(renderScores)")
+                RemoteLog.log(.render, "📊 [RenderSource] serverCurrentPlayerId=\(serverCurrentPlayerId?.uuidString.prefix(8) ?? "nil")...")
+                RemoteLog.log(.render, "📊 [RenderSource] renderCurrentPlayerIndex=\(renderCurrentPlayerIndex)")
+                RemoteLog.log(.render, "📊 [RenderSource] renderVisitNumber=\(renderVisitNumber)")
                 let source = serverScores != nil ? "SERVER ✅" : "VM fallback"
-                print("📊 [RenderSource] UI using: \(source)")
+                RemoteLog.log(.render, "📊 [RenderSource] UI using: \(source)")
             }()
             
             // Stacked player cards (current player in front / expandable into column)

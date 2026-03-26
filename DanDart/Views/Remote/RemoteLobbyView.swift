@@ -285,14 +285,23 @@ struct RemoteLobbyView: View {
                                                 .fontWeight(.semibold)
                                                 .foregroundColor(AppColor.interactivePrimaryBackground)
                                                 .onChange(of: elapsed) { _, isElapsed in
-                                                    if isElapsed && matchStatus == .lobby && bothPlayersPresent {
-                                                        Task {
-                                                            do {
-                                                                print("⏰ [Lobby] Countdown elapsed, calling start-match-if-ready")
-                                                                try await remoteMatchService.startMatchIfReady(matchId: match.id)
-                                                                print("✅ [Lobby] start-match-if-ready succeeded")
-                                                            } catch {
-                                                                print("❌ [Lobby] start-match-if-ready failed: \(error)")
+                                                    guard isElapsed else { return }
+                                                    guard matchStatus == .lobby else { return }
+                                                    guard bothPlayersPresent else { return }
+                                                    guard remoteMatchService.flowMatchId == match.id else { return }
+                                                    guard !hasRequestedMatchStart else { return }
+                                                    
+                                                    hasRequestedMatchStart = true
+                                                    print("⏰ [Lobby] Requesting match start")
+                                                    
+                                                    Task {
+                                                        do {
+                                                            try await remoteMatchService.startMatchIfReady(matchId: match.id)
+                                                            print("✅ [Lobby] Match start succeeded")
+                                                        } catch {
+                                                            print("❌ [Lobby] Match start failed: \(error)")
+                                                            await MainActor.run {
+                                                                hasRequestedMatchStart = false
                                                             }
                                                         }
                                                     }
@@ -552,7 +561,10 @@ struct RemoteLobbyView: View {
                 print("🎤 [VoiceReady] Voice connection established (phase=\(currentPhase)), reporting to server")
                 Task {
                     do {
+                        let confirmStart = Date()
                         try await remoteMatchService.confirmVoiceReady(matchId: match.id)
+                        let confirmDuration = Date().timeIntervalSince(confirmStart)
+                        print("⏱️ [VoiceTiming] CHECKPOINT 8: confirmVoiceReady RPC sent (took \(String(format: "%.3f", confirmDuration))s)")
                         print("✅ [VoiceReady] Successfully confirmed voice ready to server")
                         // Refresh to get updated countdown state
                         await requestRefresh(reason: "voice-ready")
@@ -564,8 +576,9 @@ struct RemoteLobbyView: View {
         }
         .onChange(of: match.id) { oldId, newId in
             if oldId != newId {
-                print("🔄 [VoiceReady] Match changed (\(oldId.uuidString.prefix(8)) -> \(newId.uuidString.prefix(8))), resetting hasReportedVoiceReady")
+                print("🔄 [VoiceReady] Match changed (\(oldId.uuidString.prefix(8)) -> \(newId.uuidString.prefix(8))), resetting flags")
                 hasReportedVoiceReady = false
+                hasRequestedMatchStart = false
             }
         }
         .onChange(of: voiceChatService.replayReadyMatchId) { _, replayMatchId in
@@ -594,7 +607,10 @@ struct RemoteLobbyView: View {
             
             Task {
                 do {
+                    let confirmStart = Date()
                     try await remoteMatchService.confirmVoiceReady(matchId: match.id)
+                    let confirmDuration = Date().timeIntervalSince(confirmStart)
+                    print("⏱️ [VoiceTiming] CHECKPOINT 8: confirmVoiceReady RPC sent (replay, took \(String(format: "%.3f", confirmDuration))s)")
                     print("✅ [ReplayVoice] confirmVoiceReady succeeded for replay match")
                     // Refresh to get updated countdown state
                     await requestRefresh(reason: "replay-voice-ready")
@@ -626,6 +642,10 @@ struct RemoteLobbyView: View {
                     print("   - lobbyCountdownStartedAt: \(currentMatch.lobbyCountdownStartedAt?.description ?? "nil")")
                 }
                 
+                if currentPhase == .countdown {
+                    print("⏱️ [VoiceTiming] CHECKPOINT 9: Server countdown_started_at set (countdown phase entered)")
+                }
+                
                 lastObservedPhase = currentPhase
             }
             
@@ -646,37 +666,6 @@ struct RemoteLobbyView: View {
                 FlowDebug.log("LOBBY_EXIT: TRIGGER reason=matchNotInService matchExists=\(matchExists) isStarting=\(isStarting) flowMatchExists=\(flowMatchExists) flowMatchStatus=\(flowMatchStatus)", matchId: match.id)
                 remoteMatchService.dumpStateSnapshot(reason: "lobbyExit_matchNotInService", matchId: match.id)
                 router.popToRoot()
-            }
-        }
-        .onChange(of: countdownElapsed) { _, elapsed in
-            guard elapsed, matchStatus == .lobby, bothPlayersPresent else { return }
-            
-            // Guard: Only execute if this instance's match is the current flow match
-            guard remoteMatchService.flowMatchId == match.id else {
-                // This is a stale instance - do not trigger match start
-                return
-            }
-            
-            // Guard against duplicate calls
-            guard !hasRequestedMatchStart else {
-                print("⏰ [Lobby] Countdown elapsed but start already requested - skipping")
-                return
-            }
-            
-            hasRequestedMatchStart = true
-            print("⏰ [Lobby] Countdown elapsed - requesting match start (first time)")
-            
-            Task {
-                do {
-                    try await remoteMatchService.startMatchIfReady(matchId: match.id)
-                    print("✅ [Lobby] start-match-if-ready succeeded")
-                } catch {
-                    print("❌ [Lobby] start-match-if-ready failed: \(error)")
-                    // Reset flag on error to allow retry
-                    await MainActor.run {
-                        hasRequestedMatchStart = false
-                    }
-                }
             }
         }
         .onChange(of: matchStatus) { oldStatus, newStatus in
