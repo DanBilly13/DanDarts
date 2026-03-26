@@ -4,6 +4,7 @@ struct StackedPlayerCards: View {
     let players: [Player]
     let currentPlayerIndex: Int
     let playerScores: [UUID: Int]
+    let startingScore: Int
     let currentThrow: [ScoredThrow]
     let legsWon: [UUID: Int]
     let matchFormat: Int
@@ -19,7 +20,7 @@ struct StackedPlayerCards: View {
                 ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
                     PlayerScoreCard(
                         player: player,
-                        score: playerScores[player.id] ?? 301,
+                        score: playerScores[player.id] ?? startingScore,
                         isCurrentPlayer: index == currentPlayerIndex,
                         currentThrow: index == currentPlayerIndex ? currentThrow : [ScoredThrow](),
                         legsWon: legsWon[player.id] ?? 0,

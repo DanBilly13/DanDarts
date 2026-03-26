@@ -68,6 +68,7 @@ struct HalveItGameplayView: View {
                             players: viewModel.players,
                             currentPlayerIndex: viewModel.currentPlayerIndex,
                             playerScores: viewModel.playerScores,
+                            startingScore: 0,
                             currentThrow: viewModel.currentThrow,
                             legsWon: [:],
                             matchFormat: 1,

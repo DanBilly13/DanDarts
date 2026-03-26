@@ -613,9 +613,10 @@ struct MainTabView: View {
                 .id("lobby-\(match.id.uuidString)")
                 .background(AppColor.backgroundPrimary)
         
-        case .remoteGameplay(let matchId, let challenger, let receiver, let currentUserId):
+        case .remoteGameplay(let matchId, let gameName, let challenger, let receiver, let currentUserId):
             RemoteGameplayView(
                 matchId: matchId,
+                gameName: gameName,
                 challenger: challenger,
                 receiver: receiver,
                 currentUserId: currentUserId,

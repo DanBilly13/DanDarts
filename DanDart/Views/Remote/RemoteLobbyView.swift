@@ -873,6 +873,7 @@ struct RemoteLobbyView: View {
                 
                 router.push(.remoteGameplay(
                     matchId: finalMatch.id,
+                    gameName: finalMatch.gameName,
                     challenger: challenger,
                     receiver: receiver,
                     currentUserId: currentUser.id

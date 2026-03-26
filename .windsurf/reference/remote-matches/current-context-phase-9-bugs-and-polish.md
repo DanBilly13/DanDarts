@@ -1,9 +1,5 @@
 
 
----
-trigger: always_on
----
-
 current-context-phase-9-bugs-and-polish
 
 ## Project (short)

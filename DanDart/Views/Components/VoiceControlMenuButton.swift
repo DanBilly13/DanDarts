@@ -45,7 +45,7 @@ struct VoiceControlMenuButton: View {
                     .foregroundColor(AppColor.textPrimary)
             }
             
-            Text("Sorry - we were unable to\nconnect voice for this match.")
+            Text("Sorry - we were unable to connect voice for this match.")
                 .font(.system(size: 14))
                 .foregroundColor(AppColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -10,6 +10,7 @@ import SwiftUI
 
 struct RemoteGameplayView: View {
     let matchId: UUID
+    let gameName: String
     let challenger: User
     let receiver: User
     let currentUserId: UUID
@@ -87,8 +88,14 @@ struct RemoteGameplayView: View {
     
     /// Scores for UI: prefer local override, then local hold, then server, then VM
     private var renderScores: [UUID: Int] {
-        // Start with server or VM scores
-        var mergedScores = serverScores ?? gameViewModel.playerScores
+        // Start with VM scores, then overlay server scores.
+        // Server payloads can be temporarily partial, so we must not drop a player's key.
+        var mergedScores = gameViewModel.playerScores
+        if let serverScores {
+            for (playerId, score) in serverScores {
+                mergedScores[playerId] = score
+            }
+        }
         
         // Overlay local holds (authoritative for display while server is catching up)
         for (playerId, score) in localScoreHold {
@@ -610,6 +617,7 @@ struct RemoteGameplayView: View {
                 players: gameViewModel.players,
                 currentPlayerIndex: renderCurrentPlayerIndex,
                 playerScores: renderScores,
+                startingScore: gameViewModel.startingScore,
                 currentThrow: renderThrowForCards,
                 legsWon: gameViewModel.legsWon,
                 matchFormat: gameViewModel.matchFormat,
@@ -744,10 +752,11 @@ struct RemoteGameplayView: View {
         }
     }
     
-    init(matchId: UUID, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {
+    init(matchId: UUID, gameName: String, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {
         let instanceId = UUID()
         self._viewInstanceId = State(initialValue: instanceId)
         self.matchId = matchId
+        self.gameName = gameName
         self.challenger = challenger
         self.receiver = receiver
         self.currentUserId = currentUserId
@@ -761,8 +770,8 @@ struct RemoteGameplayView: View {
             match: RemoteMatch(
                 id: matchId,
                 matchMode: "remote",
-                gameType: "301",
-                gameName: "301",
+                gameType: gameName,
+                gameName: gameName,
                 matchFormat: 1,
                 challengerId: challenger.id,
                 receiverId: receiver.id,
@@ -785,7 +794,7 @@ struct RemoteGameplayView: View {
         
         // Create game (will be updated from live match)
         let game = Game(
-            title: "301",
+            title: gameName,
             subtitle: "Remote Match",
             players: "2 Players",
             instructions: ""

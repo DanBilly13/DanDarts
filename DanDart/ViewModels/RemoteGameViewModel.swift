@@ -226,11 +226,12 @@ class RemoteGameViewModel: ObservableObject {
         }
         
         // Determine starting score based on game type
-        if game.title == "301" {
+        if game.title.contains("301") {
             self.startingScore = 301
-        } else if game.title == "501" {
+        } else if game.title.contains("501") {
             self.startingScore = 501
         } else {
+            print("⚠️ [RemoteGameVM] Unknown game title for startingScore: \(game.title) - defaulting to 501")
             self.startingScore = 501 // Default
         }
         

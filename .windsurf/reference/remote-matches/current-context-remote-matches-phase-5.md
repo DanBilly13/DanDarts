@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # DanDart — current-context (Phase 5)
 

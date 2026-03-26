@@ -86,6 +86,7 @@ struct CountdownGameplayView: View {
                                 players: gameViewModel.players,
                                 currentPlayerIndex: gameViewModel.currentPlayerIndex,
                                 playerScores: gameViewModel.playerScores,
+                                startingScore: gameViewModel.startingScore,
                                 currentThrow: gameViewModel.currentThrow,
                                 legsWon: gameViewModel.legsWon,
                                 matchFormat: gameViewModel.matchFormat,
