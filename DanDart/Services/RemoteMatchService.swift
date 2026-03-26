@@ -1835,11 +1835,16 @@ class RemoteMatchService: ObservableObject {
                 
                 let receiverMatches = receiverIdStr?.lowercased() == userId.uuidString.lowercased()
                 let isReplayStatusChange = isReplay && (remoteStatus == "ready" || remoteStatus == "cancelled")
+                let isCancelledTransition = remoteStatus == "cancelled"
                 print("🔍 [Realtime UPDATE]   - receiverMatches: \(receiverMatches)")
                 print("🔍 [Realtime UPDATE]   - isReplayStatusChange: \(isReplayStatusChange)")
+                print("🔍 [Realtime UPDATE]   - isCancelledTransition: \(isCancelledTransition)")
                 
                 if isReplayStatusChange {
                     print("🎮 [Realtime UPDATE] Replay status changed to \(remoteStatus ?? "nil") - forcing reload")
+                    self?.scheduleListReload(userId: userId, forceReload: true)
+                } else if isCancelledTransition {
+                    print("🚫 [Realtime UPDATE] Match cancelled (decline/abort) - forcing reload")
                     self?.scheduleListReload(userId: userId, forceReload: true)
                 } else {
                     // Will no-op if in remote flow
