@@ -62,7 +62,8 @@ struct PreGameHypeView: View {
                     // Game name at top
                     VStack(spacing: 8) {
                         Text(game.title)
-                            .font(.system(size: 28, weight: .bold, design: .default))
+                            .font(.system(.title2, design: .rounded))
+                            .fontWeight(.semibold)
                             .foregroundColor(AppColor.textPrimary)
                         
                         // Show "Assigning random numbers..." for Killer game, "Practice Match" for single player

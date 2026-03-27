@@ -198,7 +198,8 @@ struct RemoteLobbyView: View {
             VStack(spacing: 0) {
                 // Game name at top
                 Text(match.gameType.uppercased())
-                    .font(.system(size: 28, weight: .bold, design: .default))
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.semibold)
                     .foregroundColor(AppColor.textPrimary)
                     .padding(.top, 60)
                     .opacity(showContent ? 1.0 : 0.0)

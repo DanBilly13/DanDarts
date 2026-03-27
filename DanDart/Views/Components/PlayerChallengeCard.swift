@@ -198,7 +198,7 @@ struct PlayerChallengeCardFoot: View {
                 HStack(spacing: 8) {
                     Image(systemName: "clock")
                         .foregroundStyle(AppColor.textSecondary)
-                    Text("Waiting for response")
+                    Text("Awaiting reply")
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundStyle(AppColor.textPrimary)
@@ -220,14 +220,14 @@ struct PlayerChallengeCardFoot: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(AppColor.textPrimary)
                     }
-                    
+                    Spacer()
                     AppButton(role: .tertiaryOutline, controlSize: .small, compact: true) {
                         onCancel?()
                     } label: {
                         Text("Cancel")
                     }
-                    .frame(width: 80)
-                    .padding(.leading, 16)
+                    .frame(width: 72)
+                    
                     .disabled(isProcessing)
                 }
                 
@@ -388,7 +388,7 @@ struct PlayerChallengeCardFoot: View {
             totalWins: 15,
             totalLosses: 8
         ),
-        state: .cancelled,
+        state: .sent,
         gameType: "Remote 501",
         matchFormat: 3,
         expiresAt: Date().addingTimeInterval(300)

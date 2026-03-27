@@ -35,22 +35,8 @@ struct VoiceControlMenuButton: View {
     // MARK: - Unavailable Message
     
     private var unavailableMessage: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "microphone.slash")
-                    .font(.system(size: 16))
-                    .foregroundColor(AppColor.textSecondary)
-                Text("Voice unavailable")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppColor.textPrimary)
-            }
-            
-            Text("Sorry - we were unable to connect voice for this match.")
-                .font(.system(size: 14))
-                .foregroundColor(AppColor.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, 8)
+        Label("Voice unavailable", systemImage: "microphone.slash")
+            .foregroundColor(AppColor.textSecondary)
     }
     
     // MARK: - Route Buttons
