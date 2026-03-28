@@ -9,7 +9,7 @@ import SwiftUI
 
 struct HalveItSetupConfig: GameSetupConfigurable {
     let game: Game
-    let playerLimit: Int = 8
+    let playerLimit: Int = 6
     let optionLabel: String = "Difficulty"
     let defaultSelection: Int = 0 // Easy
     

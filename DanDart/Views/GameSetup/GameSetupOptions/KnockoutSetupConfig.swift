@@ -9,7 +9,7 @@ import SwiftUI
 
 struct KnockoutSetupConfig: GameSetupConfigurable {
     let game: Game
-    let playerLimit: Int = 10
+    let playerLimit: Int = 6
     let optionLabel: String = "Lives"
     let defaultSelection: Int = 1 // 3 Lives (most common)
     
