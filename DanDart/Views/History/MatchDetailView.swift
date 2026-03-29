@@ -326,7 +326,7 @@ struct CompactPlayerCard: View {
                 
                 // Winner crown
                 if isWinner {
-                    Image(systemName: "crown.fill")
+                    Image(systemName: "crown")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(AppColor.player1)
                         .offset(y: -55)

@@ -237,7 +237,7 @@ struct SuddenDeathMatchDetailView: View {
                             }
                         }
                         // Crown always shows for winner (replaces last skull if any, or stands alone)
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "crown")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                             .frame(width: iconWidth, height: iconWidth)
@@ -366,7 +366,7 @@ struct SuddenDeathMatchPlayerCard: View {
                 Group {
                     if isWinner {
                         // Crown icon for winner
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "crown")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                     } else {

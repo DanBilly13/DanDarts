@@ -208,17 +208,29 @@ struct MatchCard: View {
         let calendar = Calendar.current
         let now = Date()
         
-        let components = calendar.dateComponents([.day, .hour, .minute], from: summary.timestamp, to: now)
-        
-        if let days = components.day, days > 0 {
-            return "\(days)d ago"
-        } else if let hours = components.hour, hours > 0 {
-            return "\(hours)h ago"
-        } else if let minutes = components.minute, minutes > 0 {
-            return "\(minutes)m ago"
-        } else {
-            return "Just now"
+        // Check if under 1 minute
+        if calendar.isDate(summary.timestamp, inSameDayAs: now) {
+            let components = calendar.dateComponents([.hour, .minute], from: summary.timestamp, to: now)
+            
+            if let minutes = components.minute, minutes < 1 {
+                return "Just now"
+            } else if let hours = components.hour, hours > 0 {
+                return "\(hours)h"
+            } else if let minutes = components.minute, minutes > 0 {
+                return "\(minutes)m"
+            }
         }
+        
+        // Check if yesterday
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(summary.timestamp, inSameDayAs: yesterday) {
+            return "Yesterday"
+        }
+        
+        // Older dates: numeric format
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d/yy"
+        return formatter.string(from: summary.timestamp)
     }
 
     /// Resolve a cover image name for this match's game using common naming patterns

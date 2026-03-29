@@ -25,7 +25,7 @@ struct CountdownScoreDisplay: View {
             Group {
                 if isWinner {
                     // Trophy icon - 24px (no score shown for countdown winners)
-                    Image(systemName: "crown.fill")
+                    Image(systemName: "crown")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(AppColor.interactivePrimaryBackground)
                 } else {

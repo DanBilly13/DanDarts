@@ -350,7 +350,7 @@ struct KnockoutPlayerCard: View {
             HStack(spacing: 6) {
                 // Crown for player to beat
                 if isPlayerToBeat {
-                    Image(systemName: "crown.fill")
+                    Image(systemName: "crown")
                         .font(.system(size: 20))
                         .foregroundColor(.yellow)
                 }

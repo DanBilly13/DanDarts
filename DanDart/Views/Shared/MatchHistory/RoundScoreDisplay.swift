@@ -23,7 +23,7 @@ struct RoundScoreDisplay: View {
     var body: some View {
         Group {
             if score == 0 && showCrownForZero {
-                Image(systemName: "crown.fill")
+                Image(systemName: "crown")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(playerColor)
             } else {

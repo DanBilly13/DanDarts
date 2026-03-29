@@ -190,45 +190,18 @@ struct FriendsListView: View {
     }
     
     private var emptyStateContent: some View {
-        VStack(spacing: 24) {
-            Spacer()
-                .frame(height: 100)
-            
-            Image("DartHeadOnly")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 80, height: 80)
-
-            VStack(spacing: 8) {
-                Text("No friends yet")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(AppColor.textPrimary)
-
-                Text("Search for friends to add them")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppColor.textSecondary)
-                    .multilineTextAlignment(.center)
+        EmptyState(
+            imageName: "empty-friends",
+            title: "No friends yet",
+            message: "Search for friends to add them",
+            actionTitle: "Find Friends",
+            action: {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showSearch = true
+                }
             }
-
-            emptyStateFindButton
-            
-            Spacer()
-                .frame(height: 100)
-        }
-        .frame(maxWidth: .infinity)
+        )
         .listRowInsets(EdgeInsets())
-    }
-    
-    private var emptyStateFindButton: some View {
-        AppButton(role: .primary, controlSize: .regular) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showSearch = true
-            }
-        } label: {
-            Label("Find Friends", systemImage: "magnifyingglass")
-        }
-        .frame(maxWidth: 280)
-        .padding(.top, 8)
     }
     
     // iOS 26+ can show a navigation subtitle without affecting layout

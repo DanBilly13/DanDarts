@@ -214,7 +214,7 @@ struct KnockoutMatchDetailView: View {
                     }
                     
                     // Crown takes the place of the last boxing glove
-                    Image(systemName: "crown.fill")
+                    Image(systemName: "crown")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(AppColor.interactivePrimaryBackground)
                         .frame(width: 16, height: 16)
@@ -340,7 +340,7 @@ struct KnockoutMatchPlayerCard: View {
                 Group {
                     if isWinner {
                         // Crown icon for winner
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "crown")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                     } else {

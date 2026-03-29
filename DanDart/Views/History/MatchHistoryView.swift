@@ -39,7 +39,7 @@ struct MatchHistoryView: View {
         case halveIt = "Halve It"
         case knockout = "Knockout"
         case suddenDeath = "Sudden Death"
-        case cricket = "Cricket"
+        // case cricket = "Cricket"  // TODO: Uncomment when cricket game is implemented
         case killer = "Killer"
         
         var displayName: String {
@@ -237,6 +237,7 @@ struct MatchHistoryView: View {
             .padding(.horizontal, 1)
             .padding(.trailing, 16)
         }
+        .frame(height: 40)
         .scrollClipDisabled()
         .padding(.top, 12)
         .padding(.bottom, 16)
@@ -256,28 +257,11 @@ struct MatchHistoryView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 64, weight: .light))
-                .foregroundColor(AppColor.textSecondary)
-            
-            VStack(spacing: 8) {
-                Text("No matches yet")
-                    .font(.title3.weight(.semibold))
-                    .foregroundColor(AppColor.textPrimary)
-                
-                Text(emptyStateMessage)
-                    .font(.body.weight(.medium))
-                    .foregroundColor(AppColor.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 100)
+        EmptyState(
+            imageName: "empty-history",
+            title: "No history yet",
+            message: emptyStateMessage
+        )
     }
     
     private var emptyStateMessage: String {

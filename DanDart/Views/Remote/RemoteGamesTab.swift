@@ -512,23 +512,15 @@ struct RemoteGamesTab: View {
     // MARK: - Empty State View
     
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            Image(systemName: "network")
-                .font(.system(size: 80))
-                .foregroundStyle(AppColor.textSecondary.opacity(0.5))
-            
-            VStack(spacing: 8) {
-                Text("You have no\nremote matches")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(AppColor.textPrimary)
-                    .multilineTextAlignment(.center)
+        EmptyState(
+            imageName: "empty-remote",
+            title: "No remote matches",
+            message: "No pending or upcoming challenges",
+            actionTitle: "Challenge a Friend",
+            action: {
+                showGameSelection = true
             }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 32)
+        )
     }
     
     // MARK: - Section Header

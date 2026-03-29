@@ -25,7 +25,7 @@ struct AccumulationScoreDisplay: View {
             Group {
                 if isWinner {
                     // Crown icon for winner
-                    Image(systemName: "crown.fill")
+                    Image(systemName: "crown")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(AppColor.interactivePrimaryBackground)
                 } else {

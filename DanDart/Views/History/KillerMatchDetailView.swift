@@ -609,7 +609,7 @@ struct KillerMatchPlayerCard: View {
                 // Top row: crown or placement
                 Group {
                     if isWinner {
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "crown")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                     } else {
