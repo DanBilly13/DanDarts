@@ -64,7 +64,13 @@ struct MatchHistoryView: View {
         
         // Apply game type filter (only when not searching)
         if !isSearchPresented && selectedFilter != .all {
-            filtered = filtered.filter { $0.gameName == selectedFilter.rawValue }
+            if selectedFilter == .threeOhOne {
+                filtered = filtered.filter { $0.gameName.contains("301") }
+            } else if selectedFilter == .fiveOhOne {
+                filtered = filtered.filter { $0.gameName.contains("501") }
+            } else {
+                filtered = filtered.filter { $0.gameName == selectedFilter.rawValue }
+            }
         }
         
         // Apply search filter
@@ -159,40 +165,7 @@ struct MatchHistoryView: View {
         }
     }
     
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            ToolbarTitle(title: "History")
-        }
         
-        ToolbarItem(placement: .navigationBarLeading) {
-            if !isSearchPresented {
-                // TEMPORARY: Toggle for hiding local matches during testing
-                Button(action: {
-                    showLocalMatches.toggle()
-                }) {
-                    Image(systemName: showLocalMatches ? "iphone" : "iphone.slash")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(showLocalMatches ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
-                }
-                .accessibilityLabel(showLocalMatches ? "Hide local matches" : "Show local matches")
-            }
-        }
-        
-        ToolbarItem(placement: .navigationBarTrailing) {
-            if !isSearchPresented {
-                ToolbarSearchButton {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isSearchPresented = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        isSearchFieldFocused = true
-                    }
-                }
-            }
-        }
-    }
-    
     // MARK: - Sub Views
     
     private func errorBanner(message: String) -> some View {

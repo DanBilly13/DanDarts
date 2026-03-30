@@ -119,13 +119,13 @@ struct MainTabView: View {
             case 3:
                 // History tab
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
+                    /*Button {
                         historyShowLocalMatches.toggle()
                     } label: {
                         Image(systemName: historyShowLocalMatches ? "iphone" : "iphone.slash")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(historyShowLocalMatches ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
-                    }
+                    }*/
                     
                     Button {
                         withAnimation(.easeInOut(duration: 0.3)) {

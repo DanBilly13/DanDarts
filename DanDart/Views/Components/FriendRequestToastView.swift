@@ -60,7 +60,7 @@ struct FriendRequestToastView: View {
                 .buttonStyle(PlainButtonStyle())
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 16)
             .background(AppColor.justWhite)
             .contentShape(Rectangle())
             .onTapGesture {
@@ -98,11 +98,11 @@ struct FriendRequestToastView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
             }
         }
         .background(AppColor.justWhite)
-        .cornerRadius(12)
+        .cornerRadius(24)
         .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
     }
 }

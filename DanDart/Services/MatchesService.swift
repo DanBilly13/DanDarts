@@ -561,8 +561,26 @@ class MatchesService: ObservableObject {
             let totalTurns = turnCounts.reduce(0, +)
             print("📊 [LoadMatchById] Loaded turns per player: \(turnCounts), total: \(totalTurns)")
 
-            // winner_id may be NULL but MatchResult currently requires a non-optional winnerId
-            let finalWinnerId = winnerId ?? UUID()   // placeholder for NULL winner_id
+            // Determine winner for countdown games if winner_id is NULL
+            let finalWinnerId: UUID
+            if let winnerId = winnerId {
+                finalWinnerId = winnerId
+            } else if gameType == "301" || gameType == "501" {
+                // For countdown games, winner is the player with finalScore of 0
+                if let winner = playersWithTurns.first(where: { $0.finalScore == 0 }) {
+                    finalWinnerId = winner.id
+                    print("✅ [LoadMatchById] Determined winner for countdown game: player \(winner.displayName) with score 0")
+                } else {
+                    // Fallback: use player with lowest score
+                    let lowestScorePlayer = playersWithTurns.min(by: { $0.finalScore < $1.finalScore })
+                    finalWinnerId = lowestScorePlayer?.id ?? UUID()
+                    print("⚠️ [LoadMatchById] No player with score 0, using lowest score: \(lowestScorePlayer?.finalScore ?? -1)")
+                }
+            } else {
+                // For other game types, fallback to random UUID (should be rare)
+                finalWinnerId = UUID()
+                print("⚠️ [LoadMatchById] No winner_id for non-countdown game, using placeholder UUID")
+            }
 
             // Duration: computed (0 if unavailable)
             let finalDuration = TimeInterval(duration ?? 0)

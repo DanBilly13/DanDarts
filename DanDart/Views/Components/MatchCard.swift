@@ -124,12 +124,16 @@ struct MatchCard: View {
                             // Show placement for Sudden Death and Halve-It
                             placementView(for: playerPlacement(player))
                         } else {
-                            // Show trophy for winner, score for others (301/501)
+                            // Show trophy for winner, hide scores for X01 non-winners
                             if player.id == summary.winnerId {
                                 Image(systemName: "crown")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(AppColor.interactivePrimaryBackground)
+                            } else if isX01Game {
+                                // X01 games: hide non-winner scores
+                                EmptyView()
                             } else {
+                                // Other games: show scores as before
                                 Text("\(player.finalScore)")
                                     .font(.system(.callout, design: .rounded))
                                     .fontWeight(.regular)
@@ -183,6 +187,12 @@ struct MatchCard: View {
         return gameType == "knockout" ||
                gameType == "sudden death" || gameType == "sudden_death" ||
                gameType == "halve it" || gameType == "halve_it"
+    }
+    
+    /// Check if this is an X01 game (301, 501)
+    private var isX01Game: Bool {
+        let gameType = summary.gameType.lowercased()
+        return gameType.contains("301") || gameType.contains("501")
     }
     
     /// Players ranked by final score (highest to lowest for Halve-It/Knockout, lowest to highest for Sudden Death)
