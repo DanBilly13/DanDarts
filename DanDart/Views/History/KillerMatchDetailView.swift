@@ -444,16 +444,35 @@ struct KillerMatchDetailView: View {
     
     // MARK: - Helper Methods
     
+    // Check if Killer match has valid placement data (forward-only)
+    private var hasValidPlacementData: Bool {
+        guard let metadata = match.metadata else { return false }
+        return metadata.keys.contains { $0.hasPrefix("placement_") }
+    }
+
+    // Extract placement from metadata for a specific player
+    private func placementForPlayer(_ player: MatchPlayer) -> Int {
+        guard let metadata = match.metadata else { return 0 }
+        let key = "placement_\(player.id.uuidString)"
+        return Int(metadata[key] ?? "") ?? 0
+    }
+    
     private var sortedPlayers: [MatchPlayer] {
-        match.players.sorted { player1, player2 in
-            // Winner always first
-            if player1.id == match.winnerId { return true }
-            if player2.id == match.winnerId { return false }
-            
-            // Then by lives remaining (more lives = better placement)
-            let lives1 = finalLives(for: player1)
-            let lives2 = finalLives(for: player2)
-            return lives1 > lives2
+        if hasValidPlacementData {
+            // New matches: sort by placement from metadata (elimination order)
+            return match.players.sorted { placementForPlayer($0) < placementForPlayer($1) }
+        } else {
+            // Old matches: keep current behavior (winner first, then by lives)
+            return match.players.sorted { player1, player2 in
+                // Winner always first
+                if player1.id == match.winnerId { return true }
+                if player2.id == match.winnerId { return false }
+                
+                // Then by lives remaining (more lives = better placement)
+                let lives1 = finalLives(for: player1)
+                let lives2 = finalLives(for: player2)
+                return lives1 > lives2
+            }
         }
     }
     

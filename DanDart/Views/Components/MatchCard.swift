@@ -181,12 +181,29 @@ struct MatchCard: View {
     
     // MARK: - Computed Properties
     
-    /// Check if this is a ranking-based game (Knockout, Sudden Death, Halve-It)
+    /// Check if this is a ranking-based game (Knockout, Sudden Death, Halve-It, Killer)
     private var isRankingBasedGame: Bool {
         let gameType = summary.gameType.lowercased()
         return gameType == "knockout" ||
                gameType == "sudden death" || gameType == "sudden_death" ||
-               gameType == "halve it" || gameType == "halve_it"
+               gameType == "halve it" || gameType == "halve_it" ||
+               (gameType == "killer" && hasValidKillerPlacement)
+    }
+    
+    // Check if Killer match has valid placement data (forward-only)
+    private var hasValidKillerPlacement: Bool {
+        guard summary.gameType.lowercased() == "killer" else { return false }
+        guard let metadata = summary.metadata else { return false }
+        
+        // Check if metadata contains placement keys (indicates new format)
+        return metadata.keys.contains { $0.hasPrefix("placement_") }
+    }
+
+    // Extract placement from metadata for a specific player
+    private func placementForPlayer(_ player: MatchPlayer) -> Int {
+        guard let metadata = summary.metadata else { return 0 }
+        let key = "placement_\(player.id.uuidString)"
+        return Int(metadata[key] ?? "") ?? 0
     }
     
     /// Check if this is an X01 game (301, 501)
@@ -208,8 +225,11 @@ struct MatchCard: View {
         } else if gameType == "halve it" || gameType == "halve_it" {
             // For Halve-It: higher score = better placement
             return summary.players.sorted { $0.finalScore > $1.finalScore }
+        } else if gameType == "killer" && hasValidKillerPlacement {
+            // For Killer with valid placement: sort by placement from metadata
+            return summary.players.sorted { placementForPlayer($0) < placementForPlayer($1) }
         } else {
-            // For other games: keep original order
+            // For old Killer matches without placement data: keep original order
             return summary.players
         }
     }

@@ -45,6 +45,9 @@ class KillerViewModel: ObservableObject {
     @Published var animatingGunSpin: UUID? = nil
     @Published var eliminatedPlayers: Set<UUID> = []
     
+    // Elimination order tracking for placement
+    @Published var eliminationOrder: [UUID] = []
+    
     // MARK: - Computed Properties
     
     var currentPlayer: Player {
@@ -322,6 +325,26 @@ class KillerViewModel: ObservableObject {
         playerTurnHistory[currentPlayer.id]?.append(turn)
     }
     
+    private func deriveFinalPlacements() -> [UUID: Int] {
+        var placements: [UUID: Int] = [:]
+        
+        // Winner gets 1st place
+        if let winner = winner {
+            let winnerId = matchPlayerId(for: winner)
+            placements[winnerId] = 1
+        }
+        
+        // Eliminated players get placements based on REVERSE elimination order
+        // Last eliminated = 2nd place, first eliminated = last place
+        let reversedEliminationOrder = eliminationOrder.reversed()
+        for (index, playerId) in reversedEliminationOrder.enumerated() {
+            // Use consistent ID type (eliminationOrder stores matchPlayerId)
+            placements[playerId] = index + 2 // 2nd, 3rd, 4th, etc.
+        }
+        
+        return placements
+    }
+    
     private func saveMatch() {
         guard let winner = winner else { return }
         
@@ -350,6 +373,12 @@ class KillerViewModel: ObservableObject {
                 let playerId = matchPlayerId(for: player)
                 metadata["player_\(playerId.uuidString)"] = "\(number)"
             }
+        }
+        
+        // Derive placements and add to metadata
+        let placements = deriveFinalPlacements()
+        for (playerId, placement) in placements {
+            metadata["placement_\(playerId.uuidString)"] = "\(placement)"
         }
         
         let matchResult = MatchResult(
@@ -517,6 +546,12 @@ class KillerViewModel: ObservableObject {
         
         // If player is eliminated, add to eliminatedPlayers after fade animation
         if currentLives - 1 == 0 {
+            // Track elimination order for placement (use matchPlayerId for consistency)
+            if let player = players.first(where: { $0.id == playerID }) {
+                let matchPlayerId = matchPlayerId(for: player)
+                eliminationOrder.append(matchPlayerId)
+            }
+            
             Task {
                 try? await Task.sleep(nanoseconds: 500_000_000) // Match fade duration
                 await MainActor.run {

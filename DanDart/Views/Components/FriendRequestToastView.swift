@@ -81,7 +81,7 @@ struct FriendRequestToastView: View {
                             ProgressView()
                                 .tint(AppColor.interactivePrimaryBackground)
                         } else {
-                            Label("Deny", systemImage: "xmark")
+                            Label("No thanks", systemImage: "xmark")
                         }
                     }
                     
