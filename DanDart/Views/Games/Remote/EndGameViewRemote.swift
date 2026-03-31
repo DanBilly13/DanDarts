@@ -86,6 +86,25 @@ struct EndGameViewRemote: View {
         return "\(winnerLegs)-\(loserLegs)"
     }
     
+    // MARK: - Winner/Loser Logic for Rematch
+    
+    /// Get the current user ID safely
+    private var currentUserId: UUID? {
+        return authService.currentUser?.id
+    }
+    
+    /// Determine if current user is the winner
+    private var isWinner: Bool {
+        guard let currentUserId = currentUserId else { return false }
+        return currentUserId == winner.id
+    }
+    
+    /// Determine if current user is the loser (explicit, not !isWinner)
+    private var isLoser: Bool {
+        guard let currentUserId = currentUserId else { return false }
+        return currentUserId != winner.id
+    }
+    
     var body: some View {
         ZStack {
             // Dark gradient background
@@ -182,21 +201,38 @@ struct EndGameViewRemote: View {
                 
                 // Action Buttons
                 VStack(spacing: 16) {
-                    // PHASE 16 TASK 4: Replay overlay trigger
-                    AppButton(role: .primary, controlSize: .extraLarge, compact: true) {
-                        createReplayRequest()
-                    } label: {
-                        if isCreatingReplay {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Creating...")
+                    if isLoser {
+                        // Loser gets active Rematch button
+                        AppButton(role: .primary, controlSize: .extraLarge, compact: true) {
+                            createReplayRequest()
+                        } label: {
+                            if isCreatingReplay {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text("Creating...")
+                                }
+                            } else {
+                                Label("Rematch", systemImage: "arrow.clockwise")
                             }
-                        } else {
-                            Label("Play Again", systemImage: "arrow.clockwise")
+                        }
+                        .disabled(isCreatingReplay)
+                    } else if isWinner {
+                        // Winner gets disabled button with explanation
+                        VStack(spacing: 8) {
+                            AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
+                                // No action - disabled
+                            } label: {
+                                Label("Rematch", systemImage: "arrow.clockwise")
+                            }
+                            .disabled(true)
+                            
+                            Text("Only losers can request a rematch")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundColor(AppColor.textSecondary)
+                                .multilineTextAlignment(.center)
                         }
                     }
-                    .disabled(isCreatingReplay)
                     
                     // Back to Games Button
                     AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
@@ -821,6 +857,43 @@ struct EndGameViewRemote: View {
         }
     }
     
+    // MARK: - Replay State Management Helpers
+    
+    /// Find the active replay match across all valid buckets
+    private func findActiveReplayMatch(matchId: UUID) -> RemoteMatch? {
+        // Check pendingChallenges (initial state)
+        if let pending = remoteMatchService.pendingChallenges.first(where: { $0.match.id == matchId }) {
+            return pending.match
+        }
+        
+        // Check readyMatches (after acceptance)
+        if let ready = remoteMatchService.readyMatches.first(where: { $0.match.id == matchId }) {
+            return ready.match
+        }
+        
+        // Check sentChallenges (if initiator)
+        if let sent = remoteMatchService.sentChallenges.first(where: { $0.match.id == matchId }) {
+            return sent.match
+        }
+        
+        // Check activeMatch (if in lobby/gameplay)
+        if let active = remoteMatchService.activeMatch, active.match.id == matchId {
+            return active.match
+        }
+        
+        return nil
+    }
+    
+    /// Check if replay match is in terminal state (should be dismissed)
+    private func isReplayTerminal(_ match: RemoteMatch) -> Bool {
+        switch match.status {
+        case .cancelled, .expired, .completed:
+            return true
+        default:
+            return false
+        }
+    }
+    
     /// Scan for incoming replay requests (Player B detection)
     private func scanForIncomingReplayRequest() {
         guard let opponent = opponent else {
@@ -833,7 +906,32 @@ struct EndGameViewRemote: View {
         }
         
         print("🔍 [EndGameViewRemote] Scanning for replay requests...")
-        print("🔍 [EndGameViewRemote]   - opponent: \(opponent.displayName) (\(opponent.id.uuidString.prefix(8)))")
+        
+        // If we already have an active replayMatchId, preserve its state
+        if let activeReplayId = replayMatchId {
+            if let activeMatch = findActiveReplayMatch(matchId: activeReplayId) {
+                // Update replayMatch with fresh data
+                replayMatch = activeMatch
+                
+                // Check if match became terminal
+                if isReplayTerminal(activeMatch) {
+                    print("� [EndGameViewRemote] Replay became terminal - dismissing")
+                    dismissReplayOverlay()
+                    return
+                }
+                
+                print("✅ [EndGameViewRemote] Active replay found and preserved (status: \(activeMatch.status?.rawValue ?? "nil"))")
+                return
+            } else {
+                // Match not found anywhere - truly disappeared
+                print("🔴 [EndGameViewRemote] Active replay match not found - dismissing")
+                dismissReplayOverlay()
+                return
+            }
+        }
+        
+        // Initial scan for new replay requests (original logic)
+        print("�🔍 [EndGameViewRemote]   - opponent: \(opponent.displayName) (\(opponent.id.uuidString.prefix(8)))")
         print("🔍 [EndGameViewRemote]   - currentMatchId: \(currentMatchId.uuidString.prefix(8))")
         print("🔍 [EndGameViewRemote]   - pendingChallenges count: \(remoteMatchService.pendingChallenges.count)")
         
@@ -864,12 +962,6 @@ struct EndGameViewRemote: View {
         }
         
         print("❌ [EndGameViewRemote] No matching replay request found")
-        
-        // If overlay is currently showing but no matching request exists, dismiss it
-        if showReplayOverlay {
-            print("🔴 [EndGameViewRemote] Overlay is showing but replay request disappeared - dismissing")
-            dismissReplayOverlay()
-        }
     }
     
     /// Handle incoming replay request (Player B)
