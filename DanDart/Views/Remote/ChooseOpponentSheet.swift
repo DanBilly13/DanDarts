@@ -15,6 +15,18 @@ struct ChooseOpponentSheet: View {
     @State private var friendUsers: [User] = []
     @State private var isLoadingFriends = false
     
+    private var recentOpponents: [User] {
+        guard let currentUser = authService.currentUser else { return [] }
+        
+        let recentMatchPlayers = MatchHistoryService.shared.summaries
+            .recentOpponents(excludingUserId: currentUser.id, limit: 6)
+        
+        return recentMatchPlayers.compactMap { matchPlayer in
+            guard !matchPlayer.isGuest else { return nil }
+            return friendUsers.first { $0.id == matchPlayer.id }
+        }
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
@@ -39,32 +51,56 @@ struct ChooseOpponentSheet: View {
                     }
                     .padding(.vertical, 40)
                 } else {
-                    ForEach(friendUsers, id: \.id) { friend in
+                    if !recentOpponents.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Recent Opponents")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppColor.textSecondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 4)
+                            
+                            ForEach(recentOpponents, id: \.id) { friend in
+                                Button {
+                                    selectedOpponent = friend
+                                    
+                                    #if canImport(UIKit)
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                    #endif
+                                    
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                        dismiss()
+                                    }
+                                } label: {
+                                    PlayerCard(player: friend.toPlayer())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        
+                        Rectangle()
+                            .fill(AppColor.textSecondary.opacity(0.2))
+                            .frame(height: 1)
+                            .padding(.vertical, 12)
+                    }
+                    
+                    let recentIds = Set(recentOpponents.map { $0.id })
+                    let otherFriends = friendUsers.filter { !recentIds.contains($0.id) }
+                    
+                    ForEach(otherFriends, id: \.id) { friend in
                         Button {
                             selectedOpponent = friend
                             
-                            // Success haptic
                             #if canImport(UIKit)
                             let generator = UIImpactFeedbackGenerator(style: .light)
                             generator.impactOccurred()
                             #endif
                             
-                            // Dismiss after brief delay to show selection
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                 dismiss()
                             }
                         } label: {
-                            PlayerCard(
-                                player: Player(
-                                    displayName: friend.displayName,
-                                    nickname: friend.nickname,
-                                    avatarURL: friend.avatarURL,
-                                    isGuest: false,
-                                    totalWins: friend.totalWins,
-                                    totalLosses: friend.totalLosses,
-                                    userId: friend.id
-                                )
-                            )
+                            PlayerCard(player: friend.toPlayer())
                         }
                         .buttonStyle(.plain)
                     }

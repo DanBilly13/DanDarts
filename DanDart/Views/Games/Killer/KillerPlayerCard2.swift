@@ -45,13 +45,7 @@ struct KillerPlayerCard2: View {
         VStack(spacing: 4) {
             
             VStack (spacing: -4){
-                // Avatar (with double ring for current player)
-                PlayerAvatarWithRing(
-                    avatarURL: player.avatarURL,
-                    isCurrentPlayer: isCurrentPlayer,
-                    ringColor: playerColor,
-                    size: 64
-                )
+              
                 
                 // Target number in rounded container with gun icon
                 HStack(spacing: 2) {
@@ -72,8 +66,8 @@ struct KillerPlayerCard2: View {
                     }
                     
                     Text("\(assignedNumber)")
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.black)
+                        .font(.system(.title2, design: .rounded))
+                        .fontWeight(.bold)
                         .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
                         //.foregroundColor(AppColor.justBlack)
                 }
@@ -83,10 +77,18 @@ struct KillerPlayerCard2: View {
                 .padding(.bottom, 1)
                 .background(
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(isKiller ? playerColor : AppColor.inputBackground)
+                        .fill(isKiller ? playerColor : playerColor.opacity(0.25))
                 )
                 //.scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
+                
+                // Avatar (with double ring for current player)
+                PlayerAvatarWithRing(
+                    avatarURL: player.avatarURL,
+                    isCurrentPlayer: isCurrentPlayer,
+                    ringColor: playerColor,
+                    size: 64
+                )
                 
             }
             
@@ -131,8 +133,8 @@ struct KillerPlayerCard2: View {
         // Not Killer, 3 lives
         KillerPlayerCard2(
             player: Player.mockGuest1,
-            assignedNumber: 12,
-            isKiller: false,
+            assignedNumber: 20,
+            isKiller: true,
             lives: 3,
             startingLives: 3,
             isCurrentPlayer: false,
@@ -146,7 +148,7 @@ struct KillerPlayerCard2: View {
         // Killer, 3 lives, current player
         KillerPlayerCard2(
             player: Player.mockGuest2,
-            assignedNumber: 19,
+            assignedNumber: 20,
             isKiller: true,
             lives: 3,
             startingLives: 3,
@@ -161,7 +163,7 @@ struct KillerPlayerCard2: View {
         // Not Killer, 3 lives
         KillerPlayerCard2(
             player: Player(id: UUID(), displayName: "Arthur", nickname: "Arthur", avatarURL: nil),
-            assignedNumber: 7,
+            assignedNumber: 20,
             isKiller: false,
             lives: 3,
             startingLives: 3,
@@ -176,7 +178,7 @@ struct KillerPlayerCard2: View {
         // Not Killer, 3 lives
         KillerPlayerCard2(
             player: Player(id: UUID(), displayName: "Tony", nickname: "Tony", avatarURL: nil),
-            assignedNumber: 1,
+            assignedNumber: 20,
             isKiller: false,
             lives: 3,
             startingLives: 3,

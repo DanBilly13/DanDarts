@@ -92,3 +92,45 @@ struct MatchSummary: Identifiable, Codable, Hashable {
         lhs.metadata == rhs.metadata
     }
 }
+
+// MARK: - Recent Opponents Helper
+
+extension Array where Element == MatchSummary {
+    /// Extract recent unique opponents from match summaries
+    /// - Parameters:
+    ///   - currentUserId: Current user's ID to exclude
+    ///   - limit: Maximum number of opponents to return
+    /// - Returns: Array of MatchPlayer objects (most recent first, deduplicated)
+    func recentOpponents(excludingUserId currentUserId: UUID, limit: Int = 6) -> [MatchPlayer] {
+        var seen = Set<String>()
+        var opponents: [MatchPlayer] = []
+        
+        let sortedSummaries = self.sorted { $0.timestamp > $1.timestamp }
+        
+        for summary in sortedSummaries {
+            guard summary.players.count > 1 else { continue }
+            
+            for player in summary.players {
+                guard player.id != currentUserId else { continue }
+                
+                let dedupeKey: String
+                if player.isGuest {
+                    dedupeKey = "guest_\(player.displayName.lowercased())"
+                } else {
+                    dedupeKey = player.id.uuidString
+                }
+                
+                guard !seen.contains(dedupeKey) else { continue }
+                
+                seen.insert(dedupeKey)
+                opponents.append(player)
+                
+                if opponents.count >= limit {
+                    return opponents
+                }
+            }
+        }
+        
+        return opponents
+    }
+}

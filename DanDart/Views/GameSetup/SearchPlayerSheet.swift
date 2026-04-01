@@ -24,6 +24,23 @@ struct SearchPlayerSheet: View {
         // We'll pass the concrete limit from the parent later if needed.
         10
     }
+    
+    private var recentOpponents: [Player] {
+        guard let currentUser = authService.currentUser else { return [] }
+        
+        let recentMatchPlayers = MatchHistoryService.shared.summaries
+            .recentOpponents(excludingUserId: currentUser.id, limit: 6)
+        
+        return recentMatchPlayers.compactMap { matchPlayer in
+            if matchPlayer.isGuest {
+                return guestPlayers.first {
+                    $0.displayName.lowercased() == matchPlayer.displayName.lowercased()
+                }
+            } else {
+                return friendsCache.friends.first { $0.userId == matchPlayer.id }
+            }
+        }
+    }
 
     private var allPlayers: [Player] {
         var result: [Player] = []
@@ -43,6 +60,9 @@ struct SearchPlayerSheet: View {
         }
 
         var players = Array(unique.values)
+        
+        let recentIds = Set(recentOpponents.map { $0.id })
+        players.removeAll { recentIds.contains($0.id) }
 
         // Keep current user at top if present
         if let currentUser = authService.currentUser {
@@ -106,7 +126,51 @@ struct SearchPlayerSheet: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                     } else {
-                        ForEach(allPlayers, id: \.id) { player in
+                        if let currentUser = authService.currentUser,
+                           let youPlayer = allPlayers.first(where: { $0.userId == currentUser.id }) {
+                            Button {
+                                toggleSelection(youPlayer)
+                            } label: {
+                                PlayerCard(
+                                    player: youPlayer,
+                                    showCheckmark: isSelected(youPlayer)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
+                        if !recentOpponents.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Recent Opponents")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(AppColor.textSecondary)
+                                    .textCase(.uppercase)
+                                    .padding(.horizontal, 4)
+                                    .padding(.top, 8)
+                                
+                                ForEach(recentOpponents, id: \.id) { player in
+                                    Button {
+                                        toggleSelection(player)
+                                    } label: {
+                                        PlayerCard(
+                                            player: player,
+                                            showCheckmark: isSelected(player)
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            
+                            Rectangle()
+                                .fill(AppColor.textSecondary.opacity(0.2))
+                                .frame(height: 1)
+                                .padding(.vertical, 12)
+                        }
+                        
+                        ForEach(allPlayers.filter { player in
+                            guard let currentUser = authService.currentUser else { return true }
+                            return player.userId != currentUser.id
+                        }, id: \.id) { player in
                             Button {
                                 toggleSelection(player)
                             } label: {
