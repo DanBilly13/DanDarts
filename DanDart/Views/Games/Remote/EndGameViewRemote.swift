@@ -55,6 +55,14 @@ struct EndGameViewRemote: View {
         
         let iAmChallenger = match.challengerId == currentUserId
         
+        // ACCEPT UI FREEZE OVERRIDE: Force pending state during receiver accept flow
+        // This prevents the card from visually transitioning to .ready before navigation
+        if remoteMatchService.isAcceptPresentationFrozen(matchId: match.id) {
+            let rawStatus = match.status?.rawValue ?? "nil"
+            print("🔒 [EndGameViewRemote] ACCEPT_UI_FREEZE: Using pending override, rawStatus=\(rawStatus)")
+            return iAmChallenger ? .sent : .pending
+        }
+        
         switch match.status {
         case .pending:
             return iAmChallenger ? .sent : .pending
@@ -591,6 +599,9 @@ struct EndGameViewRemote: View {
         
         guard let matchId = replayMatchId else { return }
         
+        // BEGIN ACCEPT UI FREEZE - force pending state during accept flow
+        remoteMatchService.beginAcceptPresentationFreeze(matchId: matchId)
+        
         isCreatingReplay = true
         
         Task {
@@ -630,6 +641,9 @@ struct EndGameViewRemote: View {
                 print("❌ [EndGameViewRemote] Failed to accept replay: \(error)")
                 
                 await MainActor.run {
+                    // Clear accept UI freeze on error
+                    remoteMatchService.clearAcceptPresentationFreeze(matchId: matchId)
+                    
                     isCreatingReplay = false
                     replayError = error.localizedDescription
                     
@@ -680,6 +694,9 @@ struct EndGameViewRemote: View {
     private func dismissReplayOverlay() {
         // Release ownership of replay navigation
         if let matchId = replayMatchId {
+            // Clear accept UI freeze when dismissing overlay
+            remoteMatchService.clearAcceptPresentationFreeze(matchId: matchId)
+            
             remoteMatchService.activeReplayMatchId = nil
             print("🔓 [EndGameViewRemote] Released replay ownership for match \(matchId.uuidString.prefix(8))")
         }
@@ -743,6 +760,9 @@ struct EndGameViewRemote: View {
                     print("❌ [EndGameViewRemote] REVALIDATE FAILED - invalid status for lobby entry: \(statusStr)")
                     
                     await MainActor.run {
+                        // Clear accept UI freeze on revalidation failure
+                        remoteMatchService.clearAcceptPresentationFreeze(matchId: match.id)
+                        
                         isCreatingReplay = false
                         
                         // Show user-friendly error
@@ -797,38 +817,36 @@ struct EndGameViewRemote: View {
                     // Dismiss overlay before navigation
                     dismissReplayOverlay()
                     
-                    print("🎮 [REPLAY NAV] Pushing to remoteLobby with status=\(statusStr)")
+                    print("🎮 [REPLAY NAV] EXPERIMENT: Direct push to remoteLobby (no popToRoot)")
+                    print("🎮 [REPLAY NAV]   - matchId: \(updatedMatch.id)")
+                    print("🎮 [REPLAY NAV]   - status: \(statusStr)")
                     
-                    // CRITICAL: Pop to root first to clear old gameplay/lobby views from stack
-                    // This prevents stale RemoteGameplayView instances from being re-initialized
-                    // Stack before: RemoteGamesTab → Lobby(old) → Gameplay(old) → EndGameViewRemote
-                    // Stack after pop: RemoteGamesTab
-                    // Stack after push: RemoteGamesTab → Lobby(replay)
-                    router.popToRoot()
+                    // EXPERIMENT: Direct push without popToRoot
+                    // Testing if existing guards (isViewActive, viewInstanceId, flowMatchId) 
+                    // are sufficient to prevent stale instance issues
+                    router.push(.remoteLobby(
+                        match: updatedMatch,  // Use fresh match from fetchMatch (status = lobby)
+                        opponent: opponentUser,
+                        currentUser: currentUser,
+                        cancelledMatchIds: .constant(Set()),
+                        onCancel: {
+                            print("🟠 [REPLAY NAV] onCancel called in replay lobby")
+                            self.router.pop()
+                        },
+                        onUnfreeze: {
+                            print("🟠 [REPLAY NAV] onUnfreeze called in replay lobby")
+                        }
+                    ))
                     
-                    // Small delay to ensure pop completes before push
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        // Navigate to RemoteLobbyView with replay match
-                        // Reuse existing lobby flow (countdown, voice-ready, etc.)
-                        self.router.push(.remoteLobby(
-                            match: updatedMatch,  // Use fresh match from fetchMatch (status = lobby)
-                            opponent: opponentUser,
-                            currentUser: currentUser,
-                            cancelledMatchIds: .constant(Set()),
-                            onCancel: {
-                                // Handle lobby cancellation - pop back to end game view
-                                self.router.pop()
-                            },
-                            onUnfreeze: {
-                                // No-op for replay flow - no freeze state to handle
-                            }
-                        ))
-                    }
+                    print("🎮 [REPLAY NAV] Direct push completed")
                 }
             } catch {
                 print("❌ [EndGameViewRemote] Failed to enter lobby: \(error)")
                 
                 await MainActor.run {
+                    // Clear accept UI freeze on error
+                    remoteMatchService.clearAcceptPresentationFreeze(matchId: match.id)
+                    
                     isCreatingReplay = false
                     replayError = error.localizedDescription
                     

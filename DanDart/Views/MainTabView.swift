@@ -368,10 +368,17 @@ struct MainTabView: View {
                 }
             }
         }
-        .onChange(of: selectedTab) { _, newValue in
+        .onChange(of: selectedTab) { oldValue, newValue in
             // Update toast suppression based on selected tab
             // Tab 1 = Friends tab, suppress requestReceived toasts there
             toastManager.suppressRequestReceivedToasts = (newValue == 1)
+            
+            // Replay navigation diagnostics
+            let tabNames = ["Games", "Friends", "Remote matches", "History"]
+            let oldTabName = oldValue < tabNames.count ? tabNames[oldValue] : "Unknown(\(oldValue))"
+            let newTabName = newValue < tabNames.count ? tabNames[newValue] : "Unknown(\(newValue))"
+            
+            print("[ReplayNavTrace] MainTabView.selectedTab | \(oldTabName) → \(newTabName) | isInRemoteFlow: \(remoteMatchService.isInRemoteFlow) | flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "none") | \(Date())")
         }
         .onChange(of: notificationService.pendingIntent?.matchId) { _, newValue in
             guard newValue != nil else { return }

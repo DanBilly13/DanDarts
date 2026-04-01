@@ -406,6 +406,7 @@ struct RemoteLobbyView: View {
             let isChallenger = currentUser.id == match.challengerId
             let role = isChallenger ? "challenger" : "receiver"
             print("🔵 [Lifecycle]   - role: \(role)")
+            print("🔵 [EXPERIMENT] RemoteLobbyView.onAppear - role: \(role)")
             FlowDebug.log("LOBBY: onAppear role=\(role)", matchId: match.id)
             
             // TERMINAL STATE GUARD: Exit immediately if match is already terminal
@@ -518,6 +519,7 @@ struct RemoteLobbyView: View {
             print("🔴 [Lifecycle] RemoteLobbyView.onDisappear() - viewInstanceId: \(instanceId)")
             print("🔴 [Lifecycle]   - matchId: \(match.id)")
             print("🔴 [Lifecycle]   - isViewActive: \(isViewActive)")
+            print("🔴 [EXPERIMENT] RemoteLobbyView.onDisappear - was active: \(isViewActive)")
             FlowDebug.log("LOBBY: onDisappear", matchId: match.id)
             
             // Clean up voice window timer

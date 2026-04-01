@@ -346,6 +346,9 @@ class RemoteGameViewModel: ObservableObject {
             selectedDartIndex = lastIndex
         }
         // If currentThrow is empty and no selection, do nothing
+        
+        // Update checkout suggestion after deletion
+        updateCheckoutSuggestion()
     }
     
     /// Check if delete button should be enabled

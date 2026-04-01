@@ -259,7 +259,9 @@ struct RemoteGameplayView: View {
     
     private func setupGameplayView() {
         print("🔵 [Lifecycle] RemoteGameplayView.onAppear() - viewInstanceId: \(viewInstanceId)")
-        print("� [Lifecycle]   - matchId: \(matchId)")
+        print("🔵 [Lifecycle]   - matchId: \(matchId)")
+        print("🔵 [EXPERIMENT] RemoteGameplayView.onAppear - flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")")
+        print("🔵 [EXPERIMENT] RemoteGameplayView.onAppear - matches flow: \(remoteMatchService.flowMatchId == matchId)")
         dbg("onAppear")
         dbgMatchSnapshot("APPEAR")
         
@@ -379,6 +381,7 @@ struct RemoteGameplayView: View {
         print("🔴 [Lifecycle] RemoteGameplayView.onDisappear() - viewInstanceId: \(viewInstanceId)")
         print("🔴 [Lifecycle]   - matchId: \(matchId)")
         print("🔴 [Lifecycle]   - isNavigatingToGameEnd: \(isNavigatingToGameEnd)")
+        print("🔴 [EXPERIMENT] RemoteGameplayView.onDisappear - was active for flow: \(remoteMatchService.flowMatchId == matchId)")
         
         // Skip exitRemoteFlow if navigating to GameEnd
         if isNavigatingToGameEnd {
@@ -1050,10 +1053,16 @@ struct RemoteGameplayView: View {
             }
             .onChange(of: gameViewModel.winner) { _, newValue in
                 if let winner = newValue, let m = liveMatch {
+                    print("🏆 [EXPERIMENT] RemoteGameplayView.onChange(winner) triggered")
+                    print("🏆 [EXPERIMENT]   - viewInstanceId: \(viewInstanceId)")
+                    print("🏆 [EXPERIMENT]   - flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")")
+                    print("🏆 [EXPERIMENT]   - matchId: \(m.id.uuidString.prefix(8))")
+                    
                     // Guard: Only execute if this instance's match is the current flow match
                     guard remoteMatchService.flowMatchId == m.id else {
                         // This is a stale instance - do not navigate to end game
                         print("⏭️ [RemoteGameplayView] Stale instance detected - skipping end game navigation")
+                        print("⏭️ [EXPERIMENT] GUARD BLOCKED - stale instance prevented navigation")
                         print("   - myMatchId: \(m.id.uuidString.prefix(8))")
                         print("   - flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "nil")")
                         return
