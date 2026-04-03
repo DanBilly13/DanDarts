@@ -175,16 +175,16 @@ struct MatchDetailView: View {
             }
             
             VStack(spacing: 20) {
-                // Number of turns
+                // Darts thrown
                 StatCategorySection(
-                    label: "Number of turns",
+                    label: "Darts thrown",
                     players: match.players,
-                    getValue: { $0.turns.count }
+                    getValue: { $0.dartsThrown }
                 )
                 
                 // 3-dart average
                 StatCategorySection(
-                    label: "Average visit",
+                    label: "3-Dart Average",
                     players: match.players,
                     getValue: { Int($0.averageScore) },
                     isDecimal: true,

@@ -150,6 +150,10 @@ struct MatchPlayer: Identifiable, Codable, Hashable {
     }
     
     // Computed properties
+    var dartsThrown: Int {
+        turns.reduce(0) { $0 + $1.darts.count }
+    }
+    
     var averageScore: Double {
         guard totalDartsThrown > 0 else { return 0.0 }
         let totalScored = startingScore - finalScore
