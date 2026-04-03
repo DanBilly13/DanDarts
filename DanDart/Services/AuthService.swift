@@ -434,12 +434,15 @@ class AuthService: ObservableObject {
                 )
             )
             print("✅ Supabase sign-in successful")
+            print("⏱️ [OAUTH-PERF] OAuth callback received, session ready")
             
             // 7. Check if user profile exists in users table
             let userId = session.user.id
             
             do {
                 // Try to fetch existing user profile (force fresh data, no cache)
+                print("⏱️ [OAUTH-PERF] Starting existing user lookup...")
+                let lookupStart = Date()
                 print("🔍 Fetching user profile for ID: \(userId)")
                 let existingUser: User = try await supabaseService.client
                     .from("users")
@@ -449,6 +452,8 @@ class AuthService: ObservableObject {
                     .execute()
                     .value
                 
+                let lookupElapsed = Date().timeIntervalSince(lookupStart)
+                print("⏱️ [OAUTH-PERF] User lookup completed in \(lookupElapsed)s - EXISTING USER")
                 print("✅ User profile fetched: \(existingUser.displayName)")
                 print("   Stats: \(existingUser.totalWins)W / \(existingUser.totalLosses)L")
                 print("   Games played: \(existingUser.gamesPlayed)")
@@ -458,18 +463,31 @@ class AuthService: ObservableObject {
                 updateAuthenticationState()
                 
                 // Preload match history in background
+                print("⏱️ [OAUTH-PERF] Starting preloadMatches() for existing user...")
+                let preloadStart = Date()
                 Task {
                     await MatchHistoryService.shared.preloadMatches(userId: existingUser.id)
+                    print("⏱️ [OAUTH-PERF] preloadMatches() completed in \(Date().timeIntervalSince(preloadStart))s")
                 }
                 
+                print("⏱️ [OAUTH-PERF] Returning from signInWithGoogle() - spinner should clear now")
                 // Return false to indicate existing user (navigate to GamesTab)
                 return false
                 
             } catch {
+                print("⏱️ [OAUTH-PERF] User lookup completed - NEW USER, creating profile...")
+                
                 // User doesn't exist, create new profile with Google data
                 // Generate a unique nickname from email or name
+                print("⏱️ [OAUTH-PERF] Starting nickname generation...")
                 let baseNickname = generateNicknameFromGoogle(email: googleEmail, name: googleName)
+                print("⏱️ [OAUTH-PERF] Base nickname generated: '\(baseNickname)'")
+                
+                print("⏱️ [OAUTH-PERF] Starting ensureUniqueNickname()...")
+                let uniqueStart = Date()
                 let uniqueNickname = try await ensureUniqueNickname(baseNickname)
+                let uniqueElapsed = Date().timeIntervalSince(uniqueStart)
+                print("⏱️ [OAUTH-PERF] ensureUniqueNickname() completed in \(uniqueElapsed)s - result: '\(uniqueNickname)'")
                 
                 let newUser = User(
                     id: userId,
@@ -485,21 +503,26 @@ class AuthService: ObservableObject {
                     totalLosses: 0
                 )
                 
+                print("⏱️ [OAUTH-PERF] Starting profile insert...")
+                let insertStart = Date()
                 try await supabaseService.client
                     .from("users")
                     .insert(newUser)
                     .execute()
+                let insertElapsed = Date().timeIntervalSince(insertStart)
+                print("⏱️ [OAUTH-PERF] Profile insert completed in \(insertElapsed)s")
                 
                 // Set current user but mark as needing profile setup
+                print("⏱️ [OAUTH-PERF] Setting currentUser and needsProfileSetup...")
                 currentUser = newUser
                 needsProfileSetup = true
                 // Don't call updateAuthenticationState() yet - wait for profile setup
                 
-                // Preload match history in background (will be empty for new users, but sets up the service)
-                Task {
-                    await MatchHistoryService.shared.preloadMatches(userId: newUser.id)
-                }
+                // Skip preload for new users - they have no matches yet
+                // Will load naturally when they visit History tab
+                print("⏱️ [OAUTH-PERF] Skipping preloadMatches() for new user (no matches yet)")
                 
+                print("⏱️ [OAUTH-PERF] Returning from signInWithGoogle() - spinner should clear now")
                 // Return true to indicate new user (navigate to Profile Setup)
                 return true
             }
@@ -584,12 +607,15 @@ class AuthService: ObservableObject {
                 )
             )
             print("✅ Supabase sign-in successful")
+            print("⏱️ [OAUTH-PERF] OAuth callback received, session ready")
             
             // 6. Check if user profile exists in users table
             let userId = session.user.id
             
             do {
                 // Try to fetch existing user profile
+                print("⏱️ [OAUTH-PERF] Starting existing user lookup...")
+                let lookupStart = Date()
                 print("🔍 Fetching user profile for ID: \(userId)")
                 let existingUser: User = try await supabaseService.client
                     .from("users")
@@ -599,6 +625,8 @@ class AuthService: ObservableObject {
                     .execute()
                     .value
                 
+                let lookupElapsed = Date().timeIntervalSince(lookupStart)
+                print("⏱️ [OAUTH-PERF] User lookup completed in \(lookupElapsed)s - EXISTING USER")
                 print("✅ User profile fetched: \(existingUser.displayName)")
                 print("   Stats: \(existingUser.totalWins)W / \(existingUser.totalLosses)L")
                 print("   Games played: \(existingUser.gamesPlayed)")
@@ -608,21 +636,34 @@ class AuthService: ObservableObject {
                 updateAuthenticationState()
                 
                 // Preload match history in background
+                print("⏱️ [OAUTH-PERF] Starting preloadMatches() for existing user...")
+                let preloadStart = Date()
                 Task {
                     await MatchHistoryService.shared.preloadMatches(userId: existingUser.id)
+                    print("⏱️ [OAUTH-PERF] preloadMatches() completed in \(Date().timeIntervalSince(preloadStart))s")
                 }
                 
+                print("⏱️ [OAUTH-PERF] Returning from signInWithApple() - spinner should clear now")
                 // Return false to indicate existing user
                 return false
                 
             } catch {
+                print("⏱️ [OAUTH-PERF] User lookup completed - NEW USER, creating profile...")
+                
                 // User doesn't exist, create new profile with Apple data
                 // Use email from session if not provided in credentials (subsequent sign-ins)
                 let userEmail = appleEmail ?? session.user.email ?? ""
                 
                 // Generate a unique nickname from email or name
+                print("⏱️ [OAUTH-PERF] Starting nickname generation...")
                 let baseNickname = generateNicknameFromApple(email: userEmail, name: appleName)
+                print("⏱️ [OAUTH-PERF] Base nickname generated: '\(baseNickname)'")
+                
+                print("⏱️ [OAUTH-PERF] Starting ensureUniqueNickname()...")
+                let uniqueStart = Date()
                 let uniqueNickname = try await ensureUniqueNickname(baseNickname)
+                let uniqueElapsed = Date().timeIntervalSince(uniqueStart)
+                print("⏱️ [OAUTH-PERF] ensureUniqueNickname() completed in \(uniqueElapsed)s - result: '\(uniqueNickname)'")
                 
                 let newUser = User(
                     id: userId,
@@ -638,21 +679,26 @@ class AuthService: ObservableObject {
                     totalLosses: 0
                 )
                 
+                print("⏱️ [OAUTH-PERF] Starting profile insert...")
+                let insertStart = Date()
                 try await supabaseService.client
                     .from("users")
                     .insert(newUser)
                     .execute()
+                let insertElapsed = Date().timeIntervalSince(insertStart)
+                print("⏱️ [OAUTH-PERF] Profile insert completed in \(insertElapsed)s")
                 
                 // Set current user but mark as needing profile setup
+                print("⏱️ [OAUTH-PERF] Setting currentUser and needsProfileSetup...")
                 currentUser = newUser
                 needsProfileSetup = true
                 // Don't call updateAuthenticationState() yet - wait for profile setup
                 
-                // Preload match history in background (will be empty for new users, but sets up the service)
-                Task {
-                    await MatchHistoryService.shared.preloadMatches(userId: newUser.id)
-                }
+                // Skip preload for new users - they have no matches yet
+                // Will load naturally when they visit History tab
+                print("⏱️ [OAUTH-PERF] Skipping preloadMatches() for new user (no matches yet)")
                 
+                print("⏱️ [OAUTH-PERF] Returning from signInWithApple() - spinner should clear now")
                 // Return true to indicate new user
                 return true
             }
@@ -1162,38 +1208,72 @@ class AuthService: ObservableObject {
         return hashString
     }
     
-    /// Ensure nickname is unique by checking database and adding numbers if needed
+    /// Ensure nickname is unique by checking database with bounded random-suffix strategy
     private func ensureUniqueNickname(_ baseNickname: String) async throws -> String {
-        var nickname = baseNickname
-        var counter = 1
+        let startTime = Date()
+        let normalizedBase = baseNickname.lowercased()
+        print("⏱️ [NICKNAME] Starting uniqueness check for base: '\(normalizedBase)'")
         
-        while try await nicknameExists(nickname) {
-            nickname = "\(baseNickname)\(counter)"
-            counter += 1
-            
-            // Prevent infinite loop
-            if counter > 999 {
-                nickname = "user\(Int.random(in: 10000...99999))"
-                break
+        // Try base nickname first
+        if !(try await nicknameExists(normalizedBase)) {
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⏱️ [NICKNAME] Base nickname available: '\(normalizedBase)' in \(elapsed)s")
+            return normalizedBase
+        }
+        print("⏱️ [NICKNAME] Base nickname taken, trying random suffix...")
+        
+        // Try base + random 4 digits
+        let candidate1 = "\(normalizedBase)\(Int.random(in: 1000...9999))"
+        if !(try await nicknameExists(candidate1)) {
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⏱️ [NICKNAME] Random suffix nickname available: '\(candidate1)' in \(elapsed)s")
+            return candidate1
+        }
+        print("⏱️ [NICKNAME] Random suffix taken, trying fallback candidates...")
+        
+        // Try up to 4 fallback candidates with 6-digit random numbers
+        for attempt in 1...4 {
+            let fallback = "user\(Int.random(in: 100000...999999))"
+            if !(try await nicknameExists(fallback)) {
+                let elapsed = Date().timeIntervalSince(startTime)
+                print("⏱️ [NICKNAME] Fallback nickname available on attempt \(attempt): '\(fallback)' in \(elapsed)s")
+                return fallback
             }
+            print("⏱️ [NICKNAME] Fallback attempt \(attempt) taken: '\(fallback)'")
         }
         
-        return nickname
+        // All bounded attempts failed
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("❌ [NICKNAME] Unable to generate unique nickname after \(elapsed)s")
+        throw NSError(
+            domain: "AuthService",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Unable to generate a unique nickname. Please try again."]
+        )
     }
     
     /// Check if nickname already exists in database
     private func nicknameExists(_ nickname: String) async throws -> Bool {
+        let queryStart = Date()
+        
         do {
-            let _: [User] = try await supabaseService.client
+            let users: [User] = try await supabaseService.client
                 .from("users")
                 .select("id")
                 .eq("nickname", value: nickname)
+                .limit(1)
                 .execute()
                 .value
             
-            return true // If we get here, nickname exists
+            let exists = !users.isEmpty
+            let elapsed = Date().timeIntervalSince(queryStart)
+            print("⏱️ [NICKNAME-DB] Query for '\(nickname)' took \(elapsed)s - rows: \(users.count) - \(exists ? "EXISTS" : "AVAILABLE")")
+            return exists
+            
         } catch {
-            return false // If query fails, assume nickname doesn't exist
+            let elapsed = Date().timeIntervalSince(queryStart)
+            print("❌ [NICKNAME-DB] Query for '\(nickname)' failed after \(elapsed)s - error: \(error)")
+            throw error
         }
     }
     
