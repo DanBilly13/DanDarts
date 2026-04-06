@@ -597,6 +597,9 @@ class AuthService: ObservableObject {
                 .compactMap { $0 }
                 .joined(separator: " ")
             
+            print("ℹ️ Apple user info: email=\(appleEmail ?? "nil"), givenName=\(appleFullName?.givenName ?? "nil"), familyName=\(appleFullName?.familyName ?? "nil")")
+            print("ℹ️ Constructed appleName: '\(appleName)'")
+            
             // 5. Sign in to Supabase with Apple ID token
             print("ℹ️ Step 5: Signing in to Supabase...")
             let session = try await supabaseService.client.auth.signInWithIdToken(
@@ -665,9 +668,14 @@ class AuthService: ObservableObject {
                 let uniqueElapsed = Date().timeIntervalSince(uniqueStart)
                 print("⏱️ [OAUTH-PERF] ensureUniqueNickname() completed in \(uniqueElapsed)s - result: '\(uniqueNickname)'")
                 
+                // Ensure displayName is never empty (database requires NOT NULL)
+                let displayName = appleName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let finalDisplayName = displayName.isEmpty ? "Apple User" : displayName
+                print("ℹ️ Using displayName: '\(finalDisplayName)'")
+                
                 let newUser = User(
                     id: userId,
-                    displayName: appleName.isEmpty ? "Apple User" : appleName,
+                    displayName: finalDisplayName,
                     nickname: uniqueNickname,
                     email: userEmail.isEmpty ? nil : userEmail,
                     handle: nil, // Will be set in Profile Setup

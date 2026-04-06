@@ -32,7 +32,7 @@ struct GameplayMenuButton: View {
                 Label {
                     Text("Sound Effects")
                 } icon: {
-                    Image(systemName: soundManager.soundEffectsEnabled ? "speaker.wave.2" : "speaker.slash")
+                    Image(soundManager.soundEffectsEnabled ? "sfx_on" : "sfx_off")
                         .foregroundColor(soundManager.soundEffectsEnabled ? .green : .red)
                 }
             }
@@ -76,3 +76,4 @@ struct GameplayMenuButton: View {
         onExit: { print("Exit") }
     )
 }
+

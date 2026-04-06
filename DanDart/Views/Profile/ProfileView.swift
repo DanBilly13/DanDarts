@@ -39,17 +39,6 @@ struct ProfileView: View {
                             player: currentUser.toPlayer()
                         ) {
                             HStack(spacing: 12) {
-                                // Old Edit Profile (commented out for testing)
-//                                AppButton(
-//                                    role: .tertiaryOutline,
-//                                    controlSize: .regular,
-//                                    action: {
-//                                        showEditProfile = true
-//                                    }
-//                                ) {
-//                                    Text("Edit Profile")
-//                                }
-
                                 AppButton(
                                     role: .primary,
                                     controlSize: .regular,
@@ -229,7 +218,7 @@ struct ProfileView: View {
             
             VStack(spacing: 0) {
                 SettingsRow(
-                    icon: "arrow.counterclockwise.circle",
+                    icon: Image(systemName: "arrow.counterclockwise.circle"),
                     title: "Reset All Tips",
                     showChevron: false,
                     destructive: true
@@ -242,7 +231,7 @@ struct ProfileView: View {
                     .padding(.leading, 44)
                 
                 SettingsRow(
-                    icon: "trash",
+                    icon: Image(systemName: "trash"),
                     title: "Clear Local Matches",
                     showChevron: false,
                     destructive: true
@@ -265,7 +254,7 @@ struct ProfileView: View {
             VStack(spacing: 0) {
                 // Sound Effects Toggle
                 SettingsToggleRow(
-                    icon: "speaker.wave.2",
+                    icon: Image("sfx_on"),
                     title: "Sound Effects",
                     isOn: $soundManager.soundEffectsEnabled
                 )
@@ -282,7 +271,7 @@ struct ProfileView: View {
                     .padding(.leading, 44)
                 
                 SettingsRow(
-                    icon: "questionmark.circle",
+                    icon: Image(systemName: "questionmark.circle"),
                     title: "Help & Support",
                     showChevron: true
                 ) {
@@ -493,14 +482,17 @@ struct ProfileView: View {
 // MARK: - Settings Row Components
 
 struct SettingsToggleRow: View {
-    let icon: String
+    let icon: Image
     let title: String
     @Binding var isOn: Bool
     
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
+            icon
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 20, height: 20)
                 .foregroundColor(AppColor.interactivePrimaryBackground)
                 .frame(width: 28)
             
@@ -520,7 +512,7 @@ struct SettingsToggleRow: View {
 }
 
 struct SettingsRow: View {
-    let icon: String
+    let icon: Image
     let title: String
     var showChevron: Bool = true
     var destructive: Bool = false
@@ -529,8 +521,11 @@ struct SettingsRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
+                icon
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
                     .foregroundColor(destructive ? .red : AppColor.interactivePrimaryBackground)
                     .frame(width: 28)
                 
