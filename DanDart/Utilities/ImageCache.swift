@@ -47,6 +47,10 @@ class CachedImageLoader: ObservableObject {
     
     init(url: URL) {
         self.url = url
+        // Check cache immediately on init to avoid placeholder flash
+        if let cachedImage = cache.get(forKey: url.absoluteString) {
+            self.image = cachedImage
+        }
     }
     
     func load() {

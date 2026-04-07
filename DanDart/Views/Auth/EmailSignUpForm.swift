@@ -16,8 +16,17 @@ struct EmailSignUpForm: View {
     // Actions
     var onSubmit: () -> Void
     
+    // Optional focus binding for parent view observation
+    var focusedField: Binding<Field?>?
+    
     // Local computed
     private var isPasswordValid: Bool { password.count >= 8 }
+    
+    // Focus management
+    enum Field: Hashable {
+        case displayName, nickname, email, password, confirmPassword
+    }
+    @FocusState private var internalFocusedField: Field?
     
     var body: some View {
         VStack(spacing: 20) {
@@ -27,38 +36,32 @@ struct EmailSignUpForm: View {
                 placeholder: "Your full name",
                 text: $displayName,
                 textContentType: .name,
-                autocapitalization: .words
+                autocapitalization: .words,
+                submitLabel: .done,
+                onSubmit: { 
+                    internalFocusedField = .nickname
+                    focusedField?.wrappedValue = .nickname
+                }
             )
+            .focused($internalFocusedField, equals: .displayName)
+            .id("displayNameField")
             
             // Nickname
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Nickname")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(AppColor.textSecondary)
-                
-                HStack(spacing: 0) {
-                    Text("@")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
-                        .padding(.leading, 16)
-                        .padding(.trailing, 4)
-                    
-                    TextField("username", text: $nickname)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textPrimary)
-                        .textContentType(.nickname)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                        .padding(.trailing, 16)
-                        .padding(.vertical, 14)
+            DartTextField(
+                label: "Nickname",
+                placeholder: "Your game nickname",
+                text: $nickname,
+                textContentType: .nickname,
+                autocapitalization: .never,
+                autocorrectionDisabled: true,
+                submitLabel: .done,
+                onSubmit: { 
+                    internalFocusedField = .email
+                    focusedField?.wrappedValue = .email
                 }
-                .background(AppColor.inputBackground)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(AppColor.textSecondary.opacity(0.2), lineWidth: 1)
-                )
-            }
+            )
+            .focused($internalFocusedField, equals: .nickname)
+            .id("nicknameField")
             
             // Email
             DartTextField(
@@ -68,8 +71,15 @@ struct EmailSignUpForm: View {
                 keyboardType: .emailAddress,
                 textContentType: .emailAddress,
                 autocapitalization: .never,
-                autocorrectionDisabled: true
+                autocorrectionDisabled: true,
+                submitLabel: .done,
+                onSubmit: { 
+                    internalFocusedField = .password
+                    focusedField?.wrappedValue = .password
+                }
             )
+            .focused($internalFocusedField, equals: .email)
+            .id("emailField")
             .onChange(of: email) { oldValue, newValue in
                 // Fix Swedish keyboard @ symbol issue
                 let correctedEmail = newValue.replacingOccurrences(of: "™", with: "@")
@@ -83,16 +93,31 @@ struct EmailSignUpForm: View {
                 label: "Password",
                 placeholder: "Create a password",
                 text: $password,
-                textContentType: .newPassword
+                textContentType: .newPassword,
+                submitLabel: .done,
+                onSubmit: { 
+                    internalFocusedField = .confirmPassword
+                    focusedField?.wrappedValue = .confirmPassword
+                }
             )
+            .focused($internalFocusedField, equals: .password)
+            .id("passwordField")
             
             // Confirm Password
             DartSecureField(
                 label: "Confirm Password",
                 placeholder: "Confirm your password",
                 text: $confirmPassword,
-                textContentType: .newPassword
+                textContentType: .newPassword,
+                submitLabel: .done,
+                onSubmit: {
+                    internalFocusedField = nil
+                    focusedField?.wrappedValue = nil
+                    onSubmit()
+                }
             )
+            .focused($internalFocusedField, equals: .confirmPassword)
+            .id("confirmPasswordField")
             
             // Password Requirements
             VStack(alignment: .leading, spacing: 4) {
@@ -135,5 +160,6 @@ struct EmailSignUpForm: View {
             .opacity((isFormValid && !isLoading) ? 1.0 : 0.6)
         }
         .padding(.horizontal, 32)
+        .padding(.bottom, 120)
     }
 }

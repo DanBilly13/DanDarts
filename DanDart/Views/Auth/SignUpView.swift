@@ -1,10 +1,3 @@
-//
-//  SignUpView.swift
-//  Dart Freak
-//
-//  Sign up screen for user registration
-//
-
 import SwiftUI
 
 struct SignUpView: View {
@@ -28,6 +21,7 @@ struct SignUpView: View {
     @State private var isLoadingEmail = false
     @State private var isLoadingGoogle = false
     @State private var isLoadingApple = false
+    @State private var emailFormFocusedField: EmailSignUpForm.Field?
     
     // Computed property for any loading state
     private var isAnyLoading: Bool {
@@ -51,8 +45,9 @@ struct SignUpView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 24) {
                     // Header Section
                     VStack(spacing: 16) {
                         // App Logo
@@ -61,18 +56,13 @@ struct SignUpView: View {
                             .aspectRatio(contentMode: .fit)
                             .frame(maxWidth: 100)
                             
-                        
                         Text("Create Account")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(AppColor.textPrimary)
-                            
-                        
-                        
                     }
                     .padding(.top, 24)
                     
-                    
-                    // Google Sign Up Button (match SignInView style)
+                    // Google Sign Up Button
                     AppButton(
                         role: .primary,
                         controlSize: .extraLarge,
@@ -145,10 +135,9 @@ struct SignUpView: View {
                     }
                     .padding(.horizontal, 32)
                     
-                    // Collapsible two-step email sign-up (now single-step expand)
+                    // Collapsible two-step email sign-up
                     Group {
                         if !useEmail {
-                            // Closed state: show a clear action to reveal the full email form
                             AppButton(
                                 role: .primaryOutline,
                                 controlSize: .extraLarge,
@@ -165,9 +154,7 @@ struct SignUpView: View {
                                 }
                             }
                             .padding(.horizontal, 32)
-                            
                         } else {
-                            // Expanded: full email form
                             EmailSignUpForm(
                                 displayName: $displayName,
                                 nickname: $nickname,
@@ -179,14 +166,14 @@ struct SignUpView: View {
                                 errorMessage: $errorMessage,
                                 onSubmit: {
                                     Task { await handleSignUp() }
-                                }
+                                },
+                                focusedField: $emailFormFocusedField
                             )
+                            .id("emailForm")
                             
-                            // Collapse control for the expanded state
                             Button(action: { withAnimation(.easeInOut(duration: 0.2)) {
                                 useEmail = false
                                 errorMessage = ""
-                                // Keep field values as-is so user doesn't lose work
                             }}) {
                                 Text("Hide email sign-up")
                                     .font(.system(size: 14, weight: .medium))
@@ -197,11 +184,9 @@ struct SignUpView: View {
                         }
                     }
                     
-                    // Terms & Privacy Acceptance
                     TermsAndPrivacyText(showTerms: $showTerms, showPrivacy: $showPrivacy)
                         .padding(.top, 8)
                     
-                    // Sign In Link
                     Button(action: {
                         onSwitchToSignIn?()
                     }) {
@@ -217,8 +202,29 @@ struct SignUpView: View {
                     }
                     .padding(.bottom, 32)
                 }
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: emailFormFocusedField) { _, focusedField in
+                    guard let field = focusedField else { return }
+                    // Auto-scroll to specific field when keyboard appears
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.36) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            switch field {
+                            case .displayName:
+                                proxy.scrollTo("displayNameField", anchor: .bottom)
+                            case .nickname:
+                                proxy.scrollTo("nicknameField", anchor: .bottom)
+                            case .email:
+                                proxy.scrollTo("emailField", anchor: .bottom)
+                            case .password:
+                                proxy.scrollTo("passwordField", anchor: .bottom)
+                            case .confirmPassword:
+                                proxy.scrollTo("confirmPasswordField", anchor: .bottom)
+                            }
+                        }
+                    }
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.surfacePrimary)
             .navigationBarTitleDisplayMode(.inline)
@@ -239,33 +245,25 @@ struct SignUpView: View {
     
     // MARK: - Actions
     private func handleSignUp() async {
-        print("🚀 handleSignUp called")
         showErrors = true
         errorMessage = ""
         
         guard isFormValid else {
-            print("❌ Form validation failed")
             errorMessage = "Please fill in all fields correctly"
             return
         }
         
-        print("✅ Form validation passed")
         isLoadingEmail = true
         
         do {
-            // Call AuthService to create the account
             try await authService.signUp(
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines),
                 password: password,
                 displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
                 nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines)
             )
-            
-            // Success! Dismiss SignUpView - ContentView will show ProfileSetupView
             dismiss()
-            
         } catch let error as AuthError {
-            // Handle specific auth errors
             switch error {
             case .emailAlreadyExists:
                 errorMessage = "An account with this email already exists"
@@ -281,10 +279,6 @@ struct SignUpView: View {
                 errorMessage = "Failed to create account. Please try again"
             }
         } catch {
-            // Handle unexpected errors
-            print("❌ Unexpected error: \(error)")
-            
-            // Check if it's a timeout
             if error.localizedDescription.contains("timed out") ||
                error.localizedDescription.contains("network") ||
                error.localizedDescription.contains("connection") {
@@ -302,19 +296,11 @@ struct SignUpView: View {
         isLoadingGoogle = true
         
         do {
-            // Call AuthService Google OAuth
             let isNewUser = try await authService.signInWithGoogle()
-            
-            // Dismiss SignUpView
-            // If new user: ContentView will show ProfileSetupView
-            // If existing user: ContentView will show MainTabView
             dismiss()
-            
         } catch let error as AuthError {
-            // Handle specific OAuth errors
             switch error {
             case .oauthCancelled:
-                // Don't show error for cancelled OAuth
                 break
             case .oauthFailed:
                 errorMessage = "Google sign in failed. Please try again"
@@ -335,19 +321,11 @@ struct SignUpView: View {
         isLoadingApple = true
         
         do {
-            // Call AuthService Apple OAuth
             let isNewUser = try await authService.signInWithApple()
-            
-            // Dismiss SignUpView
-            // If new user: ContentView will show ProfileSetupView
-            // If existing user: ContentView will show MainTabView
             dismiss()
-            
         } catch let error as AuthError {
-            // Handle specific OAuth errors
             switch error {
             case .oauthCancelled:
-                // Don't show error for cancelled OAuth
                 break
             case .oauthFailed:
                 errorMessage = "Apple sign in failed. Please try again"
@@ -363,9 +341,6 @@ struct SignUpView: View {
         isLoadingApple = false
     }
 }
-
-// MARK: - Custom Styles
-// Note: CustomTextFieldStyle and SecondaryButtonStyle are defined in SignInView.swift
 
 // MARK: - Preview
 #Preview {

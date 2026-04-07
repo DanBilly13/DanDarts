@@ -1041,12 +1041,21 @@ class AuthService: ObservableObject {
             updatedUser.avatarURL = avatarURL
             updatedUser.lastSeenAt = Date()
             
+            print("🔧 AuthService.updateProfile - Sending to database:")
+            print("  User ID: \(currentUser.id)")
+            print("  displayName: '\(updatedUser.displayName)'")
+            print("  nickname: '\(updatedUser.nickname)'")
+            print("  email: '\(updatedUser.email ?? "nil")'")
+            print("  avatarURL: '\(updatedUser.avatarURL ?? "nil")'")
+            
             // Update user profile in Supabase
             try await supabaseService.client
                 .from("users")
                 .update(updatedUser)
                 .eq("id", value: currentUser.id)
                 .execute()
+            
+            print("✅ Database update completed successfully")
             
             // Update local state
             self.currentUser = updatedUser

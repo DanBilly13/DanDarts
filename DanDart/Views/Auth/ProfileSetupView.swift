@@ -14,6 +14,10 @@ struct ProfileSetupView: View {
     private let analytics = AnalyticsService.shared
     
     // MARK: - Form State
+    @State private var displayName: String = ""
+    @State private var nickname: String = ""
+    @State private var originalDisplayName: String = ""
+    @State private var originalNickname: String = ""
     @State private var selectedAvatar: String = "avatar1" // Default to first avatar
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedAvatarImage: UIImage?
@@ -23,17 +27,32 @@ struct ProfileSetupView: View {
     @State private var isCompleting = false
     @State private var isUploadingAvatar = false
     
+    // MARK: - Computed Properties
+    private var isGoogleUser: Bool {
+        authService.currentUser?.authProvider == .google
+    }
+    
+    private var isNameValid: Bool {
+        let trimmed = displayName.trimmingCharacters(in: .whitespaces)
+        return !trimmed.isEmpty && trimmed.count >= 2 && trimmed.count <= 50
+    }
+    
+    private var isNicknameValid: Bool {
+        let trimmed = nickname.trimmingCharacters(in: .whitespaces)
+        return !trimmed.isEmpty && trimmed.count >= 2 && trimmed.count <= 20
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 32) {
                     // Header Section
                     VStack(spacing: 16) {
-                        Text("Choose Your Avatar")
+                        Text("Complete profile")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(AppColor.textPrimary)
                         
-                        Text("Upload your own photo or pick an avatar")
+                        Text("Choose your avatar and set your details")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(AppColor.textSecondary)
                             .multilineTextAlignment(.center)
@@ -47,6 +66,55 @@ struct ProfileSetupView: View {
                         selectedAvatarImage: $selectedAvatarImage
                     )
                     
+                    // Name and Nickname Fields
+                    VStack(spacing: 24) {
+                        // Name Field (locked for Google users)
+                        if isGoogleUser {
+                            LockedTextField(
+                                label: "Name",
+                                value: displayName,
+                                subtitle: "Managed by Google"
+                            )
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                DartTextField(
+                                    label: "Name",
+                                    placeholder: "Enter your name",
+                                    text: $displayName,
+                                    textContentType: .name,
+                                    autocapitalization: .words
+                                )
+                                
+                                // Show character count only when approaching limit or invalid
+                                if displayName.count > 45 || displayName.count < 2 && !displayName.isEmpty {
+                                    Text("\(displayName.count)/50 characters")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(displayName.count > 50 || displayName.count < 2 ? .red : AppColor.textSecondary)
+                                        .padding(.leading, 2)
+                                }
+                            }
+                        }
+                        
+                        // Nickname Field (always editable)
+                        VStack(alignment: .leading, spacing: 8) {
+                            DartTextField(
+                                label: "Nickname",
+                                placeholder: "Your game nickname",
+                                text: $nickname,
+                                autocapitalization: .never,
+                                autocorrectionDisabled: true
+                            )
+                            
+                            // Show character count only when approaching limit or invalid
+                            if nickname.count > 15 || nickname.count < 2 && !nickname.isEmpty {
+                                Text("\(nickname.count)/20 characters")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(nickname.count > 20 || nickname.count < 2 ? .red : AppColor.textSecondary)
+                                    .padding(.leading, 2)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
                     
                     // Error Message
                     if !errorMessage.isEmpty {
@@ -108,11 +176,27 @@ struct ProfileSetupView: View {
                     await handlePhotoSelection(newItem)
                 }
             }
+            .onAppear {
+                loadUserProfile()
+            }
         }
         .navigationBarBackButtonHidden(true)
     }
     
     // MARK: - Actions
+    
+    private func loadUserProfile() {
+        guard let currentUser = authService.currentUser else { return }
+        
+        displayName = currentUser.displayName
+        nickname = currentUser.nickname
+        originalDisplayName = currentUser.displayName
+        originalNickname = currentUser.nickname
+        
+        print("📥 ProfileSetupView - Loaded user profile:")
+        print("  displayName: '\(displayName)'")
+        print("  nickname: '\(nickname)'")
+    }
     
     private func handlePhotoSelection(_ item: PhotosPickerItem?) async {
         guard let item = item else { return }
@@ -132,6 +216,13 @@ struct ProfileSetupView: View {
     
     private func handleCompleteSetup() async {
         errorMessage = ""
+        
+        // Validate fields first
+        guard isNameValid && isNicknameValid else {
+            errorMessage = "Please check your name (2-50 characters) and nickname (2-20 characters)"
+            return
+        }
+        
         isCompleting = true
         defer { isCompleting = false }
         
@@ -154,12 +245,23 @@ struct ProfileSetupView: View {
                 isUploadingAvatar = false
             }
             
-            // Update user profile with avatar
+            // Update user profile with name, nickname, and avatar
+            let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("🔧 ProfileSetupView - Calling updateProfile with:")
+            print("  displayName: '\(trimmedName)'")
+            print("  nickname: '\(trimmedNickname)'")
+            print("  avatarURL: '\(avatarURL)'")
+            
             try await authService.updateProfile(
-                handle: nil,
-                bio: nil,
-                avatarIcon: avatarURL
+                displayName: trimmedName,
+                nickname: trimmedNickname,
+                email: nil, // Not shown in ProfileSetupView
+                avatarURL: avatarURL
             )
+            
+            // Complete profile setup - sets needsProfileSetup = false and isAuthenticated = true
+            authService.completeProfileSetup()
             
             // Log profile setup completed event
             let hasAvatar = selectedAvatarImage != nil

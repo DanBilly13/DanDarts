@@ -228,12 +228,16 @@ struct EndGameViewRemote: View {
                     } else if isWinner {
                         // Winner gets disabled button with explanation
                         VStack(spacing: 8) {
-                            AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
+                            AppButton(role: .primary, controlSize: .extraLarge, isDisabled: true, compact: true) { } label: {
+                                Label("Rematch", systemImage: "arrow.clockwise")
+                            }
+                            .disabled(true)
+                            /*AppButton(role: .primaryOutline, controlSize: .extraLarge, compact: true) {
                                 // No action - disabled
                             } label: {
                                 Label("Rematch", systemImage: "arrow.clockwise")
                             }
-                            .disabled(true)
+                            .disabled(true)*/
                             
                             Text("Only losers can request a rematch")
                                 .font(.system(.caption, design: .rounded))

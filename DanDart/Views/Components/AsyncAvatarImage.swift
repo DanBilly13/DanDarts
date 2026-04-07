@@ -31,26 +31,20 @@ struct AsyncAvatarImage: View {
             if let avatarURL = avatarURL, !avatarURL.isEmpty {
                 // Check if it's a URL or local asset
                 if avatarURL.hasPrefix("http://") || avatarURL.hasPrefix("https://") {
-                    // Remote URL - use AsyncImage
-                    AsyncImage(url: URL(string: avatarURL)) { phase in
-                        switch phase {
-                        case .empty:
+                    // Remote URL - use CachedAsyncImage for better performance
+                    if let url = URL(string: avatarURL) {
+                        CachedAsyncImage(url: url) {
                             ProgressView()
                                 .frame(width: size, height: size)
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: size, height: size)
-                                .clipShape(Circle())
-                        case .failure:
-                            // Failed to load - show placeholder
-                            Image(systemName: placeholderIcon)
-                                .font(.system(size: size * 0.5, weight: .medium))
-                                .foregroundColor(AppColor.textSecondary)
-                        @unknown default:
-                            EmptyView()
                         }
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                    } else {
+                        // Invalid URL - show placeholder
+                        Image(systemName: placeholderIcon)
+                            .font(.system(size: size * 0.5, weight: .medium))
+                            .foregroundColor(AppColor.textSecondary)
                     }
                 } else {
                     // Check if this is a file path (starts with "/" or contains "/Documents/" or "/tmp/")
