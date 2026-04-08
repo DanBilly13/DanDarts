@@ -30,6 +30,10 @@ struct EmailSignUpForm: View {
     
     var body: some View {
         VStack(spacing: 20) {
+            
+            Text ("Sign up with email").font(.system(.headline, design: .rounded))
+                .fontWeight(.semibold)
+            
             // Display Name
             DartTextField(
                 label: "Display Name",
@@ -161,5 +165,12 @@ struct EmailSignUpForm: View {
         }
         .padding(.horizontal, 32)
         .padding(.bottom, 120)
+        .onAppear {
+            // Auto-focus display name field when form appears
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                internalFocusedField = .displayName
+                focusedField?.wrappedValue = .displayName
+            }
+        }
     }
 }

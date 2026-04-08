@@ -27,6 +27,10 @@ struct ProfileSetupView: View {
     @State private var isCompleting = false
     @State private var isUploadingAvatar = false
     
+    // Focus state for keyboard navigation
+    @FocusState private var displayNameFieldIsFocused: Bool
+    @FocusState private var nicknameFieldIsFocused: Bool
+    
     // MARK: - Computed Properties
     private var isGoogleUser: Bool {
         authService.currentUser?.authProvider == .google
@@ -44,8 +48,9 @@ struct ProfileSetupView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 32) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 32) {
                     // Header Section
                     VStack(spacing: 16) {
                         Text("Complete profile")
@@ -82,8 +87,14 @@ struct ProfileSetupView: View {
                                     placeholder: "Enter your name",
                                     text: $displayName,
                                     textContentType: .name,
-                                    autocapitalization: .words
+                                    autocapitalization: .words,
+                                    submitLabel: .done,
+                                    onSubmit: {
+                                        nicknameFieldIsFocused = true
+                                    }
                                 )
+                                .focused($displayNameFieldIsFocused)
+                                .id("displayNameField")
                                 
                                 // Show character count only when approaching limit or invalid
                                 if displayName.count > 45 || displayName.count < 2 && !displayName.isEmpty {
@@ -102,8 +113,11 @@ struct ProfileSetupView: View {
                                 placeholder: "Your game nickname",
                                 text: $nickname,
                                 autocapitalization: .never,
-                                autocorrectionDisabled: true
+                                autocorrectionDisabled: true,
+                                submitLabel: .done
                             )
+                            .focused($nicknameFieldIsFocused)
+                            .id("nicknameField")
                             
                             // Show character count only when approaching limit or invalid
                             if nickname.count > 15 || nickname.count < 2 && !nickname.isEmpty {
@@ -158,19 +172,21 @@ struct ProfileSetupView: View {
                     
                     Spacer(minLength: 20)
                 }
+                .padding(.bottom, 120)
             }
-            .background(AppColor.backgroundPrimary)
-            .navigationTitle("Profile Setup")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: nicknameFieldIsFocused) { _, isFocused in
+                if isFocused {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.36) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo("nicknameField", anchor: .bottom)
+                        }
                     }
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                    .disabled(isCompleting)
                 }
             }
+        }
+            .background(AppColor.backgroundPrimary)
+            // Removed navigationTitle and toolbar
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
                     await handlePhotoSelection(newItem)
