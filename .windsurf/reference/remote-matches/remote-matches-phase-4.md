@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 # Phase 4 — Real Gameplay Integration (Remote 301/501 GameView)
 
 ## Goal

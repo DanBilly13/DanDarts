@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # Dart Freak — Remote Matches
 ## Full Implementation Task List (Gated Execution Plan) v2

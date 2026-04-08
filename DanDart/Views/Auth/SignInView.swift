@@ -22,6 +22,9 @@ struct SignInView: View {
     @State private var showPrivacy = false
     @State private var showForgotPassword = false
     
+    // Focus state for password field
+    @FocusState private var passwordFieldIsFocused: Bool
+    
     // Computed property for any loading state
     private var isAnyLoading: Bool {
         isLoadingEmail || isLoadingGoogle || isLoadingApple
@@ -171,17 +174,20 @@ struct SignInView: View {
                             text: $password,
                             textContentType: .password
                         )
+                        .focused($passwordFieldIsFocused)
                         
-                        // Forgot Password Link
-                        Button {
-                            showForgotPassword = true
-                        } label: {
-                            Text("Forgot Password?")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(AppColor.justWhite)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                .frame(minHeight: 44)
-                                .contentShape(Rectangle())
+                        // Forgot Password Link (only show when password field is focused or has content)
+                        if passwordFieldIsFocused || !password.isEmpty {
+                            Button {
+                                showForgotPassword = true
+                            } label: {
+                                Text("Forgot Password?")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(AppColor.justWhite)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
                         }
                         
                         // Sign In with Email Button (Primary Outline)

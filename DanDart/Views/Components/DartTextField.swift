@@ -42,7 +42,10 @@ struct DartTextField: View {
     var autocorrectionDisabled: Bool = false
     var submitLabel: SubmitLabel = .done
     var onSubmit: (() -> Void)? = nil
-    
+
+    // Optional focus state binding
+    var focusBinding: FocusState<Bool>.Binding? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Label
@@ -51,17 +54,33 @@ struct DartTextField: View {
                 .foregroundColor(AppColor.textSecondary)
             
             // Text Field
-            TextField(placeholder, text: $text)
-                .textFieldStyle(DartTextFieldStyle())
-                .keyboardType(keyboardType)
-                .textContentType(textContentType)
-                .textInputAutocapitalization(autocapitalization)
-                .autocorrectionDisabled(autocorrectionDisabled)
-                .submitLabel(submitLabel)
-                .onSubmit {
-                    onSubmit?()
+            Group {
+                if let focusBinding = focusBinding {
+                    TextField(placeholder, text: $text)
+                        .textFieldStyle(DartTextFieldStyle())
+                        .keyboardType(keyboardType)
+                        .textContentType(textContentType)
+                        .textInputAutocapitalization(autocapitalization)
+                        .autocorrectionDisabled(autocorrectionDisabled)
+                        .submitLabel(submitLabel)
+                        .focused(focusBinding)
+                        .onSubmit {
+                            onSubmit?()
+                        }
+                } else {
+                    TextField(placeholder, text: $text)
+                        .textFieldStyle(DartTextFieldStyle())
+                        .keyboardType(keyboardType)
+                        .textContentType(textContentType)
+                        .textInputAutocapitalization(autocapitalization)
+                        .autocorrectionDisabled(autocorrectionDisabled)
+                        .submitLabel(submitLabel)
+                        .onSubmit {
+                            onSubmit?()
+                        }
                 }
-            
+            }
+
             // Error Message
             if let error = errorMessage, !error.isEmpty {
                 Text(error)
@@ -83,6 +102,11 @@ struct DartSecureField: View {
     var errorMessage: String? = nil
     var textContentType: UITextContentType? = .password
     @State private var isSecure: Bool = true
+
+    // Optional focus state binding
+    var focusBinding: FocusState<Bool>.Binding? = nil
+    var submitLabel: SubmitLabel = .done
+    var onSubmit: (() -> Void)? = nil
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -94,15 +118,47 @@ struct DartSecureField: View {
             // Secure Field with Toggle
             HStack(spacing: 0) {
                 if isSecure {
-                    SecureField(placeholder, text: $text)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textPrimary)
-                        .textContentType(textContentType)
+                    if let focusBinding = focusBinding {
+                        SecureField(placeholder, text: $text)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+                            .textContentType(textContentType)
+                            .submitLabel(submitLabel)
+                            .focused(focusBinding)
+                            .onSubmit {
+                                onSubmit?()
+                            }
+                    } else {
+                        SecureField(placeholder, text: $text)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+                            .textContentType(textContentType)
+                            .submitLabel(submitLabel)
+                            .onSubmit {
+                                onSubmit?()
+                            }
+                    }
                 } else {
-                    TextField(placeholder, text: $text)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppColor.textPrimary)
-                        .textContentType(textContentType)
+                    if let focusBinding = focusBinding {
+                        TextField(placeholder, text: $text)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+                            .textContentType(textContentType)
+                            .submitLabel(submitLabel)
+                            .focused(focusBinding)
+                            .onSubmit {
+                                onSubmit?()
+                            }
+                    } else {
+                        TextField(placeholder, text: $text)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+                            .textContentType(textContentType)
+                            .submitLabel(submitLabel)
+                            .onSubmit {
+                                onSubmit?()
+                            }
+                    }
                 }
                 
                 // Toggle Visibility Button

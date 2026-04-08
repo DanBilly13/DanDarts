@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # Current Context — Phase 13: Remote Matches Voice Controls
 

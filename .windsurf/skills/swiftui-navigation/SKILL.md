@@ -190,6 +190,7 @@ Consult supporting docs as needed:
 
 - `router-architecture.md` for how router wiring works
 - `one-navigation-owner.md` for transition ownership rules
+- `tab-shell-and-root-toolbar-rules.md` for root shell ownership and tab-specific toolbar behavior
 - `remote-navigation-guards.md` for remote guard stack and duplicate prevention
 - `authoritative-navigation-checks.md` for what must be true before route changes
 - `lifecycle-and-instance-guards.md` for stale instance protection

@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # current-context-phase-11-lazy-loading-match-history
 

@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # Dart Freak — Remote Matches
 ## Feature Requirements Document (FRD) v1.2

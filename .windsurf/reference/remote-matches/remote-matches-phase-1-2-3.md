@@ -1,6 +1,4 @@
----
-trigger: manual
----
+
 
 # Remote Matches — Phases 1–3 (Summary + What We Changed)
 
