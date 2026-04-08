@@ -48,31 +48,21 @@ struct PlayerCard: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(AppColor.textSecondary)
                 } else {
-                    // Show stats for connected players
-                    if player.totalWins > 0 || player.totalLosses > 0 {
-                        // Colored W/L stats: 28W15L (green W, red L)
-                        HStack(spacing: 0) {
-                            Text("\(player.totalWins)W")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(AppColor.textPrimary)
-                            
-                            Text("\(player.totalLosses)L")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(AppColor.textSecondary)
-                        }
+                    // Show stats for connected players (including 0W0L for new players)
+                    HStack(spacing: 0) {
+                        Text("\(player.totalWins)W")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColor.textPrimary)
                         
-                        Text(player.winRatePercentage)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
-                    } else {
-                        Text("No games")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
-                        
-                        Text("yet")
-                            .font(.system(size: 12, weight: .medium))
+                        Text("\(player.totalLosses)L")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(AppColor.textSecondary)
                     }
+                    
+                    // Win percentage - commented out for testing
+                    // Text(player.winRatePercentage)
+                    //     .font(.system(size: 12, weight: .medium))
+                    //     .foregroundColor(AppColor.textSecondary)
                 }
             }
             .padding(.top, 5)
@@ -107,12 +97,12 @@ struct PlayerCardCompact: View {
             
             Spacer()
             
-            // Win rate only
-            if player.totalGames > 0 {
-                Text(player.winRatePercentage)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColor.textSecondary)
-            }
+            // Win rate only - commented out for testing
+            // if player.totalGames > 0 {
+            //     Text(player.winRatePercentage)
+            //         .font(.system(size: 12, weight: .semibold))
+            //         .foregroundColor(AppColor.textSecondary)
+            // }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
