@@ -103,6 +103,7 @@ class MatchService: ObservableObject {
         matchFormat: Int,
         legsWon: [UUID: Int],
         gameMetadata: [String: String]? = nil,
+        playerScores: [UUID: Int]? = nil,
         currentUserId: UUID? = nil
     ) async throws -> User? {
         // Debug: Check AuthService state at the start
@@ -191,10 +192,23 @@ class MatchService: ObservableObject {
             if let avatarURL = player.avatarURL {
                 playerDict["avatarURL"] = avatarURL
             }
+            // Include finalScore if provided (required for ranking-based games)
+            if let scores = playerScores, let finalScore = scores[player.id] {
+                playerDict["finalScore"] = finalScore
+            }
             return playerDict
         }
         let playersJSON = try JSONSerialization.data(withJSONObject: legacyPlayers)
         let playersString = String(data: playersJSON, encoding: .utf8) ?? "[]"
+        
+        // DIAGNOSTIC: Check if finalScore appears in the JSON string
+        print("🔍 [DIAGNOSTIC] Players JSON string:")
+        print(playersString)
+        if playersString.contains("finalScore") {
+            print("   ✅ finalScore IS present in JSON")
+        } else {
+            print("   ❌ finalScore is MISSING from JSON")
+        }
         
         let matchRecord = MatchRecord(
             id: matchId.uuidString,

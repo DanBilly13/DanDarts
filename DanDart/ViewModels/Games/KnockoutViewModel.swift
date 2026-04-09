@@ -36,6 +36,9 @@ class KnockoutViewModel: ObservableObject {
     @Published var animatingLifeLoss: UUID? = nil // Player ID whose life is animating
     @Published var animatingPlayerTransition: Bool = false // Triggers player card fade transition
     
+    // Elimination order tracking for placement
+    @Published var eliminationOrder: [UUID] = []
+    
     // MARK: - Properties
     
     let startingLives: Int
@@ -241,6 +244,8 @@ class KnockoutViewModel: ObservableObject {
                             // Check if player is eliminated
                             if playerLives[currentPlayer.id] == 0 {
                                 print("💀 \(currentPlayer.displayName) is eliminated!")
+                                // Track elimination order for placement
+                                eliminationOrder.append(currentPlayer.id)
                                 // Play eliminated sound
                                 soundManager.playKnockoutEliminated()
                             }
@@ -343,6 +348,25 @@ class KnockoutViewModel: ObservableObject {
     
     // MARK: - Match Storage
     
+    /// Derive final placements based on elimination order
+    private func deriveFinalPlacements() -> [UUID: Int] {
+        var placements: [UUID: Int] = [:]
+        
+        // Winner gets 1st place
+        if let winner = winner {
+            placements[winner.id] = 1
+        }
+        
+        // Eliminated players get placements based on REVERSE elimination order
+        // Last eliminated = 2nd place, first eliminated = last place
+        let reversedEliminationOrder = eliminationOrder.reversed()
+        for (index, playerId) in reversedEliminationOrder.enumerated() {
+            placements[playerId] = index + 2 // 2nd, 3rd, 4th, etc.
+        }
+        
+        return placements
+    }
+    
     /// Save match result to local storage and Supabase
     private func saveMatchResult() {
         guard let winner = winner else { return }
@@ -372,6 +396,17 @@ class KnockoutViewModel: ObservableObject {
             )
         }
         
+        // Create metadata with starting lives and placements
+        var metadata: [String: String] = [
+            "starting_lives": "\(startingLives)"
+        ]
+        
+        // Derive placements and add to metadata
+        let placements = deriveFinalPlacements()
+        for (playerId, placement) in placements {
+            metadata["placement_\(playerId.uuidString)"] = "\(placement)"
+        }
+        
         // Create match result
         let matchResult = MatchResult(
             id: matchId,
@@ -383,7 +418,7 @@ class KnockoutViewModel: ObservableObject {
             duration: duration,
             matchFormat: 1,
             totalLegsPlayed: 1,
-            metadata: ["starting_lives": "\(startingLives)"]
+            metadata: metadata
         )
         
         // Save to local storage
@@ -440,6 +475,7 @@ class KnockoutViewModel: ObservableObject {
                     turnHistory: flatTurnHistory,
                     matchFormat: 1,
                     legsWon: [:],
+                    gameMetadata: metadata,
                     currentUserId: currentUserId
                 )
                 

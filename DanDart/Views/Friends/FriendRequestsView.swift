@@ -141,7 +141,7 @@ struct FriendRequestsView: View {
                             Text("Back")
                                 .font(.system(size: 16, weight: .medium))
                         }
-                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                        .foregroundColor(AppColor.justWhite)
                     }
                 }
             }

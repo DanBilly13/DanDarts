@@ -198,6 +198,25 @@ struct MatchCard: View {
         // Check if metadata contains placement keys (indicates new format)
         return metadata.keys.contains { $0.hasPrefix("placement_") }
     }
+    
+    // Check if Knockout match has valid placement data
+    private var hasValidKnockoutPlacement: Bool {
+        guard summary.gameType.lowercased() == "knockout" else { return false }
+        guard let metadata = summary.metadata else { return false }
+        
+        // Check if metadata contains placement keys (indicates new format)
+        return metadata.keys.contains { $0.hasPrefix("placement_") }
+    }
+    
+    // Check if Sudden Death match has valid placement data
+    private var hasValidSuddenDeathPlacement: Bool {
+        let gameType = summary.gameType.lowercased()
+        guard gameType == "sudden death" || gameType == "sudden_death" else { return false }
+        guard let metadata = summary.metadata else { return false }
+        
+        // Check if metadata contains placement keys (indicates new format)
+        return metadata.keys.contains { $0.hasPrefix("placement_") }
+    }
 
     // Extract placement from metadata for a specific player
     private func placementForPlayer(_ player: MatchPlayer) -> Int {
@@ -217,11 +236,21 @@ struct MatchCard: View {
         let gameType = summary.gameType.lowercased()
         
         if gameType == "knockout" {
-            // For Knockout: higher lives = better placement
-            return summary.players.sorted { $0.finalScore > $1.finalScore }
+            if hasValidKnockoutPlacement {
+                // For Knockout with valid placement: sort by placement from metadata
+                return summary.players.sorted { placementForPlayer($0) < placementForPlayer($1) }
+            } else {
+                // For old Knockout matches: fallback to sorting by lives (higher = better)
+                return summary.players.sorted { $0.finalScore > $1.finalScore }
+            }
         } else if gameType == "sudden death" || gameType == "sudden_death" {
-            // For Sudden Death: higher lives = better placement
-            return summary.players.sorted { $0.finalScore > $1.finalScore }
+            if hasValidSuddenDeathPlacement {
+                // For Sudden Death with valid placement: sort by placement from metadata
+                return summary.players.sorted { placementForPlayer($0) < placementForPlayer($1) }
+            } else {
+                // For old Sudden Death matches: fallback to sorting by lives (higher = better)
+                return summary.players.sorted { $0.finalScore > $1.finalScore }
+            }
         } else if gameType == "halve it" || gameType == "halve_it" {
             // For Halve-It: higher score = better placement
             return summary.players.sorted { $0.finalScore > $1.finalScore }

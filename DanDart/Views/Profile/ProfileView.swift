@@ -86,10 +86,12 @@ struct ProfileView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColor.justWhite)
                     }
-                    .foregroundColor(AppColor.textPrimary)
+                    .buttonStyle(.plain)
                 }
             }
             .navigationDestination(isPresented: $showEditProfileV2) {

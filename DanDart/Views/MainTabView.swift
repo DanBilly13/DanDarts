@@ -82,12 +82,12 @@ struct MainTabView: View {
                         ZStack {
                             Text("Invite")
                                 .font(.system(size: 17, weight: .regular))
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .foregroundColor(AppColor.justWhite)
                                 .opacity(friendsIsCreatingInvite ? 0 : 1)
                             
                             if friendsIsCreatingInvite {
                                 ProgressView()
-                                    .tint(AppColor.interactivePrimaryBackground)
+                                    .tint(AppColor.justWhite)
                             }
                         }
                         .frame(minWidth: 44)
@@ -101,7 +101,7 @@ struct MainTabView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                     }
                 }
             case 2:
@@ -112,20 +112,13 @@ struct MainTabView: View {
                     } label: {
                         Text("Challenge")
                             .font(.system(size: 17, weight: .regular))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                     }
                     .frame(minWidth: 44)
                 }
             case 3:
                 // History tab
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    /*Button {
-                        historyShowLocalMatches.toggle()
-                    } label: {
-                        Image(systemName: historyShowLocalMatches ? "iphone" : "iphone.slash")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(historyShowLocalMatches ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
-                    }*/
                     
                     Button {
                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -134,7 +127,7 @@ struct MainTabView: View {
                     } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                     }
                 }
             default:

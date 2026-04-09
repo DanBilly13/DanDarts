@@ -39,6 +39,9 @@ class SuddenDeathViewModel: ObservableObject {
     @Published var scoreAnimationPlayerId: UUID? = nil
     @Published var showSkullWiggle: Bool = false
     
+    // Elimination order tracking for placement
+    @Published var eliminationOrder: [UUID] = []
+    
     // MARK: - Properties
     
     let startingLives: Int
@@ -286,6 +289,24 @@ class SuddenDeathViewModel: ObservableObject {
             for id in losers {
                 if let currentLives = playerLives[id], currentLives > 0 {
                     playerLives[id] = max(0, currentLives - 1)
+                    
+                    // Track elimination order for placement (deterministic order using players array)
+                    if playerLives[id] == 0 {
+                        eliminationOrder.append(id)
+                    }
+                }
+            }
+            
+            // Sort eliminated players by their position in the players array for deterministic ordering
+            // This ensures simultaneous eliminations have a stable, repeatable placement order
+            if losers.count > 1 {
+                let justEliminated = losers.filter { playerLives[$0] == 0 }
+                if justEliminated.count > 1 {
+                    // Remove the just-added eliminations
+                    eliminationOrder.removeLast(justEliminated.count)
+                    // Re-add them in players array order
+                    let sortedEliminated = players.filter { justEliminated.contains($0.id) }.map { $0.id }
+                    eliminationOrder.append(contentsOf: sortedEliminated)
                 }
             }
             
@@ -438,6 +459,25 @@ class SuddenDeathViewModel: ObservableObject {
     
     // MARK: - Match Storage
     
+    /// Derive final placements based on elimination order
+    private func deriveFinalPlacements() -> [UUID: Int] {
+        var placements: [UUID: Int] = [:]
+        
+        // Winner gets 1st place
+        if let winner = winner {
+            placements[winner.id] = 1
+        }
+        
+        // Eliminated players get placements based on REVERSE elimination order
+        // Last eliminated = 2nd place, first eliminated = last place
+        let reversedEliminationOrder = eliminationOrder.reversed()
+        for (index, playerId) in reversedEliminationOrder.enumerated() {
+            placements[playerId] = index + 2 // 2nd, 3rd, 4th, etc.
+        }
+        
+        return placements
+    }
+    
     private func saveMatchResult() {
         guard let winner = winner else { return }
         guard !hasBeenSaved else {
@@ -467,6 +507,17 @@ class SuddenDeathViewModel: ObservableObject {
             )
         }
         
+        // Create metadata with starting lives and placements
+        var metadata: [String: String] = [
+            "starting_lives": "\(startingLives)"
+        ]
+        
+        // Derive placements and add to metadata
+        let placements = deriveFinalPlacements()
+        for (playerId, placement) in placements {
+            metadata["placement_\(playerId.uuidString)"] = "\(placement)"
+        }
+        
         let matchResult = MatchResult(
             id: matchId,
             gameType: "sudden_death",
@@ -477,7 +528,7 @@ class SuddenDeathViewModel: ObservableObject {
             duration: duration,
             matchFormat: 1,
             totalLegsPlayed: 1,
-            metadata: ["starting_lives": "\(startingLives)"]
+            metadata: metadata
         )
         
         // Store match result for passing to GameEndView (instant access)
@@ -529,6 +580,7 @@ class SuddenDeathViewModel: ObservableObject {
                     turnHistory: flatTurnHistory,
                     matchFormat: 1,
                     legsWon: [:],
+                    gameMetadata: metadata,
                     currentUserId: currentUserId
                 )
                 

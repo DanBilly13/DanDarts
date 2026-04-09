@@ -115,6 +115,30 @@ class MatchesService: ObservableObject {
             print("   ⚠️ Connection test failed, but will try sync anyway...")
         }
         
+        // DIAGNOSTIC: Check if finalScore exists before Supabase insert
+        print("🔍 [DIAGNOSTIC] Pre-insert player finalScores:")
+        print("   \(match.players.map { "\($0.displayName): \($0.finalScore)" })")
+        
+        // DIAGNOSTIC: Encode players locally to check if finalScore survives encoding
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        do {
+            let playersJsonData = try encoder.encode(match.players)
+            if let playersJsonString = String(data: playersJsonData, encoding: .utf8) {
+                print("🔍 [DIAGNOSTIC] Locally encoded players JSON:")
+                print(playersJsonString)
+                
+                // Check if finalScore appears in the JSON
+                if playersJsonString.contains("finalScore") {
+                    print("   ✅ finalScore IS present in local JSON encoding")
+                } else {
+                    print("   ❌ finalScore is MISSING from local JSON encoding")
+                }
+            }
+        } catch {
+            print("   ❌ Failed to encode players: \(error)")
+        }
+        
         // Convert MatchResult to Supabase format
         let supabaseMatch = SupabaseMatch(
             id: match.id,

@@ -255,11 +255,11 @@ struct EditProfileV2View: View {
                 }) {
                     if hasUnsavedChanges {
                         Text("Cancel")
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                     } else {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                     }
                 }
             }

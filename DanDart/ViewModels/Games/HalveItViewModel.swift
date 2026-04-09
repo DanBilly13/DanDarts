@@ -395,6 +395,7 @@ class HalveItViewModel: ObservableObject {
                     turnHistory: supabaseTurns,
                     matchFormat: 1, // Halve-It doesn't use legs
                     legsWon: [:], // Halve-It doesn't use legs
+                    playerScores: playerScores, // Pass final scores for ranking display
                     currentUserId: currentUserId
                 )
                 
