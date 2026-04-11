@@ -52,7 +52,7 @@ struct ProfileHeaderView<Content: View>: View {
             }
             
             // Stats Cards
-            HStack(alignment: .lastTextBaseline, spacing: 12) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
                 // Games Played
                 StatCard(
                     title: "Games",
@@ -72,6 +72,13 @@ struct ProfileHeaderView<Content: View>: View {
                     title: "Win Rate",
                     value: player.winRatePercentage,
                     icon: "chart.line.uptrend.xyaxis"
+                )
+                
+                // Rank (301/501)
+                StatCard(
+                    title: "Rank",
+                    value: player.rankDisplayName,
+                    icon: "star.circle.fill"
                 )
             }
         }

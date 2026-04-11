@@ -29,6 +29,10 @@ struct User: Codable, Identifiable {
     var totalWins: Int = 0
     var totalLosses: Int = 0
     
+    // Ranking stats for 301/501 games (V1: minimal storage)
+    var rankedWinsCount301501: Int = 0
+    var rankedTierScoreTotal301501: Int = 0
+    
     // Coding keys to match Supabase column names
     enum CodingKeys: String, CodingKey {
         case id
@@ -42,6 +46,8 @@ struct User: Codable, Identifiable {
         case lastSeenAt = "last_seen_at"
         case totalWins = "total_wins"
         case totalLosses = "total_losses"
+        case rankedWinsCount301501 = "ranked_wins_count_301_501"
+        case rankedTierScoreTotal301501 = "ranked_tier_score_total_301_501"
     }
     
     // Computed properties
@@ -62,6 +68,17 @@ struct User: Codable, Identifiable {
         handle ?? "@\(nickname)"
     }
     
+    // Ranking computed properties (V1: derive in code, not stored)
+    var rankedAverageTierScore301501: Double {
+        guard rankedWinsCount301501 > 0 else { return 0 }
+        return Double(rankedTierScoreTotal301501) / Double(rankedWinsCount301501)
+    }
+    
+    var profileRank: RankTier {
+        guard rankedWinsCount301501 > 0 else { return .unranked }
+        return RankingHelper.profileRankFromAverageTierScore(rankedAverageTierScore301501)
+    }
+    
     /// Convert User to Player for use in components that expect Player type
     func toPlayer() -> Player {
         return Player(
@@ -72,7 +89,9 @@ struct User: Codable, Identifiable {
             isGuest: false,
             totalWins: totalWins,
             totalLosses: totalLosses,
-            userId: id // Link to user account for stats tracking
+            userId: id, // Link to user account for stats tracking
+            rankedWinsCount301501: rankedWinsCount301501,
+            rankedTierScoreTotal301501: rankedTierScoreTotal301501
         )
     }
 }

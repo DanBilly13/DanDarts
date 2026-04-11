@@ -92,6 +92,8 @@ class MatchService: ObservableObject {
     ///   - matchFormat: Number of legs (1, 3, 5, or 7)
     ///   - legsWon: Dictionary of player ID to legs won
     ///   - currentUserId: UUID of the current user (optional)
+    ///   - winnerDartsThrown: Total darts thrown by winner (for ranking)
+    ///   - gameType: Game type string for ranking (e.g., "301", "501")
     func saveMatch(
         matchId: UUID,
         gameId: String,
@@ -104,7 +106,9 @@ class MatchService: ObservableObject {
         legsWon: [UUID: Int],
         gameMetadata: [String: String]? = nil,
         playerScores: [UUID: Int]? = nil,
-        currentUserId: UUID? = nil
+        currentUserId: UUID? = nil,
+        winnerDartsThrown: Int? = nil,
+        gameType: String? = nil
     ) async throws -> User? {
         // Debug: Check AuthService state at the start
         print("🔍 saveMatch called. AuthService.shared.currentUser: \(AuthService.shared.currentUser?.displayName ?? "nil")")
@@ -333,7 +337,13 @@ class MatchService: ObservableObject {
         // 4. Update player stats for connected players and get updated user
         var updatedUser: User? = nil
         if let winnerId = winnerId {
-            updatedUser = try await updatePlayerStats(winnerId: winnerId, players: playersToSave, currentUserId: currentUserId)
+            updatedUser = try await updatePlayerStats(
+                winnerId: winnerId,
+                players: playersToSave,
+                currentUserId: currentUserId,
+                winnerDartsThrown: winnerDartsThrown,
+                gameType: gameType
+            )
         }
         
         print("✅ Match saved successfully: \(matchId)")
@@ -354,6 +364,8 @@ class MatchService: ObservableObject {
     ///   - matchFormat: Number of legs (1, 3, 5, or 7)
     ///   - legsWon: Dictionary of player ID to legs won
     ///   - currentUserId: UUID of the current user (optional)
+    ///   - winnerDartsThrown: Total darts thrown by winner (for ranking)
+    ///   - gameType: Game type string for ranking (e.g., "301", "501")
     func saveRemoteMatchDetails(
         matchId: UUID,
         players: [Player],
@@ -361,7 +373,9 @@ class MatchService: ObservableObject {
         turnHistory: [TurnHistory],
         matchFormat: Int,
         legsWon: [UUID: Int],
-        currentUserId: UUID?
+        currentUserId: UUID?,
+        winnerDartsThrown: Int? = nil,
+        gameType: String? = nil
     ) async throws -> User? {
         print("🔍 [RemoteDetails] Saving remote match details for: \(matchId)")
         print("🔍 [RemoteDetails] Players: \(players.count), Winner: \(winnerId)")
@@ -476,7 +490,13 @@ class MatchService: ObservableObject {
         // 4. Update player stats for connected players and get updated user
         print("🔍 [RemoteDetails] Updating player stats")
         var updatedUser: User? = nil
-        updatedUser = try await updatePlayerStats(winnerId: winnerId, players: playersToSave, currentUserId: currentUserId)
+        updatedUser = try await updatePlayerStats(
+            winnerId: winnerId,
+            players: playersToSave,
+            currentUserId: currentUserId,
+            winnerDartsThrown: winnerDartsThrown,
+            gameType: gameType
+        )
         print("✅ [RemoteDetails] Player stats updated")
         
         print("✅ [RemoteDetails] Remote match details saved successfully: \(matchId)")
@@ -488,7 +508,13 @@ class MatchService: ObservableObject {
     // MARK: - Player Stats
     
     /// Update player stats after a match and return updated user if current user was in the match
-    private func updatePlayerStats(winnerId: UUID, players: [Player], currentUserId: UUID?) async throws -> User? {
+    private func updatePlayerStats(
+        winnerId: UUID,
+        players: [Player],
+        currentUserId: UUID?,
+        winnerDartsThrown: Int? = nil,
+        gameType: String? = nil
+    ) async throws -> User? {
         print("🔍 Updating stats for \(players.count) players. Winner ID: \(winnerId)")
         print("🔍 Current user ID passed: \(currentUserId?.uuidString ?? "nil")")
         var updatedCurrentUser: User? = nil
@@ -515,6 +541,24 @@ class MatchService: ObservableObject {
             let newWins = currentUser.totalWins + (isWinner ? 1 : 0)
             let newLosses = currentUser.totalLosses + (isWinner ? 0 : 1)
             
+            // Calculate ranking updates for 301/501 winners
+            var newRankedWinsCount = currentUser.rankedWinsCount301501
+            var newRankedTierScoreTotal = currentUser.rankedTierScoreTotal301501
+            
+            if isWinner, let gameType = gameType, let dartsThrown = winnerDartsThrown {
+                let normalizedGameType = gameType.lowercased().replacingOccurrences(of: "remote ", with: "")
+                if normalizedGameType.contains("301") || normalizedGameType.contains("501") {
+                    let rankTier = RankingHelper.rankForWinningDarts(game: gameType, dartsThrown: dartsThrown)
+                    let tierScore = RankingHelper.tierScore(for: rankTier)
+                    
+                    newRankedWinsCount += 1
+                    newRankedTierScoreTotal += tierScore
+                    
+                    print("🏆 [Ranking] Winner ranked: \(rankTier.displayName) (\(dartsThrown) darts, tier score: \(tierScore))")
+                    print("🏆 [Ranking] New totals: \(newRankedWinsCount) wins, \(newRankedTierScoreTotal) total tier score")
+                }
+            }
+            
             // VERIFICATION LOGGING - Before update
             print("🔍 [VERIFY] ========================================")
             print("🔍 [VERIFY] Updating stats for player: \(currentUser.displayName)")
@@ -522,18 +566,23 @@ class MatchService: ObservableObject {
             print("🔍 [VERIFY]   isWinner = \(isWinner)")
             print("🔍 [VERIFY]   BEFORE: \(currentUser.totalWins)W / \(currentUser.totalLosses)L")
             print("🔍 [VERIFY]   AFTER:  \(newWins)W / \(newLosses)L")
+            print("🔍 [VERIFY]   Rank: \(currentUser.rankedWinsCount301501) wins → \(newRankedWinsCount) wins")
             print("🔍 [VERIFY] ========================================")
             
             // Create update record
             struct UserStatsUpdate: Encodable {
                 let total_wins: Int
                 let total_losses: Int
+                let ranked_wins_count_301_501: Int
+                let ranked_tier_score_total_301_501: Int
                 let last_seen_at: String
             }
             
             let updateRecord = UserStatsUpdate(
                 total_wins: newWins,
                 total_losses: newLosses,
+                ranked_wins_count_301_501: newRankedWinsCount,
+                ranked_tier_score_total_301_501: newRankedTierScoreTotal,
                 last_seen_at: ISO8601DateFormatter().string(from: Date())
             )
             
@@ -557,6 +606,8 @@ class MatchService: ObservableObject {
             var updatedUser = currentUser
             updatedUser.totalWins = newWins
             updatedUser.totalLosses = newLosses
+            updatedUser.rankedWinsCount301501 = newRankedWinsCount
+            updatedUser.rankedTierScoreTotal301501 = newRankedTierScoreTotal
             updatedUser.lastSeenAt = Date()
             
             // Store ONLY if this is the authenticated current user

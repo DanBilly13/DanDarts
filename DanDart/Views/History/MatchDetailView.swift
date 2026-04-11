@@ -175,12 +175,21 @@ struct MatchDetailView: View {
             }
             
             VStack(spacing: 20) {
-                // Darts thrown
-                StatCategorySection(
-                    label: "Darts thrown",
-                    players: match.players,
-                    getValue: { $0.dartsThrown }
-                )
+                // Winner Darts Thrown bar (301/501 only)
+                if match.gameType.contains("301") || match.gameType.contains("501") {
+                    WinnerDartsThrownBar(
+                        match: match,
+                        gameType: match.gameType
+                    )
+                    .padding(.vertical, 8)
+                }
+                
+                // Darts thrown - Replaced by WinnerDartsThrownBar for 301/501
+//                StatCategorySection(
+//                    label: "Darts thrown",
+//                    players: match.players,
+//                    getValue: { $0.dartsThrown }
+//                )
                 
                 // 3-dart average
                 StatCategorySection(

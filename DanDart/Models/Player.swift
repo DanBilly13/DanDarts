@@ -19,6 +19,10 @@ struct Player: Identifiable, Codable {
     let totalLosses: Int
     let userId: UUID? // User ID for connected players (nil for guests)
     
+    // Ranking stats for 301/501 games
+    let rankedWinsCount301501: Int
+    let rankedTierScoreTotal301501: Int
+    
     // Computed properties
     var totalGames: Int {
         totalWins + totalLosses
@@ -33,8 +37,23 @@ struct Player: Identifiable, Codable {
         return String(format: "%.1f%%", winRate * 100)
     }
     
+    // Ranking computed properties
+    var rankedAverageTierScore301501: Double {
+        guard rankedWinsCount301501 > 0 else { return 0 }
+        return Double(rankedTierScoreTotal301501) / Double(rankedWinsCount301501)
+    }
+    
+    var profileRank: RankTier {
+        guard rankedWinsCount301501 > 0 else { return .unranked }
+        return RankingHelper.profileRankFromAverageTierScore(rankedAverageTierScore301501)
+    }
+    
+    var rankDisplayName: String {
+        profileRank.displayName
+    }
+    
     // Initializer for creating new players
-    init(id: UUID = UUID(), displayName: String, nickname: String, avatarURL: String? = nil, isGuest: Bool = true, totalWins: Int = 0, totalLosses: Int = 0, userId: UUID? = nil) {
+    init(id: UUID = UUID(), displayName: String, nickname: String, avatarURL: String? = nil, isGuest: Bool = true, totalWins: Int = 0, totalLosses: Int = 0, userId: UUID? = nil, rankedWinsCount301501: Int = 0, rankedTierScoreTotal301501: Int = 0) {
         self.id = id
         self.displayName = displayName
         self.nickname = nickname
@@ -43,6 +62,8 @@ struct Player: Identifiable, Codable {
         self.totalWins = totalWins
         self.totalLosses = totalLosses
         self.userId = userId
+        self.rankedWinsCount301501 = rankedWinsCount301501
+        self.rankedTierScoreTotal301501 = rankedTierScoreTotal301501
     }
 }
 
@@ -95,7 +116,10 @@ extension Player {
             avatarURL: self.avatarURL,
             isGuest: self.isGuest,
             totalWins: won ? self.totalWins + 1 : self.totalWins,
-            totalLosses: won ? self.totalLosses : self.totalLosses + 1
+            totalLosses: won ? self.totalLosses : self.totalLosses + 1,
+            userId: self.userId,
+            rankedWinsCount301501: self.rankedWinsCount301501,
+            rankedTierScoreTotal301501: self.rankedTierScoreTotal301501
         )
     }
 }

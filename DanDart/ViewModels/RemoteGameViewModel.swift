@@ -912,6 +912,13 @@ class RemoteGameViewModel: ObservableObject {
                 
                 print("🔍 [VERIFY] winnerId = \(winnerId)")
                 
+                // Get winner's darts thrown for ranking (use authoritative MatchPlayer data)
+                let winnerMatchPlayer = matchPlayers.first { $0.id == winnerId }
+                let winnerDartsThrown = winnerMatchPlayer?.totalDartsThrown
+                
+                // Determine game type for ranking (301 or 501)
+                let gameType = game.title
+                
                 // Use dedicated remote post-completion method
                 // This does NOT touch the matches table (edge function already completed it)
                 let updatedUser = try await matchService.saveRemoteMatchDetails(
@@ -921,7 +928,9 @@ class RemoteGameViewModel: ObservableObject {
                     turnHistory: turnHistory,
                     matchFormat: matchFormat,
                     legsWon: legsWon,
-                    currentUserId: currentUserId
+                    currentUserId: currentUserId,
+                    winnerDartsThrown: winnerDartsThrown,
+                    gameType: gameType
                 )
                 
                 print("✅ Remote match details saved to Supabase: \(matchId)")

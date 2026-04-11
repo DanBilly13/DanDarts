@@ -756,6 +756,13 @@ class CountdownViewModel: ObservableObject {
                 // Get winner's ID (userId for connected players, player.id for guests)
                 let winnerId = winner.userId ?? winner.id
                 
+                // Get winner's darts thrown for ranking (use authoritative MatchPlayer data)
+                let winnerMatchPlayer = matchPlayers.first { $0.id == winnerId }
+                let winnerDartsThrown = winnerMatchPlayer?.totalDartsThrown
+                
+                // Determine game type for ranking (301 or 501)
+                let gameType = game.title
+                
                 let updatedUser = try await matchService.saveMatch(
                     matchId: matchId,
                     gameId: gameId,
@@ -766,7 +773,9 @@ class CountdownViewModel: ObservableObject {
                     turnHistory: turnHistory,
                     matchFormat: matchFormat,
                     legsWon: legsWon,
-                    currentUserId: currentUserId
+                    currentUserId: currentUserId,
+                    winnerDartsThrown: winnerDartsThrown,
+                    gameType: gameType
                 )
                 
                 print("✅ Match saved to Supabase: \(matchId)")
