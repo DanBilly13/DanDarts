@@ -124,13 +124,13 @@ struct HalveItMatchDetailView: View {
             
             // Color key legend
             FlexibleLayout(spacing: 12) {
-                ForEach(0..<match.players.count, id: \.self) { index in
+                ForEach(Array(sortedPlayers.enumerated()), id: \.element.id) { _, player in
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(playerColor(for: index))
+                            .fill(playerColor(for: originalPlayerIndex(for: player)))
                             .frame(width: 12, height: 12)
                         
-                        Text(match.players[index].displayName)
+                        Text(player.displayName)
                             .font(.caption.weight(.medium))
                             .foregroundColor(AppColor.textSecondary)
                     }
@@ -141,9 +141,10 @@ struct HalveItMatchDetailView: View {
                 // Game accuracy (only stat bar for Halve-It)
                 StatCategorySection(
                     label: "Target hit rate (%)",
-                    players: match.players,
+                    players: sortedPlayers,
                     getValue: { Int(calculateTargetHitRate(for: $0) * 100) },
-                    forceMaxValue: 100  // Scale to 100% for percentage stats
+                    forceMaxValue: 100,  // Scale to 100% for percentage stats
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
             }
         }

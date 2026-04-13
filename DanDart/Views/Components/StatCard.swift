@@ -7,11 +7,24 @@ struct StatCard: View {
     let value: String
     let icon: String
     
+    // Check if this is a custom asset icon
+    private var isCustomIcon: Bool {
+        ["none", "rookie", "solid", "club", "pro", "elite", "freak", "games", "wins", "win-rate"].contains(icon)
+    }
+    
     var body: some View {
         VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundColor(AppColor.brandPrimary)
+            if isCustomIcon {
+                Image(icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundColor(AppColor.brandPrimary)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(AppColor.brandPrimary)
+            }
             VStack {
                 Text(value)
                     .font(.system(size: 20, weight: .bold))

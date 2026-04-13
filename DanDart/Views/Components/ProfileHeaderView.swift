@@ -57,28 +57,28 @@ struct ProfileHeaderView<Content: View>: View {
                 StatCard(
                     title: "Games",
                     value: "\(player.totalGames)",
-                    icon: "target"
+                    icon: "games"
                 )
                 
                 // Wins
                 StatCard(
                     title: "Wins",
                     value: "\(player.totalWins)",
-                    icon: "trophy.fill"
+                    icon: "wins"
                 )
                 
                 // Win Rate
                 StatCard(
-                    title: "Win Rate",
-                    value: player.winRatePercentage,
-                    icon: "chart.line.uptrend.xyaxis"
+                    title: "Win %",
+                    value: player.winRateValue,
+                    icon: "win-rate"
                 )
                 
                 // Rank (301/501)
                 StatCard(
                     title: "Rank",
                     value: player.rankDisplayName,
-                    icon: "star.circle.fill"
+                    icon: player.rankIconName
                 )
             }
         }

@@ -161,13 +161,13 @@ struct MatchDetailView: View {
             
             // Color key legend (wraps to 2 rows if needed)
             FlexibleLayout(spacing: 12) {
-                ForEach(0..<match.players.count, id: \.self) { index in
+                ForEach(Array(sortedPlayers.enumerated()), id: \.element.id) { _, player in
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(playerColor(for: index))
+                            .fill(playerColor(for: originalPlayerIndex(for: player)))
                             .frame(width: 12, height: 12)
                         
-                        Text(match.players[index].displayName)
+                        Text(player.displayName)
                             .font(.caption.weight(.medium))
                             .foregroundColor(AppColor.textSecondary)
                     }
@@ -194,38 +194,43 @@ struct MatchDetailView: View {
                 // 3-dart average
                 StatCategorySection(
                     label: "3-Dart Average",
-                    players: match.players,
+                    players: sortedPlayers,
                     getValue: { Int($0.averageScore) },
                     isDecimal: true,
-                    getDecimalValue: { $0.averageScore }
+                    getDecimalValue: { $0.averageScore },
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
                 
                 // Highest visit
                 StatCategorySection(
                     label: "Highest visit",
-                    players: match.players,
-                    getValue: { highestVisit(for: $0) }
+                    players: sortedPlayers,
+                    getValue: { highestVisit(for: $0) },
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
                 
                 // 100+ thrown
                 StatCategorySection(
                     label: "100+ thrown",
-                    players: match.players,
-                    getValue: { count100Plus(for: $0) }
+                    players: sortedPlayers,
+                    getValue: { count100Plus(for: $0) },
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
                 
                 // 140+ thrown
                 StatCategorySection(
                     label: "140+ thrown",
-                    players: match.players,
-                    getValue: { count140Plus(for: $0) }
+                    players: sortedPlayers,
+                    getValue: { count140Plus(for: $0) },
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
                 
                 // 180s thrown
                 StatCategorySection(
                     label: "180s thrown",
-                    players: match.players,
-                    getValue: { count180s(for: $0) }
+                    players: sortedPlayers,
+                    getValue: { count180s(for: $0) },
+                    getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
             }
         }

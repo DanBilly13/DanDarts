@@ -19,18 +19,26 @@ enum RankTier: String, Codable, CaseIterable {
     
     var displayName: String {
         switch self {
-        case .unranked: return "Unranked"
-        case .newby: return "Newby"
-        case .intermediate: return "Intermediate"
-        case .advanced: return "Advanced"
-        case .proLevel: return "Pro-Level"
-        case .worldClass: return "World Class"
-        case .immortal: return "Immortal"
+        case .unranked: return "None"
+        case .newby: return "Rookie"
+        case .intermediate: return "Solid"
+        case .advanced: return "Club"
+        case .proLevel: return "Pro"
+        case .worldClass: return "Elite"
+        case .immortal: return "Freak"
         }
     }
     
     var iconName: String {
-        return "star.circle.fill"
+        switch self {
+        case .unranked: return "none"
+        case .newby: return "rookie"
+        case .intermediate: return "solid"
+        case .advanced: return "club"
+        case .proLevel: return "pro"
+        case .worldClass: return "elite"
+        case .immortal: return "freak"
+        }
     }
 }
 

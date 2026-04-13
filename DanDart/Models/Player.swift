@@ -37,6 +37,10 @@ struct Player: Identifiable, Codable {
         return String(format: "%.1f%%", winRate * 100)
     }
     
+    var winRateValue: String {
+        return String(format: "%.1f", winRate * 100)
+    }
+    
     // Ranking computed properties
     var rankedAverageTierScore301501: Double {
         guard rankedWinsCount301501 > 0 else { return 0 }
@@ -50,6 +54,10 @@ struct Player: Identifiable, Codable {
     
     var rankDisplayName: String {
         profileRank.displayName
+    }
+    
+    var rankIconName: String {
+        profileRank.iconName
     }
     
     // Initializer for creating new players
