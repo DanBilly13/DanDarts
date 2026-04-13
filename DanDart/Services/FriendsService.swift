@@ -583,6 +583,57 @@ class FriendsService: ObservableObject {
         
         print("✅ [SendRequest] Friend request created successfully")
         
+        // Send push notification (non-blocking)
+        print("📤 [SendRequest] Starting push notification task...")
+        Task {
+            print("📤 [SendRequest] Inside push notification task")
+            do {
+                print("📤 [SendRequest] Checking for current user...")
+                guard let currentUser = AuthService.shared.currentUser else {
+                    print("⚠️ [SendRequest] No current user for push notification")
+                    return
+                }
+                print("📤 [SendRequest] Current user: \(currentUser.displayName)")
+                
+                // V1: No match_id needed - Friends tab navigation only
+                struct PushPayload: Encodable {
+                    let user_id: String
+                    let notification_type: String
+                    let title: String
+                    let body: String
+                    let route: String
+                    let highlight: String
+                }
+                
+                let pushPayload = PushPayload(
+                    user_id: friendId.uuidString,
+                    notification_type: "friend_request_received",
+                    title: "Friend request from \(currentUser.displayName)",
+                    body: "\(currentUser.displayName) wants to be friends",
+                    route: "friends",
+                    highlight: "friend_request"
+                )
+                print("📤 [SendRequest] Push payload created for user: \(friendId.uuidString.prefix(8))...")
+                
+                print("📤 [SendRequest] Getting Edge Function headers...")
+                let headers = try await getEdgeFunctionHeaders()
+                print("📤 [SendRequest] Headers obtained")
+                
+                print("📤 [SendRequest] Invoking push-notifications Edge Function...")
+                struct EmptyResponse: Decodable {}
+                let _: EmptyResponse = try await supabaseService.client.functions
+                    .invoke("push-notifications", options: FunctionInvokeOptions(
+                        headers: headers,
+                        body: pushPayload
+                    ))
+                
+                print("✅ [SendRequest] Push notification sent successfully")
+            } catch {
+                print("⚠️ [SendRequest] Push notification failed (non-critical): \(error)")
+                // Don't throw - friend request already succeeded
+            }
+        }
+        
         // Log friend request sent event
         analytics.logFriendRequestSent()
     }
@@ -969,5 +1020,17 @@ enum FriendsError: LocalizedError {
         case .networkError:
             return "Network error. Please try again"
         }
+    }
+}
+
+// MARK: - Private Helpers
+
+extension FriendsService {
+    /// Get headers for Edge Function calls with auth token
+    private func getEdgeFunctionHeaders() async throws -> [String: String] {
+        guard let session = try? await supabaseService.client.auth.session else {
+            throw FriendsError.networkError
+        }
+        return ["Authorization": "Bearer \(session.accessToken)"]
     }
 }

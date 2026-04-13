@@ -35,8 +35,8 @@ const APNS_PRODUCTION_URL = 'https://api.push.apple.com'
 
 interface PushPayload {
   user_id: string
-  notification_type: 'challenge_received' | 'match_ready'
-  match_id: string
+  notification_type: 'challenge_received' | 'match_ready' | 'friend_request_received'
+  match_id?: string  // Optional - not needed for friend requests
   title: string
   body: string
   route?: string
@@ -66,7 +66,16 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization')
     console.log('🔑 [Push] Auth header present:', !!authHeader)
-    console.log('🔑 [Push] Auth header preview:', authHeader?.substring(0, 20) + '...')
+    
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Authorization header' } as ErrorResponse),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const jwt = authHeader.replace('Bearer ', '').trim()
+    console.log('🔑 [Push] JWT extracted, length:', jwt.length)
     
     // Create Supabase client for authentication
     const supabaseClient = createClient(
@@ -74,18 +83,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader! },
+          headers: { Authorization: `Bearer ${jwt}` },
         },
       }
     )
 
-    console.log('🔍 [Push] Calling auth.getUser()...')
+    console.log('🔍 [Push] Calling auth.getUser(jwt)...')
     
-    // Verify caller is authenticated
+    // Verify caller is authenticated - MUST pass JWT as parameter
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseClient.auth.getUser(jwt)
 
     console.log('👤 [Push] User result:', { hasUser: !!user, hasError: !!userError })
     if (userError) {
@@ -110,15 +119,16 @@ serve(async (req) => {
 
     const payload: PushPayload = await req.json()
 
-    // Validate required fields
-    if (!payload.user_id || !payload.notification_type || !payload.match_id || !payload.title || !payload.body) {
+    // Validate required fields (match_id optional for friend requests)
+    if (!payload.user_id || !payload.notification_type || !payload.title || !payload.body) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: user_id, notification_type, match_id, title, body' } as ErrorResponse),
+        JSON.stringify({ error: 'Missing required fields: user_id, notification_type, title, body' } as ErrorResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`📤 [Push] Sending ${payload.notification_type} to user ${payload.user_id.substring(0, 8)}... for match ${payload.match_id.substring(0, 8)}...`)
+    const matchIdLog = payload.match_id ? `for match ${payload.match_id.substring(0, 8)}...` : '(no match ID)'
+    console.log(`📤 [Push] Sending ${payload.notification_type} to user ${payload.user_id.substring(0, 8)}... ${matchIdLog}`)
 
     // Load active push tokens for target user
     const { data: tokens, error: tokensError } = await adminClient
@@ -160,7 +170,7 @@ serve(async (req) => {
         badge: 1,
       },
       type: payload.notification_type,
-      matchId: payload.match_id,
+      ...(payload.match_id && { matchId: payload.match_id }),  // Only include if present
       route: payload.route || 'remote',
       highlight: payload.highlight || (payload.notification_type === 'challenge_received' ? 'incoming' : 'ready'),
     }
@@ -172,7 +182,7 @@ serve(async (req) => {
     // Send to each token
     for (const token of tokens as PushToken[]) {
       try {
-        const result = await sendAPNs(token, apnsPayload, payload.match_id)
+        const result = await sendAPNs(token, apnsPayload, payload.match_id || 'friend-request')
         results.push(result)
         
         if (result.success) {
@@ -197,7 +207,7 @@ serve(async (req) => {
           .from('push_delivery_log')
           .insert({
             user_id: payload.user_id,
-            match_id: payload.match_id,
+            match_id: payload.match_id || null,  // Null for friend requests
             notification_type: payload.notification_type,
             device_install_id: token.device_install_id,
             push_token_id: token.id,

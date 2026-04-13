@@ -373,9 +373,19 @@ struct MainTabView: View {
             
             print("[ReplayNavTrace] MainTabView.selectedTab | \(oldTabName) → \(newTabName) | isInRemoteFlow: \(remoteMatchService.isInRemoteFlow) | flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "none") | \(Date())")
         }
-        .onChange(of: notificationService.pendingIntent?.matchId) { _, newValue in
-            guard newValue != nil else { return }
-            selectedTab = 2
+        .onChange(of: notificationService.pendingIntent) { _, intent in
+            guard let intent = intent else { return }
+            
+            // Route based on destination
+            switch intent.destination {
+            case .remoteTab:
+                selectedTab = 2  // Remote matches tab
+            case .friendsTab:
+                selectedTab = 1  // Friends tab
+            }
+            
+            // Clear intent after consumption
+            notificationService.clearIntent()
         }
         .onChange(of: authService.currentUser?.id) { oldValue, newValue in
             loadPendingRequestCount()

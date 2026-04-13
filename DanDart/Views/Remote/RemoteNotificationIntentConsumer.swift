@@ -26,18 +26,24 @@ struct RemoteNotificationIntentConsumer {
         setHighlighted: (UUID?) -> Void,
         clearIntent: () -> Void
     ) async {
+        // Remote match notifications require a matchId
+        guard let matchId = intent.matchId else {
+            clearIntent()
+            return
+        }
+        
         await loadMatches()
 
         let snapshot = listsSnapshot()
-        guard snapshot.contains(matchId: intent.matchId) else {
+        guard snapshot.contains(matchId: matchId) else {
             clearIntent()
             return
         }
 
         await Task.yield()
 
-        scrollTo(intent.matchId)
-        setHighlighted(intent.matchId)
+        scrollTo(matchId)
+        setHighlighted(matchId)
 
         try? await Task.sleep(nanoseconds: 1_250_000_000)
 

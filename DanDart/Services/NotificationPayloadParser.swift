@@ -2,6 +2,19 @@ import Foundation
 
 struct NotificationPayloadParser {
     static func parseIntent(from userInfo: [AnyHashable: Any]) -> NotificationRouteIntent? {
+        let typeString = (userInfo["type"] as? String)?.lowercased()
+        let highlightString = (userInfo["highlight"] as? String)?.lowercased()
+        
+        // Friend request notifications (V1: no ID needed)
+        if typeString?.hasPrefix("friend_request") == true {
+            return NotificationRouteIntent(
+                matchId: nil,
+                destination: .friendsTab,
+                highlightStyle: .friendRequest
+            )
+        }
+        
+        // Remote match notifications (require matchId)
         let matchIdString = (userInfo["matchId"] as? String)
             ?? (userInfo["match_id"] as? String)
             ?? (userInfo["matchID"] as? String)
@@ -10,9 +23,6 @@ struct NotificationPayloadParser {
               let matchId = UUID(uuidString: matchIdString) else {
             return nil
         }
-
-        let typeString = (userInfo["type"] as? String)?.lowercased()
-        let highlightString = (userInfo["highlight"] as? String)?.lowercased()
 
         let highlightStyle: NotificationRouteIntent.HighlightStyle
 

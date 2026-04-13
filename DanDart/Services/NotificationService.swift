@@ -250,12 +250,14 @@ class NotificationService: NSObject, ObservableObject {
         // Foreground policy (Phase 8): if app is already active, do not force navigation.
         #if canImport(UIKit)
         guard UIApplication.shared.applicationState != .active else {
-            print("⏭️ Notification tap ignored (app active) matchId=\(intent.matchId.uuidString.prefix(8))...")
+            let idString = intent.matchId.map { String($0.uuidString.prefix(8)) } ?? "none"
+            print("⏭️ Notification tap ignored (app active) matchId=\(idString)...")
             return
         }
         #endif
 
-        print("📍 Enqueue notification intent matchId=\(intent.matchId.uuidString.prefix(8))... highlight=\(intent.highlightStyle)")
+        let idString = intent.matchId.map { String($0.uuidString.prefix(8)) } ?? "none"
+        print("📍 Enqueue notification intent matchId=\(idString)... highlight=\(intent.highlightStyle)")
         pendingIntent = intent
     }
     
@@ -298,18 +300,20 @@ extension NotificationService: UNUserNotificationCenterDelegate {
 // MARK: - Notification Route Intent Model
 
 /// Intent object for deep-linking from push notifications
-struct NotificationRouteIntent {
-    let matchId: UUID
-    let destination: RemoteDestination
+struct NotificationRouteIntent: Equatable {
+    let matchId: UUID?  // Optional - nil for friend requests (V1)
+    let destination: Destination
     let highlightStyle: HighlightStyle
     var isConsumed: Bool = false
     
-    enum RemoteDestination {
+    enum Destination: Equatable {
         case remoteTab
+        case friendsTab
     }
     
-    enum HighlightStyle {
+    enum HighlightStyle: Equatable {
         case incoming  // Scroll to pending challenges section
         case ready     // Scroll to ready matches section
+        case friendRequest  // Friend request notification
     }
 }
