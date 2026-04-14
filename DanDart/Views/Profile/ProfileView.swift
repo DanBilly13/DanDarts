@@ -19,12 +19,14 @@ struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var soundManager = SoundManager.shared
     @StateObject private var voicePermissionManager = VoicePermissionManager.shared
+    @StateObject private var notificationService = NotificationService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
     @State private var showEditProfileV2: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
     @State private var showResetTipsConfirmation: Bool = false
     @State private var showVoicePermissionAlert = false
+    @State private var showNotificationPermissionAlert = false
     @State private var voiceAlertMessage = ""
     @State private var navigationPath: [ProfileDestination] = []
     @State private var isRefreshingProfile: Bool = false
@@ -78,6 +80,7 @@ struct ProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await refreshProfileIfPossible()
+                await notificationService.loadNotificationState()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
                 Task {
@@ -149,6 +152,14 @@ struct ProfileView: View {
                 }
             } message: {
                 Text(voiceAlertMessage)
+            }
+            .alert("Notifications Disabled", isPresented: $showNotificationPermissionAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Open Settings") {
+                    notificationService.openAppSettings()
+                }
+            } message: {
+                Text("Push notifications are turned off for DanDart. Enable them in Settings to receive match invites and friend requests.")
             }
         }
     }
@@ -259,6 +270,31 @@ struct ProfileView: View {
                     icon: Image("sfx_on"),
                     title: "Sound Effects",
                     isOn: $soundManager.soundEffectsEnabled
+                )
+                
+                Divider()
+                    .background(AppColor.textSecondary.opacity(0.2))
+                    .padding(.leading, 44)
+                
+                // Notifications Toggle
+                SettingsToggleRow(
+                    icon: Image(systemName: "bell.fill"),
+                    title: "Notifications",
+                    isOn: Binding(
+                        get: { notificationService.notificationsEnabled },
+                        set: { newValue in
+                            Task {
+                                do {
+                                    try await notificationService.setNotificationsEnabled(newValue)
+                                } catch NotificationService.NotificationError.permissionDenied {
+                                    // Show alert for denied permission
+                                    showNotificationPermissionAlert = true
+                                } catch {
+                                    print("❌ Failed to toggle notifications: \(error)")
+                                }
+                            }
+                        }
+                    )
                 )
                 
                 Divider()

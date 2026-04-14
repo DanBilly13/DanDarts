@@ -20,7 +20,7 @@ interface SuccessResponse {
   data?: any
 }
 
-const CHALLENGE_EXPIRY_SECONDS = 30 // 30 seconds (DEBUG: was 86400/24h)
+const CHALLENGE_EXPIRY_SECONDS = 300 // 5 minutes
 
 serve(async (req) => {
   // Handle CORS preflight

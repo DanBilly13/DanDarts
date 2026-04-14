@@ -20,6 +20,7 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - Published Properties
     @Published var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published var pendingIntent: NotificationRouteIntent?
+    @Published var notificationsEnabled: Bool = false
     
     // MARK: - Private Properties
     private let supabaseService = SupabaseService.shared
@@ -28,6 +29,8 @@ class NotificationService: NSObject, ObservableObject {
     
     private let deviceInstallIdKey = "device_install_id"
     private let storedTokenKey = "apns_device_token"
+    
+    private var isTogglingNotifications = false
     
     // Store the last received token for retry attempts
     private var lastReceivedToken: String? {
@@ -38,7 +41,10 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - Initialization
     private override init() {
         super.init()
-        // Additional setup will be added in later tasks
+        Task {
+            await checkAuthorizationStatus()
+            await loadNotificationState()
+        }
     }
     
     // MARK: - Device Install ID
@@ -219,6 +225,179 @@ class NotificationService: NSObject, ObservableObject {
         }
     }
     
+    /// Activate current device token (opposite of deactivate)
+    func activateCurrentDeviceToken() async {
+        guard let userId = authService.currentUser?.id else {
+            print("⚠️ Cannot activate token - no authenticated user")
+            return
+        }
+        
+        let deviceInstallId = getOrCreateDeviceInstallId()
+        
+        print("🔓 Activating push token...")
+        print("   User ID: \(userId)")
+        print("   Device Install ID: \(deviceInstallId)")
+        
+        do {
+            // Set is_active = true for this user/device combination
+            try await supabaseService.client
+                .from("push_tokens")
+                .update(["is_active": true])
+                .eq("user_id", value: userId.uuidString)
+                .eq("device_install_id", value: deviceInstallId)
+                .execute()
+            
+            print("✅ Push token activated successfully")
+        } catch {
+            print("❌ Failed to activate push token: \(error)")
+        }
+    }
+    
+    /// Load current notification state from database
+    func loadNotificationState() async {
+        print("📥 [Load] loadNotificationState() called")
+        
+        // Guard: Don't reload state while a manual toggle is in progress
+        guard !isTogglingNotifications else {
+            print("⏭️ [Load] Skipping loadNotificationState - toggle operation in progress")
+            return
+        }
+        
+        guard let userId = authService.currentUser?.id else {
+            print("⏭️ [Load] No authenticated user - notifications disabled")
+            notificationsEnabled = false
+            return
+        }
+        
+        let deviceInstallId = getOrCreateDeviceInstallId()
+        
+        print("📥 [Load] Loading notification state from database...")
+        print("   User ID: \(userId)")
+        print("   Device Install ID: \(deviceInstallId)")
+        
+        do {
+            struct PushTokenResponse: Decodable {
+                let is_active: Bool
+            }
+            
+            let response: [PushTokenResponse] = try await supabaseService.client
+                .from("push_tokens")
+                .select("is_active")
+                .eq("user_id", value: userId.uuidString)
+                .eq("device_install_id", value: deviceInstallId)
+                .execute()
+                .value
+            
+            if let tokenState = response.first {
+                print("📊 [Load] Database returned is_active=\(tokenState.is_active)")
+                notificationsEnabled = tokenState.is_active
+                print("✅ [Load] notificationsEnabled set to \(notificationsEnabled)")
+            } else {
+                // No token record yet - default to false
+                print("ℹ️ [Load] No token record found - defaulting to disabled")
+                notificationsEnabled = false
+                print("✅ [Load] notificationsEnabled set to false")
+            }
+        } catch {
+            print("❌ Failed to load notification state: \(error)")
+            notificationsEnabled = false
+        }
+    }
+    
+    /// Toggle notifications on/off (called from Settings UI)
+    func setNotificationsEnabled(_ enabled: Bool) async throws {
+        guard !isTogglingNotifications else {
+            print("⏭️ Already toggling notifications - skipping")
+            return
+        }
+        
+        isTogglingNotifications = true
+        defer { isTogglingNotifications = false }
+        
+        print("🔔 [Toggle] setNotificationsEnabled(\(enabled)) called")
+        print("🔔 [Toggle] Setting notifications to: \(enabled ? "enabled" : "disabled")")
+        
+        if enabled {
+            // Turning ON
+            await checkAuthorizationStatus()
+            
+            switch authorizationStatus {
+            case .authorized:
+                // Permission already granted - activate token
+                print("✅ Permission already granted - activating token")
+                
+                // Ensure token is synced
+                if let token = lastReceivedToken {
+                    try await syncPushToken(token)
+                } else {
+                    // Request token registration
+                    #if canImport(UIKit)
+                    await MainActor.run {
+                        UIApplication.shared.registerForRemoteNotifications()
+                    }
+                    #endif
+                }
+                
+                print("📤 [Toggle] About to activate token in database (is_active=true)")
+                await activateCurrentDeviceToken()
+                print("✅ [Toggle] Database updated successfully (is_active=true)")
+                notificationsEnabled = true
+                print("✅ [Toggle] notificationsEnabled set to true")
+                
+            case .notDetermined:
+                // Need to request permission
+                print("❓ Permission not determined - requesting")
+                try await requestPermissions()
+                
+                // Check result
+                await checkAuthorizationStatus()
+                if authorizationStatus == .authorized {
+                    await activateCurrentDeviceToken()
+                    notificationsEnabled = true
+                } else {
+                    notificationsEnabled = false
+                    throw NotificationError.permissionDenied
+                }
+                
+            case .denied:
+                // Permission denied - cannot enable
+                print("❌ Permission denied - cannot enable notifications")
+                notificationsEnabled = false
+                throw NotificationError.permissionDenied
+                
+            case .provisional, .ephemeral:
+                // Treat as authorized
+                await activateCurrentDeviceToken()
+                notificationsEnabled = true
+                
+            @unknown default:
+                notificationsEnabled = false
+                throw NotificationError.unknownStatus
+            }
+        } else {
+            // Turning OFF
+            print("📤 [Toggle] About to deactivate token in database (is_active=false)")
+            await deactivateCurrentDeviceToken()
+            print("✅ [Toggle] Database updated successfully (is_active=false)")
+            notificationsEnabled = false
+            print("✅ [Toggle] notificationsEnabled set to false")
+        }
+    }
+    
+    /// Open iOS Settings app
+    func openAppSettings() {
+        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
+            print("❌ Failed to create settings URL")
+            return
+        }
+        
+        print("📱 Opening iOS Settings...")
+        
+        if UIApplication.shared.canOpenURL(settingsURL) {
+            UIApplication.shared.open(settingsURL)
+        }
+    }
+    
     /// Retry syncing stored token (called on app launch or auth state change)
     func retryTokenSyncIfNeeded() async {
         // Only retry if we have a stored token and an authenticated user
@@ -264,6 +443,25 @@ class NotificationService: NSObject, ObservableObject {
     /// Clear consumed intent
     func clearIntent() {
         pendingIntent = nil
+    }
+    
+    // MARK: - Error Types
+    
+    enum NotificationError: LocalizedError {
+        case permissionDenied
+        case unknownStatus
+        case noAuthenticatedUser
+        
+        var errorDescription: String? {
+            switch self {
+            case .permissionDenied:
+                return "Notification permission denied"
+            case .unknownStatus:
+                return "Unknown notification status"
+            case .noAuthenticatedUser:
+                return "No authenticated user"
+            }
+        }
     }
 }
 
