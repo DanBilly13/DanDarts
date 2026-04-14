@@ -232,13 +232,35 @@ serve(async (req) => {
 
     console.log(`✅ Challenge created: ${match.id}`)
 
+    // Fetch challenger's display name for push notification
+    let challengerName = 'Someone' // final fallback
+    try {
+      const { data: challengerProfile, error: profileError } = await supabaseClient
+        .from('users')
+        .select('display_name')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (profileError) {
+        console.log(`⚠️ Profile lookup failed (non-critical):`, profileError)
+      } else if (challengerProfile?.display_name) {
+        challengerName = challengerProfile.display_name
+      } else {
+        // Fallback to user_metadata.full_name if display_name is missing
+        challengerName = user.user_metadata?.full_name || 'Someone'
+      }
+    } catch (profileLookupError) {
+      console.log(`⚠️ Profile lookup exception (non-critical):`, profileLookupError)
+      challengerName = user.user_metadata?.full_name || 'Someone'
+    }
+
     // Send push notification to receiver
     try {
       const pushPayload = {
         user_id: receiver_id,
         notification_type: 'challenge_received',
         match_id: match.id,
-        title: `Challenge from ${user.user_metadata?.full_name || 'Someone'}!`,
+        title: `Challenge from ${challengerName}!`,
         body: `You've been challenged to a ${game_type} match`,
         route: 'remote',
         highlight: 'incoming',
