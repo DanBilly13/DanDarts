@@ -12,8 +12,12 @@ struct RemoteGamesTab: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var notificationService: NotificationService
+    @StateObject private var expiredChallengeService = ExpiredChallengeService.shared
     
     @Binding var showGameSelection: Bool
+    
+    // Stage 1: Track if this tab is currently visible
+    @State private var isTabVisible = false
     
     @State private var errorMessage: String?
     @State private var showError = false
@@ -42,6 +46,7 @@ struct RemoteGamesTab: View {
     
     // Phase 10: Declined challenge presentation
     @State private var previousSentChallenges: [RemoteMatchWithPlayers] = []
+    @State private var previousPendingChallenges: [RemoteMatchWithPlayers] = []
     @State private var declinedMatchesCache: [UUID: RemoteMatchWithPlayers] = [:]
     @State private var showDeclinedForMatchIds: Set<UUID> = []
     @State private var declineHandledMatchIds: Set<UUID> = []
@@ -119,6 +124,12 @@ struct RemoteGamesTab: View {
             Text("Select which game type you'd like to play")
         }
         .background(AppColor.backgroundPrimary)
+    .onAppear {
+        isTabVisible = true
+    }
+    .onDisappear {
+        isTabVisible = false
+    }
     }
     
     
@@ -445,6 +456,10 @@ struct RemoteGamesTab: View {
                 detectDeclinedMatches(old: previousSentChallenges, new: newValue)
                 previousSentChallenges = newValue
             }
+            .onReceive(remoteMatchService.$pendingChallenges) { newValue in
+                detectExpiredIncomingChallenges(old: previousPendingChallenges, new: newValue)
+                previousPendingChallenges = newValue
+            }
             .onReceive(remoteMatchService.$readyMatches) { newReadyMatches in
                 // Clean up any cached declined matches that have become ready
                 for readyMatch in newReadyMatches {
@@ -655,7 +670,7 @@ struct RemoteGamesTab: View {
         let opponent = matchWithPlayers.opponent
         FlowDebug.log("ACCEPT: opponent captured name=\(opponent.displayName)", matchId: matchId)
         
-        // BEGIN ACCEPT UI FREEZE - force pending state during flow
+        // BEGIN ACCEPT UI FREEZE - force pending state during receiver accept flow
         remoteMatchService.beginAcceptPresentationFreeze(matchId: matchId)
         
         // FREEZE LIST SNAPSHOT - capture BEFORE any state changes or network calls
@@ -1262,9 +1277,68 @@ struct RemoteGamesTab: View {
         guard !fadingMatchIds.contains(matchId) && !expiredMatchIds.contains(matchId) else {
             return
         }
-        
-        print("⏰ Starting expiration timer for match: \(matchId)")
-        
+
+        // === STAGE 1: Diagnostic logging only ===
+
+        // Find the match to get context
+        var foundMatch: RemoteMatchWithPlayers?
+        var isIncomingChallenge = false
+        var isReplayOrRematch = false
+
+        // Check pending challenges (incoming) using frozen-aware stable snapshot
+        if let match = self.pendingForUIStable.first(where: { $0.match.id == matchId }) {
+            foundMatch = match
+            isIncomingChallenge = true
+            isReplayOrRematch = match.match.isReplay == true || match.match.replaySourceMatchId != nil
+        }
+        // Check ready matches (could be replay) using frozen-aware stable snapshot
+        else if let match = self.readyForUIStable.first(where: { $0.match.id == matchId }) {
+            foundMatch = match
+            isIncomingChallenge = false
+            isReplayOrRematch = match.match.isReplay == true || match.match.replaySourceMatchId != nil
+        }
+
+        // Determine if user is currently on Remote tab
+        let isUserOnRemoteTab = isTabVisible
+
+        // Log diagnostic information
+        print("=== CHALLENGE EXPIRY DETECTED ===")
+        print("matchId: \(matchId)")
+        print("isReplayOrRematch: \(isReplayOrRematch)")
+        print("isUserOnRemoteTab: \(isUserOnRemoteTab)")
+        print("isIncomingChallenge: \(isIncomingChallenge)")
+
+        if let match = foundMatch {
+            print("challengeExpiresAt: \(match.match.challengeExpiresAt?.description ?? "nil")")
+            print("joinWindowExpiresAt: \(match.match.joinWindowExpiresAt?.description ?? "nil")")
+            print("status: \(match.match.status?.rawValue ?? "nil")")
+            print("challengerId: \(match.match.challengerId)")
+            print("receiverId: \(match.match.receiverId)")
+
+            if let currentUser = authService.currentUser?.id {
+                print("currentUserId: \(currentUser)")
+                print("isReceiver: \(match.match.receiverId == currentUser)")
+            } else {
+                print("currentUserId: nil (not authenticated)")
+            }
+        } else {
+            print("WARNING: Match not found in any array")
+        }
+        print("=== END EXPIRY DIAGNOSTICS ===")
+
+        // === STAGE 2: Storage for expired unseen challenges ===
+        // Only store when all preservation conditions are met
+        if let match = foundMatch {
+            expiredChallengeService.storeExpiredChallenge(
+                matchWithPlayers: match,
+                isReplayOrRematch: isReplayOrRematch,
+                isUserOnRemoteTab: isUserOnRemoteTab,
+                isIncomingChallenge: isIncomingChallenge
+            )
+        }
+
+        print("Starting expiration timer for match: \(matchId)")
+
         // Fire-and-forget: Call API to update status to expired
         // Don't await - let it happen in background
         Task {
@@ -1381,6 +1455,120 @@ struct RemoteGamesTab: View {
         case .none:
             // No status set - shouldn't happen, default to pending
             return .pending
+        }
+    }
+    
+    /// Detect expired incoming challenges when pending challenges list changes
+    /// This handles server-side expiry for incoming challenges when user is ON Remote tab
+    private func detectExpiredIncomingChallenges(
+        old: [RemoteMatchWithPlayers],
+        new: [RemoteMatchWithPlayers]
+    ) {
+        let oldIds = Set(old.map { $0.match.id })
+        let newIds = Set(new.map { $0.match.id })
+        let removedIds = oldIds.subtracting(newIds)
+        
+        print("ð [IncomingExpiryDetect] old=\(oldIds.map { String($0.uuidString.prefix(8)) }.sorted()) new=\(newIds.map { String($0.uuidString.prefix(8)) }.sorted()) removed=\(removedIds.map { String($0.uuidString.prefix(8)) }.sorted())")
+        
+        for removedId in removedIds {
+            print("ð INCOMING REMOVAL DETECTED match=\(removedId.uuidString.prefix(8))")
+            
+            // Find the removed match in OLD snapshot
+            guard let removedMatch = old.first(where: { $0.match.id == removedId }) else {
+                continue
+            }
+            
+            // GUARD: Previous status was .pending
+            guard removedMatch.match.status == .pending else {
+                print("â Skip - status was \(removedMatch.match.status?.rawValue ?? "nil"), not .pending")
+                continue
+            }
+            
+            // GUARD: Not expired locally
+            guard !expiredMatchIds.contains(removedId) else {
+                print("â Skip - match already expired")
+                continue
+            }
+            
+            // GUARD: Not already handled
+            guard !declineHandledMatchIds.contains(removedId),
+                  !showDeclinedForMatchIds.contains(removedId),
+                  !fadingMatchIds.contains(removedId) else {
+                print("â Skip - already handled")
+                continue
+            }
+            
+            // === EXPIRED CHALLENGE DIAGNOSTICS (Incoming server-side expiry) ===
+            // This handles the case where user is ON Remote tab and server expires an incoming challenge
+            print("=== CHALLENGE EXPIRY DETECTED (INCOMING SERVER-SIDE) ===")
+            print("matchId: \(removedId)")
+            print("isReplayOrRematch: \(removedMatch.match.isReplay == true || removedMatch.match.replaySourceMatchId != nil)")
+            print("isUserOnRemoteTab: \(isTabVisible)")
+            print("isIncomingChallenge: true")
+            print("expiryPath: incoming server-side realtime update")
+            print("challengeExpiresAt: \(removedMatch.match.challengeExpiresAt?.description ?? "nil")")
+            print("joinWindowExpiresAt: \(removedMatch.match.joinWindowExpiresAt?.description ?? "nil")")
+            print("status: \(removedMatch.match.status?.rawValue ?? "nil")")
+            print("challengerId: \(removedMatch.match.challengerId)")
+            print("receiverId: \(removedMatch.match.receiverId)")
+            print("currentUserId: \(removedMatch.currentUserId)")
+            print("isReceiver: \(removedMatch.match.receiverId == removedMatch.currentUserId)")
+            print("=== END EXPIRY DIAGNOSTICS ===")
+            
+            // === STAGE 2: Storage for expired unseen challenges ===
+            // Only store when all preservation conditions are met
+            let isReplayOrRematch = removedMatch.match.isReplay == true || removedMatch.match.replaySourceMatchId != nil
+            expiredChallengeService.storeExpiredChallenge(
+                matchWithPlayers: removedMatch,
+                isReplayOrRematch: isReplayOrRematch,
+                isUserOnRemoteTab: isTabVisible,
+                isIncomingChallenge: true
+            )
+            
+            // Verify via network to determine if it was expired vs other terminal state
+            Task {
+                await classifyIncomingRemoval(matchId: removedId, removedMatch: removedMatch)
+            }
+        }
+    }
+    
+    /// Classify an incoming challenge removal by fetching authoritative status
+    private func classifyIncomingRemoval(
+        matchId: UUID,
+        removedMatch: RemoteMatchWithPlayers
+    ) async {
+        print("ð ð¸ VERIFYING INCOMING TERMINAL REASON match=\(matchId.uuidString.prefix(8))")
+        
+        // Fetch current authoritative status
+        guard let currentMatch = try? await remoteMatchService.fetchMatch(matchId: matchId) else {
+            print("â INCOMING EXPIRED SKIPPED - could not fetch match for verification")
+            return
+        }
+        
+        let status = currentMatch.status
+        print("ð ð¸ INCOMING VERIFIED STATUS = \(status?.rawValue ?? "nil")")
+        
+        await MainActor.run {
+            // Only show declined UI for truly terminal states
+            switch status {
+            case .expired:
+                print("â INCOMING EXPIRED CONFIRMED - server status is expired")
+                // Don't show declined UI for expired challenges - they should just disappear
+                
+            case .cancelled:
+                print("â INCOMING CANCELLED CONFIRMED - server status is cancelled")
+                // Don't show declined UI for cancelled challenges either
+                
+            case .ready, .lobby, .inProgress:
+                print("â INCOMING TRANSITION - status became \(status?.rawValue ?? "nil")")
+                // Normal transition, no expired UI needed
+                
+            case .completed:
+                print("â INCOMING COMPLETED - status became completed")
+                
+            case .pending, .sent, .none:
+                print("â INCOMING UNCLEAR - state was ambiguous: \(status?.rawValue ?? "nil")")
+            }
         }
     }
     
@@ -1532,7 +1720,7 @@ struct RemoteGamesTab: View {
         
         // Primary guard: ensure toast/timer run only once
         guard !declineHandledMatchIds.contains(matchId) else {
-            print("⚠️ Decline already handled for: \(matchId)")
+            print("â ï¸ Decline already handled for: \(matchId)")
             return
         }
         
@@ -1543,11 +1731,58 @@ struct RemoteGamesTab: View {
         let isInEnterFlow = remoteMatchService.isPendingEnterFlow(matchId: matchId)
         
         guard !isNowReady && !isNowActive && !isInEnterFlow else {
-            print("⚠️ Abort decline - match is now ready/active/entering (challenger side protection)")
+            print("â ï¸ Abort decline - match is now ready/active/entering (challenger side protection)")
             return
         }
         
-        print("🚫 Starting decline display for match: \(matchId)")
+        // === EXPIRED CHALLENGE DIAGNOSTICS (Server-side expiry path) ===
+        // This handles the case where user is ON Remote tab and server updates status to .expired
+        if match.match.status == .expired {
+            // Find the match context for diagnostics
+            var isReplayOrRematch = false
+            var isIncomingChallenge = false
+            
+            // Determine if this is an incoming challenge and if it's a replay
+            if match.match.challengerId != match.currentUserId {
+                // Current user is receiver - this is an incoming challenge
+                isIncomingChallenge = true
+                isReplayOrRematch = match.match.isReplay == true || match.match.replaySourceMatchId != nil
+            } else {
+                // Current user is challenger - this is an outgoing challenge
+                isIncomingChallenge = false
+                isReplayOrRematch = match.match.isReplay == true || match.match.replaySourceMatchId != nil
+            }
+            
+            // Determine if user is currently on Remote tab (always true for this path)
+            let isUserOnRemoteTab = isTabVisible
+            
+            // Log diagnostic information
+            print("=== CHALLENGE EXPIRY DETECTED (SERVER-SIDE) ===")
+            print("matchId: \(matchId)")
+            print("isReplayOrRematch: \(isReplayOrRematch)")
+            print("isUserOnRemoteTab: \(isUserOnRemoteTab)")
+            print("isIncomingChallenge: \(isIncomingChallenge)")
+            print("expiryPath: server-side realtime update")
+            print("challengeExpiresAt: \(match.match.challengeExpiresAt?.description ?? "nil")")
+            print("joinWindowExpiresAt: \(match.match.joinWindowExpiresAt?.description ?? "nil")")
+            print("status: \(match.match.status?.rawValue ?? "nil")")
+            print("challengerId: \(match.match.challengerId)")
+            print("receiverId: \(match.match.receiverId)")
+            print("currentUserId: \(match.currentUserId)")
+            print("isReceiver: \(match.match.receiverId == match.currentUserId)")
+            print("=== END EXPIRY DIAGNOSTICS ===")
+            
+            // === STAGE 2: Storage for expired unseen challenges ===
+            // Only store when all preservation conditions are met
+            expiredChallengeService.storeExpiredChallenge(
+                matchWithPlayers: match,
+                isReplayOrRematch: isReplayOrRematch,
+                isUserOnRemoteTab: isUserOnRemoteTab,
+                isIncomingChallenge: isIncomingChallenge
+            )
+        }
+        
+        print("ð « Starting decline display for match: \(matchId)")
         
         // Mark as handled IMMEDIATELY (before any async work)
         declineHandledMatchIds.insert(matchId)
@@ -1558,7 +1793,7 @@ struct RemoteGamesTab: View {
         // Mark as showing declined
         showDeclinedForMatchIds.insert(matchId)
         
-        print("🧪 [DeclineDebug] Cached declined match wrapperId=\(match.id.uuidString.prefix(8)) matchId=\(matchId.uuidString.prefix(8))")
+        print("ð § [DeclineDebug] Cached declined match wrapperId=\(match.id.uuidString.prefix(8)) matchId=\(matchId.uuidString.prefix(8))")
         logDeclineDebugSnapshot("after inserting declined cache")
         
         // TODO: Show toast "Match declined"

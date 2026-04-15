@@ -666,6 +666,84 @@ extension RemoteMatch {
     )
 }
 
+// MARK: - Expired Challenge Model
+
+struct ExpiredChallenge: Codable, Identifiable {
+    let id: UUID
+    let matchId: UUID
+    let challengerId: UUID
+    let receiverId: UUID
+    let gameType: String
+    let gameName: String
+    let matchFormat: Int
+    let challengerDisplayName: String
+    let challengerNickname: String?
+    let challengerAvatarURL: String?
+    let expiredAt: Date
+    let challengeExpiresAt: Date
+    let createdAt: Date
+    
+    // Computed properties
+    var isReceiver: Bool {
+        // This will be determined by the current user context when loaded
+        false
+    }
+    
+    var opponentDisplayName: String {
+        challengerDisplayName
+    }
+    
+    init(
+        matchId: UUID,
+        challengerId: UUID,
+        receiverId: UUID,
+        gameType: String,
+        gameName: String,
+        matchFormat: Int,
+        challengerDisplayName: String,
+        challengerNickname: String?,
+        challengerAvatarURL: String?,
+        expiredAt: Date,
+        challengeExpiresAt: Date,
+        createdAt: Date
+    ) {
+        self.id = UUID() // Generate unique storage ID
+        self.matchId = matchId
+        self.challengerId = challengerId
+        self.receiverId = receiverId
+        self.gameType = gameType
+        self.gameName = gameName
+        self.matchFormat = matchFormat
+        self.challengerDisplayName = challengerDisplayName
+        self.challengerNickname = challengerNickname
+        self.challengerAvatarURL = challengerAvatarURL
+        self.expiredAt = expiredAt
+        self.challengeExpiresAt = challengeExpiresAt
+        self.createdAt = createdAt
+    }
+    
+    // Create from RemoteMatchWithPlayers snapshot
+    static func from(
+        matchWithPlayers: RemoteMatchWithPlayers,
+        expiredAt: Date
+    ) -> ExpiredChallenge {
+        return ExpiredChallenge(
+            matchId: matchWithPlayers.match.id,
+            challengerId: matchWithPlayers.match.challengerId,
+            receiverId: matchWithPlayers.match.receiverId,
+            gameType: matchWithPlayers.match.gameType,
+            gameName: matchWithPlayers.match.gameName,
+            matchFormat: matchWithPlayers.match.matchFormat,
+            challengerDisplayName: matchWithPlayers.challenger.displayName,
+            challengerNickname: matchWithPlayers.challenger.nickname,
+            challengerAvatarURL: matchWithPlayers.challenger.avatarURL,
+            expiredAt: expiredAt,
+            challengeExpiresAt: matchWithPlayers.match.challengeExpiresAt ?? Date(),
+            createdAt: matchWithPlayers.match.createdAt
+        )
+    }
+}
+
 // MARK: - Presentation Status Extension
 
 extension RemoteMatch {
@@ -677,3 +755,4 @@ extension RemoteMatch {
         return status ?? .pending
     }
 }
+
