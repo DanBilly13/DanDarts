@@ -451,7 +451,9 @@ class VoiceChatService: NSObject, ObservableObject {
             createdAt: Date()
         )
         
+        let sessionStartTime = Date()
         print("🟡 [Voice] Creating new session - sessionId: \(sessionId), matchId: \(matchId)")
+        print("⏱️ [VoiceDelay] SESSION_START timestamp=\(ISO8601DateFormatter().string(from: sessionStartTime)) matchId=\(matchId.uuidString.prefix(8))")
         updateSession(session)
         
         // Initialize WebRTC components
@@ -536,7 +538,9 @@ class VoiceChatService: NSObject, ObservableObject {
             self.isLocalReady = true
             let readyDuration = Date().timeIntervalSince(readyStart)
             print("⏱️ [VoiceTiming] CHECKPOINT 3: Local voice_ready sent (took \(String(format: "%.3f", readyDuration))s)")
-            print("✅ [VoiceSignalling] voice_ready sent (role: \(role))")
+            let readyTimestamp = Date()
+        print("✅ [VoiceSignalling] voice_ready sent (role: \(role))")
+        print("⏱️ [VoiceDelay] READY_SENT timestamp=\(ISO8601DateFormatter().string(from: readyTimestamp)) role=\(role) matchId=\(matchId.uuidString.prefix(8))")
         } catch {
             print("❌ [VoiceChatService] Failed to send ready: \(error)")
             session.connectionState = .failed
@@ -566,7 +570,9 @@ class VoiceChatService: NSObject, ObservableObject {
             
             // If still no offer received, request one
             if let session = currentSession, session.connectionState == .connecting {
-                print("⏱️ [VoiceSignalling] No offer received after 5s, sending voice_request_offer")
+                let requestOfferTimestamp = Date()
+            print("⏱️ [VoiceSignalling] No offer received after 5s, sending voice_request_offer")
+            print("⏱️ [VoiceDelay] REQUEST_OFFER_TIMEOUT timestamp=\(ISO8601DateFormatter().string(from: requestOfferTimestamp)) matchId=\(session.matchId.uuidString.prefix(8))")
                 try? await sendRequestOffer()
             }
         }
@@ -726,6 +732,32 @@ class VoiceChatService: NSObject, ObservableObject {
         print("   - Signaling channel: REBOUND to new match")
         print("   - Session matchId: \(session.matchId)")
         print("   - Peer ready flags: RESET and RE-ANNOUNCED")
+    }
+    
+    /// Re-announce voice readiness if session is still connecting
+    /// Used when voice window starts to handle delayed peer entry
+    @MainActor
+    func reannounceReadyIfConnecting() async throws {
+        guard let session = currentSession else {
+            print("⚠️ [VoiceSignalling] Cannot reannounce: no active session")
+            return
+        }
+        
+        // Only re-announce if still trying to connect
+        guard session.connectionState == .connecting else {
+            print("ℹ️ [VoiceSignalling] Skipping reannounce: already \(session.connectionState)")
+            return
+        }
+        
+        guard let role = localRole else {
+            print("⚠️ [VoiceSignalling] Cannot reannounce: no local role")
+            return
+        }
+        
+        print("🔊 [VoiceWindow] Re-announcing voice_ready as \(role) after window start")
+        
+        try await sendReady(role: role)
+        print("✅ [VoiceWindow] Re-announcement sent")
     }
     
     /// Re-announce voice readiness after replay rebind
@@ -1642,7 +1674,9 @@ class VoiceChatService: NSObject, ObservableObject {
             return
         }
         
+        let readyReceivedTimestamp = Date()
         print("✅ [VoiceSignalling] voice_ready received (peer role: \(peerRole))")
+        print("⏱️ [VoiceDelay] READY_RECEIVED timestamp=\(ISO8601DateFormatter().string(from: readyReceivedTimestamp)) peerRole=\(peerRole) matchId=\(session.matchId.uuidString.prefix(8))")
         
         // Mark peer as ready
         self.isPeerReady = true

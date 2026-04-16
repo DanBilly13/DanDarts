@@ -50,6 +50,7 @@ struct RemoteLobbyView: View {
     // Voice connection state
     @State private var hasReportedVoiceReady = false
     @State private var voiceWindowTimer: Timer?
+    @State private var voiceHealthMonitorTimer: Timer?
     @State private var lastObservedPhase: LobbyPhase = .waiting
     
     // Lobby phase enum
@@ -480,7 +481,11 @@ struct RemoteLobbyView: View {
                         
                         // If voice window started, begin monitoring
                         if let deadline = flowMatch.voiceConnectDeadline {
+                            let windowStartTime = Date()
+                            let voiceState = voiceChatService.connectionState
+                            let sessionAge = voiceChatService.currentSession?.createdAt.timeIntervalSinceNow ?? 0
                             print("🎤 [VoiceWindow] Voice connection window started, deadline: \(deadline)")
+                            print("⏱️ [VoiceDelay] WINDOW_START timestamp=\(ISO8601DateFormatter().string(from: windowStartTime)) voiceState=\(voiceState) sessionAge=\(String(format: "%.1f", abs(sessionAge)))s matchId=\(match.id.uuidString.prefix(8))")
                             await MainActor.run {
                                 startVoiceWindowMonitoring(deadline: deadline)
                             }
@@ -503,6 +508,9 @@ struct RemoteLobbyView: View {
             // Task 13: Start voice session for this match
             Task {
                 do {
+                    let voiceStartTime = Date()
+                    let role = currentUser.id == match.challengerId ? "challenger" : "receiver"
+                    print("⏱️ [VoiceDelay] LOBBY_VOICE_START timestamp=\(ISO8601DateFormatter().string(from: voiceStartTime)) role=\(role) matchId=\(match.id.uuidString.prefix(8))")
                     try await voiceChatService.startSession(
                         matchId: match.id,
                         localUserId: currentUser.id,
@@ -510,6 +518,11 @@ struct RemoteLobbyView: View {
                         receiverId: match.receiverId
                     )
                     print("✅ [Lobby] Voice session started for match: \(match.id.uuidString.prefix(8))")
+                    
+                    // Start health monitoring to track session state during wait
+                    await MainActor.run {
+                        startVoiceHealthMonitoring()
+                    }
                 } catch {
                     print("⚠️ [Lobby] Failed to start voice session: \(error)")
                     // Non-blocking: voice failure doesn't prevent match
@@ -526,6 +539,10 @@ struct RemoteLobbyView: View {
             // Clean up voice window timer
             voiceWindowTimer?.invalidate()
             voiceWindowTimer = nil
+            
+            // Clean up voice health monitoring timer
+            voiceHealthMonitorTimer?.invalidate()
+            voiceHealthMonitorTimer = nil
             
             // Skip side effects in preview mode
             guard !isPreview else {
@@ -583,6 +600,24 @@ struct RemoteLobbyView: View {
                 print("🔄 [VoiceReady] Match changed (\(oldId.uuidString.prefix(8)) -> \(newId.uuidString.prefix(8))), resetting flags")
                 hasReportedVoiceReady = false
                 hasRequestedMatchStart = false
+            }
+        }
+        .onChange(of: remoteMatchService.flowMatch?.voiceConnectWindowStartedAt) { oldValue, newValue in
+            // Voice window just started (both players confirmed in lobby UI)
+            guard oldValue == nil, newValue != nil else { return }
+            
+            print("🎤 [VoiceWindow] Voice connection window started, re-announcing readiness")
+            
+            Task {
+                // Small delay to ensure both signaling channels are fully subscribed
+                try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                
+                do {
+                    try await voiceChatService.reannounceReadyIfConnecting()
+                    print("✅ [VoiceWindow] Re-announcement complete")
+                } catch {
+                    print("⚠️ [VoiceWindow] Re-announcement failed (non-blocking): \(error)")
+                }
             }
         }
         .onChange(of: voiceChatService.replayReadyMatchId) { _, replayMatchId in
@@ -1088,6 +1123,37 @@ struct RemoteLobbyView: View {
                 if phaseAfterRefresh == .countdown {
                     print("✅ [VoiceWindow] Countdown detected, stopping timer")
                     self.voiceWindowTimer?.invalidate()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Voice Health Monitoring
+    
+    /// Monitor voice session health while waiting for voice window to start
+    private func startVoiceHealthMonitoring() {
+        voiceHealthMonitorTimer?.invalidate()
+        
+        print("🔍 [VoiceHealth] Starting health monitoring")
+        
+        voiceHealthMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in
+                guard let session = self.voiceChatService.currentSession else {
+                    print("🔍 [VoiceHealth] No active session")
+                    self.voiceHealthMonitorTimer?.invalidate()
+                    return
+                }
+                
+                let sessionAge = abs(session.createdAt.timeIntervalSinceNow)
+                let state = self.voiceChatService.connectionState
+                let hasWindow = self.remoteMatchService.flowMatch?.voiceConnectDeadline != nil
+                
+                print("⏱️ [VoiceDelay] HEALTH_CHECK sessionAge=\(String(format: "%.1f", sessionAge))s state=\(state) hasWindow=\(hasWindow) matchId=\(self.match.id.uuidString.prefix(8))")
+                
+                // Stop monitoring once voice window starts
+                if hasWindow {
+                    print("🔍 [VoiceHealth] Voice window started, stopping health monitoring")
+                    self.voiceHealthMonitorTimer?.invalidate()
                 }
             }
         }
