@@ -530,7 +530,8 @@ struct RemoteGamesTab: View {
         EmptyState(
             imageName: "empty-remote",
             title: "No remote matches",
-            message: "No pending or upcoming challenges",
+            message: "Challenge a friend to a remote 301 or 501",
+            secondaryMessage: "Matches expire if not joined within 5 minutes",
             actionTitle: "Challenge a Friend",
             action: {
                 showGameSelection = true
