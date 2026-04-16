@@ -168,25 +168,24 @@ struct RemoteLobbyView: View {
             return "Voice unavailable"
             
         case .countdown:
-            // During countdown, show voice status or players ready
+            // During countdown, show voice status
             if voiceChatService.connectionState == .connected {
                 return "Voice connected"
-            } else if voiceChatService.connectionState == .failed || voiceChatService.connectionState == .disconnected {
-                return "Voice unavailable"
             }
-            return "Players ready"
+            // If not connected during countdown, voice is unavailable
+            return "Voice unavailable"
         }
     }
     
-    /// Whether the status text should pulse (waiting/connecting states)
-    private var shouldPulseStatus: Bool {
+    /// Whether to show typing indicator (waiting/connecting states)
+    private var shouldShowTypingIndicator: Bool {
         switch lobbyPhase {
         case .waiting:
-            return !bothPlayersPresent  // Pulse while waiting for opponent
+            return !bothPlayersPresent  // Show while waiting for opponent
         case .connecting:
-            return voiceChatService.connectionState != .connected  // Pulse while connecting
+            return voiceChatService.connectionState != .connected  // Show while connecting
         case .timedOut, .countdown:
-            return false  // No pulsing for static states
+            return false  // No indicator for static states
         }
     }
     
@@ -248,21 +247,22 @@ struct RemoteLobbyView: View {
                                 .foregroundColor(AppColor.textSecondary)
                         }
                     } else {
-                        // Single status line with smooth transitions
-                        Text(statusText)
-                            .font(.system(.headline, design: .rounded))
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppColor.textPrimary)
-                            .opacity(shouldPulseStatus ? 0.6 : 1.0)
-                            .animation(
-                                shouldPulseStatus 
-                                    ? .easeInOut(duration: 1.5).repeatForever(autoreverses: true)
-                                    : .easeInOut(duration: 0.3),
-                                value: shouldPulseStatus
-                            )
-                            .transition(.opacity)
-                            .id(statusText)  // Force view recreation on text change for smooth transition
-                            .animation(.easeInOut(duration: 0.3), value: statusText)
+                        // Status line with typing indicator
+                        HStack(alignment: .lastTextBaseline, spacing: 8) {
+                            Text(statusText)
+                                .font(.system(.headline, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundColor(AppColor.textPrimary)
+                                .transition(.opacity)
+                                .id(statusText)
+                            
+                            if shouldShowTypingIndicator {
+                                TypingIndicator()
+                                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            }
+                        }
+                        .animation(.easeInOut(duration: 0.3), value: statusText)
+                        .animation(.easeInOut(duration: 0.3), value: shouldShowTypingIndicator)
                         
                         // Fixed-height container for match starting area
                         ZStack {
@@ -310,7 +310,8 @@ struct RemoteLobbyView: View {
                                         }
                                     }
                                 }
-                                .opacity(showMatchStarting ? 1.0 : 0.4)
+                                .scaleEffect(showMatchStarting ? 1.05 : 1.0)
+                                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: showMatchStarting)
                                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
                             }
                         }
