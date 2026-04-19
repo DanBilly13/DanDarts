@@ -8,6 +8,7 @@
 
 import Foundation
 import UserNotifications
+import Security
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -41,6 +42,11 @@ class NotificationService: NSObject, ObservableObject {
     // MARK: - Initialization
     private override init() {
         super.init()
+        
+        // Diagnostic: Check environment detection on startup
+        let detectedEnvironment = getAPNsEnvironment()
+        print("🔍 [NotificationService] Initialized with environment: \(detectedEnvironment)")
+        
         Task {
             await checkAuthorizationStatus()
             await loadNotificationState()
@@ -66,14 +72,63 @@ class NotificationService: NSObject, ObservableObject {
     
     // MARK: - APNs Environment Detection
     
-    /// Detect APNs environment based on build configuration
+    /// Detect APNs environment by reading actual aps-environment entitlement
     func getAPNsEnvironment() -> String {
+        // Try to read aps-environment from embedded.mobileprovision
+        if let environment = readAPNsEnvironmentFromProvisioningProfile() {
+            print("✅ [APNs] Read aps-environment from provisioning profile: \(environment)")
+            return environment
+        }
+        
+        // Fallback to build configuration if provisioning profile can't be read
+        print("⚠️ [APNs] Could not read aps-environment from provisioning profile, using fallback")
         #if DEBUG
+        print("   Fallback: sandbox (DEBUG build)")
         return "sandbox"
         #else
-        // TestFlight and App Store both use production
+        print("   Fallback: production (RELEASE build)")
         return "production"
         #endif
+    }
+    
+    /// Read aps-environment from embedded.mobileprovision file
+    private func readAPNsEnvironmentFromProvisioningProfile() -> String? {
+        // Provisioning profile is not embedded in App Store builds
+        // It's only present in development and TestFlight builds
+        guard let profilePath = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") else {
+            return nil
+        }
+        
+        guard let profileData = try? Data(contentsOf: URL(fileURLWithPath: profilePath)) else {
+            return nil
+        }
+        
+        // The provisioning profile is a CMS-wrapped plist
+        // We need to extract the plist portion and parse it
+        guard let profileString = String(data: profileData, encoding: .ascii) else {
+            return nil
+        }
+        
+        // Find the plist section (between <?xml and </plist>)
+        guard let plistStart = profileString.range(of: "<?xml"),
+              let plistEnd = profileString.range(of: "</plist>") else {
+            return nil
+        }
+        
+        let plistString = String(profileString[plistStart.lowerBound...plistEnd.upperBound])
+        guard let plistData = plistString.data(using: .utf8) else {
+            return nil
+        }
+        
+        // Parse the plist
+        guard let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any],
+              let entitlements = plist["Entitlements"] as? [String: Any],
+              let apsEnvironment = entitlements["aps-environment"] as? String else {
+            return nil
+        }
+        
+        // Map Apple's values: "development" → "sandbox", "production" → "production"
+        return apsEnvironment == "development" ? "sandbox" : "production"
     }
     
     // MARK: - Permission Management
@@ -151,7 +206,26 @@ class NotificationService: NSObject, ObservableObject {
         print("   User ID: \(userId)")
         print("   Device Install ID: \(deviceInstallId)")
         print("   Environment: \(environment)")
-        print("   Token: \(token.prefix(20))...")
+        print("   Token prefix: \(token.prefix(16))...")  // Log prefix for duplicate detection
+        
+        // Log build configuration
+        #if DEBUG
+        print("   Build Config: DEBUG")
+        #else
+        print("   Build Config: RELEASE")
+        #endif
+        
+        // Log distribution method (TestFlight vs App Store)
+        if let receiptURL = Bundle.main.appStoreReceiptURL {
+            let receiptType = receiptURL.lastPathComponent == "sandboxReceipt" ? "TestFlight/Sandbox" : "App Store/Production"
+            print("   Receipt: \(receiptType)")
+        }
+        
+        // Log app version for tracking
+        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+           let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+            print("   App Version: \(version) (\(build))")
+        }
         
         // Prepare token record as Codable struct
         struct PushTokenRecord: Codable {
