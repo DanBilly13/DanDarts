@@ -22,6 +22,8 @@ struct KillerGameplayView: View {
     @State private var showExitConfirmation = false
     @State private var showGameTip: Bool = false
     @State private var currentTip: GameTip? = nil
+    @State private var titleColor: Color = AppColor.justWhite
+    @State private var animatingTitleForPlayer: UUID? = nil
     
     // Initialize with game, players, and starting lives
     init(game: Game, players: [Player], startingLives: Int) {
@@ -59,8 +61,8 @@ struct KillerGameplayView: View {
                 VStack {
                     playerCardsRow
                         .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 8)
+                        .padding(.top, 0)
+                        .padding(.bottom, 0)
                     
                     Spacer(minLength: 0)
                     
@@ -135,7 +137,8 @@ struct KillerGameplayView: View {
                 Text(game.title)
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(viewModel.anyPlayerIsKiller ? AppColor.interactivePrimaryBackground : AppColor.justWhite)
+                    .foregroundColor(titleColor)
+                    .animation(.easeInOut(duration: 0.5), value: titleColor)
             }
             
             ToolbarItem(placement: .topBarTrailing) {
@@ -205,6 +208,47 @@ struct KillerGameplayView: View {
                 ))
             }
         }
+        .onChange(of: viewModel.animatingKillerActivation) { _, newPlayerID in
+            guard let playerID = newPlayerID else { return }
+            guard animatingTitleForPlayer != playerID else { return }
+            
+            animatingTitleForPlayer = playerID
+            
+            // Get player color
+            if let playerIndex = viewModel.players.firstIndex(where: { $0.id == playerID }) {
+                let playerColor = getPlayerColor(for: playerIndex)
+                
+                // Fade to player color
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    titleColor = playerColor
+                }
+                
+                // Hold for 1 second, then fade back to white
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    await MainActor.run {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            titleColor = AppColor.justWhite
+                        }
+                        animatingTitleForPlayer = nil
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func getPlayerColor(for index: Int) -> Color {
+        switch index {
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.player1
+        }
     }
     
     // MARK: - Player Cards Row
@@ -218,7 +262,7 @@ struct KillerGameplayView: View {
         
         return HStack(spacing: layout.spacing) {
             ForEach(playersToShow) { player in
-                KillerPlayerCard2(
+                KillerPlayerCard3(
                     player: player,
                     assignedNumber: viewModel.playerNumbers[player.id] ?? 0,
                     isKiller: viewModel.isKiller[player.id] ?? false,
@@ -234,7 +278,7 @@ struct KillerGameplayView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .frame(height: 160)
+        
     }
 }
 

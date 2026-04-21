@@ -3,10 +3,12 @@
 //  Dart Freak
 //
 //  New design for Killer player card:
-//  - Target number in rounded container above avatar
+//  - Split badge: left (icon) + right (number)
+//  - Not Killer: Gun (20% white) + X icon on white 20% background
+//  - Killer: Gun (white) on player color background, no X
 //  - Avatar with current player ring
-//  - Player name
-//  - Larger lives display (14px heart, headline font)
+//  - Player name (player color)
+//  - Lives display (hearts only, no numbers)
 //
 
 import SwiftUI
@@ -42,46 +44,8 @@ struct KillerPlayerCard2: View {
     }
     
     var body: some View {
-        VStack(spacing: 4) {
-            
-            VStack (spacing: -4){
-              
-                
-                // Target number in rounded container with gun icon
-                HStack(spacing: 2) {
-                    // Gun icon in fixed-size container to prevent rotation affecting layout
-                    ZStack {
-                        Color.clear
-                            .frame(width: 17, height: 17)
-                        
-                        Image("Gun")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 17)
-                            .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
-                            //.foregroundColor(AppColor.justWhite)
-                            .opacity(isKiller ? 1.0 : 0.3)
-                            .rotationEffect(.degrees(animatingGunSpin ? 1125 : -25)) // 45° default, +1080° (3 spins) when animating
-                            .animation(.easeInOut(duration: 0.6), value: animatingGunSpin)
-                    }
-                    
-                    Text("\(assignedNumber)")
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.bold)
-                        .foregroundColor(isKiller ? AppColor.justBlack : AppColor.justWhite)
-                        //.foregroundColor(AppColor.justBlack)
-                }
-                .frame(height: 32)
-                .frame(width: 48)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 1)
-                .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(isKiller ? playerColor : playerColor.opacity(0.25))
-                )
-                //.scaleEffect(animatingKillerActivation ? 1.3 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.5), value: animatingKillerActivation)
-                
+        VStack(spacing: 8) {
+            VStack (spacing: 4) {
                 // Avatar (with double ring for current player)
                 PlayerAvatarWithRing(
                     avatarURL: player.avatarURL,
@@ -90,35 +54,62 @@ struct KillerPlayerCard2: View {
                     size: 64
                 )
                 
-            }
-            
-            
-           
-            
-            VStack(spacing: 2) {
                 // Name
                 Text(firstName)
-                    .font(.subheadline)
+                    .font(.system(.headline, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(playerColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: cardWidth)
+            }
+            
+            
+            // Target badge: split into left (icon) and right (number) containers
+            HStack(spacing: 0) {
+                // Left container: Gun + X icon
+                ZStack {
+                    // Gun icon (behind X when not killer)
+                    Image("Gun")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 17)
+                        .foregroundColor(AppColor.justWhite)
+                        .opacity(isKiller ? 1.0 : 0.2)
+                        .rotationEffect(.degrees(animatingGunSpin ? 1125 : 0))
+                        .animation(.easeInOut(duration: 0.6), value: animatingGunSpin)
+                    
+                    // X icon (only when not killer)
+                    if !isKiller {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(AppColor.backgroundPrimary)
+                    }
+                }
+                .frame(width: 32, height: 32)
+                .background(isKiller ? playerColor : AppColor.justWhite.opacity(0.2))
                 
-                // Lives display (larger)
-                if startingLives > 1 {
-                    HStack(spacing: 2) {
+                // Right container: Number
+                Text("\(assignedNumber)")
+                    .font(.system(.title, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(isKiller ? playerColor : AppColor.backgroundPrimary)
+                    .frame(width: 44, height: 32)
+                    .background(AppColor.justWhite)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            
+            // Lives display (hearts only, no numbers)
+            if startingLives > 1 {
+                HStack(spacing: -1) {
+                    ForEach(0..<lives, id: \.self) { _ in
                         Image(systemName: "heart.fill")
                             .font(.system(size: 14))
                             .foregroundColor(AppColor.justWhite)
-                            .scaleEffect(animatingLifeLoss ? 2.0 : 1.0)
-                            .animation(.spring(response: 0.2, dampingFraction: 0.4), value: animatingLifeLoss)
-                        Text("\(lives)")
-                            .font(.system(.headline, design: .rounded))
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppColor.textSecondary)
                     }
                 }
+                .scaleEffect(animatingLifeLoss ? 1.3 : 1.0)
+                .animation(.spring(response: 0.2, dampingFraction: 0.4), value: animatingLifeLoss)
             }
         }
         .frame(width: cardWidth)
@@ -134,8 +125,8 @@ struct KillerPlayerCard2: View {
         KillerPlayerCard2(
             player: Player.mockGuest1,
             assignedNumber: 20,
-            isKiller: true,
-            lives: 3,
+            isKiller: false,
+            lives: 5,
             startingLives: 3,
             isCurrentPlayer: false,
             animatingKillerActivation: false,
@@ -145,12 +136,12 @@ struct KillerPlayerCard2: View {
             cardWidth: 64
         )
         
-        // Killer, 3 lives, current player
+        // Not Killer, current player, 2 lives
         KillerPlayerCard2(
             player: Player.mockGuest2,
-            assignedNumber: 20,
-            isKiller: true,
-            lives: 3,
+            assignedNumber: 17,
+            isKiller: false,
+            lives: 2,
             startingLives: 3,
             isCurrentPlayer: true,
             animatingKillerActivation: false,
@@ -160,11 +151,11 @@ struct KillerPlayerCard2: View {
             cardWidth: 64
         )
         
-        // Not Killer, 3 lives
+        // Killer, 3 lives
         KillerPlayerCard2(
             player: Player(id: UUID(), displayName: "Arthur", nickname: "Arthur", avatarURL: nil),
-            assignedNumber: 20,
-            isKiller: false,
+            assignedNumber: 5,
+            isKiller: true,
             lives: 3,
             startingLives: 3,
             isCurrentPlayer: false,
@@ -175,14 +166,14 @@ struct KillerPlayerCard2: View {
             cardWidth: 64
         )
         
-        // Not Killer, 3 lives
+        // Killer, current player, 1 life
         KillerPlayerCard2(
             player: Player(id: UUID(), displayName: "Tony", nickname: "Tony", avatarURL: nil),
-            assignedNumber: 20,
-            isKiller: false,
-            lives: 3,
+            assignedNumber: 12,
+            isKiller: true,
+            lives: 1,
             startingLives: 3,
-            isCurrentPlayer: false,
+            isCurrentPlayer: true,
             animatingKillerActivation: false,
             animatingLifeLoss: false,
             animatingGunSpin: false,
