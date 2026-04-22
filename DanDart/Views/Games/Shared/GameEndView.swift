@@ -28,6 +28,23 @@ struct GameEndView: View {
     @State private var isLoadingMatch = false
     @State private var hasPlayedWinSound = false
     
+    // Computed property for winner's player color
+    private var winnerColor: Color {
+        guard let winnerIndex = players.firstIndex(where: { $0.id == winner.id }) else {
+            return AppColor.interactivePrimaryBackground // Fallback
+        }
+        
+        switch winnerIndex {
+        case 0: return AppColor.player1
+        case 1: return AppColor.player2
+        case 2: return AppColor.player3
+        case 3: return AppColor.player4
+        case 4: return AppColor.player5
+        case 5: return AppColor.player6
+        default: return AppColor.interactivePrimaryBackground
+        }
+    }
+    
     // Computed property for match result text
     private var matchResultText: String? {
         guard let matchFormat = matchFormat,
@@ -65,8 +82,8 @@ struct GameEndView: View {
                     // Trophy/Crown Icon
                     Image(systemName: "crown")
                         .font(.system(size: 60, weight: .regular))
-                        .foregroundColor(AppColor.interactivePrimaryBackground)
-                        .shadow(color: AppColor.interactivePrimaryBackground.opacity(0.5), radius: 20, x: 0, y: 0)
+                        .foregroundColor(winnerColor)
+                        .shadow(color: winnerColor.opacity(0.5), radius: 20, x: 0, y: 0)
                         .scaleEffect(showCelebration ? 1.0 : 0.5)
                         .opacity(showCelebration ? 1.0 : 0.0)
                         .animation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.2), value: showCelebration)
@@ -75,9 +92,9 @@ struct GameEndView: View {
                     PlayerAvatarView(
                         avatarURL: winner.avatarURL,
                         size: 120,
-                        borderColor: AppColor.interactivePrimaryBackground
+                        
                     )
-                    .shadow(color: AppColor.interactivePrimaryBackground.opacity(0.4), radius: 30, x: 0, y: 10)
+                    
                     .scaleEffect(showCelebration ? 1.0 : 0.8)
                     .opacity(showCelebration ? 1.0 : 0.0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.3), value: showCelebration)
@@ -86,13 +103,13 @@ struct GameEndView: View {
                     VStack(spacing: 8) {
                         Text("WINNER!")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(AppColor.justWhite)
                             .tracking(2)
                         
                         Text(winner.displayName)
                             .font(.system(.title2, design: .rounded))
                             .fontWeight(.semibold)
-                            .foregroundColor(AppColor.textPrimary)
+                            .foregroundColor(winnerColor)
                         
                         Text("@\(winner.nickname)")
                             .font(.system(.headline, design: .rounded))
@@ -107,7 +124,7 @@ struct GameEndView: View {
                     if let resultText = matchResultText {
                         Text("Wins \(resultText)")
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .foregroundColor(winnerColor)
                             .opacity(showCelebration ? 1.0 : 0.0)
                             .animation(.easeIn(duration: 0.3).delay(0.5), value: showCelebration)
                     }

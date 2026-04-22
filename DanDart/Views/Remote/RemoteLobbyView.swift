@@ -198,9 +198,9 @@ struct RemoteLobbyView: View {
             VStack(spacing: 0) {
                 // Game name at top
                 Text(match.gameType.uppercased())
-                    .font(.system(.title2, design: .rounded))
+                    .font(.system(.largeTitle, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(AppColor.textPrimary)
+                    .foregroundColor(AppColor.justWhite)
                     .padding(.top, 60)
                     .opacity(showContent ? 1.0 : 0.0)
                 
@@ -219,7 +219,7 @@ struct RemoteLobbyView: View {
                     // VS in center
                     VStack(spacing: 8) {
                         Text("VS")
-                            .font(.system(size: 28, weight: .black))
+                            .font(.system(size: 28, weight: .bold))
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                     }
                     .offset(y: -32)
@@ -947,15 +947,15 @@ struct RemoteLobbyView: View {
             
             // Name and nickname
             VStack(spacing: 0) {
-                Text(user.displayName)
-                    .font(.system(.headline, design: .rounded))
+                Text(user.displayName.abbreviatedName())
+                    .font(.system(.title2, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(AppColor.textPrimary)
                 
-                Text("@\(user.nickname)")
+                /*Text("@\(user.nickname)")
                     .font(.system(. subheadline, design: .rounded))
                     .fontWeight(.medium)
-                    .foregroundColor(AppColor.textSecondary)
+                    .foregroundColor(AppColor.textSecondary)*/
             }
             
             Spacer()
@@ -970,7 +970,7 @@ struct RemoteLobbyView: View {
                 Text("L\(user.totalLosses)")
                     .font(.footnote)
                     .fontWeight(.semibold)
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                    .foregroundColor(AppColor.textSecondary)
             }
         }
     }

@@ -62,27 +62,28 @@ struct PreGameHypeView: View {
                     // Game name at top
                     VStack(spacing: 8) {
                         Text(game.title)
-                            .font(.system(.title2, design: .rounded))
-                            .fontWeight(.semibold)
+                            .font(.system(.largeTitle, design: .rounded))
+                            .fontWeight(.bold)
                             .foregroundColor(AppColor.textPrimary)
+                        
                         
                         // Show "Assigning random numbers..." for Killer game, "Practice Match" for single player
                         if game.title == "Killer" {
-                            Text("ASSIGNING RANDOM NUMBERS...")
+                            Text("ASSIGNING NUMBERS...")
                                 .font(.system(size: 14, weight: .semibold, design: .default))
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .foregroundColor(AppColor.textSecondary)
                                 .tracking(2)
                         } else if players.count == 1 {
                             Text("PRACTICE MATCH")
                                 .font(.system(size: 14, weight: .semibold, design: .default))
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .foregroundColor(AppColor.textSecondary)
                                 .tracking(2)
-                        } else {
+                        } /*else {
                             Text("MATCH STARTING")
                                 .font(.system(size: 14, weight: .semibold, design: .default))
-                                .foregroundColor(AppColor.interactivePrimaryBackground)
+                                .foregroundColor(AppColor.textSecondary)
                                 .tracking(2)
-                        }
+                        }*/
                     }
                     .padding(.top, 60)
                     
@@ -97,7 +98,8 @@ struct PreGameHypeView: View {
                     // GET READY section at bottom
                     VStack(spacing: 16) {
                         Text("GET READY!")
-                            .font(.system(size: 32, weight: .black, design: .default))
+                            .font(.system(.title, design: .rounded))
+                            .fontWeight(.bold)
                             .foregroundColor(AppColor.interactivePrimaryBackground)
                             .tracking(2)
                             .scaleEffect(showGetReady ? 1.0 : 0.8)
@@ -170,12 +172,12 @@ struct PreGameHypeView: View {
             // VS absolutely positioned in center (doesn't take layout space)
             VStack(spacing: 8) {
                 Text("VS")
-                    .font(.system(size: 28, weight: .black))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(AppColor.interactivePrimaryBackground)
                     .scaleEffect(showVS ? 1.0 : 0.5)
                     .opacity(showVS ? 1.0 : 0.0)
             }
-            .offset(y: -40) // Align with avatar center
+            .offset(y: -30) // Align with avatar center
         }
     }
     
@@ -265,18 +267,18 @@ struct PreGameHypeView: View {
             
             // Name and nickname grouped together (no spacing)
             VStack(spacing: 0) {
-                // Player name (.subheadline)
-                Text(player.displayName)
-                    .font(.subheadline)
+                // Player name (.subheadline) - abbreviated last name
+                Text(player.displayName.abbreviatedName())
+                    .font(.system(.title2, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(AppColor.textPrimary)
                     .opacity(showPlayers ? 1.0 : 0.0)
                 
                 // Nickname (.footnote) - no spacing from name
-                Text("@\(player.nickname)")
+                /*Text("@\(player.nickname)")
                     .font(.footnote)
                     .foregroundColor(AppColor.textSecondary)
-                    .opacity(showPlayers ? 1.0 : 0.0)
+                    .opacity(showPlayers ? 1.0 : 0.0)*/
             }
             
             // 8px spacing before stats
@@ -292,7 +294,7 @@ struct PreGameHypeView: View {
                 Text("L\(player.totalLosses)")
                         .font(.footnote)
                     .fontWeight(.semibold)
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                    .foregroundColor(AppColor.textSecondary)
             }
             .opacity(showPlayers ? 1.0 : 0.0)
         }
