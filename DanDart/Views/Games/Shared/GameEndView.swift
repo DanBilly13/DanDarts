@@ -30,19 +30,34 @@ struct GameEndView: View {
     
     // Computed property for winner's player color
     private var winnerColor: Color {
+        print("🎨 [GameEndView] Winner Color Calculation:")
+        print("   Winner ID: \(winner.id)")
+        print("   Winner Name: \(winner.displayName)")
+        print("   Players array count: \(players.count)")
+        for (index, player) in players.enumerated() {
+            print("   Player[\(index)]: \(player.displayName) (ID: \(player.id))")
+        }
+        
         guard let winnerIndex = players.firstIndex(where: { $0.id == winner.id }) else {
+            print("   ❌ Winner NOT found in players array - using fallback color")
             return AppColor.interactivePrimaryBackground // Fallback
         }
         
+        print("   ✅ Winner found at index: \(winnerIndex)")
+        
+        let color: Color
         switch winnerIndex {
-        case 0: return AppColor.player1
-        case 1: return AppColor.player2
-        case 2: return AppColor.player3
-        case 3: return AppColor.player4
-        case 4: return AppColor.player5
-        case 5: return AppColor.player6
-        default: return AppColor.interactivePrimaryBackground
+        case 0: color = AppColor.player1
+        case 1: color = AppColor.player2
+        case 2: color = AppColor.player3
+        case 3: color = AppColor.player4
+        case 4: color = AppColor.player5
+        case 5: color = AppColor.player6
+        default: color = AppColor.interactivePrimaryBackground
         }
+        
+        print("   Color assigned: player\(winnerIndex + 1)")
+        return color
     }
     
     // Computed property for match result text

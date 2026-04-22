@@ -281,11 +281,21 @@ struct CountdownGameplayView: View {
                 if let winner = newValue {
                     // Match winner detected - navigate to game end screen after brief delay
                     // This ensures all state updates are complete
+                    print("🏆 [CountdownGameplayView] Winner detected: \(winner.displayName)")
+                    print("   Original players array (from view):")
+                    for (index, player) in players.enumerated() {
+                        print("     [\(index)]: \(player.displayName) (ID: \(player.id))")
+                    }
+                    print("   ViewModel players array (shuffled):")
+                    for (index, player) in gameViewModel.players.enumerated() {
+                        print("     [\(index)]: \(player.displayName) (ID: \(player.id))")
+                    }
+                    
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         router.push(.gameEnd(
                             game: game,
                             winner: winner,
-                            players: players,
+                            players: gameViewModel.players,
                             onPlayAgain: {
                                 gameViewModel.restartGame()
                                 router.pop()
