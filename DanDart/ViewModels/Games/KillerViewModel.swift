@@ -197,8 +197,8 @@ class KillerViewModel: ObservableObject {
                 return KillerDartMetadata(outcome: .hitOwnNumber, affectedPlayerIds: affectedIds)
             }
             
-            // Check if hit opponent's number
-            for opponent in players where opponent.id != playerID {
+            // Check if hit opponent's number (only if opponent is still alive)
+            for opponent in players where opponent.id != playerID && !eliminatedPlayers.contains(opponent.id) {
                 if let opponentNumber = playerNumbers[opponent.id], thrownNumber == opponentNumber {
                     // Play hit sound first
                     soundManager.playKillerHit()
