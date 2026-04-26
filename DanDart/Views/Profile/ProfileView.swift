@@ -18,12 +18,12 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var navigationPath = NavigationPath()
     @State private var isRefreshingProfile: Bool = false
+    @StateObject private var statsService = ProfileStatsService.shared
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Profile Header (Reusable Component)
                     if let currentUser = authService.currentUser {
                         ProfileHeaderView(
                             player: currentUser.toPlayer()
@@ -43,7 +43,33 @@ struct ProfileView: View {
                             .padding(.top, 8)
                         }
                         .padding(.top, 24)
-                        .padding(.bottom, 40)
+                        .padding(.bottom, 16)
+                        
+                        VStack(spacing: 48) {
+                            ThreeDartAverageTrendChart(
+                                dataPoints: statsService.threeDartAverageHistory
+                            )
+                            
+                            DartsThrownPerLegBar(
+                                avgDarts: statsService.avgDartsPerLeg,
+                                rank: statsService.avgDartsRank,
+                                gameType: "301"
+                            )
+                            
+                            ScoringDistributionChart(
+                                distribution: statsService.scoringDistribution
+                            )
+                            
+                            PersonalBestBars(
+                                highestVisit: statsService.highestVisit,
+                                bestCheckout: statsService.bestCheckout,
+                                checkoutPercentage: statsService.checkoutPercentage
+                            )
+                            
+                            RecentFormTracker(
+                                formResults: statsService.recentForm
+                            )
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -53,10 +79,16 @@ struct ProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await refreshProfileIfPossible()
+                if let userId = authService.currentUser?.id {
+                    await statsService.calculateStats(userId: userId)
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
                 Task {
                     await refreshProfileIfPossible()
+                    if let userId = authService.currentUser?.id {
+                        await statsService.calculateStats(userId: userId)
+                    }
                 }
             }
             .toolbar {
