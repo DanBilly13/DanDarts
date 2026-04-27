@@ -94,11 +94,21 @@ class ProfileStatsService: ObservableObject {
         
         var totalDarts = 0
         var totalLegs = 0
+        var totalTierScore = 0
+        var rankedWinsCount = 0
         
         for match in winningMatches {
             guard let player = match.players.first(where: { $0.id == userId }) else { continue }
             totalDarts += player.totalDartsThrown
             totalLegs += match.totalLegsPlayed
+            
+            // Calculate rank for this specific winning match
+            let dartsPerLegThisMatch = Double(player.totalDartsThrown) / Double(match.totalLegsPlayed)
+            let rankTier = RankingHelper.rankForWinningDarts(game: match.gameType, dartsThrown: Int(dartsPerLegThisMatch))
+            let tierScore = RankingHelper.tierScore(for: rankTier)
+            
+            totalTierScore += tierScore
+            rankedWinsCount += 1
         }
         
         guard totalLegs > 0 else {
@@ -107,10 +117,17 @@ class ProfileStatsService: ObservableObject {
             return
         }
         
+        // Calculate average darts per leg for display
         avgDartsPerLeg = Double(totalDarts) / Double(totalLegs)
         
-        let gameType = winningMatches.first?.gameType ?? "301"
-        avgDartsRank = RankingHelper.rankForWinningDarts(game: gameType, dartsThrown: Int(avgDartsPerLeg))
+        // Calculate rank using same method as profile rank (average tier score approach)
+        guard rankedWinsCount > 0 else {
+            avgDartsRank = .unranked
+            return
+        }
+        
+        let averageTierScore = Double(totalTierScore) / Double(rankedWinsCount)
+        avgDartsRank = RankingHelper.profileRankFromAverageTierScore(averageTierScore)
     }
     
     private func calculateScoringDistribution(matches: [MatchResult], userId: UUID) {
