@@ -121,13 +121,13 @@ class SoundManager: ObservableObject {
         let soundName: String
         switch consecutiveMisses {
         case 1:
-            soundName = "brokenglass"
+            soundName = "Brokenglass"
         case 2:
-            soundName = "cat"
+            soundName = "Cat"
         case 3:
-            soundName = "horse"
+            soundName = "Horse"
         default:
-            soundName = "horse" // Continue with horse sound for 4+ misses
+            soundName = "Horse" // Continue with horse sound for 4+ misses
         }
         
         playSound(named: soundName)
@@ -141,7 +141,7 @@ class SoundManager: ObservableObject {
     /// Play scoring sound
     func playScoreSound() {
         resetMissCounter() // Reset miss counter when scoring
-        playSound(named: "thud")
+        playSound(named: "Thud")
     }
     
     /// Play boxing sound for pre-game hype
@@ -155,7 +155,7 @@ class SoundManager: ObservableObject {
             setupAudioSession()
         }
         
-        playSound(named: "boxing")
+        playSound(named: "MatchStart")
     }
     
     /// Generic method to play any sound file
