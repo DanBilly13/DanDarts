@@ -345,6 +345,11 @@ class CountdownViewModel: ObservableObject {
             playerId: currentPlayer.id,
             darts: currentThrow
         )
+
+        let didMatchWin = events.contains { event in
+            if case .matchWon = event { return true }
+            return false
+        }
         
         // Extract values for turn history
         let throwTotal = currentThrowTotal
@@ -428,7 +433,9 @@ class CountdownViewModel: ObservableObject {
                 legsWon = newState.legsWon
                 
                 // Play lighter celebration for leg win
-                SoundManager.shared.playScoreSound()
+                if !didMatchWin {
+                    SoundManager.shared.playScoreSound()
+                }
                 
             case .matchWon(let winnerId):
                 winner = players.first { $0.id == winnerId }
