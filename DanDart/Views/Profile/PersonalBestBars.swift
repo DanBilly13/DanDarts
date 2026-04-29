@@ -11,15 +11,16 @@ struct PersonalBestBars: View {
     let highestVisit: Int
     let bestCheckout: Int
     let checkoutPercentage: Double
+    let isLoading: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Personal Bests")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColor.textSecondary)
-            
-            if highestVisit == 0 && bestCheckout == 0 {
-                emptyState
+
+            if isLoading {
+                loadingState
             } else {
                 VStack(spacing: 16) {
                     StatBar(
@@ -46,21 +47,14 @@ struct PersonalBestBars: View {
             }
         }
     }
-    
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "star.fill")
-                .font(.system(size: 40))
-                .foregroundColor(AppColor.textSecondary.opacity(0.5))
-            Text("No personal bests yet")
-                .font(.subheadline)
-                .foregroundColor(AppColor.textSecondary)
-            Text("Play some 301/501 games to set your records")
-                .font(.caption)
-                .foregroundColor(AppColor.textSecondary.opacity(0.7))
+
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            SkeletonBlock(height: 12, cornerRadius: 6, isShimmering: true)
+            SkeletonBlock(height: 12, cornerRadius: 6, isShimmering: true)
+            SkeletonBlock(height: 12, cornerRadius: 6, isShimmering: true)
         }
-        .frame(height: 120)
-        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
     }
 }
 
@@ -123,7 +117,8 @@ struct StatBar: View {
     PersonalBestBars(
         highestVisit: 180,
         bestCheckout: 121,
-        checkoutPercentage: 42.5
+        checkoutPercentage: 42.5,
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
@@ -133,7 +128,8 @@ struct StatBar: View {
     PersonalBestBars(
         highestVisit: 140,
         bestCheckout: 76,
-        checkoutPercentage: 28.3
+        checkoutPercentage: 28.3,
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
@@ -143,7 +139,8 @@ struct StatBar: View {
     PersonalBestBars(
         highestVisit: 0,
         bestCheckout: 0,
-        checkoutPercentage: 0
+        checkoutPercentage: 0,
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)

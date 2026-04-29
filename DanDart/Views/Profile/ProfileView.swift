@@ -47,27 +47,32 @@ struct ProfileView: View {
                         
                         VStack(spacing: 48) {
                             ThreeDartAverageTrendChart(
-                                dataPoints: statsService.threeDartAverageHistory
+                                dataPoints: statsService.threeDartAverageHistory,
+                                isLoading: statsService.isLoading
                             )
                             
                             DartsThrownPerLegBar(
                                 avgDarts: statsService.avgDartsPerLeg,
                                 rank: statsService.avgDartsRank,
-                                gameType: "301"
+                                gameType: "301",
+                                isLoading: statsService.isLoading
                             )
                             
                             ScoringDistributionChart(
-                                distribution: statsService.scoringDistribution
+                                distribution: statsService.scoringDistribution,
+                                isLoading: statsService.isLoading
                             )
                             
                             PersonalBestBars(
                                 highestVisit: statsService.highestVisit,
                                 bestCheckout: statsService.bestCheckout,
-                                checkoutPercentage: statsService.checkoutPercentage
+                                checkoutPercentage: statsService.checkoutPercentage,
+                                isLoading: statsService.isLoading
                             )
                             
                             RecentFormTracker(
-                                formResults: statsService.recentForm
+                                formResults: statsService.recentForm,
+                                isLoading: statsService.isLoading
                             )
                         }
                     }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ThreeDartAverageTrendChart: View {
     let dataPoints: [ThreeDartDataPoint]
+    let isLoading: Bool
     
     @State private var selectedPoint: ThreeDartDataPoint?
     @State private var dragLocation: CGPoint?
@@ -22,9 +23,11 @@ struct ThreeDartAverageTrendChart: View {
             Text("3-Dart Average Trend")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColor.textSecondary)
-            
-            if dataPoints.isEmpty {
-                emptyState
+
+            if isLoading {
+                loadingState
+            } else if dataPoints.isEmpty {
+                noDataState
             } else {
                 // Value overlay sits above the chart with its own spacing
                 Group {
@@ -42,20 +45,39 @@ struct ThreeDartAverageTrendChart: View {
         }
     }
     
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 40))
-                .foregroundColor(AppColor.textSecondary.opacity(0.5))
-            Text("No match data yet")
-                .font(.subheadline)
-                .foregroundColor(AppColor.textSecondary)
-            Text("Play some 301/501 games to see your trend")
+    private var loadingState: some View {
+        VStack(spacing: 12) {
+            VStack(spacing: 2) {
+                SkeletonBlock(height: 28, cornerRadius: 10, isShimmering: true)
+                    .frame(width: 140)
+                SkeletonBlock(height: 12, cornerRadius: 6, isShimmering: true)
+                    .frame(width: 160)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            SkeletonBlock(height: chartHeight, cornerRadius: 12, isShimmering: true)
+        }
+    }
+
+    private var noDataState: some View {
+        VStack(spacing: 12) {
+            Text("No games played yet — no data")
                 .font(.caption)
                 .foregroundColor(AppColor.textSecondary.opacity(0.7))
+
+            VStack(spacing: 2) {
+                Text("0.00 pts")
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(AppColor.textPrimary)
+                Text("—")
+                    .font(.caption)
+                    .foregroundColor(AppColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .allowsHitTesting(false)
+
+            SkeletonBlock(height: chartHeight, cornerRadius: 12, isShimmering: false)
         }
-        .frame(height: chartHeight)
-        .frame(maxWidth: .infinity)
     }
     
     // Fixed-height chart container. Geometry inside uses its own width/height for all calculations.
@@ -302,14 +324,15 @@ struct ThreeDartAverageTrendChart: View {
             ThreeDartDataPoint(timestamp: Date().addingTimeInterval(-86400 * 2), average: 67, matchId: UUID()),
             ThreeDartDataPoint(timestamp: Date().addingTimeInterval(-86400 * 1), average: 72, matchId: UUID()),
             ThreeDartDataPoint(timestamp: Date(), average: 86, matchId: UUID())
-        ]
+        ],
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Empty State") {
-    ThreeDartAverageTrendChart(dataPoints: [])
+    ThreeDartAverageTrendChart(dataPoints: [], isLoading: false)
         .padding()
         .background(AppColor.backgroundPrimary)
 }

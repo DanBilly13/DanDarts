@@ -12,6 +12,7 @@ struct DartsThrownPerLegBar: View {
     let avgDarts: Double
     let rank: RankTier
     let gameType: String
+    let isLoading: Bool
     
     private let pixelsPerDart: CGFloat = 10.0
     
@@ -24,29 +25,21 @@ struct DartsThrownPerLegBar: View {
             Text("Avg. Darts Per Leg")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColor.textSecondary)
-            
-            if avgDarts == 0 {
-                emptyState
+
+            if isLoading {
+                loadingState
             } else {
                 barView
             }
         }
     }
-    
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "target")
-                .font(.system(size: 40))
-                .foregroundColor(AppColor.textSecondary.opacity(0.5))
-            Text("No winning matches yet")
-                .font(.subheadline)
-                .foregroundColor(AppColor.textSecondary)
-            Text("Win some 301/501 games to see your average")
-                .font(.caption)
-                .foregroundColor(AppColor.textSecondary.opacity(0.7))
+
+    private var loadingState: some View {
+        HStack(spacing: 12) {
+            SkeletonBlock(height: 50, cornerRadius: 12, isShimmering: true)
+            SkeletonBlock(height: 12, cornerRadius: 6, isShimmering: true)
+                .frame(width: 40)
         }
-        .frame(height: 80)
-        .frame(maxWidth: .infinity)
     }
     
     private var barView: some View {
@@ -54,6 +47,8 @@ struct DartsThrownPerLegBar: View {
             GeometryReader { geometry in
                 let barWidth = geometry.size.width
                 let dartPosition = min(CGFloat(avgDarts) * pixelsPerDart, barWidth)
+                let labelWidth: CGFloat = 100
+                let clampedLabelOffset = min(max(dartPosition - (labelWidth / 2), 0), max(barWidth - labelWidth, 0))
                 
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 6)
@@ -97,7 +92,7 @@ struct DartsThrownPerLegBar: View {
                     .frame(maxWidth: .infinity)
                 }
                 .frame(width: 100)
-                .offset(x: dartPosition - 50)
+                .offset(x: clampedLabelOffset)
             }
             .frame(height: 50)
             
@@ -117,7 +112,8 @@ struct DartsThrownPerLegBar: View {
     DartsThrownPerLegBar(
         avgDarts: 15.3,
         rank: .proLevel,
-        gameType: "301"
+        gameType: "301",
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
@@ -127,7 +123,8 @@ struct DartsThrownPerLegBar: View {
     DartsThrownPerLegBar(
         avgDarts: 18.7,
         rank: .advanced,
-        gameType: "501"
+        gameType: "501",
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
@@ -137,7 +134,8 @@ struct DartsThrownPerLegBar: View {
     DartsThrownPerLegBar(
         avgDarts: 0,
         rank: .unranked,
-        gameType: "301"
+        gameType: "301",
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)

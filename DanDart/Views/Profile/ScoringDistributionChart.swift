@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ScoringDistributionChart: View {
     let distribution: ScoringDistribution
+    let isLoading: Bool
     
     private let donutSize: CGFloat = 140
     private let donutThickness: CGFloat = 28
@@ -18,37 +19,52 @@ struct ScoringDistributionChart: View {
             Text("Scoring Distribution (\(distribution.totalVisits) visits)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColor.textSecondary)
-            
-            if distribution.totalVisits == 0 {
-                emptyState
+
+            if isLoading {
+                loadingState
             } else {
                 chartView
             }
         }
      
     }
-    
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.pie")
-                .font(.system(size: 40))
-                .foregroundColor(AppColor.textSecondary.opacity(0.5))
-            Text("No scoring data yet")
-                .font(.subheadline)
-                .foregroundColor(AppColor.textSecondary)
-            Text("Play some 301/501 games to see your distribution")
-                .font(.caption)
-                .foregroundColor(AppColor.textSecondary.opacity(0.7))
+
+    private var loadingState: some View {
+        HStack(spacing: 20) {
+            SkeletonBlock(height: donutSize, cornerRadius: donutSize / 2, isShimmering: true)
+                .frame(width: donutSize, height: donutSize)
+                .mask {
+                    Circle()
+                        .stroke(lineWidth: donutThickness)
+                        .frame(width: donutSize, height: donutSize)
+                }
+
+            VStack(alignment: .leading, spacing: 12) {
+                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+            }
         }
         .frame(height: 160)
-        .frame(maxWidth: .infinity)
     }
     
     private var chartView: some View {
         HStack(spacing: 20) {
-            donutChart
+            if distribution.totalVisits == 0 {
+                emptyDonut
+            } else {
+                donutChart
+            }
             legendView
         }
+    }
+
+    private var emptyDonut: some View {
+        Circle()
+            .stroke(AppColor.interactivePrimaryBackground, lineWidth: donutThickness)
+            .frame(width: donutSize, height: donutSize)
     }
     
     private var donutChart: some View {
@@ -92,12 +108,12 @@ struct ScoringDistributionChart: View {
                 .foregroundColor(colorForBucket(bucket.color))
             
             HStack(spacing: 4) {
-                Text(String(format: "%.1f%%", bucket.percentage))
+                Text(String(format: "%.1f%%", distribution.totalVisits == 0 ? 0 : bucket.percentage))
                     .font(.system(.footnote, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(AppColor.textPrimary)
                 
-                Text("(\(bucket.count))")
+                Text("(\(distribution.totalVisits == 0 ? 0 : bucket.count))")
                     .font(.system(.footnote, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(AppColor.textSecondary)
@@ -179,14 +195,15 @@ struct DonutSegment: Shape {
             bucket100_139: BucketData(range: "100-139", count: 30, percentage: 20.0, color: "yellow"),
             bucket140_179: BucketData(range: "140-179", count: 12, percentage: 8.0, color: "orange"),
             bucket180: BucketData(range: "180", count: 3, percentage: 2.0, color: "red")
-        )
+        ),
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Empty State") {
-    ScoringDistributionChart(distribution: .empty)
+    ScoringDistributionChart(distribution: .empty, isLoading: false)
         .padding()
         .background(AppColor.backgroundPrimary)
 }

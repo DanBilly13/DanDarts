@@ -9,6 +9,9 @@ import SwiftUI
 
 struct RecentFormTracker: View {
     let formResults: [FormResult]
+    let isLoading: Bool
+    
+    private let maxResults: Int = 10
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -26,47 +29,57 @@ struct RecentFormTracker: View {
                 }
             }
             
-            if formResults.isEmpty {
-                emptyState
+            if isLoading {
+                loadingState
             } else {
                 formView
             }
         }
     }
-    
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 40))
-                .foregroundColor(AppColor.textSecondary.opacity(0.5))
-            Text("No recent matches")
-                .font(.subheadline)
-                .foregroundColor(AppColor.textSecondary)
-            Text("Play some 301/501 games to track your form")
-                .font(.caption)
-                .foregroundColor(AppColor.textSecondary.opacity(0.7))
+
+    private var loadingState: some View {
+        GeometryReader { proxy in
+            let count = maxResults
+            let spacing: CGFloat = 4
+            let totalSpacing = CGFloat(count - 1) * spacing
+            let availableWidth = proxy.size.width
+            let boxWidth = max((availableWidth - totalSpacing) / CGFloat(count), 0)
+
+            HStack(spacing: spacing) {
+                ForEach(0..<maxResults, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(AppColor.inputBackground)
+                        .frame(width: boxWidth, height: 40)
+                        .shimmer(isActive: true)
+                }
+            }
+            .frame(width: availableWidth, alignment: .leading)
         }
-        .frame(height: 80)
-        .frame(maxWidth: .infinity)
+        .frame(height: 40)
     }
     
     private var formView: some View {
         GeometryReader { proxy in
-            let count = max(formResults.count, 1)
+            let count = maxResults
             let spacing: CGFloat = 4
             let totalSpacing = CGFloat(count - 1) * spacing
             let availableWidth = proxy.size.width
             let boxWidth = max((availableWidth - totalSpacing) / CGFloat(count), 0)
             
+            let resultsOldestToNewest = Array(formResults.reversed())
+            let paddedResults: [FormResult?] = resultsOldestToNewest.map { Optional($0) } + Array(repeating: nil, count: max(0, maxResults - resultsOldestToNewest.count))
+            
             HStack(spacing: spacing) {
-                ForEach(formResults.reversed()) { result in
+                ForEach(Array(paddedResults.enumerated()), id: \.offset) { _, result in
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(result.isWin ? Color.green : Color.red)
+                        .fill(result?.isWin == true ? Color.green : (result == nil ? AppColor.inputBackground : Color.red))
                         .frame(width: boxWidth, height: 40)
                         .overlay {
-                            Text(result.isWin ? "W" : "L")
-                                .font(.caption.bold())
-                                .foregroundColor(.white)
+                            if let result {
+                                Text(result.isWin ? "W" : "L")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                            }
                         }
                 }
             }
@@ -91,7 +104,8 @@ struct RecentFormTracker: View {
             FormResult(matchId: UUID(), isWin: false, timestamp: Date()),
             FormResult(matchId: UUID(), isWin: true, timestamp: Date()),
             FormResult(matchId: UUID(), isWin: true, timestamp: Date())
-        ]
+        ],
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
@@ -105,14 +119,15 @@ struct RecentFormTracker: View {
             FormResult(matchId: UUID(), isWin: false, timestamp: Date()),
             FormResult(matchId: UUID(), isWin: true, timestamp: Date()),
             FormResult(matchId: UUID(), isWin: true, timestamp: Date())
-        ]
+        ],
+        isLoading: false
     )
     .padding()
     .background(AppColor.backgroundPrimary)
 }
 
 #Preview("Empty State") {
-    RecentFormTracker(formResults: [])
+    RecentFormTracker(formResults: [], isLoading: false)
         .padding()
         .background(AppColor.backgroundPrimary)
 }
