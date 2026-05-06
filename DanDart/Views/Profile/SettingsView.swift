@@ -15,8 +15,8 @@ enum SettingsDestination: Hashable {
 
 struct SettingsView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject private var voicePermissionManager: VoicePermissionManager
     @StateObject private var soundManager = SoundManager.shared
-    @StateObject private var voicePermissionManager = VoicePermissionManager.shared
     @StateObject private var notificationService = NotificationService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
@@ -51,6 +51,7 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            voicePermissionManager.logState("settings task")
             await notificationService.loadNotificationState()
         }
         .alert("Log Out", isPresented: $showLogoutConfirmation) {
@@ -195,26 +196,45 @@ struct SettingsView: View {
                     .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
-                // Notifications Toggle
-                SettingsToggleRow(
-                    icon: Image(systemName: "bell.fill"),
-                    title: "Notifications",
-                    isOn: Binding(
-                        get: { notificationService.notificationsEnabled },
-                        set: { newValue in
-                            Task {
-                                do {
-                                    try await notificationService.setNotificationsEnabled(newValue)
-                                } catch NotificationService.NotificationError.permissionDenied {
-                                    // Show alert for denied permission
-                                    showNotificationPermissionAlert = true
-                                } catch {
-                                    print("❌ Failed to toggle notifications: \(error)")
+                // Notifications row - shows ProgressView while loading, then a Toggle.
+                // Rendering a placeholder until `hasLoadedState` is true prevents the
+                // toggle from animating off→on the first time the DB read completes.
+                if notificationService.hasLoadedState {
+                    SettingsToggleRow(
+                        icon: Image(systemName: "bell.fill"),
+                        title: "Notifications",
+                        isOn: Binding(
+                            get: { notificationService.notificationsEnabled },
+                            set: { newValue in
+                                Task {
+                                    do {
+                                        try await notificationService.setNotificationsEnabled(newValue)
+                                    } catch NotificationService.NotificationError.permissionDenied {
+                                        // Show alert for denied permission
+                                        showNotificationPermissionAlert = true
+                                    } catch {
+                                        print("❌ Failed to toggle notifications: \(error)")
+                                    }
                                 }
                             }
-                        }
+                        )
                     )
-                )
+                } else {
+                    HStack(spacing: 16) {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .frame(width: 28)
+                        Text("Notifications")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+                        Spacer()
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                }
                 
                 Divider()
                     .background(AppColor.textSecondary.opacity(0.2))
@@ -367,7 +387,13 @@ struct SettingsView: View {
             Spacer()
             
             if shouldShowToggle {
-                Toggle("", isOn: $voicePermissionManager.isVoiceEnabledInApp)
+                Toggle("", isOn: Binding(
+                    get: { voicePermissionManager.isVoiceEnabledInApp },
+                    set: { newValue in
+                        print("🎤 [Settings] Voice Chat toggle set to: \(newValue)")
+                        voicePermissionManager.setVoiceEnabled(newValue)
+                    }
+                ))
                     .labelsHidden()
                     .tint(.green)
             } else {

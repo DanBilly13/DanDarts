@@ -511,6 +511,7 @@ struct RemoteLobbyView: View {
                     let voiceStartTime = Date()
                     let role = currentUser.id == match.challengerId ? "challenger" : "receiver"
                     print("⏱️ [VoiceDelay] LOBBY_VOICE_START timestamp=\(ISO8601DateFormatter().string(from: voiceStartTime)) role=\(role) matchId=\(match.id.uuidString.prefix(8))")
+                    VoicePermissionManager.shared.logState("remote lobby before startSession")
                     try await voiceChatService.startSession(
                         matchId: match.id,
                         localUserId: currentUser.id,

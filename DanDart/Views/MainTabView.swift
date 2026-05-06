@@ -318,6 +318,10 @@ struct MainTabView: View {
                 Task {
                     await friendsService.setupRealtimeSubscription(userId: userId)
                     await remoteMatchService.setupRealtimeSubscription(userId: userId)
+                    // Recover push token after delete+reinstall: if iOS is still authorized
+                    // but UserDefaults was wiped (no cached token, no push_tokens row for new
+                    // device_install_id), this re-asks the system for a fresh APNs token.
+                    await notificationService.retryTokenSyncIfNeeded()
                 }
             } else {
                 print("⚠️ [MainTabView] No authenticated user, skipping realtime subscriptions")

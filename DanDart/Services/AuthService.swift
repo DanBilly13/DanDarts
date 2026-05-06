@@ -58,6 +58,7 @@ class AuthService: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = false
     @Published var needsProfileSetup: Bool = false // Track if new user needs profile setup
+    @Published var needsPermissionsOnboarding: Bool = false // Track if new user needs to see the permissions onboarding screen
     @Published var isInRecoveryMode: Bool = false // Track if user is in password reset flow
     
     // MARK: - Private Properties
@@ -142,6 +143,7 @@ class AuthService: ObservableObject {
             // 4. Set current user but DON'T authenticate yet (wait for profile setup)
             currentUser = newUser
             needsProfileSetup = true // Mark that profile setup is needed
+            needsPermissionsOnboarding = true // New sign-up will see the permissions onboarding step after profile setup
             // Don't call updateAuthenticationState() yet - wait for profile setup
             
             print("🎉 Sign up complete! User: \(newUser.displayName) - Profile setup needed")
@@ -516,6 +518,7 @@ class AuthService: ObservableObject {
                 print("⏱️ [OAUTH-PERF] Setting currentUser and needsProfileSetup...")
                 currentUser = newUser
                 needsProfileSetup = true
+                needsPermissionsOnboarding = true // New sign-up will see the permissions onboarding step after profile setup
                 // Don't call updateAuthenticationState() yet - wait for profile setup
                 
                 // Skip preload for new users - they have no matches yet
@@ -700,6 +703,7 @@ class AuthService: ObservableObject {
                 print("⏱️ [OAUTH-PERF] Setting currentUser and needsProfileSetup...")
                 currentUser = newUser
                 needsProfileSetup = true
+                needsPermissionsOnboarding = true // New sign-up will see the permissions onboarding step after profile setup
                 // Don't call updateAuthenticationState() yet - wait for profile setup
                 
                 // Skip preload for new users - they have no matches yet
@@ -834,6 +838,7 @@ class AuthService: ObservableObject {
             
             // 2. Deactivate push token (Phase 8)
             await NotificationService.shared.deactivateCurrentDeviceToken()
+            NotificationService.shared.resetLoadedState()
             
             // 3. Call Supabase sign out
             try await supabaseService.client.auth.signOut()
@@ -1304,6 +1309,17 @@ class AuthService: ObservableObject {
     private func updateAuthenticationState() {
         isAuthenticated = currentUser != nil
         needsProfileSetup = false // Ensure profile setup flag is cleared when authenticating
+        // Note: do NOT touch needsPermissionsOnboarding here. New sign-ups set it to true
+        // explicitly; existing user sign-in paths leave it false. ContentView routes on it.
+    }
+    
+    /// Mark the permissions onboarding screen as completed for the current user.
+    /// Persists a per-user UserDefaults flag so the screen never re-appears.
+    func completePermissionsOnboarding() {
+        if let userId = currentUser?.id {
+            UserDefaults.standard.set(true, forKey: "permissions_onboarding_completed_\(userId.uuidString)")
+        }
+        needsPermissionsOnboarding = false
     }
     
     /// Clear all authentication state
@@ -1311,6 +1327,7 @@ class AuthService: ObservableObject {
         currentUser = nil
         isAuthenticated = false
         needsProfileSetup = false
+        needsPermissionsOnboarding = false
     }
     
     // MARK: - REST API Sign Up (Workaround for SDK timeout issue)

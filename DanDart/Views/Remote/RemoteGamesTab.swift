@@ -28,9 +28,6 @@ struct RemoteGamesTab: View {
     // Only show the full-screen loading view on the very first load.
     // For subsequent background refreshes, keep the list mounted to avoid row DISAPPEAR/APPEAR flashes.
     @State private var hasLoadedOnce = false
-    
-    // Track if we've requested permissions this session
-    @State private var hasRequestedPermissions = false
     @State private var hasRequestedVoicePermission = false
     
     
@@ -77,11 +74,9 @@ struct RemoteGamesTab: View {
             }
         }
         .task {
-            // Check and request notification permissions (Phase 8)
-            await checkNotificationPermissions()
-            
-            // Request voice permission if needed (Phase 12.1)
-            // This happens AFTER notifications, from stable top-level state
+            // Permission requests now happen during sign-up via PermissionsOnboardingView.
+            // We still retry token sync here in case a previous sync failed (no UI prompt).
+            await notificationService.retryTokenSyncIfNeeded()
             await requestVoicePermissionIfNeeded()
             
             // Load matches when tab appears
@@ -581,63 +576,43 @@ struct RemoteGamesTab: View {
         }
     }
     
-    /// Check notification permissions and request if needed (Phase 8)
-    private func checkNotificationPermissions() async {
-        // Only request once per session
-        guard !hasRequestedPermissions else {
-            // Even if we already requested, retry token sync on subsequent visits
-            await notificationService.retryTokenSyncIfNeeded()
-            return
-        }
-        
-        // Check current status
-        await notificationService.checkAuthorizationStatus()
-        
-        // If not determined, request permissions
-        if notificationService.authorizationStatus == .notDetermined {
-            do {
-                try await notificationService.requestPermissions()
-                hasRequestedPermissions = true
-            } catch {
-                print("❌ Failed to request notification permissions: \(error)")
-            }
-        } else if notificationService.authorizationStatus == .authorized {
-            // If already authorized, retry token sync in case it failed previously
-            await notificationService.retryTokenSyncIfNeeded()
-        }
-    }
-    
-    /// Request microphone permission for voice chat (Phase 12.1)
-    /// Only runs once per session, from stable top-level Remote Games context
+    // Note: Notification + microphone permissions are now requested during sign-up
+    // via PermissionsOnboardingView. The Remote tab only retries token sync.
     private func requestVoicePermissionIfNeeded() async {
-        // Only request once per session
+        let manager = VoicePermissionManager.shared
+        manager.logState("remote tab voice permission check")
+        
         guard !hasRequestedVoicePermission else {
+            print("🎤 [RemoteGamesTab] Voice permission request skipped - already requested this session")
             return
         }
         
-        // Only request if not already determined
-        guard VoicePermissionManager.shared.microphoneAuthorizationStatus == .undetermined else {
+        guard manager.isVoiceEnabledInApp else {
+            print("🎤 [RemoteGamesTab] Voice permission request skipped - app preference disabled")
             return
         }
         
-        // Only request if we haven't attempted the initial prompt before
-        guard !VoicePermissionManager.shared.hasAttemptedInitialPrompt else {
+        guard manager.microphoneAuthorizationStatus == .undetermined else {
+            print("🎤 [RemoteGamesTab] Voice permission request skipped - permission already \(manager.microphoneAuthorizationStatus)")
             return
         }
         
-        // Small delay to ensure screen is stable after notifications dialog
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        guard !manager.hasAttemptedInitialPrompt else {
+            print("🎤 [RemoteGamesTab] Voice permission request skipped - initial prompt already attempted")
+            return
+        }
         
-        print("🎤 [RemoteGamesTab] Requesting microphone permission for voice chat...")
+        try? await Task.sleep(nanoseconds: 500_000_000)
         
-        // Request permission
-        let granted = await VoicePermissionManager.shared.requestMicrophonePermissionIfNeeded()
+        print("🎤 [RemoteGamesTab] Requesting microphone permission for voice chat fallback")
+        let granted = await manager.requestMicrophonePermissionIfNeeded()
         hasRequestedVoicePermission = true
+        manager.logState("remote tab voice permission fallback completed granted=\(granted)")
         
         if granted {
             print("✅ [RemoteGamesTab] Microphone permission granted - voice chat available")
         } else {
-            print("ℹ️ [RemoteGamesTab] Microphone permission denied - remote matches will work without voice")
+            print("ℹ️ [RemoteGamesTab] Microphone permission not granted - remote matches continue without voice")
         }
     }
     

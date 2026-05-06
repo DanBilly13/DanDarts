@@ -50,6 +50,7 @@ struct DartFreakApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authService = AuthService.shared
     @StateObject private var notificationService = NotificationService.shared
+    @StateObject private var voicePermissionManager = VoicePermissionManager.shared
     
     init() {
         // Initialize Firebase
@@ -63,6 +64,8 @@ struct DartFreakApp: App {
         
         // Set up notification delegate (Phase 8)
         UNUserNotificationCenter.current().delegate = NotificationService.shared
+        
+        VoicePermissionManager.shared.logState("app init")
     }
     
     var body: some Scene {
@@ -74,6 +77,7 @@ struct DartFreakApp: App {
                 ContentView()
                     .environmentObject(authService)
                     .environmentObject(notificationService)
+                    .environmentObject(voicePermissionManager)
                     .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                         guard let url = activity.webpageURL else { return }
 

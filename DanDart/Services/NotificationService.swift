@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 import UserNotifications
 import Security
 #if canImport(UIKit)
@@ -22,6 +23,10 @@ class NotificationService: NSObject, ObservableObject {
     @Published var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published var pendingIntent: NotificationRouteIntent?
     @Published var notificationsEnabled: Bool = false
+    /// True once `loadNotificationState()` has completed at least once for the current user/device.
+    /// Used by Settings UI to render a loading state and avoid the false→true animation
+    /// caused by the published `notificationsEnabled` defaulting to `false` before the DB read returns.
+    @Published var hasLoadedState: Bool = false
     
     // MARK: - Private Properties
     private let supabaseService = SupabaseService.shared
@@ -47,9 +52,13 @@ class NotificationService: NSObject, ObservableObject {
         let detectedEnvironment = getAPNsEnvironment()
         print("🔍 [NotificationService] Initialized with environment: \(detectedEnvironment)")
         
+        // Only check OS-level authorization status here. Do NOT call loadNotificationState()
+        // from init - the user may not yet be authenticated, and triggering it before the
+        // user is known causes the published `notificationsEnabled` to flip false→false→true
+        // later, which SwiftUI animates in the Settings toggle. The Settings view (and
+        // permissions onboarding) call loadNotificationState() explicitly when needed.
         Task {
             await checkAuthorizationStatus()
-            await loadNotificationState()
         }
     }
     
@@ -327,27 +336,36 @@ class NotificationService: NSObject, ObservableObject {
         }
     }
     
-    /// Load current notification state from database
-    func loadNotificationState() async {
-        print("📥 [Load] loadNotificationState() called")
+    /// Load current notification state from database.
+    /// - Parameter force: If false (default), skips work when `hasLoadedState` is already true
+    ///   for the current user. Pass `true` to force a re-read (e.g. after toggling).
+    func loadNotificationState(force: Bool = false) async {
+        print("🔔[NOTIF] loadNotificationState(force: \(force)) entry pre=enabled:\(notificationsEnabled) loaded:\(hasLoadedState)")
         
         // Guard: Don't reload state while a manual toggle is in progress
         guard !isTogglingNotifications else {
-            print("⏭️ [Load] Skipping loadNotificationState - toggle operation in progress")
+            print("🔔[NOTIF] skip - toggle in progress")
+            return
+        }
+        
+        // Guard: Don't re-fetch on every Settings appearance. The Settings toggle's
+        // off→on animation on each visit was caused by `loadNotificationState()` being
+        // called from `.task` and re-publishing the value. Cache the first read.
+        if hasLoadedState && !force {
+            print("🔔[NOTIF] skip - already loaded (cached enabled:\(notificationsEnabled))")
             return
         }
         
         guard let userId = authService.currentUser?.id else {
-            print("⏭️ [Load] No authenticated user - notifications disabled")
-            notificationsEnabled = false
+            print("🔔[NOTIF] no user - leaving enabled=false, not marking loaded")
+            withTransaction(Transaction(animation: nil)) {
+                notificationsEnabled = false
+            }
             return
         }
         
         let deviceInstallId = getOrCreateDeviceInstallId()
-        
-        print("📥 [Load] Loading notification state from database...")
-        print("   User ID: \(userId)")
-        print("   Device Install ID: \(deviceInstallId)")
+        print("🔔[NOTIF] reading push_tokens user=\(userId.uuidString.prefix(8))... device=\(deviceInstallId.prefix(8))...")
         
         do {
             struct PushTokenResponse: Decodable {
@@ -362,34 +380,43 @@ class NotificationService: NSObject, ObservableObject {
                 .execute()
                 .value
             
-            if let tokenState = response.first {
-                print("📊 [Load] Database returned is_active=\(tokenState.is_active)")
-                notificationsEnabled = tokenState.is_active
-                print("✅ [Load] notificationsEnabled set to \(notificationsEnabled)")
-            } else {
-                // No token record yet - default to false
-                print("ℹ️ [Load] No token record found - defaulting to disabled")
-                notificationsEnabled = false
-                print("✅ [Load] notificationsEnabled set to false")
+            let resolved = response.first?.is_active ?? false
+            print("🔔[NOTIF] DB returned \(response.first.map { "is_active=\($0.is_active)" } ?? "no row") -> resolved=\(resolved)")
+            
+            // Apply the loaded value WITHOUT animation so the Settings toggle does not
+            // visibly slide from false→true the first time it appears.
+            withTransaction(Transaction(animation: nil)) {
+                notificationsEnabled = resolved
+                hasLoadedState = true
             }
+            print("🔔[NOTIF] post-load enabled=\(notificationsEnabled) loaded=\(hasLoadedState)")
         } catch {
-            print("❌ Failed to load notification state: \(error)")
-            notificationsEnabled = false
+            print("🔔[NOTIF] load failed: \(error)")
+            withTransaction(Transaction(animation: nil)) {
+                notificationsEnabled = false
+                hasLoadedState = true
+            }
         }
+    }
+    
+    /// Reset cached state. Call on sign out or user change so the next load re-reads from DB.
+    func resetLoadedState() {
+        print("🔔[NOTIF] resetLoadedState()")
+        hasLoadedState = false
+        notificationsEnabled = false
     }
     
     /// Toggle notifications on/off (called from Settings UI)
     func setNotificationsEnabled(_ enabled: Bool) async throws {
         guard !isTogglingNotifications else {
-            print("⏭️ Already toggling notifications - skipping")
+            print("🔔[NOTIF] toggle skip - already in progress")
             return
         }
         
         isTogglingNotifications = true
         defer { isTogglingNotifications = false }
         
-        print("🔔 [Toggle] setNotificationsEnabled(\(enabled)) called")
-        print("🔔 [Toggle] Setting notifications to: \(enabled ? "enabled" : "disabled")")
+        print("🔔[NOTIF] setNotificationsEnabled(\(enabled)) pre=enabled:\(notificationsEnabled) authStatus:\(authorizationStatus.rawValue) hasUser:\(authService.currentUser != nil)")
         
         if enabled {
             // Turning ON
@@ -474,21 +501,38 @@ class NotificationService: NSObject, ObservableObject {
     
     /// Retry syncing stored token (called on app launch or auth state change)
     func retryTokenSyncIfNeeded() async {
-        // Only retry if we have a stored token and an authenticated user
-        guard let token = lastReceivedToken,
-              authService.currentUser != nil else {
-            print("⏭️ No token to retry or no authenticated user")
+        // Need an authenticated user
+        guard authService.currentUser != nil else {
+            print("⏭️ No authenticated user - skipping token retry")
             return
         }
         
-        print("🔄 Retrying token sync...")
-        
-        do {
-            try await syncPushToken(token)
-        } catch {
-            print("❌ Token retry failed: \(error)")
-            // Will retry again on next app launch
+        // If we have a cached token, re-upsert it (recovers from deleted/inactive rows)
+        if let token = lastReceivedToken {
+            print("🔄 Retrying token sync with cached token...")
+            do {
+                try await syncPushToken(token)
+            } catch {
+                print("❌ Token retry failed: \(error)")
+            }
+            return
         }
+        
+        // No cached token (e.g. after delete + reinstall): if iOS still considers
+        // the user authorized, ask the system to deliver a fresh APNs token. The
+        // AppDelegate will receive it and call syncPushToken, which upserts.
+        await checkAuthorizationStatus()
+        guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+            print("⏭️ No cached token and iOS not authorized (status: \(authorizationStatus.rawValue)) - nothing to retry")
+            return
+        }
+        
+        print("🔄 No cached token but iOS authorized - requesting fresh APNs registration")
+        #if canImport(UIKit)
+        await MainActor.run {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+        #endif
     }
     
     // MARK: - Deep Link Handling

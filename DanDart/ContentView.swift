@@ -20,6 +20,10 @@ struct ContentView: View {
                     // User is in password reset flow - show password change screen
                     ChangePasswordView()
                         .environmentObject(authService)
+                } else if authService.isAuthenticated && authService.needsPermissionsOnboarding {
+                    // New sign-up has completed profile setup; show one-time permissions screen
+                    PermissionsOnboardingView()
+                        .environmentObject(authService)
                 } else if authService.isAuthenticated {
                     // User is authenticated - show main app
                     MainTabView()

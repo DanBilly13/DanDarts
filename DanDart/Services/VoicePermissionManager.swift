@@ -25,7 +25,8 @@ class VoicePermissionManager: ObservableObject {
     @Published var isVoiceEnabledInApp: Bool {
         didSet {
             UserDefaults.standard.set(isVoiceEnabledInApp, forKey: UserDefaultsKeys.voiceChatEnabled)
-            print("🎤 [VoicePermissionManager] Voice preference changed to: \(isVoiceEnabledInApp)")
+            print("🎤 [VoicePermissionManager] Voice preference changed: \(oldValue) → \(isVoiceEnabledInApp)")
+            logState("preference didSet")
         }
     }
     
@@ -87,6 +88,7 @@ class VoicePermissionManager: ObservableObject {
         if newStatus != microphoneAuthorizationStatus {
             print("🎤 [VoicePermissionManager] Permission status changed: \(microphoneAuthorizationStatus) → \(newStatus)")
             microphoneAuthorizationStatus = newStatus
+            logState("permission refresh changed")
         }
     }
     
@@ -124,6 +126,7 @@ class VoicePermissionManager: ObservableObject {
         } else {
             print("❌ [VoicePermissionManager] Microphone permission denied")
         }
+        logState("permission request completed")
         
         return granted
     }
@@ -131,7 +134,16 @@ class VoicePermissionManager: ObservableObject {
     /// Set the app-level voice chat preference
     /// - Parameter enabled: Whether voice chat should be enabled
     func setVoiceEnabled(_ enabled: Bool) {
+        print("🎤 [VoicePermissionManager] setVoiceEnabled(\(enabled)) called")
         isVoiceEnabledInApp = enabled
+    }
+    
+    func logState(_ context: String) {
+        print("🎤 [VoiceState] \(context)")
+        print("   - permission: \(microphoneAuthorizationStatus)")
+        print("   - app preference: \(isVoiceEnabledInApp ? "enabled" : "disabled")")
+        print("   - initial prompt attempted: \(hasAttemptedInitialPrompt)")
+        print("   - voice usable: \(isVoiceUsable)")
     }
     
     /// Open iOS Settings app to allow user to change microphone permission
