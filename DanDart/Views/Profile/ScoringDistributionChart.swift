@@ -13,6 +13,8 @@ struct ScoringDistributionChart: View {
     
     private let donutSize: CGFloat = 140
     private let donutThickness: CGFloat = 28
+    private let columnWidth: CGFloat = 85 // Fixed width for legend columns
+    private let legendGutter: CGFloat = 24 // Fixed spacing between legend columns
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -26,7 +28,6 @@ struct ScoringDistributionChart: View {
                 chartView
             }
         }
-     
     }
 
     private var loadingState: some View {
@@ -40,23 +41,26 @@ struct ScoringDistributionChart: View {
                 }
 
             VStack(alignment: .leading, spacing: 12) {
-                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
-                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
-                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
-                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
-                SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+                ForEach(0..<5) { _ in
+                    SkeletonBlock(height: 14, cornerRadius: 6, isShimmering: true)
+                }
             }
         }
         .frame(height: 160)
     }
     
     private var chartView: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) { // Fixed spacing between donut and legend start
             if distribution.totalVisits == 0 {
                 emptyDonut
             } else {
                 donutChart
             }
+            
+            // This spacer pushes the legend to the right and absorbs
+            // all extra width on Pro Max screens.
+            Spacer()
+            
             legendView
         }
     }
@@ -84,24 +88,24 @@ struct ScoringDistributionChart: View {
     private var legendView: some View {
         VStack(alignment: .leading, spacing: 12) {
             // First row: 0-40 and 41-99
-            HStack(spacing: 20) {
+            HStack(alignment: .top, spacing: legendGutter) {
                 legendItem(for: distribution.buckets[0])
                 legendItem(for: distribution.buckets[1])
             }
             
             // Second row: 100-139 and 140-179
-            HStack(spacing: 20) {
+            HStack(alignment: .top, spacing: legendGutter) {
                 legendItem(for: distribution.buckets[2])
                 legendItem(for: distribution.buckets[3])
             }
             
-            // Third row: 180 (centered or left-aligned)
+            // Third row: 180
             legendItem(for: distribution.buckets[4])
         }
     }
     
     private func legendItem(for bucket: BucketData) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(bucket.range)
                 .font(.system(.footnote, design: .rounded))
                 .fontWeight(.semibold)
@@ -119,7 +123,7 @@ struct ScoringDistributionChart: View {
                     .foregroundColor(AppColor.textSecondary)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: columnWidth, alignment: .leading) // Keeps column alignment stable
     }
     
     private var segments: [(bucket: BucketData, startAngle: Angle, endAngle: Angle)] {
@@ -186,7 +190,6 @@ struct DonutSegment: Shape {
         return path
     }
 }
-
 #Preview("With Data") {
     ScoringDistributionChart(
         distribution: ScoringDistribution(
