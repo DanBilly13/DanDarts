@@ -89,8 +89,18 @@ class NotificationService: NSObject, ObservableObject {
             return environment
         }
         
-        // Fallback to build configuration if provisioning profile can't be read
-        print("⚠️ [APNs] Could not read aps-environment from provisioning profile, using fallback")
+        // Try to detect from App Store receipt (more reliable than provisioning profile)
+        // TestFlight builds have a sandboxReceipt but use production APNs
+        if let receiptURL = Bundle.main.appStoreReceiptURL {
+            let isSandboxReceipt = receiptURL.lastPathComponent == "sandboxReceipt"
+            // Both TestFlight (sandbox receipt) and App Store use production APNs
+            let environment = isSandboxReceipt ? "production" : "production"
+            print("✅ [APNs] Detected from App Store receipt (sandboxReceipt=\(isSandboxReceipt)): \(environment)")
+            return environment
+        }
+        
+        // Fallback to build configuration if neither method works
+        print("⚠️ [APNs] Could not detect from provisioning profile or receipt, using fallback")
         #if DEBUG
         print("   Fallback: sandbox (DEBUG build)")
         return "sandbox"

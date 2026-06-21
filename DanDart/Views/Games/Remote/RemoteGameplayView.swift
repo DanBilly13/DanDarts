@@ -1213,7 +1213,7 @@ extension RemoteGameplayView {
         var body: some View {
             Text("Checkout: \(checkout)")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(AppColor.brandPrimary)
+                .foregroundColor(AppColor.interactiveTertiaryBackground)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .transition(.asymmetric(
