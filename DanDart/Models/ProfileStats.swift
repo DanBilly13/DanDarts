@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct ThreeDartDataPoint: Identifiable, Hashable {
+struct ThreeDartDataPoint: Identifiable, Hashable, Codable {
     let id: UUID
     let timestamp: Date
     let average: Double
@@ -21,7 +21,7 @@ struct ThreeDartDataPoint: Identifiable, Hashable {
     }
 }
 
-struct ScoringDistribution: Hashable {
+struct ScoringDistribution: Hashable, Codable {
     let bucket0_40: BucketData
     let bucket41_99: BucketData
     let bucket100_139: BucketData
@@ -47,7 +47,7 @@ struct ScoringDistribution: Hashable {
     }
 }
 
-struct BucketData: Identifiable, Hashable {
+struct BucketData: Identifiable, Hashable, Codable {
     let id: UUID
     let range: String
     let count: Int
@@ -63,7 +63,7 @@ struct BucketData: Identifiable, Hashable {
     }
 }
 
-struct FormResult: Identifiable, Hashable {
+struct FormResult: Identifiable, Hashable, Codable {
     let id: UUID
     let matchId: UUID
     let isWin: Bool

@@ -1328,6 +1328,7 @@ class AuthService: ObservableObject {
         isAuthenticated = false
         needsProfileSetup = false
         needsPermissionsOnboarding = false
+        ProfileStatsService.shared.clearPersistedStats()
     }
     
     // MARK: - REST API Sign Up (Workaround for SDK timeout issue)

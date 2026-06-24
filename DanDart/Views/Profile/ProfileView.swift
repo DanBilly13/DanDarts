@@ -85,14 +85,14 @@ struct ProfileView: View {
             .task {
                 await refreshProfileIfPossible()
                 if let userId = authService.currentUser?.id {
-                    await statsService.calculateStats(userId: userId)
+                    await statsService.calculateStatsIfNeeded(userId: userId)
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
                 Task {
                     await refreshProfileIfPossible()
                     if let userId = authService.currentUser?.id {
-                        await statsService.calculateStats(userId: userId)
+                        await statsService.calculateStatsIfNeeded(userId: userId, force: true)
                     }
                 }
             }
