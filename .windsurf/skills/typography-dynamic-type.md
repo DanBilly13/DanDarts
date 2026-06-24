@@ -1,34 +1,81 @@
 # Typography & Dynamic Type
 
-Reference for how Dart Freak handles font sizing and Dynamic Type (the iOS system text-size setting).
+Reference for how Dart Freak handles font sizing and why Dynamic Type (the iOS system text-size setting) is disabled app-wide.
 
 ---
 
-## 1. Current State
+## 1. Decision
 
-Dart Freak **honors Dynamic Type app-wide**. The user's iOS text-size setting now scales text throughout the app, including sheets, full-screen covers, popovers, and alerts.
+Dart Freak **disables Dynamic Type scaling app-wide**. All text renders at the default content size category (`.large`) regardless of the user's iOS text-size setting.
 
----
+**Why:** User testing showed that enlarged system font sizes broke layouts (clipped/overflowing text, misaligned cards). The app's typography is hand-tuned with fixed point sizes, so honoring Dynamic Type produced worse UX than locking it.
 
-## 2. Historical Context
-
-A previous implementation disabled Dynamic Type by overriding the window's `preferredContentSizeCategory` to `.large` via a `UIViewRepresentable` called `WindowContentSizeLock`. It was added because an earlier attempt using `.dynamicTypeSize(.large)` on the root view did not propagate into SwiftUI presented content (`.sheet`, `.fullScreenCover`, `.popover`).
-
-That lock has been removed. The app now relies on the standard system behavior, and any layout issues caused by enlarged text should be addressed by fixing the affected layouts rather than disabling accessibility.
+**Tradeoff:** Users who rely on larger system text for accessibility get no scaling benefit inside the app. This was an intentional product decision.
 
 ---
 
-## 3. Rules for Future Work
+## 2. How It Works
 
-- **Do not** reintroduce a global lock on `preferredContentSizeCategory` unless there is a new product decision to disable Dynamic Type.
-- **Do not** use `.dynamicTypeSize(...)` to suppress scaling; it does not propagate into presented content.
+The lock is implemented as a **window-level trait override**, not a SwiftUI environment modifier.
+
+`WindowContentSizeLock` in `DanDart/DartFreakApp.swift`:
+
+```swift
+struct WindowContentSizeLock: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView { TraitLockView() }
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    private final class TraitLockView: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            window?.traitOverrides.preferredContentSizeCategory = .large
+        }
+    }
+}
+```
+
+Applied once at the root, on `ContentView` inside `WindowGroup`:
+
+```swift
+ContentView()
+    .environmentObject(authService)
+    .environmentObject(notificationService)
+    .environmentObject(voicePermissionManager)
+    .background(WindowContentSizeLock())
+```
+
+Because it overrides the trait on the **UIWindow**, it covers everything hosted in that window: pushed navigation views, sheets, full-screen covers, popovers, and alerts.
+
+---
+
+## 3. Why NOT `.dynamicTypeSize(.large)`
+
+The first attempt used SwiftUI's `.dynamicTypeSize(.large)` on the root view. **It did not work for sheets.**
+
+- `.dynamicTypeSize` is a SwiftUI **environment** value.
+- SwiftUI gives presented content (`.sheet`, `.fullScreenCover`, `.popover`) a **fresh environment** that does NOT inherit from the presenter.
+- Result: main navigation screens were locked, but the ~20 sheet presentations (e.g. player selection in `GameSetupView` → `SearchPlayerSheet`) still scaled.
+
+The window-level trait override bypasses this entirely because all presentations share the same window.
+
+---
+
+## 4. Rules for Future Work
+
+- **Do not** rely on `.dynamicTypeSize(...)` for app-wide font locking — it misses presented content.
+- **Do not** remove `WindowContentSizeLock` or its `.background(...)` hookup unless intentionally re-enabling Dynamic Type.
 - Fixed point sizes (`.font(.system(size: X))`) are unaffected by Dynamic Type and are safe.
-- Semantic styles (`.body`, `.headline`, `.title`, `.caption`, etc.) **will** scale with Dynamic Type. Many components use them (e.g. `PlayerIdentity`, `ModernSheet`, `MatchCard`, `GameCard`, `TopBar`).
-- When laying out text, use scalable containers, `minimumScaleFactor`, and flexible frames where appropriate so larger sizes do not clip or overflow.
+- Semantic styles (`.body`, `.headline`, `.title`, `.caption`, etc.) WOULD scale if the lock were removed — many components use them (e.g. `PlayerIdentity`, `ModernSheet`, `MatchCard`, `GameCard`, `TopBar`).
+- The lock value is `.large` — iOS's **default** category, not an accessibility size.
 
 ---
 
-## 4. Testing
+## 5. Toggling for Before/After Testing
 
-- Use the Accessibility Inspector or iOS Settings → Display & Text Size → Larger Text to verify scaling.
-- Check sheets, full-screen covers, popovers, and alerts explicitly, as these were previously unaffected by `.dynamicTypeSize`.
+To temporarily re-enable Dynamic Type (e.g. for screenshots), comment out the single hookup line in `DanDart/DartFreakApp.swift`:
+
+```swift
+//.background(WindowContentSizeLock())
+```
+
+Then clean build + relaunch. Remember to restore it.
