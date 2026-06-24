@@ -107,7 +107,7 @@ extension PlayerIdentity {
     init(
         player: Player,
         avatarSize: CGFloat = 48,
-        nameFont: Font = .system(.callout, design: .rounded).weight(.semibold),
+        nameFont: Font = .system(.title3, design: .rounded).weight(.semibold),
         nicknameFont: Font = .footnote.weight(.medium),
         nicknameColor: Color = AppColor.textSecondary,
         spacing: CGFloat = 4,

@@ -78,7 +78,6 @@ struct DartFreakApp: App {
                     .environmentObject(authService)
                     .environmentObject(notificationService)
                     .environmentObject(voicePermissionManager)
-                    .background(WindowContentSizeLock())
                     .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                         guard let url = activity.webpageURL else { return }
 
@@ -176,28 +175,6 @@ struct DartFreakApp: App {
                         }
                     }
             }
-        }
-    }
-}
-
-/// Locks the entire window — including presented sheets, full-screen covers,
-/// popovers, and alerts — to the default content size category, disabling
-/// Dynamic Type scaling app-wide.
-///
-/// SwiftUI's `.dynamicTypeSize` is an environment value that does NOT propagate
-/// into presented content (sheets/covers get a fresh environment), so a
-/// window-level trait override is used instead to cover every presentation.
-struct WindowContentSizeLock: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIView {
-        TraitLockView()
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
-
-    private final class TraitLockView: UIView {
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-            window?.traitOverrides.preferredContentSizeCategory = .large
         }
     }
 }
