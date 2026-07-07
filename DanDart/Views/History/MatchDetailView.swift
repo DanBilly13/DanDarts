@@ -198,6 +198,7 @@ struct MatchDetailView: View {
                     getValue: { Int($0.averageScore) },
                     isDecimal: true,
                     getDecimalValue: { $0.averageScore },
+                    forceMaxValue: 180,
                     getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
                 
@@ -206,6 +207,7 @@ struct MatchDetailView: View {
                     label: "Highest visit",
                     players: sortedPlayers,
                     getValue: { highestVisit(for: $0) },
+                    forceMaxValue: 180,
                     getOriginalIndex: { originalPlayerIndex(for: $0) }
                 )
                 
