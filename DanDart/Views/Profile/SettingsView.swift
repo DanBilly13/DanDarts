@@ -20,6 +20,9 @@ struct SettingsView: View {
     @StateObject private var notificationService = NotificationService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
+    @State private var showDeleteAccountConfirmation: Bool = false
+    @State private var showDeleteAccountError: Bool = false
+    @State private var isDeletingAccount: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
     @State private var showResetTipsConfirmation: Bool = false
     @State private var showVoicePermissionAlert = false
@@ -43,6 +46,10 @@ struct SettingsView: View {
                     // Log Out Button
                     logoutButton
                         .padding(.top, 16)
+
+                    // Delete Account Button
+                    deleteAccountButton
+                        .padding(.top, 12)
                         .padding(.bottom, 40)
                 }
                 .padding(.horizontal, 16)
@@ -63,6 +70,19 @@ struct SettingsView: View {
             }
         } message: {
             Text("Are you sure you want to log out?")
+        }
+        .alert("Delete Account?", isPresented: $showDeleteAccountConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete Account", role: .destructive) {
+                performAccountDeletion()
+            }
+        } message: {
+            Text("This permanently deletes your account, profile, friends, and personal match data. Games you played with others are kept but no longer linked to you.\n\nThis can't be undone.")
+        }
+        .alert("Couldn't Delete Account", isPresented: $showDeleteAccountError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Something went wrong deleting your account. Please check your connection and try again.")
         }
         .alert("Clear Local Matches", isPresented: $showClearMatchesConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -99,6 +119,20 @@ struct SettingsView: View {
     }
     
     // MARK: - Helper Methods
+    
+    private func performAccountDeletion() {
+        Task {
+            isDeletingAccount = true
+            defer { isDeletingAccount = false }
+            do {
+                try await authService.deleteAccount()
+                // On success, clearAuthenticationState() routes the app back to login.
+            } catch {
+                print("❌ Account deletion failed: \(error.localizedDescription)")
+                showDeleteAccountError = true
+            }
+        }
+    }
     
     private func clearLocalMatches() {
         MatchStorageManager.shared.deleteAllMatches()
@@ -473,6 +507,31 @@ struct SettingsView: View {
             .background(AppColor.inputBackground)
             .cornerRadius(12)
         }
+    }
+    
+    private var deleteAccountButton: some View {
+        Button(action: {
+            showDeleteAccountConfirmation = true
+        }) {
+            HStack {
+                if isDeletingAccount {
+                    ProgressView()
+                        .tint(Color.red)
+                } else {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .medium))
+                    
+                    Text("Delete Account")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+            }
+            .foregroundColor(Color.red)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(AppColor.inputBackground)
+            .cornerRadius(12)
+        }
+        .disabled(isDeletingAccount)
     }
 }
 

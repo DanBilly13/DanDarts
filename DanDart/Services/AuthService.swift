@@ -591,6 +591,11 @@ class AuthService: ObservableObject {
                 throw AuthError.oauthFailed
             }
             print("✅ Credentials extracted")
+
+            // Capture the Apple authorization code (only available at this moment).
+            // Needed to exchange for a refresh token so the account can be revoked on deletion.
+            let appleAuthorizationCode = appleIDCredential.authorizationCode
+                .flatMap { String(data: $0, encoding: .utf8) }
             
             // Get Apple user info
             let appleUserID = appleIDCredential.user
@@ -614,6 +619,12 @@ class AuthService: ObservableObject {
             )
             print("✅ Supabase sign-in successful")
             print("⏱️ [OAUTH-PERF] OAuth callback received, session ready")
+
+            // Best-effort: persist an Apple refresh token for deletion-time revocation.
+            // Non-blocking so it never delays or fails sign-in.
+            if let appleAuthorizationCode {
+                Task { await self.storeAppleAuthorizationCode(appleAuthorizationCode) }
+            }
             
             // 6. Check if user profile exists in users table
             let userId = session.user.id
@@ -856,6 +867,76 @@ class AuthService: ObservableObject {
             // Log the error for debugging but don't throw it
             // User should always be able to sign out locally
             print("Sign out error (cleared local state anyway): \(error.localizedDescription)")
+        }
+    }
+    
+    /// Permanently delete the current user's account and all personal data.
+    /// Calls the `delete-account` Edge Function (service-role deletion + anonymization
+    /// of shared remote matches + Apple token revocation), then clears local state.
+    /// Throws on failure so the caller can surface an error and keep the session.
+    func deleteAccount() async throws {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let session = try? await supabaseService.client.auth.session else {
+            throw AuthError.userNotFound
+        }
+        
+        let headers = [
+            "apikey": supabaseService.supabaseAnonKey,
+            "Authorization": "Bearer \(session.accessToken)"
+        ]
+        
+        struct EmptyBody: Encodable {}
+        struct DeleteResponse: Decodable { let success: Bool }
+        
+        do {
+            let response: DeleteResponse = try await supabaseService.client.functions
+                .invoke("delete-account", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: EmptyBody()
+                ))
+            guard response.success else {
+                throw AuthError.networkError
+            }
+        } catch let error as AuthError {
+            throw error
+        } catch {
+            print("❌ delete-account failed: \(error.localizedDescription)")
+            throw AuthError.networkError
+        }
+        
+        // Account is deleted server-side. Clear local caches and session state.
+        FriendRequestToastManager.shared.clearAll()
+        NotificationService.shared.resetLoadedState()
+        MatchStorageManager.shared.deleteAllMatches()
+        
+        // Best-effort local sign out (the server session is already invalid).
+        try? await supabaseService.client.auth.signOut()
+        
+        clearAuthenticationState()
+    }
+    
+    /// Best-effort: exchange the Apple authorization code for a refresh token and store it
+    /// server-side (via `exchange-apple-code`) so the account can be revoked on deletion.
+    /// Never throws — sign-in must not fail if this does not succeed.
+    private func storeAppleAuthorizationCode(_ code: String) async {
+        do {
+            guard let session = try? await supabaseService.client.auth.session else { return }
+            let headers = [
+                "apikey": supabaseService.supabaseAnonKey,
+                "Authorization": "Bearer \(session.accessToken)"
+            ]
+            struct Body: Encodable { let authorization_code: String }
+            struct Resp: Decodable { let success: Bool }
+            let _: Resp = try await supabaseService.client.functions
+                .invoke("exchange-apple-code", options: FunctionInvokeOptions(
+                    headers: headers,
+                    body: Body(authorization_code: code)
+                ))
+            print("✅ Apple authorization code stored for deletion-time revocation")
+        } catch {
+            print("⚠️ Failed to store Apple authorization code (non-fatal): \(error.localizedDescription)")
         }
     }
     

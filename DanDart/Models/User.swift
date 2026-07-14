@@ -96,6 +96,28 @@ struct User: Codable, Identifiable {
     }
 }
 
+// MARK: - Deleted User Placeholder
+extension User {
+    /// Placeholder for a participant whose account has been deleted (their id no
+    /// longer resolves in the `users` table). Used so shared matches still render
+    /// for the surviving participant instead of silently disappearing.
+    static func deletedPlaceholder(id: UUID) -> User {
+        User(
+            id: id,
+            displayName: "Deleted User",
+            nickname: "deleted",
+            email: nil,
+            handle: nil,
+            avatarURL: nil,
+            authProvider: nil,
+            createdAt: Date(timeIntervalSince1970: 0),
+            lastSeenAt: nil,
+            totalWins: 0,
+            totalLosses: 0
+        )
+    }
+}
+
 // MARK: - Mock Data for Previews
 extension User {
     static let mockUser1 = User(

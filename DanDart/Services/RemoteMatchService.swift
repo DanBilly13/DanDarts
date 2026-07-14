@@ -543,10 +543,11 @@ class RemoteMatchService: ObservableObject {
             var active: RemoteMatchWithPlayers?
             
             for match in matches {
-                guard let challenger = userDict[match.challengerId],
-                      let receiver = userDict[match.receiverId] else {
-                    continue
-                }
+                // If a participant's profile no longer resolves (their account was
+                // deleted/anonymized), substitute a "Deleted User" placeholder instead
+                // of dropping the match, so the surviving participant keeps their history.
+                let challenger = userDict[match.challengerId] ?? User.deletedPlaceholder(id: match.challengerId)
+                let receiver = userDict[match.receiverId] ?? User.deletedPlaceholder(id: match.receiverId)
                 
                 let matchWithPlayers = RemoteMatchWithPlayers(
                     match: match,
