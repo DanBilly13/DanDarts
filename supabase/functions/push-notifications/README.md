@@ -55,6 +55,23 @@ supabase secrets set APNS_PRIVATE_KEY="$(cat AuthKey_ABC123XYZ.p8)"
 
 Or set them in the Supabase Dashboard under Edge Functions → Settings → Secrets.
 
+### FCM (Android)
+
+```bash
+# The full contents of a Firebase service-account JSON key file (Project
+# Settings -> Service Accounts -> Generate new private key, on the
+# dartfreak-28640 Firebase project -- the same project already used for
+# Android App Distribution/Analytics). Requires Cloud Messaging to be
+# enabled on that project first.
+FCM_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"dartfreak-28640","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...@dartfreak-28640.iam.gserviceaccount.com", ...}'
+```
+
+Set it with:
+
+```bash
+supabase secrets set FCM_SERVICE_ACCOUNT_JSON="$(cat service-account.json)"
+```
+
 ## Request Format
 
 ```typescript
