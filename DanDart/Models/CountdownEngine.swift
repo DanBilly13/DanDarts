@@ -36,6 +36,13 @@ enum CountdownEvent {
     case matchWon(winnerId: UUID)
 }
 
+extension Array where Element == CountdownEvent {
+    /// True when the visit that produced these events was a bust.
+    var containsBust: Bool {
+        contains { if case .busted = $0 { return true } else { return false } }
+    }
+}
+
 // MARK: - Engine (pure functions only)
 
 enum CountdownEngine {

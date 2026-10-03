@@ -1921,33 +1921,38 @@ class RemoteMatchService: ObservableObject {
     
     // MARK: - Save Visit (Gameplay)
     
+    /// Body of the `save-visit` edge function call. Property names are the JSON keys.
+    struct SaveVisitPayload: Encodable {
+        let match_id: String
+        let darts: [Int]
+        let score_before: Int
+        let score_after: Int
+        /// Without this the server stores every visit as not-bust, so busts in remote
+        /// matches were never recorded and later counted as scored visits in stats.
+        let is_bust: Bool
+    }
+    
     /// Save a visit (3 darts) to the server
     /// - Parameters:
     ///   - matchId: Match ID
     ///   - darts: Array of 3 dart scores
     ///   - scoreBefore: Player's score before this visit
     ///   - scoreAfter: Player's score after this visit
+    ///   - isBust: Whether the visit was a bust (score unchanged because the rules rejected it)
     /// - Returns: Updated match state from server
-    func saveVisit(matchId: UUID, darts: [Int], scoreBefore: Int, scoreAfter: Int) async throws -> RemoteMatch {
+    func saveVisit(matchId: UUID, darts: [Int], scoreBefore: Int, scoreAfter: Int, isBust: Bool) async throws -> RemoteMatch {
         print("💾 [SaveVisit] Starting - matchId: \(matchId.uuidString.prefix(8))...")
-        print("💾 [SaveVisit] Darts: \(darts), Before: \(scoreBefore), After: \(scoreAfter)")
+        print("💾 [SaveVisit] Darts: \(darts), Before: \(scoreBefore), After: \(scoreAfter), Bust: \(isBust)")
         
         // Get headers with auth token
         let headers = try await getEdgeFunctionHeaders()
-        
-        // Build payload as encodable struct
-        struct SaveVisitPayload: Encodable {
-            let match_id: String
-            let darts: [Int]
-            let score_before: Int
-            let score_after: Int
-        }
         
         let payload = SaveVisitPayload(
             match_id: matchId.uuidString,
             darts: darts,
             score_before: scoreBefore,
-            score_after: scoreAfter
+            score_after: scoreAfter,
+            is_bust: isBust
         )
         
         // Call save-visit edge function
