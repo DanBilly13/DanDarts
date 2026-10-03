@@ -88,6 +88,21 @@ Wraps `AppButton` and adds the fill. Inputs: `role`, `isArmed: Bool`,
   styling (green on / red off). It already observes `SoundManager.shared`; it
   will also observe `GameplaySettings.shared`.
 
+### As built (differences from the first draft)
+
+- The fill is drawn by `AppButton(fillProgress:)` behind the label, not as an overlay
+  on top of it, so the text stays crisp.
+- Menu pause comes from `MenuCoordinator.shared`, read inside `AutoSaveButton`, so all
+  five games pause without each screen passing it. Only the scoreboard flag is passed
+  (Countdown and Halve-It).
+- A one-shot latch (`hasFired`) stops a visit that a view model clears late (Knockout
+  waits about 0.25 s) from saving twice.
+- Reduce Motion: the fill is already a linear progress change with no easing, so there
+  is no special case.
+- `GameplayMenuButton` has `showsAutoSave` (default `false`) so Remote's menu has no
+  inert toggle.
+- The `?` menu entry is `Auto-Save` with a check (on) or cross (off) icon.
+
 ## Per-game wiring
 
 Each screen replaces its Save Score `AppButton` with `AutoSaveButton`.
