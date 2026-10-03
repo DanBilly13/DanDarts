@@ -88,7 +88,20 @@ class KillerViewModel: ObservableObject {
     let startingLives: Int
     private var playerTurnHistory: [UUID: [MatchTurn]] = [:] // Per-player turn history
     let matchId: UUID
-    
+
+    /// Everything a dart can change, captured just before the dart is processed so that
+    /// deleting the dart can put the game back exactly as it was.
+    private struct DartSnapshot {
+        let playerLives: [UUID: Int]
+        let displayPlayerLives: [UUID: Int]
+        let isKiller: [UUID: Bool]
+        let eliminatedPlayers: Set<UUID>
+        let eliminationOrder: [UUID]
+    }
+
+    /// One snapshot per dart in `currentThrow`, oldest first. Cleared when the turn ends.
+    private var dartSnapshots: [DartSnapshot] = []
+
     init(players: [Player], startingLives: Int) {
         self.players = players
         self.startingLives = startingLives
@@ -145,6 +158,15 @@ class KillerViewModel: ObservableObject {
         }()
         let dart = ScoredThrow(baseValue: value, scoreType: scoreType)
         print("   Created ScoredThrow: base=\(dart.baseValue), type=\(scoreType), total=\(dart.totalValue)")
+
+        // Remember the game as it is before this dart, so deleting the dart can undo its effect.
+        dartSnapshots.append(DartSnapshot(
+            playerLives: playerLives,
+            displayPlayerLives: displayPlayerLives,
+            isKiller: isKiller,
+            eliminatedPlayers: eliminatedPlayers,
+            eliminationOrder: eliminationOrder
+        ))
         currentThrow.append(dart)
         
         // Process throw and get metadata
@@ -555,6 +577,8 @@ class KillerViewModel: ObservableObject {
             Task {
                 try? await Task.sleep(nanoseconds: 500_000_000) // Match fade duration
                 await MainActor.run {
+                    // The dart may have been deleted during the fade, which brings the player back.
+                    guard (self.displayPlayerLives[playerID] ?? 0) == 0 else { return }
                     self.eliminatedPlayers.insert(playerID)
                 }
             }
@@ -564,45 +588,51 @@ class KillerViewModel: ObservableObject {
     func clearThrow() {
         currentThrow.removeAll()
         currentThrowMetadata.removeAll()
+        dartSnapshots.removeAll()
         selectedDartIndex = 0  // Reset to dart 1 for next turn
     }
     
     func undoLastDart() {
-        guard !currentThrow.isEmpty, phase == .playing else { return }
-        currentThrow.removeLast()
-        selectedDartIndex = currentThrow.isEmpty ? nil : currentThrow.count - 1
-        
-        // Note: We don't undo the game state changes (lives, killer status)
-        // This is intentional - once a dart is thrown, its effects are permanent
-        // User should use "Restart" if they made a mistake
+        deleteThrow()
     }
-    
-    /// Delete the current throw or move back to previous throw
+
+    /// Undo the last dart of the current visit: remove it AND reverse what it did (lives lost,
+    /// Killer status, elimination).
+    ///
+    /// It is always the last dart, whichever dart is highlighted. Each dart's effect depends on
+    /// the state the earlier darts left behind, so an earlier dart can't be undone on its own.
     func deleteThrow() {
-        guard phase == .playing else { return }
-        
-        // If there's a selected dart, delete it and keep that position selected
-        if let selectedIndex = selectedDartIndex, selectedIndex < currentThrow.count {
-            currentThrow.remove(at: selectedIndex)
-            if selectedIndex < currentThrowMetadata.count {
-                currentThrowMetadata.remove(at: selectedIndex)
-            }
-            // Keep the same index selected (now points to empty slot or next throw)
-        } else if !currentThrow.isEmpty {
-            // No selection, delete the last throw and select that position
-            let lastIndex = currentThrow.count - 1
-            currentThrow.removeLast()
-            if !currentThrowMetadata.isEmpty {
-                currentThrowMetadata.removeLast()
-            }
-            selectedDartIndex = lastIndex
+        guard canDelete else { return }
+
+        currentThrow.removeLast()
+        if !currentThrowMetadata.isEmpty {
+            currentThrowMetadata.removeLast()
         }
-        // If currentThrow is empty and no selection, do nothing
+        if let snapshot = dartSnapshots.popLast() {
+            restore(snapshot)
+        }
+
+        // Any animation for the undone dart no longer applies.
+        animatingLifeLoss = nil
+        animatingGunSpin = nil
+        animatingKillerActivation = nil
+
+        // The next dart goes into the slot just freed.
+        selectedDartIndex = currentThrow.count
     }
-    
-    /// Check if delete button should be enabled
+
+    private func restore(_ snapshot: DartSnapshot) {
+        playerLives = snapshot.playerLives
+        displayPlayerLives = snapshot.displayPlayerLives
+        isKiller = snapshot.isKiller
+        eliminatedPlayers = snapshot.eliminatedPlayers
+        eliminationOrder = snapshot.eliminationOrder
+    }
+
+    /// Check if delete button should be enabled. Once the game is over the match has already
+    /// been saved, so there is nothing left to undo.
     var canDelete: Bool {
-        !currentThrow.isEmpty && phase == .playing
+        !currentThrow.isEmpty && phase == .playing && !isGameOver
     }
     
     func completeTurn() {
