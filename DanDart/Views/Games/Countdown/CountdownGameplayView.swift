@@ -160,10 +160,13 @@ struct CountdownGameplayView: View {
                                 .disabled(true)
                                 
                                 // Actual button that pops in/out
-                                AppButton(
+                                AutoSaveButton(
                                     role: gameViewModel.isWinningThrow ? .secondary : .primary,
-                                    controlSize: .extraLarge,
-                                    action: { gameViewModel.saveScore() }
+                                    isVisitComplete: gameViewModel.isTurnComplete,
+                                    isWinningThrow: gameViewModel.isWinningThrow,
+                                    scoreboardExpanded: isScoreboardExpanded,
+                                    resetKey: gameViewModel.currentThrow.autoSaveKey,
+                                    onSave: { gameViewModel.saveScore() }
                                 ) {
                                     if gameViewModel.isWinningThrow {
                                         Label("Game Over", systemImage: "trophy.fill")
@@ -207,6 +210,7 @@ struct CountdownGameplayView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     GameplayMenuButton(
+                        showsAutoSave: true,
                         onInstructions: { showInstructions = true },
                         onRestart: { showRestartAlert = true },
                         onExit: { showExitAlert = true },

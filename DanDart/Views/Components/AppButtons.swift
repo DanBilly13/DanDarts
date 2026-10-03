@@ -22,12 +22,15 @@ struct AppButton<Label: View>: View {
     let controlSize: ControlSize
     let isDisabled: Bool
     let compact: Bool
+    /// 0...1. Draws a darker fill from the left behind the label (auto-save countdown). 0 = none.
+    let fillProgress: CGFloat
     @ViewBuilder let label: () -> Label
 
     init(role: AppButtonRole,
          controlSize: ControlSize = .regular,
          isDisabled: Bool = false,
          compact: Bool = false,
+         fillProgress: CGFloat = 0,
          action: @escaping () -> Void,
          @ViewBuilder label: @escaping () -> Label) {
         self.role = role
@@ -35,6 +38,7 @@ struct AppButton<Label: View>: View {
         self.controlSize = controlSize
         self.isDisabled = isDisabled
         self.compact = compact
+        self.fillProgress = fillProgress
         self.label = label
     }
 
@@ -46,7 +50,7 @@ struct AppButton<Label: View>: View {
                 .contentShape(Capsule())
         }
         .controlSize(controlSize)
-        .buttonStyle(AppButtonStyle(role: role, controlSize: controlSize, compact: compact))
+        .buttonStyle(AppButtonStyle(role: role, controlSize: controlSize, compact: compact, fillProgress: fillProgress))
         .disabled(isDisabled)
     }
 
@@ -76,6 +80,7 @@ private struct AppButtonStyle: ButtonStyle {
     let role: AppButtonRole
     let controlSize: ControlSize
     let compact: Bool
+    var fillProgress: CGFloat = 0
 
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
@@ -111,6 +116,7 @@ private struct AppButtonStyle: ButtonStyle {
                 return pressed ? base.opacity(role == .tertiary ? 0.85 : 0.90) : base
             }()
             Capsule().fill(bg)
+                .overlay(alignment: .leading) { progressFill }
 
         case .primaryOutline, .tertiaryOutline:
             // Use app background to clearly differentiate from disabled filled buttons
@@ -121,6 +127,17 @@ private struct AppButtonStyle: ButtonStyle {
             // White background for secondary outline (deny button style)
             Capsule().fill(AppColor.justWhite)
         }
+    }
+
+    /// Always present, zero-width at 0, so animating `fillProgress` sweeps instead of popping in.
+    private var progressFill: some View {
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(Color.black.opacity(0.25))
+                .frame(width: geometry.size.width * min(max(fillProgress, 0), 1))
+        }
+        .clipShape(Capsule())
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder

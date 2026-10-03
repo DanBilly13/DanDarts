@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct GameplayMenuButton: View {
+    /// Local games turn this on. Remote games leave it off: auto-save is local-only.
+    var showsAutoSave: Bool = false
     let onInstructions: () -> Void
     let onRestart: () -> Void
     let onExit: () -> Void
@@ -16,7 +18,8 @@ struct GameplayMenuButton: View {
     var canUndo: Bool = false
     
     @ObservedObject private var soundManager = SoundManager.shared
-    
+    @ObservedObject private var gameplaySettings = GameplaySettings.shared
+
     var body: some View {
         Menu {
             Button {
@@ -36,7 +39,20 @@ struct GameplayMenuButton: View {
                         .foregroundColor(soundManager.soundEffectsEnabled ? .green : .red)
                 }
             }
-            
+
+            if showsAutoSave {
+                Button {
+                    gameplaySettings.autoSaveEnabled.toggle()
+                } label: {
+                    Label {
+                        Text("Auto-Save")
+                    } icon: {
+                        Image(systemName: gameplaySettings.autoSaveEnabled ? "checkmark.circle.fill" : "xmark.circle")
+                            .foregroundColor(gameplaySettings.autoSaveEnabled ? .green : .red)
+                    }
+                }
+            }
+
             Divider()
             
             if canUndo, let undoAction = onUndo {
