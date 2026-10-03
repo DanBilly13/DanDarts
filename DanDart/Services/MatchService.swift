@@ -783,4 +783,19 @@ enum MatchSaveRules {
     static func shouldUpdateStats(playerCount: Int) -> Bool {
         playerCount > 1
     }
+    
+    /// The winner to show for a stored match. `winner_id` is null when a Guest won
+    /// (see `memberWinnerId`), so a null winner means "someone who isn't an account".
+    /// For 301/501 that's the player who reached zero. Other games have no equivalent
+    /// of a final score of zero, so they get a placeholder that matches nobody: the
+    /// signed-in user correctly reads as not having won.
+    static func resolvedWinnerId(stored: UUID?, gameType: String, players: [MatchPlayer]) -> UUID {
+        if let stored = stored { return stored }
+        let isCountdown = gameType.contains("301") || gameType.contains("501")
+        if isCountdown,
+           let winner = players.first(where: { $0.finalScore == 0 }) ?? players.min(by: { $0.finalScore < $1.finalScore }) {
+            return winner.id
+        }
+        return UUID()
+    }
 }

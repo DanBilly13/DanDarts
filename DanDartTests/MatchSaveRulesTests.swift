@@ -77,4 +77,41 @@ struct MatchSaveRulesTests {
         // Two players (one a guest) is not practice: the member is credited a win or loss.
         #expect(MatchSaveRules.shouldUpdateStats(playerCount: 2))
     }
+
+    // MARK: - reading a stored winner back
+
+    private func stored(_ name: String, isGuest: Bool, finalScore: Int) -> MatchPlayer {
+        MatchPlayer(
+            id: UUID(), displayName: name, nickname: "", avatarURL: nil, isGuest: isGuest,
+            finalScore: finalScore, startingScore: 301, totalDartsThrown: 3, turns: []
+        )
+    }
+
+    @Test func aStoredWinnerIsUsedAsIs() {
+        let me = stored("Me", isGuest: false, finalScore: 0)
+        let them = stored("Guest", isGuest: true, finalScore: 40)
+        let winner = UUID()
+
+        #expect(MatchSaveRules.resolvedWinnerId(stored: winner, gameType: "301", players: [me, them]) == winner)
+    }
+
+    @Test func aGuestWinOf301IsTheGuestWhoReachedZero() {
+        let me = stored("Me", isGuest: false, finalScore: 120)
+        let guest = stored("Guest", isGuest: true, finalScore: 0)
+
+        let resolved = MatchSaveRules.resolvedWinnerId(stored: nil, gameType: "301", players: [me, guest])
+
+        #expect(resolved == guest.id)
+        #expect(resolved != me.id)
+    }
+
+    @Test func aNullWinnerInAnotherGameMatchesNobody() {
+        let me = stored("Me", isGuest: false, finalScore: 0)
+        let guest = stored("Guest", isGuest: true, finalScore: 0)
+
+        let resolved = MatchSaveRules.resolvedWinnerId(stored: nil, gameType: "killer", players: [me, guest])
+
+        #expect(resolved != me.id)
+        #expect(resolved != guest.id)
+    }
 }
