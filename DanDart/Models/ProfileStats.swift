@@ -7,6 +7,32 @@
 
 import Foundation
 
+/// The throwing widgets on Profile (trend, darts per leg, distribution, personal
+/// bests) for one set of matches. Computed once over real matches and once over
+/// solo practice sessions, so the two can be compared side by side.
+struct ThrowingStats: Hashable, Codable {
+    let threeDartAverageHistory: [ThreeDartDataPoint]
+    let avgDartsPerLeg: Double
+    let avgDartsRank: RankTier
+    let scoringDistribution: ScoringDistribution
+    let highestVisit: Int
+    let bestCheckout: Int
+    let checkoutPercentage: Double
+    /// Matches the user played in within this set.
+    let matchCount: Int
+
+    static let empty = ThrowingStats(
+        threeDartAverageHistory: [],
+        avgDartsPerLeg: 0,
+        avgDartsRank: .unranked,
+        scoringDistribution: .empty,
+        highestVisit: 0,
+        bestCheckout: 0,
+        checkoutPercentage: 0,
+        matchCount: 0
+    )
+}
+
 struct ThreeDartDataPoint: Identifiable, Hashable, Codable {
     let id: UUID
     let timestamp: Date

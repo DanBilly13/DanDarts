@@ -287,14 +287,8 @@ class MatchesService: ObservableObject {
                     print("⚠️ Skipping match \(idString) - missing 'game_name' field")
                     continue
                 }
-                guard let winnerIdString = json["winner_id"] as? String else {
-                    print("⚠️ Skipping match \(idString) - missing 'winner_id' field")
-                    continue
-                }
-                guard let winnerId = UUID(uuidString: winnerIdString) else {
-                    print("⚠️ Skipping match \(idString) - invalid UUID for 'winner_id': \(winnerIdString)")
-                    continue
-                }
+                // winner_id is null when a Guest won; it is resolved below once the players are known.
+                let storedWinnerId = (json["winner_id"] as? String).flatMap { UUID(uuidString: $0) }
                 guard let timestampString = json["timestamp"] as? String else {
                     print("⚠️ Skipping match \(idString) - missing 'timestamp' field")
                     continue
@@ -395,7 +389,7 @@ class MatchesService: ObservableObject {
                     gameType: gameType,
                     gameName: gameName,
                     players: playersWithTurns,
-                    winnerId: winnerId,
+                    winnerId: MatchSaveRules.resolvedWinnerId(stored: storedWinnerId, gameType: gameType, players: playersWithTurns),
                     timestamp: timestamp,
                     duration: TimeInterval(duration),
                     matchFormat: matchFormat,
@@ -1744,17 +1738,8 @@ extension MatchesService {
                     continue
                 }
                 
-                guard let winnerIdString = json["winner_id"] as? String else {
-                    print("❌ [Summary \(index+1)] Missing 'winner_id' for match \(idString)")
-                    skippedCount += 1
-                    continue
-                }
-                
-                guard let winnerId = UUID(uuidString: winnerIdString) else {
-                    print("❌ [Summary \(index+1)] Invalid winner UUID: \(winnerIdString)")
-                    skippedCount += 1
-                    continue
-                }
+                // winner_id is null when a Guest won; it is resolved below once the players are known.
+                let storedWinnerId = (json["winner_id"] as? String).flatMap { UUID(uuidString: $0) }
                 
                 guard let timestampString = json["timestamp"] as? String else {
                     print("❌ [Summary \(index+1)] Missing 'timestamp' for match \(idString)")
@@ -1868,7 +1853,7 @@ extension MatchesService {
                     gameType: gameType,
                     gameName: gameName,
                     players: summaryPlayers,
-                    winnerId: winnerId,
+                    winnerId: MatchSaveRules.resolvedWinnerId(stored: storedWinnerId, gameType: gameType, players: summaryPlayers),
                     timestamp: timestamp,
                     duration: TimeInterval(duration),
                     matchFormat: matchFormat,
