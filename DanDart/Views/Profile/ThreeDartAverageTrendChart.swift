@@ -10,12 +10,24 @@ import SwiftUI
 struct ThreeDartAverageTrendChart: View {
     let dataPoints: [ThreeDartDataPoint]
     let isLoading: Bool
+    /// Pass a shared scale to make two charts directly comparable (match vs practice).
+    /// Left nil, the axis is fitted to this chart's own data.
+    var yScale: TrendYScale? = nil
     
     @State private var selectedPoint: ThreeDartDataPoint?
     @State private var dragLocation: CGPoint?
     
-    private let yAxisLabels = [0, 60, 120, 180]
+    private var scale: TrendYScale {
+        yScale ?? TrendYScale.fitting(dataPoints.map(\.average))
+    }
+    
     private let chartHeight: CGFloat = 112
+    // Points sit this far in from the plot's edges so the first/last marker isn't clipped.
+    private let plotInset: CGFloat = 8
+    // With this few sessions the line alone is hard to read, so mark each one.
+    private let maxPointsWithMarkers = 6
+    private let yLabelWidth: CGFloat = 30
+    private let yLabelSpacing: CGFloat = 8
     private let lineColor = Color(red: 1.0, green: 0.4, blue: 0.3)
     
     var body: some View {
@@ -40,7 +52,16 @@ struct ThreeDartAverageTrendChart: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .allowsHitTesting(false)
                 
-                chartArea
+                if dataPoints.count == 1 {
+                    // A lone session has no trend to draw: say so instead of a mostly-empty chart.
+                    Text("First session · your trend appears after your next one")
+                        .font(.caption)
+                        .foregroundColor(AppColor.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    chartArea
+                    dateRange
+                }
             }
         }
     }
@@ -83,7 +104,7 @@ struct ThreeDartAverageTrendChart: View {
     // Fixed-height chart container. Geometry inside uses its own width/height for all calculations.
     private var chartArea: some View {
         ZStack {
-            HStack(spacing: 8) {
+            HStack(spacing: yLabelSpacing) {
                 GeometryReader { geometry in
                     let width = geometry.size.width
                     let height = geometry.size.height
@@ -92,6 +113,10 @@ struct ThreeDartAverageTrendChart: View {
                         gridLines(width: width, height: height)
                         linePath(width: width, height: height)
                         gradientFill(width: width, height: height)
+                        
+                        if dataPoints.count <= maxPointsWithMarkers {
+                            pointMarkers(width: width, height: height)
+                        }
                         
                         if let dragLoc = dragLocation {
                             scrubberLine(at: dragLoc, height: height)
@@ -134,7 +159,7 @@ struct ThreeDartAverageTrendChart: View {
     
     private func gridLines(width: CGFloat, height: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            ForEach(yAxisLabels, id: \.self) { value in
+            ForEach(scale.ticks, id: \.self) { value in
                 let y = yPosition(for: Double(value), height: height)
                 Rectangle()
                     .fill(Color.white.opacity(0.1))
@@ -154,26 +179,25 @@ struct ThreeDartAverageTrendChart: View {
                 return CGPoint(x: x, y: y)
             }
             
-            if points.count == 1 {
-                path.addEllipse(in: CGRect(x: points[0].x - 2, y: points[0].y - 2, width: 4, height: 4))
-            } else {
-                path.move(to: points[0])
+            // A single session never reaches here (it shows a note instead of the chart).
+            guard points.count > 1 else { return }
+            
+            path.move(to: points[0])
+            
+            for i in 1..<points.count {
+                let current = points[i]
+                let previous = points[i - 1]
                 
-                for i in 1..<points.count {
-                    let current = points[i]
-                    let previous = points[i - 1]
-                    
-                    let controlPoint1 = CGPoint(
-                        x: previous.x + (current.x - previous.x) * 0.5,
-                        y: previous.y
-                    )
-                    let controlPoint2 = CGPoint(
-                        x: previous.x + (current.x - previous.x) * 0.5,
-                        y: current.y
-                    )
-                    
-                    path.addCurve(to: current, control1: controlPoint1, control2: controlPoint2)
-                }
+                let controlPoint1 = CGPoint(
+                    x: previous.x + (current.x - previous.x) * 0.5,
+                    y: previous.y
+                )
+                let controlPoint2 = CGPoint(
+                    x: previous.x + (current.x - previous.x) * 0.5,
+                    y: current.y
+                )
+                
+                path.addCurve(to: current, control1: controlPoint1, control2: controlPoint2)
             }
         }
         .stroke(lineColor, lineWidth: 3)
@@ -189,9 +213,7 @@ struct ThreeDartAverageTrendChart: View {
                 return CGPoint(x: x, y: y)
             }
             
-            if points.count == 1 {
-                return
-            }
+            guard points.count > 1 else { return }
             
             path.move(to: CGPoint(x: points[0].x, y: height))
             path.addLine(to: points[0])
@@ -222,6 +244,45 @@ struct ThreeDartAverageTrendChart: View {
                 endPoint: .bottom
             )
         )
+    }
+    
+    private func pointMarkers(width: CGFloat, height: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(dataPoints.enumerated()), id: \.element.id) { index, point in
+                Circle()
+                    .fill(lineColor)
+                    .frame(width: 10, height: 10)
+                    .position(x: xPosition(for: index, width: width), y: yPosition(for: point.average, height: height))
+            }
+        }
+    }
+    
+    /// Which dates the plot covers: first and last session, or one label when every
+    /// session was on the same day.
+    private var dateRange: some View {
+        let first = rangeDateString(dataPoints.first?.timestamp)
+        let last = rangeDateString(dataPoints.last?.timestamp)
+        return HStack {
+            if first == last {
+                Spacer()
+                Text(first)
+                Spacer()
+            } else {
+                Text(first)
+                Spacer()
+                Text(last)
+            }
+        }
+        .font(.caption2)
+        .foregroundColor(AppColor.textSecondary)
+        .padding(.trailing, yLabelWidth + yLabelSpacing)
+    }
+    
+    private func rangeDateString(_ date: Date?) -> String {
+        guard let date else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
     
     private func scrubberLine(at location: CGPoint, height: CGFloat) -> some View {
@@ -255,7 +316,7 @@ struct ThreeDartAverageTrendChart: View {
         GeometryReader { geometry in
             let height = geometry.size.height
             ZStack(alignment: .topLeading) {
-                ForEach(yAxisLabels, id: \.self) { value in
+                ForEach(scale.ticks, id: \.self) { value in
                     let y = yPosition(for: Double(value), height: height)
                     Text("\(value)")
                         .font(.caption2)
@@ -264,22 +325,17 @@ struct ThreeDartAverageTrendChart: View {
                 }
             }
         }
-        .frame(width: 30)
+        .frame(width: yLabelWidth)
     }
     
     private func xPosition(for index: Int, width: CGFloat) -> CGFloat {
         guard dataPoints.count > 1 else { return width / 2 }
-        let spacing = width / CGFloat(dataPoints.count - 1)
-        return CGFloat(index) * spacing
+        let spacing = (width - 2 * plotInset) / CGFloat(dataPoints.count - 1)
+        return plotInset + CGFloat(index) * spacing
     }
     
     private func yPosition(for value: Double, height: CGFloat) -> CGFloat {
-        let maxValue: Double = 180
-        let minValue: Double = 0
-        let range = maxValue - minValue
-        let clamped = min(max(value, minValue), maxValue)
-        let normalizedValue = (clamped - minValue) / range
-        return height * (1.0 - CGFloat(normalizedValue))
+        height * (1.0 - CGFloat(scale.fraction(for: value)))
     }
     
     private func handleDrag(at location: CGPoint, width: CGFloat, height: CGFloat) {
@@ -324,6 +380,28 @@ struct ThreeDartAverageTrendChart: View {
             ThreeDartDataPoint(timestamp: Date().addingTimeInterval(-86400 * 2), average: 67, matchId: UUID()),
             ThreeDartDataPoint(timestamp: Date().addingTimeInterval(-86400 * 1), average: 72, matchId: UUID()),
             ThreeDartDataPoint(timestamp: Date(), average: 86, matchId: UUID())
+        ],
+        isLoading: false
+    )
+    .padding()
+    .background(AppColor.backgroundPrimary)
+}
+
+#Preview("Single Session") {
+    ThreeDartAverageTrendChart(
+        dataPoints: [ThreeDartDataPoint(timestamp: Date(), average: 41.5, matchId: UUID())],
+        isLoading: false
+    )
+    .padding()
+    .background(AppColor.backgroundPrimary)
+}
+
+#Preview("Few Sessions") {
+    ThreeDartAverageTrendChart(
+        dataPoints: [
+            ThreeDartDataPoint(timestamp: Date().addingTimeInterval(-86400 * 6), average: 38, matchId: UUID()),
+            ThreeDartDataPoint(timestamp: Date().addingTimeInterval(-86400 * 3), average: 46, matchId: UUID()),
+            ThreeDartDataPoint(timestamp: Date(), average: 43, matchId: UUID())
         ],
         isLoading: false
     )

@@ -45,10 +45,17 @@ struct ProfileView: View {
                         .padding(.top, 24)
                         .padding(.bottom, 16)
                         
+                        // One y-axis for both trend charts, fitted to every average in either,
+                        // so a practice session and a match at the same average draw at the same height.
+                        let trendScale = TrendYScale.fitting(
+                            (statsService.threeDartAverageHistory + statsService.practice.threeDartAverageHistory).map(\.average)
+                        )
+
                         VStack(spacing: 48) {
                             ThreeDartAverageTrendChart(
                                 dataPoints: statsService.threeDartAverageHistory,
-                                isLoading: statsService.isLoading
+                                isLoading: statsService.isLoading,
+                                yScale: trendScale
                             )
                             
                             DartsThrownPerLegBar(
@@ -74,6 +81,16 @@ struct ProfileView: View {
                                 formResults: statsService.recentForm,
                                 isLoading: statsService.isLoading
                             )
+
+                            // Only once there is a solo session: an all-empty block of four
+                            // placeholder widgets would just be dead space.
+                            if !statsService.isLoading && statsService.practice.matchCount > 0 {
+                                PracticeSessionsSection(
+                                    practice: statsService.practice,
+                                    trendScale: trendScale,
+                                    isLoading: false
+                                )
+                            }
                         }
                     }
                 }
