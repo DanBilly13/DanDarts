@@ -414,8 +414,9 @@ class RemoteGameViewModel: ObservableObject {
         // Convert currentThrow to array of integers for server
         let darts = currentThrow.map { $0.totalValue }
         
-        // 🚨 DEBUG: Check if this is a bust visit
-        let isBustVisit = (currentScore == newScore)
+        // The engine decides what a bust is. "Score unchanged" is not enough: three misses
+        // also leave the score alone but are a valid visit.
+        let isBustVisit = events.containsBust
         if isBustVisit {
             print("🚨 [BUST] Saving bust visit - player: \(currentPlayer.displayName), darts: \(darts), score: \(currentScore) → \(newScore) (NO CHANGE = BUST)")
         }
@@ -469,7 +470,8 @@ class RemoteGameViewModel: ObservableObject {
                     matchId: remoteMatchId,
                     darts: darts,
                     scoreBefore: currentScore,
-                    scoreAfter: newScore
+                    scoreAfter: newScore,
+                    isBust: isBustVisit
                 )
                 
                 // Server succeeded - update UI from authoritative server state
