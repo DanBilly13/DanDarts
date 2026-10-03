@@ -139,10 +139,12 @@ struct HalveItGameplayView: View {
                             .disabled(true)
                             
                             // Actual button that pops in/out
-                            AppButton(
+                            AutoSaveButton(
                                 role: .primary,
-                                controlSize: .extraLarge,
-                                action: { viewModel.completeTurn() }
+                                isVisitComplete: viewModel.isTurnComplete,
+                                scoreboardExpanded: isScoreboardExpanded,
+                                resetKey: viewModel.currentThrow.autoSaveKey,
+                                onSave: { viewModel.completeTurn() }
                             ) {
                                 Label("Save Score", systemImage: "checkmark.circle.fill")
                             }
@@ -181,6 +183,7 @@ struct HalveItGameplayView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 GameplayMenuButton(
+                    showsAutoSave: true,
                     onInstructions: { showInstructions = true },
                     onRestart: { showRestartAlert = true },
                     onExit: { showExitAlert = true }

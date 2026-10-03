@@ -99,10 +99,11 @@ struct SuddenDeathGameplayView: View {
                         .opacity(0)
                         .disabled(true)
                         
-                        AppButton(
+                        AutoSaveButton(
                             role: .primary,
-                            controlSize: .extraLarge,
-                            action: { viewModel.completeTurn() }
+                            isVisitComplete: viewModel.isTurnComplete,
+                            resetKey: viewModel.currentThrow.autoSaveKey,
+                            onSave: { viewModel.completeTurn() }
                         ) {
                             Label("Save Score", systemImage: "checkmark.circle.fill")
                         }
@@ -124,6 +125,7 @@ struct SuddenDeathGameplayView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 GameplayMenuButton(
+                    showsAutoSave: true,
                     onInstructions: { showInstructions = true },
                     onRestart: { viewModel.restartGame() },
                     onExit: { showExitConfirmation = true }

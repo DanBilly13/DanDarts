@@ -109,10 +109,11 @@ struct KillerGameplayView: View {
                         .opacity(0)
                         .disabled(true)
                         
-                        AppButton(
+                        AutoSaveButton(
                             role: .primary,
-                            controlSize: .extraLarge,
-                            action: { viewModel.completeTurn() }
+                            isVisitComplete: viewModel.canSave,
+                            resetKey: viewModel.currentThrow.autoSaveKey,
+                            onSave: { viewModel.completeTurn() }
                         ) {
                             Label("Save Score", systemImage: "checkmark.circle.fill")
                         }
@@ -143,6 +144,7 @@ struct KillerGameplayView: View {
             
             ToolbarItem(placement: .topBarTrailing) {
                 GameplayMenuButton(
+                    showsAutoSave: true,
                     onInstructions: { showInstructions = true },
                     onRestart: {
                         // Reset game

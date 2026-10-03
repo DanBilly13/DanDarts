@@ -132,10 +132,11 @@ struct KnockoutGameplayView: View {
                         .disabled(true)
                         
                         // Actual button that pops in/out
-                        AppButton(
+                        AutoSaveButton(
                             role: .primary,
-                            controlSize: .extraLarge,
-                            action: { viewModel.completeTurn() }
+                            isVisitComplete: viewModel.isTurnComplete,
+                            resetKey: viewModel.currentThrow.autoSaveKey,
+                            onSave: { viewModel.completeTurn() }
                         ) {
                             Label("Save Score", systemImage: "checkmark.circle.fill")
                         }
@@ -157,6 +158,7 @@ struct KnockoutGameplayView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 GameplayMenuButton(
+                    showsAutoSave: true,
                     onInstructions: { showInstructions = true },
                     onRestart: { viewModel.restartGame() },
                     onExit: { showExitConfirmation = true }
