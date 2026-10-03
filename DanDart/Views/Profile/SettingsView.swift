@@ -17,6 +17,7 @@ struct SettingsView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject private var voicePermissionManager: VoicePermissionManager
     @StateObject private var soundManager = SoundManager.shared
+    @StateObject private var gameplaySettings = GameplaySettings.shared
     @StateObject private var notificationService = NotificationService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
@@ -225,11 +226,22 @@ struct SettingsView: View {
                     title: "Sound Effects",
                     isOn: $soundManager.soundEffectsEnabled
                 )
-                
+
                 Divider()
                     .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
-                
+
+                // Auto-Save: fill the Save Score button, then save the visit automatically
+                SettingsToggleRow(
+                    icon: Image(systemName: "checkmark.circle"),
+                    title: "Auto-Save",
+                    isOn: $gameplaySettings.autoSaveEnabled
+                )
+
+                Divider()
+                    .background(AppColor.textSecondary.opacity(0.2))
+                    .padding(.leading, 44)
+
                 // Notifications row - shows ProgressView while loading, then a Toggle.
                 // Rendering a placeholder until `hasLoadedState` is true prevents the
                 // toggle from animating off→on the first time the DB read completes.
