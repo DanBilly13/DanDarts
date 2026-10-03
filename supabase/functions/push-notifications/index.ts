@@ -33,6 +33,31 @@ const APNS_PRIVATE_KEY = Deno.env.get('APNS_PRIVATE_KEY') ?? ''
 const APNS_SANDBOX_URL = 'https://api.sandbox.push.apple.com'
 const APNS_PRODUCTION_URL = 'https://api.push.apple.com'
 
+// FCM (Android) configuration -- a single secret holding the full service
+// account JSON key (not separate KEY_ID/TEAM_ID/PRIVATE_KEY fields like
+// APNs, since Google's service-account format already bundles everything
+// needed: project_id, client_email, private_key).
+const FCM_SERVICE_ACCOUNT_JSON = Deno.env.get('FCM_SERVICE_ACCOUNT_JSON') ?? ''
+
+interface FcmServiceAccount {
+  project_id: string
+  client_email: string
+  private_key: string
+}
+
+let cachedServiceAccount: FcmServiceAccount | null = null
+function parseServiceAccount(): FcmServiceAccount {
+  if (cachedServiceAccount) return cachedServiceAccount
+  cachedServiceAccount = JSON.parse(FCM_SERVICE_ACCOUNT_JSON) as FcmServiceAccount
+  return cachedServiceAccount
+}
+
+// Cached across the sends within a single invocation (a user can have
+// multiple active devices) -- avoids minting a fresh OAuth2 token per
+// device. Not shared across invocations (each edge function call is a new
+// isolate), unlike a long-lived server process's token cache.
+let cachedFCMToken: { token: string; expiresAt: number } | null = null
+
 interface PushPayload {
   user_id: string
   notification_type: 'challenge_received' | 'match_ready' | 'friend_request_received'
@@ -182,7 +207,9 @@ serve(async (req) => {
     // Send to each token
     for (const token of tokens as PushToken[]) {
       try {
-        const result = await sendAPNs(token, apnsPayload, payload.match_id || 'friend-request')
+        const result = token.provider === 'fcm'
+          ? await sendFCM(token, apnsPayload, payload.match_id || 'friend-request')
+          : await sendAPNs(token, apnsPayload, payload.match_id || 'friend-request')
         results.push(result)
         
         if (result.success) {
@@ -192,8 +219,9 @@ serve(async (req) => {
           failureCount++
           console.error(`❌ [Push] Failed to send to device ${token.device_install_id.substring(0, 8)}...:`, result.error)
           
-          // Handle invalid token (410 Gone from APNs)
-          if (result.status === 410) {
+          // Handle invalid token: 410 Gone from APNs, or 404 Not Found from FCM
+          // (FCM returns 404 with error.status === "UNREGISTERED" for a dead token).
+          if (result.status === 410 || result.status === 404) {
             console.log(`🗑️ [Push] Deactivating invalid token for device ${token.device_install_id.substring(0, 8)}...`)
             await adminClient
               .from('push_tokens')
@@ -365,4 +393,123 @@ function base64UrlEncode(str: string): string {
 // Convert ArrayBuffer to string
 function arrayBufferToString(buffer: ArrayBuffer): string {
   return String.fromCharCode(...new Uint8Array(buffer))
+}
+
+// Send push notification via FCM (Android)
+async function sendFCM(token: PushToken, payload: any, matchId: string): Promise<{ success: boolean; status?: number; error?: string }> {
+  try {
+    const accessToken = await getFCMAccessToken()
+    const serviceAccount = parseServiceAccount()
+
+    // Data-only message (no top-level "notification" key) -- the Android
+    // client always receives onMessageReceived and decides how to present
+    // it (in-app toast if foreground, a built NotificationCompat notification
+    // if backgrounded), mirroring iOS's willPresent-suppresses-banner
+    // contract. A "notification" key here would let Android auto-render a
+    // system tray notification even in foreground, breaking that contract.
+    const fcmMessage = {
+      message: {
+        token: token.push_token,
+        data: {
+          type: String(payload.type),
+          route: String(payload.route),
+          highlight: String(payload.highlight),
+          title: String(payload.aps.alert.title),
+          body: String(payload.aps.alert.body),
+          ...(payload.matchId ? { matchId: String(payload.matchId) } : {}),
+        },
+        android: {
+          collapse_key: `match-${matchId}`,
+          priority: 'high',
+        },
+      },
+    }
+
+    const response = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(fcmMessage),
+      }
+    )
+
+    if (response.ok) {
+      return { success: true, status: response.status }
+    } else {
+      const errorBody = await response.text()
+      return { success: false, status: response.status, error: `FCM error: ${response.status} - ${errorBody}` }
+    }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+// Mint (or reuse a cached) OAuth2 access token for the FCM HTTP v1 API,
+// via a JWT-bearer exchange against the service account's RS256 key --
+// the RSA equivalent of the ES256 JWT signing already done for APNs above.
+async function getFCMAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  if (cachedFCMToken && cachedFCMToken.expiresAt > now + 60) {
+    return cachedFCMToken.token
+  }
+
+  const serviceAccount = parseServiceAccount()
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const claims = {
+    iss: serviceAccount.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  }
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header))
+  const encodedClaims = base64UrlEncode(JSON.stringify(claims))
+  const signingInput = `${encodedHeader}.${encodedClaims}`
+
+  const privateKey = await importRSAPrivateKey(serviceAccount.private_key)
+  const signatureBuffer = await crypto.subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    privateKey,
+    new TextEncoder().encode(signingInput)
+  )
+  const jwt = `${signingInput}.${base64UrlEncode(arrayBufferToString(signatureBuffer))}`
+
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  })
+
+  if (!tokenResponse.ok) {
+    throw new Error(`Failed to get FCM access token: ${tokenResponse.status} ${await tokenResponse.text()}`)
+  }
+
+  const tokenData = await tokenResponse.json()
+  cachedFCMToken = { token: tokenData.access_token, expiresAt: now + tokenData.expires_in }
+  return tokenData.access_token
+}
+
+// Import an RSA private key (PKCS8 PEM, as found in a Google service
+// account JSON's "private_key" field) for RS256 signing.
+async function importRSAPrivateKey(pemKey: string): Promise<CryptoKey> {
+  const pemContents = pemKey
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '')
+  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0))
+  return await crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
 }

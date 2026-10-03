@@ -50,7 +50,14 @@ serve(async (req) => {
       })
     }
 
-    const { match_id, darts, score_before, score_after } = await req.json()
+    // is_bust is optional: iOS doesn't send it yet (as of this writing), so
+    // it defaults to false -- identical to this function's prior hardcoded
+    // behavior for any client that doesn't send it. Android sends the real
+    // value starting with DartFreak-Android's remote-gameplay-sync phase.
+    // See DartFreak-Android's docs/superpowers/specs/2026-08-17-remote-
+    // gameplay-sync-design.md ("Opportunistic fix") if match_throws.is_bust
+    // history ever looks wrong -- check this exact change first.
+    const { match_id, darts, score_before, score_after, is_bust } = await req.json()
     if (!match_id || !darts || score_before === undefined || score_after === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -103,7 +110,7 @@ serve(async (req) => {
       p_throws: darts,
       p_score_before: score_before,
       p_score_after: score_after,
-      p_is_bust: false,
+      p_is_bust: is_bust ?? false,
       p_timestamp: nowIso,
     })
 

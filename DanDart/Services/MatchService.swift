@@ -219,7 +219,7 @@ class MatchService: ObservableObject {
             game_id: gameId,
             started_at: ISO8601DateFormatter().string(from: startedAt),
             ended_at: ISO8601DateFormatter().string(from: endedAt),
-            winner_id: winnerId?.uuidString,
+            winner_id: MatchSaveRules.memberWinnerId(winnerId: winnerId, players: playersToSave)?.uuidString,
             metadata: MatchMetadata(
                 match_format: matchFormat,
                 legs_won: legsWon.mapKeys { $0.uuidString },
@@ -336,7 +336,7 @@ class MatchService: ObservableObject {
         
         // 4. Update player stats for connected players and get updated user
         var updatedUser: User? = nil
-        if let winnerId = winnerId {
+        if let winnerId = winnerId, MatchSaveRules.shouldUpdateStats(playerCount: playersToSave.count) {
             updatedUser = try await updatePlayerStats(
                 winnerId: winnerId,
                 players: playersToSave,
@@ -682,8 +682,12 @@ class MatchService: ObservableObject {
             }
         }
         
-        let participants = players.map { player in
-            let userId = player.userId ?? player.id // Use userId for connected, player.id for guests
+        // Members only: match_participants.user_id has a foreign key to users(id), so a
+        // guest's made-up id makes the WHOLE batch fail and the match ends up with no
+        // participant rows at all. Guests are still recorded in matches.players and
+        // match_players (guest_name).
+        let participants = MatchSaveRules.participantPlayers(players).map { player in
+            let userId = player.userId ?? player.id
             print("   - \(player.displayName) (ID: \(userId), Guest: \(player.isGuest))")
             return MatchParticipantInsert(
                 matchId: matchId.uuidString,
@@ -691,6 +695,11 @@ class MatchService: ObservableObject {
                 isGuest: player.isGuest,
                 displayName: player.displayName
             )
+        }
+        
+        guard !participants.isEmpty else {
+            print("   ℹ️ No member participants to write (guests only)")
+            return
         }
         
         do {
@@ -747,5 +756,31 @@ extension Dictionary where Key == UUID {
             result[transform(key)] = value
         }
         return result
+    }
+}
+
+// MARK: - Save rules
+
+/// Pure rules for what a finished match writes to Supabase, kept separate from the
+/// network code so they can be unit tested.
+enum MatchSaveRules {
+    /// The winner to store in `matches.winner_id`. That column has a foreign key to
+    /// `users(id)`, and the view models pass `winner.userId ?? winner.id`, so a guest
+    /// winner arrives as the guest's made-up id and would make the whole match insert
+    /// fail. Only a winner who is actually one of the match's members is returned.
+    static func memberWinnerId(winnerId: UUID?, players: [Player]) -> UUID? {
+        guard let winnerId = winnerId else { return nil }
+        return players.contains(where: { $0.userId == winnerId }) ? winnerId : nil
+    }
+    
+    /// Players who get a `match_participants` row: connected members only.
+    static func participantPlayers(_ players: [Player]) -> [Player] {
+        players.filter { $0.userId != nil && !$0.isGuest }
+    }
+    
+    /// A solo (single-player) match is practice: no opponent, so it is not a win or a
+    /// loss and must not move wins/losses or the ranked tier.
+    static func shouldUpdateStats(playerCount: Int) -> Bool {
+        playerCount > 1
     }
 }
