@@ -32,6 +32,7 @@ class NotificationService: NSObject, ObservableObject {
     private let supabaseService = SupabaseService.shared
     private let authService = AuthService.shared
     private let userDefaults = UserDefaults.standard
+    private lazy var preferences = NotificationPreferences(defaults: userDefaults)
     
     private let deviceInstallIdKey = "device_install_id"
     private let storedTokenKey = "apns_device_token"
@@ -257,6 +258,14 @@ class NotificationService: NSObject, ObservableObject {
             let is_active: Bool
         }
         
+        // Active unless the user switched notifications off on this device. This used to be a
+        // hard-coded `true`, so every launch and every visit to the Remote tab silently turned
+        // notifications back on after the user had turned them off.
+        let shouldBeActive = NotificationStatePolicy.tokenShouldBeActive(
+            optedOut: preferences.isOptedOut(userId: userId)
+        )
+        print("   Active: \(shouldBeActive) (user opted out: \(!shouldBeActive))")
+        
         let tokenRecord = PushTokenRecord(
             user_id: userId.uuidString,
             device_install_id: deviceInstallId,
@@ -264,7 +273,7 @@ class NotificationService: NSObject, ObservableObject {
             provider: "apns",
             environment: environment,
             push_token: token,
-            is_active: true
+            is_active: shouldBeActive
         )
         
         do {
@@ -377,6 +386,10 @@ class NotificationService: NSObject, ObservableObject {
         let deviceInstallId = getOrCreateDeviceInstallId()
         print("🔔[NOTIF] reading push_tokens user=\(userId.uuidString.prefix(8))... device=\(deviceInstallId.prefix(8))...")
         
+        // The toggle also depends on the iOS permission: an active token can't deliver anything
+        // if notifications are blocked in iOS Settings.
+        await checkAuthorizationStatus()
+        
         do {
             struct PushTokenResponse: Decodable {
                 let is_active: Bool
@@ -390,8 +403,9 @@ class NotificationService: NSObject, ObservableObject {
                 .execute()
                 .value
             
-            let resolved = response.first?.is_active ?? false
-            print("🔔[NOTIF] DB returned \(response.first.map { "is_active=\($0.is_active)" } ?? "no row") -> resolved=\(resolved)")
+            let tokenActive = response.first?.is_active ?? false
+            let resolved = NotificationStatePolicy.isEnabled(tokenActive: tokenActive, authorization: authorizationStatus)
+            print("🔔[NOTIF] DB returned \(response.first.map { "is_active=\($0.is_active)" } ?? "no row"), iOS auth=\(authorizationStatus.rawValue) -> resolved=\(resolved)")
             
             // Apply the loaded value WITHOUT animation so the Settings toggle does not
             // visibly slide from false→true the first time it appears.
@@ -407,6 +421,11 @@ class NotificationService: NSObject, ObservableObject {
                 hasLoadedState = true
             }
         }
+    }
+    
+    /// Notifications are blocked in iOS Settings, which the toggle can't change.
+    var needsIOSSettingsHint: Bool {
+        NotificationStatePolicy.needsIOSSettingsHint(authorization: authorizationStatus)
     }
     
     /// Reset cached state. Call on sign out or user change so the next load re-reads from DB.
@@ -425,6 +444,12 @@ class NotificationService: NSObject, ObservableObject {
         
         isTogglingNotifications = true
         defer { isTogglingNotifications = false }
+        
+        // Remember the choice first: the token sync below (and every later one) writes
+        // is_active from it.
+        if let userId = authService.currentUser?.id {
+            preferences.setOptedOut(!enabled, userId: userId)
+        }
         
         print("🔔[NOTIF] setNotificationsEnabled(\(enabled)) pre=enabled:\(notificationsEnabled) authStatus:\(authorizationStatus.rawValue) hasUser:\(authService.currentUser != nil)")
         

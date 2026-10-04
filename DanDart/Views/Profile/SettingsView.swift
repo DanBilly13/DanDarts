@@ -60,7 +60,15 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             voicePermissionManager.logState("settings task")
-            await notificationService.loadNotificationState()
+            // Re-read every time Settings appears, not just the first time: the token can be
+            // changed elsewhere (a sign-out, the server dropping a dead token) and iOS
+            // permission can change in the Settings app. A reload with `hasLoadedState`
+            // already true updates the value without a spinner or animation.
+            await notificationService.loadNotificationState(force: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Coming back from iOS Settings after changing the notification permission.
+            Task { await notificationService.loadNotificationState(force: true) }
         }
         .alert("Log Out", isPresented: $showLogoutConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -280,6 +288,16 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
+                }
+                
+                if notificationService.hasLoadedState && notificationService.needsIOSSettingsHint {
+                    Text("Notifications are turned off for this app in iOS Settings.")
+                        .font(.footnote)
+                        .foregroundColor(AppColor.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.leading, 44)
+                        .padding(.bottom, 12)
                 }
                 
                 Divider()
