@@ -174,6 +174,10 @@ struct KillerGameplayView: View {
                 }
             }
         }
+        .onAppear {
+            // Inject authService for match saving
+            viewModel.authService = authService
+        }
         .sheet(isPresented: $showInstructions) {
             GameInstructionsView(game: game)
         }
