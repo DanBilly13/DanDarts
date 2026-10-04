@@ -39,8 +39,19 @@ struct CricketBoardView: View {
     /// Shorter rows and smaller avatars, for phones that are too short for the normal layout.
     var compact: Bool = false
 
-    private let labelWidth: CGFloat = 34
+    /// The number column in the middle, like the chalkboard's.
+    private let labelWidth: CGFloat = 44
     private let columnSpacing: CGFloat = 6
+
+    /// With n players, (n + 1) / 2 sit left of the numbers (in throwing order), the rest right:
+    /// 2 = 1 | numbers | 1, 3 = 2 | numbers | 1, 4 = 2 | numbers | 2.
+    private var leftColumns: ArraySlice<CricketBoardColumn> {
+        columns.prefix((columns.count + 1) / 2)
+    }
+
+    private var rightColumns: ArraySlice<CricketBoardColumn> {
+        columns.dropFirst((columns.count + 1) / 2)
+    }
 
     private var rowHeight: CGFloat { compact ? 28 : 34 }
 
@@ -56,8 +67,11 @@ struct CricketBoardView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: columnSpacing) {
+                ForEach(leftColumns) { column in
+                    header(for: column)
+                }
                 Color.clear.frame(width: labelWidth, height: 1)
-                ForEach(columns) { column in
+                ForEach(rightColumns) { column in
                     header(for: column)
                 }
             }
@@ -98,6 +112,17 @@ struct CricketBoardView: View {
         .accessibilityLabel(CricketBoardAccessibility.headerLabel(for: column))
     }
 
+    private var verticalHairline: some View {
+        Rectangle()
+            .fill(AppColor.justWhite.opacity(0.12))
+            .frame(width: 0.5)
+    }
+
+    private func markCell(for column: CricketBoardColumn, target: CricketTarget) -> some View {
+        CricketMarkView(count: column.markCounts[target] ?? 0, color: column.color)
+            .frame(maxWidth: .infinity)
+    }
+
     private func row(for target: CricketTarget) -> some View {
         let isDead = deadTargets.contains(target)
         return VStack(spacing: 0) {
@@ -106,21 +131,26 @@ struct CricketBoardView: View {
                 .frame(height: 0.5)
 
             HStack(spacing: columnSpacing) {
+                ForEach(leftColumns) { column in
+                    markCell(for: column, target: target)
+                }
+
                 Text(target.label)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColor.justWhite)
-                    .frame(width: labelWidth)
+                    .frame(width: labelWidth, height: rowHeight)
+                    .overlay(alignment: .leading) { verticalHairline }
+                    .overlay(alignment: .trailing) { verticalHairline }
 
-                ForEach(columns) { column in
-                    CricketMarkView(count: column.markCounts[target] ?? 0, color: column.color)
-                        .frame(maxWidth: .infinity)
+                ForEach(rightColumns) { column in
+                    markCell(for: column, target: target)
                 }
             }
             .frame(height: rowHeight)
         }
         .opacity(isDead ? 0.3 : 1)
         .animation(.easeOut(duration: 0.3), value: isDead)
-        // One element per target row: "20: Dan closed, Sam 1 mark, Alex no marks".
+        // One element per target row: "20: Dan closed, Sam 1 mark, Alex no marks" (throwing order).
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(CricketBoardAccessibility.targetLabel(target))
         .accessibilityValue(CricketBoardAccessibility.rowValue(columns: columns, target: target, isDead: isDead))
@@ -159,7 +189,7 @@ enum CricketBoardAccessibility {
 
 // MARK: - Marks
 
-/// 1 mark: a slash. 2 marks: a cross. 3 marks (closed): a filled circle with a black cross.
+/// 1 mark: a slash. 2 marks: a cross. 3 marks (closed): a cross inside an outlined circle.
 struct CricketMarkView: View {
     let count: Int
     let color: Color
@@ -175,8 +205,8 @@ struct CricketMarkView: View {
             case 2:
                 CricketCross().stroke(color, style: stroke)
             case 3:
-                Circle().fill(color)
-                CricketCross().stroke(AppColor.justBlack, style: stroke).padding(6)
+                Circle().stroke(color, style: stroke).padding(1.3)
+                CricketCross().stroke(color, style: stroke).padding(4)
             default:
                 EmptyView()
             }
