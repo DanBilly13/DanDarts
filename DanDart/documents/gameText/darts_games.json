@@ -30,10 +30,10 @@
       "instructions": "Sudden Death is fast, simple, and unforgiving. Each round, every player throws three darts, and the player with the lowest total is eliminated.\n\nAll scores reset at the start of each new round — everyone begins even, but only for a moment.\n\nRound after round, one player falls, until only one remains.\n\nThe last player standing wins."
     },
     {
-      "title": "English Cricket",
-      "subtitle": "Take Wickets. Chase Runs.",
-      "players": "2-6",
-      "instructions": "English Cricket is played with a batter and a bowler, just like the real game. You can play one-on-one or in teams.\n\nAs the batting side, your goal is to score as many runs as you can by hitting the scoring numbers: 15, 16, 17, 18, 19, 20, and the bullseye.\n\nAs the bowling side, you're aiming for the bull to take wickets:\n- Outer bull = 1 wicket\n- Inner bullseye = 2 wickets\n\nOnce the bowling side reaches 10 wickets, the batting innings ends, and the roles swap.\n\nAfter both sides have batted, the team with the highest total wins."
+      "title": "Cricket",
+      "subtitle": "Tactics. Close, Score, Outsmart.",
+      "players": "2-4",
+      "instructions": "Cricket, also called Tactics, is a game of closing numbers and scoring on them.\n\nThe numbers in play are 20, 19, 18, 17, 16, 15, and the bull.\n\nClosing a number.\nHit a number three times to close it. A single counts as one hit, a double as two, and a treble as three. The outer bull counts as one hit and the inner bull as two.\n\nScoring.\nOnce you have closed a number, every extra hit on it scores that number's value, but only while at least one opponent has not closed it. When everyone has closed a number, it is dead and nobody can score on it.\n\nWinning.\nClose all seven numbers while your points are equal to or higher than every opponent's.\n\nThe tactics.\nAttack to score, or defend by closing the numbers your opponents are scoring on."
     },
   {
     "title": "Killer",

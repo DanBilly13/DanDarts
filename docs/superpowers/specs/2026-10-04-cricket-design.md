@@ -30,7 +30,7 @@ Scoring numbers are the seven **targets**: 20, 19, 18, 17, 16, 15 and the bull.
   the overflow becomes points (see Scoring).
 - **Closing.** A player closes a target with their third mark. Marks beyond
   three on that dart carry on as scoring (a treble 20 on an open 20 closes it,
-  no points; a treble 20 with 2 marks already on it closes it and scores one 20).
+  no points; a treble 20 with 2 marks already on it takes 1 mark to close and the other 2 score, so it adds 40).
 - **Scoring.** A mark beyond the third scores the target's value (20 for 20, 25
   for the bull) **only while at least one opponent has not closed that target**.
   Once every player has closed a target it is **dead**: no marks, no points.
