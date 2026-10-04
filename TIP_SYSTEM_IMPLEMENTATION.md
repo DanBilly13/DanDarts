@@ -8,14 +8,13 @@ Implemented a flexible, JSON-based tip system that shows game-specific tips to p
 ### 1. `game_tips.json`
 **Location:** `/DanDart/documents/gameText/game_tips.json`
 
-Contains tip definitions for all 7 games:
+Contains tip definitions for 6 games (Cricket has no tip yet):
 - **301**: "Reach exactly zero by finishing on a double. Long-press any number to choose single, double, or treble."
 - **501**: Same as 301
 - **Halve-It**: "Hit the target with at least one dart or your score gets halved! Long-press any number to choose single, double, or treble."
 - **Killer**: "Hit your own double first to become a Killer, then attack others! Long-press any number to choose single, double, or treble."
 - **Knockout**: "Beat the current high score or lose a life. Long-press any number to choose single, double, or treble."
 - **Sudden Death**: "The lowest score each round is eliminated. Score high to survive! Long-press any number to choose single, double, or treble."
-- **English Cricket**: "Batters score runs on 15-20 and bull. Bowlers take wickets by hitting the bull. Long-press any number to choose single, double, or treble."
 
 Each tip includes:
 - `gameTitle`: Matches the game title exactly
