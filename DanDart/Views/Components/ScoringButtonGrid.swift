@@ -93,7 +93,19 @@ struct ScoringButton: View {
     let title: String
     let baseValue: Int
     let onScoreSelected: (Int, ScoreType) -> Void
-    
+    /// False hides the long-press Single/Double/Triple menu (Cricket's 25 button).
+    let allowsMenu: Bool
+
+    init(title: String,
+         baseValue: Int,
+         onScoreSelected: @escaping (Int, ScoreType) -> Void,
+         allowsMenu: Bool = true) {
+        self.title = title
+        self.baseValue = baseValue
+        self.onScoreSelected = onScoreSelected
+        self.allowsMenu = allowsMenu
+    }
+
     @State private var isPressed = false
     @State private var isHighlighted = false
     @StateObject private var menuCoordinator = MenuCoordinator.shared
@@ -148,7 +160,7 @@ struct ScoringButton: View {
     
     // Don't show context menu for special buttons
     private var canShowContextMenu: Bool {
-        baseValue > 0 && baseValue != 50 // Exclude Miss, Bust, and Bull
+        allowsMenu && baseValue > 0 && baseValue != 50 // Exclude Miss, Bust, and Bull
     }
     
     var body: some View {
