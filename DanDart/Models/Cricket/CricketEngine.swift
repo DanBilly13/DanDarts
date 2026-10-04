@@ -12,6 +12,7 @@
 
 import Foundation
 
+/// Declaration order is the scoreboard row order (20 down to 15, then the bull); keep it.
 enum CricketTarget: Int, CaseIterable, Codable, Hashable {
     case twenty = 20
     case nineteen = 19
@@ -62,6 +63,8 @@ struct CricketState: Equatable {
     var winnerId: UUID?
 
     init(playerIds: [UUID]) {
+        precondition(!playerIds.isEmpty && Set(playerIds).count == playerIds.count,
+                     "Cricket needs at least one player and no duplicate players")
         self.playerIds = playerIds
         let empty = Dictionary(uniqueKeysWithValues: CricketTarget.allCases.map { ($0, 0) })
         markCounts = Dictionary(uniqueKeysWithValues: playerIds.map { ($0, empty) })
@@ -69,6 +72,12 @@ struct CricketState: Equatable {
     }
 
     var currentPlayerId: UUID { playerIds[currentPlayerIndex] }
+
+    /// The visit has its three darts, or a dart has won the game. Save Score shows once this is true.
+    var isVisitComplete: Bool { dartsThrown >= 3 || winnerId != nil }
+
+    /// Another dart can be thrown in this visit.
+    var canThrow: Bool { !isVisitComplete }
 
     func marks(for playerId: UUID, on target: CricketTarget) -> Int {
         markCounts[playerId]?[target] ?? 0
@@ -94,6 +103,7 @@ struct CricketState: Equatable {
 
 /// What one dart did. Drives sounds today; room for animations later.
 struct CricketOutcome: Equatable {
+    /// Marks that counted towards closing (0...3). Marks beyond the third are overflow and are not included; they show up as pointsScored instead. This is what gets saved per dart.
     var marksAdded = 0
     var pointsScored = 0
     var closedTarget = false
@@ -106,9 +116,7 @@ enum CricketEngine {
     /// or the visit already has three darts.
     static func apply(_ dart: CricketDart, to state: CricketState)
         -> (state: CricketState, outcome: CricketOutcome) {
-        guard state.winnerId == nil, state.dartsThrown < 3 else {
-            return (state, CricketOutcome())
-        }
+        guard state.canThrow else { return (state, CricketOutcome()) }
 
         var next = state
         var outcome = CricketOutcome()

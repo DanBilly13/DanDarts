@@ -91,6 +91,8 @@ struct CricketEngineTests {
         #expect(r.outcome.marksAdded == 1)
         #expect(r.outcome.closedTarget)
         #expect(r.outcome.pointsScored == 40)
+        #expect(r.state.points(for: g.ids[0]) == 40)
+        #expect(r.state.marks(for: g.ids[0], on: .twenty) == 3)
     }
 
     @Test func noPointsOnceEveryOpponentHasClosedTheTarget() {
@@ -283,5 +285,114 @@ struct CricketEngineTests {
         #expect(placements[g.ids[2]] == 1)
         #expect(placements[g.ids[0]] == 2)
         #expect(placements[g.ids[1]] == 3)
+    }
+
+    // MARK: - edge cases
+
+    @Test func closeAndScoreOnTheSameDartDecidesTheWin() {
+        var g = game()
+        close(&g.state, g.ids[0], targets: everythingButBull)
+        g.state.markCounts[g.ids[0]]![.bull] = 2
+        g.state.pointTotals[g.ids[1]] = 20
+        let r = CricketEngine.apply(CricketDart.from(baseValue: 50, scoreType: .single), to: g.state)
+
+        #expect(r.outcome.won)
+        #expect(r.outcome.pointsScored == 25) // 2 + 2 marks: one closes, one overflows
+        #expect(r.state.winnerId == g.ids[0])
+    }
+
+    @Test func aThreePlayerWinMustBeatTheBestOpponent() {
+        var g = game(3)
+        close(&g.state, g.ids[0], targets: everythingButBull)
+        g.state.markCounts[g.ids[0]]![.bull] = 1
+        g.state.pointTotals[g.ids[1]] = 0
+        g.state.pointTotals[g.ids[2]] = 30
+        let behind = throwDart(g.state, .bull, 2)
+
+        #expect(behind.state.winnerId == nil)
+
+        g.state.pointTotals[g.ids[0]] = 30
+        let level = throwDart(g.state, .bull, 2)
+
+        #expect(level.state.winnerId == g.ids[0])
+    }
+
+    @Test func deadTargetsInThreeAndFourPlayerGames() {
+        for count in [3, 4] {
+            var g = game(count)
+            for id in g.ids.dropLast() { close(&g.state, id, targets: [.twenty]) }
+            #expect(g.state.isDead(.twenty) == false)
+
+            close(&g.state, g.ids.last!, targets: [.twenty])
+            #expect(g.state.isDead(.twenty))
+        }
+    }
+
+    @Test func aDeadTargetInAThreePlayerGameScoresNothing() {
+        var g = game(3)
+        for id in g.ids { close(&g.state, id, targets: [.twenty]) }
+        let r = throwDart(g.state, .twenty, 3)
+
+        #expect(r.outcome.marksAdded == 0)
+        #expect(r.outcome.pointsScored == 0)
+        #expect(r.state.points(for: g.ids[0]) == 0)
+    }
+
+    @Test func theFourPlayerVisitWrapsRound() {
+        let g = game(4)
+        var s = g.state
+        for expected in [1, 2, 3, 0] {
+            s = CricketEngine.endVisit(throwDart(s, .twenty, 1).state)
+
+            #expect(s.currentPlayerIndex == expected)
+            #expect(s.dartsThrown == 0)
+        }
+    }
+
+    @Test func theOuterBullScoresTwentyFiveOnAClosedBull() {
+        var g = game()
+        close(&g.state, g.ids[0], targets: [.bull])
+        let r = CricketEngine.apply(CricketDart.from(baseValue: 25, scoreType: .single), to: g.state)
+
+        #expect(r.outcome.pointsScored == 25)
+    }
+
+    @Test func bullMarksAreClamped() {
+        #expect(CricketDart.from(baseValue: 50, scoreType: .double).marks == 2)
+        #expect(CricketDart.from(baseValue: 50, scoreType: .triple).marks == 2)
+        #expect(CricketDart.from(baseValue: 25, scoreType: .triple).marks == 2)
+        #expect(CricketDart.from(baseValue: -5, scoreType: .single) == .miss)
+        #expect(CricketDart.from(baseValue: 999, scoreType: .single) == .miss)
+    }
+
+    @Test func placementsWithoutAWinnerRankByClosedThenPointsThenOrder() {
+        var g = game(3)
+        close(&g.state, g.ids[1], targets: [.twenty, .nineteen])
+        close(&g.state, g.ids[2], targets: [.twenty])
+        close(&g.state, g.ids[0], targets: [.twenty])
+        g.state.pointTotals[g.ids[2]] = 50
+
+        let placements = CricketEngine.placements(for: g.state)
+
+        #expect(g.state.winnerId == nil)
+        #expect(placements[g.ids[1]] == 1)
+        #expect(placements[g.ids[2]] == 2)
+        #expect(placements[g.ids[0]] == 3)
+    }
+
+    @Test func canThrowAndIsVisitComplete() {
+        let g = game()
+        #expect(g.state.canThrow)
+        #expect(g.state.isVisitComplete == false)
+
+        var s = g.state
+        for _ in 0..<3 { s = throwDart(s, nil, 0).state }
+        #expect(s.isVisitComplete)
+        #expect(s.canThrow == false)
+
+        var won = g.state
+        won.winnerId = g.ids[0]
+        #expect(won.isVisitComplete)
+        #expect(won.canThrow == false)
     }
 }
