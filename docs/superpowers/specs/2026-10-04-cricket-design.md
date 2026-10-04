@@ -1,7 +1,7 @@
 # Cricket (Tactics) — Design
 
 **Date:** 2026-10-04
-**Status:** Draft for review (iOS first; Android port is a separate plan afterwards)
+**Status:** Implemented on `feature/cricket` (iOS); Android port pending
 
 ## Goal
 
@@ -72,8 +72,8 @@ slots, then the keypad and **Save Score** in the bottom half.
 - **Player columns.** One column per player (2–4). Each has the avatar in
   `PlayerAvatarWithRing` (coloured ring plus inner black ring on the thrower), the
   first name in the player's colour (`player1`–`player4`), and the player's
-  points under it. Column width and spacing follow `PlayerCardLayout`, with a
-  new 4-player case sized so the target labels still fit.
+  points under it. The columns are a flexible grid (not `PlayerCardLayout`), with the
+  avatars shrinking by player count so the target labels still fit.
 - **Target rows.** A narrow label column down the left, 20 to 15 then "B", with
   hairlines between rows. In each player's cell:
   - 1 mark: a slash in the player's colour.
@@ -83,10 +83,9 @@ slots, then the keypad and **Save Score** in the bottom half.
 - **Dart slots.** The existing `CurrentThrowDisplay(showScore: false)`.
 - **Keypad.** `CricketKeypad`: the 20–15 buttons, a green 25 and a red Bull, then
   Miss and delete. A tap is a single; long-press opens the existing multiplier
-  menu (double/treble for 20–15, double for the bull, no treble offered). Bull
-  and 25 are two buttons because bull = 25 outer / 50 inner: tapping 25 is the
-  outer bull (single), tapping Bull is the inner bull (double). Neither opens a
-  menu.
+  menu (double/treble) for 20–15. Bull and 25 are two buttons because bull = 25
+  outer / 50 inner, so neither opens a menu: 25 is the outer bull (1 mark) and
+  Bull is the inner bull (2 marks).
 - **Save Score.** Appears when the visit is complete (3 darts, or the winning
   dart). Uses `AutoSaveButton`, so auto-save works as in the other local games,
   except that the winning dart never auto-saves.
@@ -147,12 +146,14 @@ All engine and policy logic is pure and covered by Swift Testing, in the style o
   overflow marks scoring when an opponent is open; no points once all have closed;
   bull outer = 1 mark, inner = 2; miss records nothing; 2, 3 and 4 players;
   winning needs all closed AND points ≥ every opponent; equal points wins;
-  closed-but-behind keeps playing; dead targets score nothing.
-- **`CricketUndoTests`:** delete restores marks, points and turn exactly across a
-  closing dart, a scoring dart and the winning dart; delete is disabled once the
-  game is won.
-- **`CricketPlacementTests`:** placement ordering and tie-breaks.
-- **`CricketSaveTests`:** `cricket_darts` payload and placement metadata round-trip.
+  closed-but-behind keeps playing; dead targets score nothing; placement ordering and tie-breaks.
+- **`CricketMatchDataTests`:** the saved `cricket_darts` payload and placement
+  metadata, and rebuilding the board from saved data.
+- **`CricketViewModelTests`:** turn flow, undo (delete restores marks, points and
+  the thrower exactly; disabled once the game is won) and the saved payload.
+- **`CricketCatalogTests`:** the catalog lists Cricket for 2-4 players.
+- **`CricketBoardAccessibilityTests`:** the VoiceOver wording for each target row
+  and player header.
 - Manual: a full 2-, 3- and 4-player game on the simulator, then the saved match
   appears in History with the right detail view. Verify against Supabase that
   `matches`, `match_participants`, `match_players` and `match_throws` all received
@@ -185,3 +186,4 @@ All engine and policy logic is pure and covered by Swift Testing, in the style o
 
 - **Cover art.** `Assets.xcassets/game-cover/cricket.imageset/cricket.png` is a flat grey placeholder that was already in the project, so the Cricket card on the Games tab, the setup header and the History thumbnail are all grey. It needs real artwork before release.
 - **Android.** The port is a separate plan, written once iOS has merged.
+- **`games` table.** `supabase_schema.sql` (line ~72) seeds ('cricket', 'English Cricket'); the live row likely says the same. History reads `game_name` from the match row so nothing breaks, but the name should be updated (needs a decision before touching the live database).
