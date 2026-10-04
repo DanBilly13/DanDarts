@@ -69,7 +69,7 @@ INSERT INTO games (id, name, rules) VALUES
     ('halve_it', 'Halve-It', '{"rounds": 7}'::jsonb),
     ('knockout', 'Knockout', '{"startingLives": 3}'::jsonb),
     ('sudden_death', 'Sudden Death', '{"startingScore": 301}'::jsonb),
-    ('cricket', 'English Cricket', '{"targets": [20, 19, 18, 17, 16, 15, 25]}'::jsonb),
+    ('cricket', 'Cricket', '{"targets": [20, 19, 18, 17, 16, 15, 25]}'::jsonb),
     ('killer', 'Killer', '{"startingLives": 3}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 

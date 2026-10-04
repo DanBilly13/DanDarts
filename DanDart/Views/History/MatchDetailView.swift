@@ -35,6 +35,8 @@ struct MatchDetailView: View {
             KnockoutMatchDetailView(match: match, isSheet: isSheet)
         } else if match.gameName == "Killer" {
             KillerMatchDetailView(match: match, isSheet: isSheet)
+        } else if match.gameName == "Cricket" && CricketBoardBuilder.hasData(in: match.players) {
+            CricketMatchDetailView(match: match, isSheet: isSheet)
         } else {
             // 301/501 matches use generic view
             if isSheet {

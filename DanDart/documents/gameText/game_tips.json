@@ -45,13 +45,5 @@
     "message1": "The player with the lowest score at the end of each round loses a life.",
     "message2": "Long-press any number to score doubles and trebles."
 
-  },
-  {
-    "gameTitle": "English Cricket",
-    "icon": "cricket.ball.fill",
-    "title": "Score Runs & Take Wickets",
-    "message1": "Batters score runs on 15-20 and bull. Bowlers take wickets by hitting the bull.",
-    "message2": "Long-press any number to score doubles and trebles."
-
   }
 ]

@@ -288,6 +288,7 @@ struct MatchDart: Codable, Hashable {
     let multiplier: Int // 1=single, 2=double, 3=triple
     let value: Int // total value (baseValue * multiplier)
     let killerMetadata: KillerDartMetadata? // Killer-specific data
+    let cricketMetadata: CricketDartMetadata? // Cricket-specific data
     
     var displayText: String {
         if multiplier == 1 {
@@ -300,11 +301,13 @@ struct MatchDart: Codable, Hashable {
         return "\(value)"
     }
     
-    init(baseValue: Int, multiplier: Int, killerMetadata: KillerDartMetadata? = nil) {
+    init(baseValue: Int, multiplier: Int, killerMetadata: KillerDartMetadata? = nil,
+         cricketMetadata: CricketDartMetadata? = nil) {
         self.baseValue = baseValue
         self.multiplier = multiplier
         self.value = baseValue * multiplier
         self.killerMetadata = killerMetadata
+        self.cricketMetadata = cricketMetadata
     }
 }
 

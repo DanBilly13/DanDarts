@@ -187,7 +187,15 @@ struct MatchCard: View {
         return gameType == "knockout" ||
                gameType == "sudden death" || gameType == "sudden_death" ||
                gameType == "halve it" || gameType == "halve_it" ||
-               (gameType == "killer" && hasValidKillerPlacement)
+               (gameType == "killer" && hasValidKillerPlacement) ||
+               (gameType == "cricket" && hasValidCricketPlacement)
+    }
+
+    // Check if Cricket match has placement data
+    private var hasValidCricketPlacement: Bool {
+        guard summary.gameType.lowercased() == "cricket" else { return false }
+        guard let metadata = summary.metadata else { return false }
+        return metadata.keys.contains { $0.hasPrefix("placement_") }
     }
     
     // Check if Killer match has valid placement data (forward-only)
@@ -256,6 +264,8 @@ struct MatchCard: View {
             return summary.players.sorted { $0.finalScore > $1.finalScore }
         } else if gameType == "killer" && hasValidKillerPlacement {
             // For Killer with valid placement: sort by placement from metadata
+            return summary.players.sorted { placementForPlayer($0) < placementForPlayer($1) }
+        } else if gameType == "cricket" && hasValidCricketPlacement {
             return summary.players.sorted { placementForPlayer($0) < placementForPlayer($1) }
         } else {
             // For old Killer matches without placement data: keep original order

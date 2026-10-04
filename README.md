@@ -4,7 +4,7 @@ A Swift-based iOS app for casual dart players who want to focus on the fun, not 
 
 ## Features
 
-- **7 Game Modes**: 301, 501, Halve-It, Knockout, Sudden Death, English Cricket, Killer
+- **7 Game Modes**: 301, 501, Halve-It, Knockout, Sudden Death, Cricket, Killer
 - **Smart Scoring**: Automatic score tracking and checkout calculations
 - **Social Play**: Connect with friends, track head-to-head stats
 - **Pre-Game Hype**: Boxing match style excitement before games

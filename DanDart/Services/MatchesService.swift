@@ -961,6 +961,7 @@ class MatchesService: ObservableObject {
             
             // Get is_bust flag (for Knockout life losses)
             let isBust = throwJson["is_bust"] as? Bool ?? false
+            let cricketDarts = CricketMatchData.decodeAll(from: throwJson["game_metadata"] as? [String: Any])
             
             // Convert dart scores to MatchDart objects
             let darts = dartScores.enumerated().map { index, score -> MatchDart in
@@ -977,7 +978,8 @@ class MatchesService: ObservableObject {
                 // For now, assume all are singles (baseValue = score, multiplier = 1)
                 // This is a limitation - we lose the double/triple info
                 // But for Halve-It, what matters is whether the dart hit the target (value > 0)
-                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: killerMetadata)
+                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: killerMetadata,
+                                 cricketMetadata: cricketDarts[index])
             }
             
             let turn = MatchTurn(
@@ -1353,6 +1355,7 @@ class MatchesService: ObservableObject {
             }
             
             let isBust = turnJson["is_bust"] as? Bool ?? false
+            let cricketDarts = CricketMatchData.decodeAll(from: turnJson["game_metadata"] as? [String: Any])
             
             // Convert to MatchDart objects
             let darts = dartScores.enumerated().map { index, score -> MatchDart in
@@ -1364,7 +1367,8 @@ class MatchesService: ObservableObject {
                         killerMetadata = KillerDartMetadata(outcome: outcome, affectedPlayerIds: affectedIds)
                     }
                 }
-                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: killerMetadata)
+                return MatchDart(baseValue: score, multiplier: 1, killerMetadata: killerMetadata,
+                                 cricketMetadata: cricketDarts[index])
             }
             
             let turn = MatchTurn(

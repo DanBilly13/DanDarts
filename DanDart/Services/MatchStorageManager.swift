@@ -388,7 +388,7 @@ extension MatchStorageManager {
         
         let match3 = MatchResult(
             gameType: "Cricket",
-            gameName: "English Cricket",
+            gameName: "Cricket",
             players: [player2, player3],
             winnerId: player2.id,
             timestamp: Date().addingTimeInterval(-172800), // 2 days ago
