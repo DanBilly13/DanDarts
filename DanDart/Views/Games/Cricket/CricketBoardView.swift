@@ -36,12 +36,16 @@ struct CricketBoardColumn: Identifiable {
 struct CricketBoardView: View {
     let columns: [CricketBoardColumn]
     let deadTargets: Set<CricketTarget>
+    /// Shorter rows and smaller avatars, for phones that are too short for the normal layout.
+    var compact: Bool = false
 
     private let labelWidth: CGFloat = 34
-    private let rowHeight: CGFloat = 34
     private let columnSpacing: CGFloat = 6
 
+    private var rowHeight: CGFloat { compact ? 28 : 34 }
+
     private var avatarSize: CGFloat {
+        if compact { return columns.count <= 2 ? 48 : 40 }
         switch columns.count {
         case ...2: return 64
         case 3: return 56
@@ -57,16 +61,18 @@ struct CricketBoardView: View {
                     header(for: column)
                 }
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, compact ? 4 : 8)
 
             ForEach(CricketTarget.allCases, id: \.self) { target in
                 row(for: target)
             }
         }
+        // The rows and marks are drawn at fixed sizes, so larger text would only break the grid.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
 
     private func header(for column: CricketBoardColumn) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: compact ? 2 : 4) {
             PlayerAvatarWithRing(
                 avatarURL: column.avatarURL,
                 isCurrentPlayer: column.isCurrent,
@@ -89,7 +95,7 @@ struct CricketBoardView: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(column.name), \(column.points) points")
+        .accessibilityLabel(CricketBoardAccessibility.headerLabel(for: column))
     }
 
     private func row(for target: CricketTarget) -> some View {
@@ -114,6 +120,40 @@ struct CricketBoardView: View {
         }
         .opacity(isDead ? 0.3 : 1)
         .animation(.easeOut(duration: 0.3), value: isDead)
+        // One element per target row: "20: Dan closed, Sam 1 mark, Alex no marks".
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CricketBoardAccessibility.targetLabel(target))
+        .accessibilityValue(CricketBoardAccessibility.rowValue(columns: columns, target: target, isDead: isDead))
+    }
+}
+
+// MARK: - Accessibility wording
+
+/// The VoiceOver wording for the board. Pure, so it is unit tested.
+enum CricketBoardAccessibility {
+    static func targetLabel(_ target: CricketTarget) -> String {
+        target == .bull ? "Bull" : "\(target.rawValue)"
+    }
+
+    static func marksPhrase(_ marks: Int) -> String {
+        switch min(max(marks, 0), 3) {
+        case 0: return "no marks"
+        case 1: return "1 mark"
+        case 2: return "2 marks"
+        default: return "closed"
+        }
+    }
+
+    /// "Dan closed, Sam 1 mark, Alex no marks", plus ", dead, nobody can score" on a dead row.
+    static func rowValue(columns: [CricketBoardColumn], target: CricketTarget, isDead: Bool) -> String {
+        let marks = columns.map { "\($0.name) \(marksPhrase($0.markCounts[target] ?? 0))" }
+        let sentence = marks.joined(separator: ", ")
+        return isDead ? sentence + ", dead, nobody can score" : sentence
+    }
+
+    static func headerLabel(for column: CricketBoardColumn) -> String {
+        let base = "\(column.name), \(column.points) points"
+        return column.isCurrent ? base + ", throwing" : base
     }
 }
 

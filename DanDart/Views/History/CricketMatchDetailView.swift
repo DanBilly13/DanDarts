@@ -62,19 +62,27 @@ struct CricketMatchDetailView: View {
 
     /// From the saved placements when present, otherwise winner first then most points.
     private var standings: [MatchPlayer] {
-        let metadata = match.metadata ?? [:]
-        let hasPlacements = metadata.keys.contains { $0.hasPrefix("placement_") }
         if hasPlacements {
             return match.players.sorted { placement(for: $0) < placement(for: $1) }
         }
         return match.players.sorted { lhs, rhs in
-            if (lhs.id == match.winnerId) != (rhs.id == match.winnerId) { return lhs.id == match.winnerId }
+            if isWinner(lhs) != isWinner(rhs) { return isWinner(lhs) }
             return (boards[lhs.id]?.points ?? 0) > (boards[rhs.id]?.points ?? 0)
         }
     }
 
     private func placement(for player: MatchPlayer) -> Int {
         Int(match.metadata?["placement_\(player.id.uuidString)"] ?? "") ?? Int.max
+    }
+
+    private var hasPlacements: Bool {
+        (match.metadata ?? [:]).keys.contains { $0.hasPrefix("placement_") }
+    }
+
+    /// A Guest winner is saved with a null winner_id (the loader substitutes a random UUID),
+    /// so the saved placement is the reliable signal; winnerId only backs up older data.
+    private func isWinner(_ player: MatchPlayer) -> Bool {
+        hasPlacements ? placement(for: player) == 1 : player.id == match.winnerId
     }
 
     private var boardColumns: [CricketBoardColumn] {
@@ -133,7 +141,7 @@ struct CricketMatchDetailView: View {
 
                     Spacer()
 
-                    if player.id == match.winnerId {
+                    if isWinner(player) {
                         Image(systemName: "crown")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(AppColor.interactivePrimaryBackground)

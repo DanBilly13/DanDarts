@@ -45,74 +45,90 @@ struct CricketGameplayView: View {
         Set(CricketTarget.allCases.filter { viewModel.state.isDead($0) })
     }
 
+    /// Content-area height (pt) below which the board and keypad use the compact layout.
+    private static let compactHeightThreshold: CGFloat = 700
+
+    private func content(compact: Bool) -> some View {
+        VStack(spacing: 0) {
+            // TOP HALF: scoreboard + current visit
+            VStack {
+                CricketBoardView(columns: boardColumns, deadTargets: deadTargets, compact: compact)
+                    .padding(.horizontal, 16)
+
+                Spacer(minLength: 0)
+
+                CurrentThrowDisplay(
+                    currentThrow: viewModel.currentThrow,
+                    selectedDartIndex: viewModel.selectedDartIndex,
+                    onDartTapped: { _ in },
+                    showScore: false
+                )
+                .padding(.horizontal, 16)
+
+                Spacer(minLength: 0)
+            }
+            .safeAreaInset(edge: .top) {
+                Color.clear.frame(height: compact ? 8 : 16)
+            }
+
+            Spacer(minLength: 0)
+
+            // BOTTOM HALF: keypad + Save Score
+            VStack(spacing: 0) {
+                CricketKeypad(
+                    onScoreSelected: { baseValue, scoreType in
+                        viewModel.recordThrow(value: baseValue, scoreType: scoreType)
+                    },
+                    onDelete: { viewModel.deleteThrow() },
+                    canDelete: viewModel.canDelete
+                )
+                .padding(.horizontal, 16)
+
+                Color.clear.frame(height: compact ? 12 : 24)
+
+                ZStack {
+                    AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
+                        Text("Save Score")
+                    }
+                    .opacity(0)
+                    .disabled(true)
+
+                    AutoSaveButton(
+                        role: .primary,
+                        isVisitComplete: viewModel.canSave,
+                        isWinningThrow: viewModel.isWinningThrow,
+                        resetKey: viewModel.currentThrow.autoSaveKey,
+                        onSave: { viewModel.completeTurn() }
+                    ) {
+                        Label(viewModel.isWinningThrow ? "Game Over" : "Save Score",
+                              systemImage: "checkmark.circle.fill")
+                    }
+                    .popAnimation(
+                        active: viewModel.canSave,
+                        duration: 0.28,
+                        bounce: 0.22
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, compact ? 12 : 34)
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             AppColor.backgroundPrimary
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // TOP HALF: scoreboard + current visit
-                VStack {
-                    CricketBoardView(columns: boardColumns, deadTargets: deadTargets)
-                        .padding(.horizontal, 16)
-
-                    Spacer(minLength: 0)
-
-                    CurrentThrowDisplay(
-                        currentThrow: viewModel.currentThrow,
-                        selectedDartIndex: viewModel.selectedDartIndex,
-                        onDartTapped: { _ in },
-                        showScore: false
-                    )
-                    .padding(.horizontal, 16)
-
-                    Spacer(minLength: 0)
-                }
-                .safeAreaInset(edge: .top) {
-                    Color.clear.frame(height: 16)
-                }
-
-                Spacer(minLength: 0)
-
-                // BOTTOM HALF: keypad + Save Score
-                VStack(spacing: 0) {
-                    CricketKeypad(
-                        onScoreSelected: { baseValue, scoreType in
-                            viewModel.recordThrow(value: baseValue, scoreType: scoreType)
-                        },
-                        onDelete: { viewModel.deleteThrow() },
-                        canDelete: viewModel.canDelete
-                    )
-                    .padding(.horizontal, 16)
-
-                    Color.clear.frame(height: 24)
-
-                    ZStack {
-                        AppButton(role: .primary, controlSize: .extraLarge, action: {}) {
-                            Text("Save Score")
-                        }
-                        .opacity(0)
-                        .disabled(true)
-
-                        AutoSaveButton(
-                            role: .primary,
-                            isVisitComplete: viewModel.canSave,
-                            isWinningThrow: viewModel.isWinningThrow,
-                            resetKey: viewModel.currentThrow.autoSaveKey,
-                            onSave: { viewModel.completeTurn() }
-                        ) {
-                            Label(viewModel.isWinningThrow ? "Game Over" : "Save Score",
-                                  systemImage: "checkmark.circle.fill")
-                        }
-                        .popAnimation(
-                            active: viewModel.canSave,
-                            duration: 0.28,
-                            bounce: 0.22
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 34)
-                }
+            GeometryReader { geo in
+                // Compact mode for short phones. `geo` is the content area below the navigation
+                // bar, including the home-indicator strip (the bottom edge is ignored). Normal
+                // layout needs about 677 pt, so: iPhone SE (667 total, ~603 here), iPhone 8 Plus
+                // (~672 here) and Zoomed displays go compact; iPhone 12/13 mini and up (~720+)
+                // and everything taller keep the normal layout. 700 sits between the two.
+                let compact = geo.size.height < Self.compactHeightThreshold
+                content(compact: compact)
+                    .frame(width: geo.size.width, height: geo.size.height)
             }
         }
         .background(AppColor.backgroundPrimary)
