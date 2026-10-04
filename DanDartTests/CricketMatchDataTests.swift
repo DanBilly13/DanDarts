@@ -48,6 +48,23 @@ struct CricketMatchDataTests {
         #expect(CricketMatchData.encode([]) == nil)
     }
 
+    @Test func encodingKeepsEachDartsOriginalPosition() throws {
+        let first = dart(20, marks: 3, added: 3)
+        let third = dart(19, marks: 1, added: 1)
+
+        let json = try #require(CricketMatchData.encode([first, nil, third]))
+        let decoded = CricketMatchData.decode(json)
+
+        #expect(Set(decoded.keys) == [0, 2])
+        #expect(decoded[0] == first)
+        #expect(decoded[2] == third)
+        #expect(decoded[1] == nil)
+    }
+
+    @Test func encodingOnlyNilsGivesNothing() {
+        #expect(CricketMatchData.encode([nil, nil]) == nil)
+    }
+
     @Test func garbageDecodesToNothing() {
         #expect(CricketMatchData.decode("not json").isEmpty)
         #expect(CricketMatchData.decode("{\"a\": 1}").isEmpty)

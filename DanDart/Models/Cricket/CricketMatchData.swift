@@ -23,10 +23,12 @@ struct CricketDartMetadata: Codable, Hashable {
 enum CricketMatchData {
     static let metadataKey = "cricket_darts"
 
-    /// One JSON string for a visit's darts, indexed by `dart_index`. nil when there are none.
-    static func encode(_ darts: [CricketDartMetadata]) -> String? {
-        guard !darts.isEmpty else { return nil }
-        let entries = darts.enumerated().map { index, dart -> [String: Any] in
+    /// One JSON string for a visit's darts. `dart_index` is each dart's position in `darts`,
+    /// so a nil entry (a dart with no data) is skipped without shifting the others.
+    /// nil when no dart has data.
+    static func encode(_ darts: [CricketDartMetadata?]) -> String? {
+        let entries = darts.enumerated().compactMap { index, dart -> [String: Any]? in
+            guard let dart else { return nil }
             var entry: [String: Any] = [
                 "dart_index": index,
                 "marks": dart.marks,
@@ -36,6 +38,7 @@ enum CricketMatchData {
             if let target = dart.target { entry["target"] = target }
             return entry
         }
+        guard !entries.isEmpty else { return nil }
         guard let data = try? JSONSerialization.data(withJSONObject: entries, options: [.sortedKeys]) else {
             return nil
         }

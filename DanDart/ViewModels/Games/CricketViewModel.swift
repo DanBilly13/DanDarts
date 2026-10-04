@@ -171,9 +171,10 @@ final class CricketViewModel: ObservableObject {
             )
         }
 
+        let placements = CricketEngine.placements(for: state)
         var metadata: [String: String] = [:]
         for player in players {
-            if let place = CricketEngine.placements(for: state)[player.id] {
+            if let place = placements[player.id] {
                 metadata["placement_\(matchPlayerId(for: player).uuidString)"] = "\(place)"
             }
         }
@@ -201,7 +202,7 @@ final class CricketViewModel: ObservableObject {
                     )
                 }
                 var gameMetadata: [String: String]?
-                if let json = CricketMatchData.encode(turn.darts.compactMap(\.cricketMetadata)) {
+                if let json = CricketMatchData.encode(turn.darts.map(\.cricketMetadata)) {
                     gameMetadata = [CricketMatchData.metadataKey: json]
                 }
                 flatTurnHistory.append(TurnHistory(

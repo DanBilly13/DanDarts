@@ -175,6 +175,84 @@ struct CricketViewModelTests {
         #expect(boards[g.b.id]?.marks(on: .twenty) == 0)
     }
 
+    @Test func theBoardRebuiltFromWhatTheDatabaseReturnsMatchesTheGame() throws {
+        let g = makeGame()
+        playUpToTheWinningDart(g.vm)
+        g.vm.completeTurn()
+        let payload = try #require(g.vm.makeMatchPayload())
+
+        // Rebuild the players the way MatchesService does when it reads Supabase.
+        let rebuilt = g.vm.players.map { player -> MatchPlayer in
+            let saved = payload.turnHistory
+                .filter { $0.playerId == player.id }
+                .sorted { $0.turnNumber < $1.turnNumber }
+            let turns = saved.map { turn -> MatchTurn in
+                let cricketDarts = CricketMatchData.decodeAll(from: turn.gameMetadata as [String: Any]?)
+                let darts = turn.darts.enumerated().map { index, dart in
+                    MatchDart(baseValue: dart.totalValue, multiplier: 1, killerMetadata: nil,
+                              cricketMetadata: cricketDarts[index])
+                }
+                return MatchTurn(turnNumber: turn.turnNumber, darts: darts,
+                                 scoreBefore: turn.scoreBefore, scoreAfter: turn.scoreAfter, isBust: false)
+            }
+            return MatchPlayer.from(player: player, finalScore: 0, startingScore: 0,
+                                    totalDartsThrown: turns.reduce(0) { $0 + $1.darts.count }, turns: turns)
+        }
+
+        let boards = CricketBoardBuilder.build(players: rebuilt)
+        for player in g.vm.players {
+            let board = try #require(boards[player.id])
+            for target in CricketTarget.allCases {
+                #expect(board.marks(on: target) == g.vm.state.marks(for: player.id, on: target))
+            }
+            #expect(board.points == g.vm.state.points(for: player.id))
+        }
+    }
+
+    @Test func undoThenADifferentDartIsWhatGetsSaved() throws {
+        let g = makeGame()
+        throwDart(g.vm, 20, .triple)
+        g.vm.deleteThrow()
+        for value in [19, 18, 17] { throwDart(g.vm, value, .triple) }
+        g.vm.completeTurn()
+        missVisit(g.vm)
+        for value in [20, 16, 15] { throwDart(g.vm, value, .triple) }
+        g.vm.completeTurn()
+        missVisit(g.vm)
+        throwDart(g.vm, 50)
+        throwDart(g.vm, 25)
+        g.vm.completeTurn()
+
+        let payload = try #require(g.vm.makeMatchPayload())
+        let firstTurn = try #require(payload.turnHistory
+            .filter { $0.playerId == g.a.id }
+            .min { $0.turnNumber < $1.turnNumber })
+        let darts = CricketMatchData.decodeAll(from: firstTurn.gameMetadata as [String: Any]?)
+
+        #expect(firstTurn.darts.map(\.displayText) == ["T19", "T18", "T17"])
+        #expect(darts.count == 3)
+        #expect(darts[0]?.target == 19)
+    }
+
+    @Test func aSignedInMembersIdsAreUsedConsistently() throws {
+        let memberUserId = UUID()
+        let a = Player(displayName: "A", nickname: "a", isGuest: false, userId: memberUserId)
+        let b = Player(displayName: "B", nickname: "b")
+        let vm = CricketViewModel(players: [a, b], shuffle: false, persistsMatch: false)
+        playUpToTheWinningDart(vm)
+        vm.completeTurn()
+
+        let payload = try #require(vm.makeMatchPayload())
+        let result = payload.matchResult
+
+        #expect(result.winnerId == memberUserId)
+        #expect(result.metadata?["placement_\(memberUserId.uuidString)"] == "1")
+        #expect(CricketBoardBuilder.build(players: result.players)[memberUserId] != nil)
+        let turnsOfA = payload.turnHistory.filter { $0.player.id == a.id }
+        #expect(turnsOfA.count == 3)
+        #expect(turnsOfA.allSatisfy { $0.playerId == a.id })
+    }
+
     @Test func noPayloadUntilThereIsAWinner() {
         let g = makeGame()
         throwDart(g.vm, 20)
