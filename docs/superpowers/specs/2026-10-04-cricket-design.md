@@ -172,3 +172,16 @@ All engine and policy logic is pure and covered by Swift Testing, in the style o
 - New sounds, animations or a Cricket-specific tip.
 - Profile stats for Cricket.
 - Cross-visit undo.
+
+## Deviations from the first draft (recorded during implementation)
+
+- **Board layout.** A flexible grid with one narrow label column, not `PlayerCardLayout`'s fixed card widths: four 72 pt columns plus the label column do not fit a phone. The avatar shrinks with the player count (64, 56, 48).
+- **Keypad buttons.** The keypad reuses the existing circular `ScoringButton`, in the same 5-column grid as the other games (20 19 18 17 16 / 15 25 Bull Miss delete), not the cream rounded squares from the first mockup.
+- **Outcome, not events.** The engine returns one `CricketOutcome` per dart (marks added, points, closed, dead, won) instead of an event list. It drives the dart hit and miss sounds only.
+- **Overflow example.** A treble on a target with 2 marks adds 1 mark to close and scores the other 2, so 40 on the 20s (the first draft said 20).
+- **Engine helpers.** `CricketState.isVisitComplete` and `canThrow` were added after review so the view model does not repeat the "three darts or a win" rule.
+
+## Open items
+
+- **Cover art.** `Assets.xcassets/game-cover/cricket.imageset/cricket.png` is a flat grey placeholder that was already in the project, so the Cricket card on the Games tab, the setup header and the History thumbnail are all grey. It needs real artwork before release.
+- **Android.** The port is a separate plan, written once iOS has merged.
