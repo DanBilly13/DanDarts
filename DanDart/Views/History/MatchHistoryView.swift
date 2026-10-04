@@ -39,7 +39,7 @@ struct MatchHistoryView: View {
         case halveIt = "Halve It"
         case knockout = "Knockout"
         case suddenDeath = "Sudden Death"
-        // case cricket = "Cricket"  // TODO: Uncomment when cricket game is implemented
+        case cricket = "Cricket"
         case killer = "Killer"
         
         var displayName: String {
