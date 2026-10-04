@@ -16,7 +16,7 @@ language, with Killer's per-player columns as the model.
 |---|---|---|
 | English Cricket | **Replaced** by Cricket. Its catalog entry, hide-filter and mock data go. | It was never shipped and is a different game (batter and bowler). |
 | Players | **2–4**, no teams. | Columns stay readable. Teams can come later. |
-| Keypad | **Cricket-only keypad**: 20, 19, 18, 17, 16, 15, 25, Bull, Miss, delete. | The normal grid has 1–14 buttons that can never matter. |
+| Keypad | **Cricket-only keypad**: 15, 16, 17, 18, 19, 20, 25, Bull, Miss, delete. | The normal grid has 1–14 buttons that can never matter. |
 | Platforms | **iOS first**, then an Android port. | Same order as auto-save. |
 | Remote play | **Out of scope.** | Remote has its own server turn-lock and visit save path. |
 
@@ -74,16 +74,21 @@ slots, then the keypad and **Save Score** in the bottom half.
   first name in the player's colour (`player1`–`player4`), and the player's
   points under it. The columns are a flexible grid (not `PlayerCardLayout`), with the
   avatars shrinking by player count so the target labels still fit.
-- **Target rows.** A narrow label column down the left, 20 to 15 then "B", with
-  hairlines between rows. In each player's cell:
-  - 1 mark: a slash in the player's colour.
-  - 2 marks: an X in the player's colour.
-  - Closed: a filled circle in the player's colour with a black X.
+- **Target rows.** The target numbers sit in a centre column, like a chalkboard,
+  top to bottom 20, 19, 18, 17, 16, 15 then "B", with hairlines between rows and
+  faint vertical hairlines either side of the number column. The players split
+  around it: with n players, (n + 1) / 2 in throwing order go left and the rest
+  right (2 = 1 | numbers | 1, 3 = 2 | 1, 4 = 2 | 2). The header row (avatar, name,
+  points) uses the same split, so each header sits over its marks. In each
+  player's cell, in the player's colour (standard Cricket notation):
+  - 1 mark: a slash `/`.
+  - 2 marks: an X.
+  - Closed: an X inside an outlined circle.
 - **Dead rows** dim to 30% opacity. Nothing else about the row changes.
 - **Dart slots.** The existing `CurrentThrowDisplay(showScore: false)`.
-- **Keypad.** `CricketKeypad`: the 20–15 buttons, a green 25 and a red Bull, then
-  Miss and delete. A tap is a single; long-press opens the existing multiplier
-  menu (double/treble) for 20–15. Bull and 25 are two buttons because bull = 25
+- **Keypad.** `CricketKeypad`, low to high: 15 16 17 18 19 / 20, a green 25, a
+  red Bull, Miss, delete. A tap is a single; long-press opens the existing
+  multiplier menu (double/treble) for 15–20. Bull and 25 are two buttons because bull = 25
   outer / 50 inner, so neither opens a menu: 25 is the outer bull (1 mark) and
   Bull is the inner bull (2 marks).
 - **Save Score.** Appears when the visit is complete (3 darts, or the winning
@@ -177,7 +182,8 @@ All engine and policy logic is pure and covered by Swift Testing, in the style o
 ## Deviations from the first draft (recorded during implementation)
 
 - **Board layout.** A flexible grid with one narrow label column, not `PlayerCardLayout`'s fixed card widths: four 72 pt columns plus the label column do not fit a phone. The avatar shrinks with the player count (64, 56, 48).
-- **Keypad buttons.** The keypad reuses the existing circular `ScoringButton`, in the same 5-column grid as the other games (20 19 18 17 16 / 15 25 Bull Miss delete), not the cream rounded squares from the first mockup.
+- **Layout revised after trying it.** Target numbers moved to a centre column (players split left/right, extra player on the left), closed marks are a circled X outline, keypad runs low to high.
+- **Keypad buttons.** The keypad reuses the existing circular `ScoringButton`, in the same 5-column grid as the other games (15 16 17 18 19 / 20 25 Bull Miss delete), not the cream rounded squares from the first mockup.
 - **Outcome, not events.** The engine returns one `CricketOutcome` per dart (marks added, points, closed, dead, won) instead of an event list. It drives the dart hit and miss sounds only.
 - **Overflow example.** A treble on a target with 2 marks adds 1 mark to close and scores the other 2, so 40 on the 20s (the first draft said 20).
 - **Engine helpers.** `CricketState.isVisitComplete` and `canThrow` were added after review so the view model does not repeat the "three darts or a win" rule.
