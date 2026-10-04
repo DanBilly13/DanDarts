@@ -192,4 +192,4 @@ All engine and policy logic is pure and covered by Swift Testing, in the style o
 
 - **Cover art.** `Assets.xcassets/game-cover/cricket.imageset/cricket.png` is a flat grey placeholder that was already in the project, so the Cricket card on the Games tab, the setup header and the History thumbnail are all grey. It needs real artwork before release.
 - **Android.** The port is a separate plan, written once iOS has merged.
-- **`games` table.** `supabase_schema.sql` (line ~72) seeds ('cricket', 'English Cricket'); the live row likely says the same. History reads `game_name` from the match row so nothing breaks, but the name should be updated (needs a decision before touching the live database).
+- ~~`games` table~~ Resolved: the live database has no `games` table (only the old `supabase_schema.sql` seed mentioned it); the seed now says 'Cricket'. History reads `game_name` from each match row.
