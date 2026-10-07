@@ -22,6 +22,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
     @State private var showDeleteAccountConfirmation: Bool = false
+    @State private var deleteConfirmText: String = ""
     @State private var showDeleteAccountError: Bool = false
     @State private var isDeletingAccount: Bool = false
     @State private var showClearMatchesConfirmation: Bool = false
@@ -81,10 +82,17 @@ struct SettingsView: View {
             Text("Are you sure you want to log out?")
         }
         .alert("Delete Account?", isPresented: $showDeleteAccountConfirmation) {
-            Button("Cancel", role: .cancel) { }
+            TextField("Type \(DeleteAccountConfirmation.word) to confirm", text: $deleteConfirmText)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+            Button("Cancel", role: .cancel) {
+                deleteConfirmText = ""
+            }
             Button("Delete Account", role: .destructive) {
+                deleteConfirmText = ""
                 performAccountDeletion()
             }
+            .disabled(!DeleteAccountConfirmation.isConfirmed(deleteConfirmText))
         } message: {
             Text("This permanently deletes your account, profile, friends, and personal match data. Games you played with others are kept but no longer linked to you.\n\nThis can't be undone.")
         }
@@ -541,6 +549,7 @@ struct SettingsView: View {
     
     private var deleteAccountButton: some View {
         Button(action: {
+            deleteConfirmText = ""
             showDeleteAccountConfirmation = true
         }) {
             HStack {
