@@ -12,6 +12,12 @@
       "instructions": "You start with a score of 501. On your turn (called a visit), throw three darts and subtract the total from your score.\n\nYour goal is to reach exactly zero, finishing on a double.\n\nIf your score drops below zero, or you're left on 1, the turn is a bust and your score returns to what it was before you threw.\n\nThe first player to check out on zero wins.\n\nThe perfect leg:\nThe fewest visits you can finish 501 in is three — the famous nine-dart finish:\n- Visit 1: 180\n- Visit 2: 180\n- Visit 3: 141 checkout (T20, T19, D12)"
     },
     {
+      "title": "Cricket",
+      "subtitle": "Tactics. Close, Score, Outsmart.",
+      "players": "2-4",
+      "instructions": "Cricket, also called Tactics, is a game of closing numbers and scoring on them.\n\nThe numbers in play are 20, 19, 18, 17, 16, 15, and the bull.\n\nClosing a number.\nHit a number three times to close it. A single counts as one hit, a double as two, and a treble as three. The outer bull counts as one hit and the inner bull as two.\n\nScoring.\nOnce you have closed a number, every extra hit on it scores that number's value, but only while at least one opponent has not closed it. When everyone has closed a number, it is dead and nobody can score on it.\n\nWinning.\nClose all seven numbers while your points are equal to or higher than every opponent's.\n\nThe tactics.\nAttack to score, or defend by closing the numbers your opponents are scoring on."
+    },
+    {
       "title": "Halve-It",
       "subtitle": "No one escapes the chop",
       "players": "2-6",
@@ -28,12 +34,6 @@
       "subtitle": "One slip and you’re history",
       "players": "2-6",
       "instructions": "Sudden Death is fast, simple, and unforgiving. Each round, every player throws three darts, and the player with the lowest total is eliminated.\n\nAll scores reset at the start of each new round — everyone begins even, but only for a moment.\n\nRound after round, one player falls, until only one remains.\n\nThe last player standing wins."
-    },
-    {
-      "title": "Cricket",
-      "subtitle": "Tactics. Close, Score, Outsmart.",
-      "players": "2-4",
-      "instructions": "Cricket, also called Tactics, is a game of closing numbers and scoring on them.\n\nThe numbers in play are 20, 19, 18, 17, 16, 15, and the bull.\n\nClosing a number.\nHit a number three times to close it. A single counts as one hit, a double as two, and a treble as three. The outer bull counts as one hit and the inner bull as two.\n\nScoring.\nOnce you have closed a number, every extra hit on it scores that number's value, but only while at least one opponent has not closed it. When everyone has closed a number, it is dead and nobody can score on it.\n\nWinning.\nClose all seven numbers while your points are equal to or higher than every opponent's.\n\nThe tactics.\nAttack to score, or defend by closing the numbers your opponents are scoring on."
     },
   {
     "title": "Killer",
