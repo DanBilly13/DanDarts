@@ -83,7 +83,10 @@ struct CricketPlayerBoard: Equatable {
 }
 
 enum CricketBoardBuilder {
-    /// Adds up every saved dart. Keyed by `MatchPlayer.id`. `players` must be in throwing order.
+    /// Rebuilds the final board from the saved darts. Keyed by `MatchPlayer.id`.
+    /// Standard adds up each player's own darts. Cut-Throat replays the match turn by turn,
+    /// so `players` must be in throwing order. A dart missing from the saved data (no Cricket
+    /// metadata) leaves that opponent looking open, so later points can land on them.
     static func build(players: [MatchPlayer], scoring: CricketScoring = .standard) -> [UUID: CricketPlayerBoard] {
         switch scoring {
         case .standard: return buildStandard(players: players)
@@ -113,7 +116,8 @@ enum CricketBoardBuilder {
     /// was thrown, so the match is replayed in turn order: turn 1 for everyone in throwing
     /// order, then turn 2, and so on. The saved `points` per dart is the overflow's points.
     private static func buildCutThroat(players: [MatchPlayer]) -> [UUID: CricketPlayerBoard] {
-        var boards = Dictionary(uniqueKeysWithValues: players.map { ($0.id, CricketPlayerBoard()) })
+        var boards: [UUID: CricketPlayerBoard] = [:]
+        for player in players { boards[player.id] = CricketPlayerBoard() }
         let rounds = players.map(\.turns.count).max() ?? 0
 
         for round in 0..<rounds {
