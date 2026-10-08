@@ -27,4 +27,11 @@ struct CricketCatalogTests {
 
         #expect(cricket?.coverImageName == "cricket")
     }
+
+    @Test func theInstructionsExplainCutThroat() {
+        let cricket = Game.loadGames().first { $0.title == "Cricket" }
+
+        #expect(cricket?.instructions.contains("Cut-Throat.") == true)
+        #expect(cricket?.instructions.contains("lowest score wins") == true)
+    }
 }

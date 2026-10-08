@@ -36,6 +36,7 @@ final class CricketViewModel: ObservableObject {
 
     private let startedAt = Date()
     private let persistsMatch: Bool
+    private let scoring: CricketScoring
     private let soundManager = SoundManager.shared
 
     /// Parallel to `currentThrow`.
@@ -44,10 +45,11 @@ final class CricketViewModel: ObservableObject {
     private var dartSnapshots: [CricketState] = []
     private var playerTurnHistory: [UUID: [MatchTurn]] = [:]
 
-    init(players: [Player], shuffle: Bool = true, persistsMatch: Bool = true) {
+    init(players: [Player], scoring: CricketScoring = .standard, shuffle: Bool = true, persistsMatch: Bool = true) {
         let order = shuffle ? players.shuffled() : players
         self.players = order
-        self.state = CricketState(playerIds: order.map(\.id))
+        self.scoring = scoring
+        self.state = CricketState(playerIds: order.map(\.id), scoring: scoring)
         self.persistsMatch = persistsMatch
     }
 
@@ -187,7 +189,7 @@ final class CricketViewModel: ObservableObject {
             winnerId: matchPlayerId(for: winner),
             timestamp: Date(),
             duration: Date().timeIntervalSince(startedAt),
-            matchFormat: 1,
+            matchFormat: scoring.matchFormat,
             totalLegsPlayed: 1,
             metadata: metadata
         )
@@ -245,7 +247,7 @@ final class CricketViewModel: ObservableObject {
                     startedAt: startedAt,
                     endedAt: Date(),
                     turnHistory: payload.turnHistory,
-                    matchFormat: 1,
+                    matchFormat: scoring.matchFormat,
                     legsWon: [:],
                     gameMetadata: metadata,
                     currentUserId: currentUserId

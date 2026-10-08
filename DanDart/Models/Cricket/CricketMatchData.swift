@@ -83,8 +83,18 @@ struct CricketPlayerBoard: Equatable {
 }
 
 enum CricketBoardBuilder {
-    /// Adds up every saved dart. Keyed by `MatchPlayer.id`.
-    static func build(players: [MatchPlayer]) -> [UUID: CricketPlayerBoard] {
+    /// Rebuilds the final board from the saved darts. Keyed by `MatchPlayer.id`.
+    /// Standard adds up each player's own darts. Cut-Throat replays the match turn by turn,
+    /// so `players` must be in throwing order. A dart missing from the saved data (no Cricket
+    /// metadata) leaves that opponent looking open, so later points can land on them.
+    static func build(players: [MatchPlayer], scoring: CricketScoring = .standard) -> [UUID: CricketPlayerBoard] {
+        switch scoring {
+        case .standard: return buildStandard(players: players)
+        case .cutThroat: return buildCutThroat(players: players)
+        }
+    }
+
+    private static func buildStandard(players: [MatchPlayer]) -> [UUID: CricketPlayerBoard] {
         var boards: [UUID: CricketPlayerBoard] = [:]
         for player in players {
             var board = CricketPlayerBoard()
@@ -98,6 +108,35 @@ enum CricketBoardBuilder {
                 }
             }
             boards[player.id] = board
+        }
+        return boards
+    }
+
+    /// Cut-Throat points belong to the opponents who had not closed the target when the dart
+    /// was thrown, so the match is replayed in turn order: turn 1 for everyone in throwing
+    /// order, then turn 2, and so on. The saved `points` per dart is the overflow's points.
+    private static func buildCutThroat(players: [MatchPlayer]) -> [UUID: CricketPlayerBoard] {
+        var boards: [UUID: CricketPlayerBoard] = [:]
+        for player in players { boards[player.id] = CricketPlayerBoard() }
+        let rounds = players.map(\.turns.count).max() ?? 0
+
+        for round in 0..<rounds {
+            for player in players where round < player.turns.count {
+                for dart in player.turns[round].darts {
+                    guard let metadata = dart.cricketMetadata,
+                          let rawTarget = metadata.target,
+                          let target = CricketTarget(rawValue: rawTarget) else { continue }
+
+                    boards[player.id]?.markCounts[target, default: 0] += metadata.marksAdded
+
+                    guard metadata.pointsScored > 0 else { continue }
+                    for opponent in players where opponent.id != player.id {
+                        if (boards[opponent.id]?.markCounts[target] ?? 0) < 3 {
+                            boards[opponent.id]?.points += metadata.pointsScored
+                        }
+                    }
+                }
+            }
         }
         return boards
     }

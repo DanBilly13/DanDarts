@@ -26,7 +26,7 @@ enum Destination: Hashable {
     case knockoutGameplay(game: Game, players: [Player], startingLives: Int)
     case suddenDeathGameplay(game: Game, players: [Player], startingLives: Int)
     case killerGameplay(game: Game, players: [Player], startingLives: Int)
-    case cricketGameplay(game: Game, players: [Player])
+    case cricketGameplay(game: Game, players: [Player], matchFormat: Int)
     
     // Remote games flow
     case remoteGameSetup(game: Game, opponent: User?)
@@ -54,8 +54,8 @@ enum Destination: Hashable {
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
         case (.killerGameplay(let g1, let p1, let l1), .killerGameplay(let g2, let p2, let l2)):
             return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && l1 == l2
-        case (.cricketGameplay(let g1, let p1), .cricketGameplay(let g2, let p2)):
-            return g1.id == g2.id && p1.map(\.id) == p2.map(\.id)
+        case (.cricketGameplay(let g1, let p1, let m1), .cricketGameplay(let g2, let p2, let m2)):
+            return g1.id == g2.id && p1.map(\.id) == p2.map(\.id) && m1 == m2
         case (.remoteGameSetup(let g1, let o1), .remoteGameSetup(let g2, let o2)):
             return g1.id == g2.id && o1?.id == o2?.id
         case (.remoteLobby(let m1, let o1, let c1, _, _, _), .remoteLobby(let m2, let o2, let c2, _, _, _)):
@@ -106,10 +106,11 @@ enum Destination: Hashable {
             hasher.combine(game.id)
             hasher.combine(players.map(\.id))
             hasher.combine(startingLives)
-        case .cricketGameplay(let game, let players):
+        case .cricketGameplay(let game, let players, let matchFormat):
             hasher.combine("cricketGameplay")
             hasher.combine(game.id)
             hasher.combine(players.map(\.id))
+            hasher.combine(matchFormat)
         case .remoteGameSetup(let game, let opponent):
             hasher.combine("remoteGameSetup")
             hasher.combine(game.id)
@@ -234,8 +235,8 @@ class Router: ObservableObject {
         case .killerGameplay(let game, let players, let startingLives):
             KillerGameplayView(game: game, players: players, startingLives: startingLives)
 
-        case .cricketGameplay(let game, let players):
-            CricketGameplayView(game: game, players: players)
+        case .cricketGameplay(let game, let players, let matchFormat):
+            CricketGameplayView(game: game, players: players, matchFormat: matchFormat)
             
         case .remoteGameSetup:
             EmptyView() // Requires selectedTab binding - use view(for:selectedTab:) instead
