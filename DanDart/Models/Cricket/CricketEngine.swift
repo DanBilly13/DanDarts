@@ -51,9 +51,24 @@ struct CricketDart: Equatable {
     }
 }
 
+/// How Cricket is scored. The raw value is what a match saves as `matchFormat`, so every
+/// Cricket match saved before this option existed (format 1) reads as Standard.
+enum CricketScoring: Int, Equatable {
+    case standard = 1
+    case cutThroat = 2
+
+    /// Anything other than 2 is Standard.
+    init(matchFormat: Int) {
+        self = CricketScoring(rawValue: matchFormat) ?? .standard
+    }
+
+    var matchFormat: Int { rawValue }
+}
+
 struct CricketState: Equatable {
     /// Throwing order.
     let playerIds: [UUID]
+    let scoring: CricketScoring
     /// Marks per player per target, 0...3. Three means closed.
     var markCounts: [UUID: [CricketTarget: Int]]
     var pointTotals: [UUID: Int]
@@ -62,10 +77,11 @@ struct CricketState: Equatable {
     var dartsThrown = 0
     var winnerId: UUID?
 
-    init(playerIds: [UUID]) {
+    init(playerIds: [UUID], scoring: CricketScoring = .standard) {
         precondition(!playerIds.isEmpty && Set(playerIds).count == playerIds.count,
                      "Cricket needs at least one player and no duplicate players")
         self.playerIds = playerIds
+        self.scoring = scoring
         let empty = Dictionary(uniqueKeysWithValues: CricketTarget.allCases.map { ($0, 0) })
         markCounts = Dictionary(uniqueKeysWithValues: playerIds.map { ($0, empty) })
         pointTotals = Dictionary(uniqueKeysWithValues: playerIds.map { ($0, 0) })
@@ -133,29 +149,60 @@ enum CricketEngine {
             outcome.marksAdded = after - before
             outcome.closedTarget = before < 3 && after == 3
 
-            let anOpponentIsOpen = state.playerIds.contains {
+            let openOpponents = state.playerIds.filter {
                 $0 != playerId && state.marks(for: $0, on: target) < 3
             }
-            if overflow > 0 && anOpponentIsOpen {
-                outcome.pointsScored = overflow * target.pointValue
-                next.pointTotals[playerId, default: 0] += outcome.pointsScored
+            if overflow > 0 && !openOpponents.isEmpty {
+                let points = overflow * target.pointValue
+                outcome.pointsScored = points
+                switch state.scoring {
+                case .standard:
+                    next.pointTotals[playerId, default: 0] += points
+                case .cutThroat:
+                    for opponent in openOpponents { next.pointTotals[opponent, default: 0] += points }
+                }
             }
 
             outcome.targetBecameDead = outcome.closedTarget && next.isDead(target)
         }
 
-        if next.hasClosedAll(playerId) {
-            let bestOpponent = state.playerIds
-                .filter { $0 != playerId }
-                .map { next.points(for: $0) }
-                .max() ?? 0
-            if next.points(for: playerId) >= bestOpponent {
-                next.winnerId = playerId
+        switch state.scoring {
+        case .standard:
+            if next.hasClosedAll(playerId) {
+                let bestOpponent = state.playerIds
+                    .filter { $0 != playerId }
+                    .map { next.points(for: $0) }
+                    .max() ?? 0
+                if next.points(for: playerId) >= bestOpponent {
+                    next.winnerId = playerId
+                    outcome.won = true
+                }
+            }
+        case .cutThroat:
+            if let winner = cutThroatWinner(in: next, thrower: playerId) {
+                next.winnerId = winner
                 outcome.won = true
             }
         }
 
         return (next, outcome)
+    }
+
+    /// Cut-Throat: the first player (thrower first, then throwing order) who has closed
+    /// everything with points at or below every opponent's. Every player is checked, because
+    /// points only rise: someone who closed earlier while another player was lower wins the
+    /// moment that player is fed past them. Checking only the thrower could leave a game
+    /// where every target is dead and nobody can ever win.
+    private static func cutThroatWinner(in state: CricketState, thrower: UUID) -> UUID? {
+        let candidates = [thrower] + state.playerIds.filter { $0 != thrower }
+        return candidates.first { candidate in
+            guard state.hasClosedAll(candidate) else { return false }
+            let lowestOpponent = state.playerIds
+                .filter { $0 != candidate }
+                .map { state.points(for: $0) }
+                .min() ?? Int.max
+            return state.points(for: candidate) <= lowestOpponent
+        }
     }
 
     /// Pass play to the next player. A finished game stays as it is.
@@ -167,7 +214,8 @@ enum CricketEngine {
         return next
     }
 
-    /// 1 for the winner, then by targets closed, then points, then throwing order.
+    /// 1 for the winner, then by targets closed, then points (most for Standard, fewest for
+    /// Cut-Throat), then throwing order.
     static func placements(for state: CricketState) -> [UUID: Int] {
         let ranked = state.playerIds.enumerated().sorted { lhs, rhs in
             let leftWon = lhs.element == state.winnerId
@@ -180,7 +228,9 @@ enum CricketEngine {
 
             let leftPoints = state.points(for: lhs.element)
             let rightPoints = state.points(for: rhs.element)
-            if leftPoints != rightPoints { return leftPoints > rightPoints }
+            if leftPoints != rightPoints {
+                return state.scoring == .cutThroat ? leftPoints < rightPoints : leftPoints > rightPoints
+            }
 
             return lhs.offset < rhs.offset
         }
