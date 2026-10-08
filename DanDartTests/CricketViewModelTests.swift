@@ -259,4 +259,53 @@ struct CricketViewModelTests {
 
         #expect(g.vm.makeMatchPayload() == nil)
     }
+
+    // MARK: - Cut-Throat
+
+    private func makeCutThroatGame() -> (vm: CricketViewModel, a: Player, b: Player) {
+        let a = Player(displayName: "A", nickname: "a")
+        let b = Player(displayName: "B", nickname: "b")
+        let vm = CricketViewModel(players: [a, b], scoring: .cutThroat, shuffle: false, persistsMatch: false)
+        return (vm, a, b)
+    }
+
+    @Test func aCutThroatGameStartsWithCutThroatScoring() {
+        let g = makeCutThroatGame()
+        #expect(g.vm.state.scoring == .cutThroat)
+    }
+
+    @Test func standardIsTheDefaultScoring() {
+        #expect(makeGame().vm.state.scoring == .standard)
+    }
+
+    @Test func deletingACutThroatScoringDartTakesTheOpponentsPointsBack() {
+        let g = makeCutThroatGame()
+        throwDart(g.vm, 20, .triple)
+        throwDart(g.vm, 20) // 20 points to B
+        #expect(g.vm.state.points(for: g.b.id) == 20)
+        #expect(g.vm.state.points(for: g.a.id) == 0)
+
+        g.vm.deleteThrow()
+
+        #expect(g.vm.state.points(for: g.b.id) == 0)
+        #expect(g.vm.state.marks(for: g.a.id, on: .twenty) == 3)
+    }
+
+    @Test func aFinishedCutThroatGameSavesMatchFormatTwo() {
+        let g = makeCutThroatGame()
+        playUpToTheWinningDart(g.vm) // A closes everything; B has no points, so A is lowest
+        g.vm.completeTurn()
+
+        let payload = g.vm.makeMatchPayload()
+
+        #expect(payload?.matchResult.matchFormat == 2)
+    }
+
+    @Test func aFinishedStandardGameStillSavesMatchFormatOne() {
+        let g = makeGame()
+        playUpToTheWinningDart(g.vm)
+        g.vm.completeTurn()
+
+        #expect(g.vm.makeMatchPayload()?.matchResult.matchFormat == 1)
+    }
 }
