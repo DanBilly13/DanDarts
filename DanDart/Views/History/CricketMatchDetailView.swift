@@ -52,8 +52,10 @@ struct CricketMatchDetailView: View {
 
     // MARK: - Data
 
+    private var scoring: CricketScoring { CricketScoring(matchFormat: match.matchFormat) }
+
     private var boards: [UUID: CricketPlayerBoard] {
-        CricketBoardBuilder.build(players: match.players)
+        CricketBoardBuilder.build(players: match.players, scoring: scoring)
     }
 
     private func playerIndex(of player: MatchPlayer) -> Int {
@@ -67,7 +69,9 @@ struct CricketMatchDetailView: View {
         }
         return match.players.sorted { lhs, rhs in
             if isWinner(lhs) != isWinner(rhs) { return isWinner(lhs) }
-            return (boards[lhs.id]?.points ?? 0) > (boards[rhs.id]?.points ?? 0)
+            let left = boards[lhs.id]?.points ?? 0
+            let right = boards[rhs.id]?.points ?? 0
+            return scoring == .cutThroat ? left < right : left > right
         }
     }
 
@@ -118,10 +122,19 @@ struct CricketMatchDetailView: View {
 
     private var standingsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Final standings")
-                .font(.system(.headline, design: .rounded))
-                .fontWeight(.semibold)
-                .foregroundColor(AppColor.justWhite)
+            HStack {
+                Text("Final standings")
+                    .font(.system(.headline, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppColor.justWhite)
+                Spacer()
+                if scoring == .cutThroat {
+                    Text("Cut-Throat")
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColor.textSecondary)
+                }
+            }
 
             ForEach(Array(standings.enumerated()), id: \.element.id) { position, player in
                 HStack(spacing: 12) {
