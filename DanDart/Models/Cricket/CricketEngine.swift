@@ -8,6 +8,8 @@
 //  score the target's value, but only while at least one opponent has not closed it.
 //  A target everyone has closed is dead. Win by closing all seven targets while your
 //  points are at least every opponent's.
+//  Cut-Throat: overflow points go to each opponent who has not closed the target, and the
+//  winner is whoever has closed everything with points at or below every opponent's.
 //
 
 import Foundation
@@ -124,6 +126,7 @@ struct CricketOutcome: Equatable {
     var pointsScored = 0
     var closedTarget = false
     var targetBecameDead = false
+    /// In Cut-Throat the winner may not be the thrower: a dart can push an opponent past an earlier closer.
     var won = false
 }
 

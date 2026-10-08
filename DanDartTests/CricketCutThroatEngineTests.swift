@@ -71,6 +71,19 @@ struct CricketCutThroatEngineTests {
         #expect(r.state.points(for: g.ids[0]) == 0)
     }
 
+    @Test func overflowFeedsEveryOpenOpponentInAFourPlayerGameAndSkipsTheClosedOne() {
+        var g = game(4)
+        close(&g.state, g.ids[0], targets: [.twenty])
+        close(&g.state, g.ids[3], targets: [.twenty])
+        let r = throwDart(g.state, .twenty, 2)
+
+        #expect(r.state.points(for: g.ids[0]) == 0)
+        #expect(r.state.points(for: g.ids[1]) == 40)
+        #expect(r.state.points(for: g.ids[2]) == 40)
+        #expect(r.state.points(for: g.ids[3]) == 0)
+        #expect(r.outcome.pointsScored == 40)
+    }
+
     @Test func nothingScoresOnADeadTarget() {
         var g = game(3)
         for id in g.ids { close(&g.state, id, targets: [.twenty]) }
@@ -155,6 +168,7 @@ struct CricketCutThroatEngineTests {
         g.state.pointTotals[g.ids[2]] = 30
         g.state.markCounts[g.ids[2]]![.fifteen] = 3
         g.state.currentPlayerIndex = 2
+        #expect(g.state.winnerId == nil)
 
         let r = throwDart(g.state, .fifteen, 1)
 
@@ -163,18 +177,53 @@ struct CricketCutThroatEngineTests {
         #expect(r.outcome.won)
     }
 
-    @Test func theThrowerWinsWhenSeveralPlayersQualifyAtOnce() {
-        var g = game(3)
-        close(&g.state, g.ids[0])                                     // Anna: closed all, 10 points
-        close(&g.state, g.ids[2], targets: everythingButTwenty)       // Cara about to close the last one
-        g.state.pointTotals[g.ids[0]] = 10
-        g.state.pointTotals[g.ids[1]] = 20
-        g.state.pointTotals[g.ids[2]] = 10
+    @Test func whenSeveralNonThrowersQualifyTheFirstInThrowingOrderWins() {
+        // Anna (0) and Dan (3) both closed everything on 20 points while Ben (1) was on 10,
+        // so neither won. Cara (2) throws, has closed 15, and scores 15 on Ben (open on 15):
+        // Ben goes 10 -> 25. Now Anna (20 <= 20, 25, 30) and Dan (20 <= 20, 25, 30) both
+        // qualify and Cara has not closed everything, so Anna wins as the earlier thrower.
+        var g = game(4)
+        close(&g.state, g.ids[0])
+        close(&g.state, g.ids[3])
+        close(&g.state, g.ids[2], targets: [.fifteen])
+        g.state.pointTotals[g.ids[0]] = 20
+        g.state.pointTotals[g.ids[1]] = 10
+        g.state.pointTotals[g.ids[2]] = 30
+        g.state.pointTotals[g.ids[3]] = 20
         g.state.currentPlayerIndex = 2
+        #expect(g.state.winnerId == nil)
+
+        let r = throwDart(g.state, .fifteen, 1)
+
+        #expect(r.state.points(for: g.ids[1]) == 25)
+        #expect(r.state.winnerId == g.ids[0])
+        #expect(r.outcome.won)
+    }
+
+    @Test func theThrowerWinsOverAnEarlierPlayerWhoQualifiesOnTheSameDart() {
+        // Anna (0) closed everything on 20 points while Ben (1) was on 10, so she did not win.
+        // Cara (2) has closed everything except 20 (two marks) and is on 20 points. She
+        // throws a treble 20: one mark closes it, two are overflow = 40 to Ben (the only
+        // opponent open on 20; Anna is closed), so Ben goes 10 -> 50.
+        // Cara: closed all, 20 <= min(Anna 20, Ben 50) -> qualifies.
+        // Anna: closed all, 20 <= min(Ben 50, Cara 20) -> also qualifies.
+        // Both qualify; the thrower is checked first, so Cara wins, not Anna.
+        var g = game(3)
+        close(&g.state, g.ids[0])
+        close(&g.state, g.ids[2], targets: everythingButTwenty)
+        g.state.markCounts[g.ids[2]]![.twenty] = 2
+        g.state.pointTotals[g.ids[0]] = 20
+        g.state.pointTotals[g.ids[1]] = 10
+        g.state.pointTotals[g.ids[2]] = 20
+        g.state.currentPlayerIndex = 2
+        #expect(g.state.winnerId == nil)
 
         let r = throwDart(g.state, .twenty, 3)
 
+        #expect(r.state.points(for: g.ids[1]) == 50)
+        #expect(r.state.hasClosedAll(g.ids[0]))
         #expect(r.state.winnerId == g.ids[2])
+        #expect(r.outcome.won)
     }
 
     // MARK: - placements
