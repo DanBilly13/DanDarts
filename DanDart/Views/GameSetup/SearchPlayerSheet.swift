@@ -224,10 +224,8 @@ struct SearchPlayerSheet: View {
                 toggleSelection(player)
                 // Reload guest players to show the newly added one
                 loadGuestPlayers()
-                // AddGuestPlayerView dismisses itself, so we also dismiss the SearchPlayerSheet
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    dismiss()
-                }
+                // AddGuestPlayerView dismisses itself. This sheet stays open, with the new guest
+                // selected, so several guests can be added in a row; Done closes it.
             }
         }
     }
