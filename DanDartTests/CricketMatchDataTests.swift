@@ -111,4 +111,61 @@ struct CricketMatchDataTests {
         #expect(CricketBoardBuilder.hasData(in: [without]) == false)
         #expect(CricketBoardBuilder.hasData(in: []) == false)
     }
+
+    // MARK: - Cut-Throat board
+
+    @Test func cutThroatPointsLandOnOpponentsWhoWereOpenAtThatMoment() {
+        // Round 1: A closes 20, B closes 20. Round 2: A scores 20 on 20 (only C is open),
+        // then C closes 20. Round 3: A scores 20 again; nobody is open any more.
+        let a = player("A", turns: [
+            [dart(20, marks: 3, added: 3)],
+            [dart(20, marks: 1, added: 0, points: 20)],
+            [dart(20, marks: 1, added: 0, points: 0)]
+        ])
+        let b = player("B", turns: [
+            [dart(20, marks: 3, added: 3)],
+            [dart(nil, marks: 0, added: 0)],
+            [dart(nil, marks: 0, added: 0)]
+        ])
+        let c = player("C", turns: [
+            [dart(nil, marks: 0, added: 0)],
+            [dart(20, marks: 3, added: 3)],
+            [dart(nil, marks: 0, added: 0)]
+        ])
+
+        let boards = CricketBoardBuilder.build(players: [a, b, c], scoring: .cutThroat)
+
+        #expect(boards[a.id]?.points == 0)
+        #expect(boards[b.id]?.points == 0)
+        #expect(boards[c.id]?.points == 20)
+        #expect(boards[a.id]?.marks(on: .twenty) == 3)
+        #expect(boards[c.id]?.marks(on: .twenty) == 3)
+    }
+
+    @Test func cutThroatGivesTheSamePointsToEveryOpenOpponent() {
+        let a = player("A", turns: [
+            [dart(19, marks: 3, added: 3)],
+            [dart(19, marks: 2, added: 0, points: 38)]
+        ])
+        let b = player("B", turns: [[dart(nil, marks: 0, added: 0)], [dart(nil, marks: 0, added: 0)]])
+        let c = player("C", turns: [[dart(nil, marks: 0, added: 0)], [dart(nil, marks: 0, added: 0)]])
+
+        let boards = CricketBoardBuilder.build(players: [a, b, c], scoring: .cutThroat)
+
+        #expect(boards[a.id]?.points == 0)
+        #expect(boards[b.id]?.points == 38)
+        #expect(boards[c.id]?.points == 38)
+    }
+
+    @Test func standardBoardStillCreditsTheThrower() {
+        let a = player("A", turns: [[dart(20, marks: 3, added: 3), dart(20, marks: 1, added: 0, points: 20)]])
+        let b = player("B", turns: [[dart(nil, marks: 0, added: 0)]])
+
+        let boards = CricketBoardBuilder.build(players: [a, b], scoring: .standard)
+        let defaultBoards = CricketBoardBuilder.build(players: [a, b])
+
+        #expect(boards[a.id]?.points == 20)
+        #expect(boards[b.id]?.points == 0)
+        #expect(defaultBoards[a.id]?.points == 20)
+    }
 }
