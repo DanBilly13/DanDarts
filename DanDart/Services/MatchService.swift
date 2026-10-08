@@ -15,8 +15,10 @@ struct MatchRecord: Codable {
     let started_at: String
     let ended_at: String
     let winner_id: String?
+    // History reads this top-level column; metadata.match_format is kept for compatibility.
+    let match_format: Int
     let metadata: MatchMetadata
-    
+
     // Legacy columns for backward compatibility
     let game_type: String
     let game_name: String
@@ -220,6 +222,7 @@ class MatchService: ObservableObject {
             started_at: ISO8601DateFormatter().string(from: startedAt),
             ended_at: ISO8601DateFormatter().string(from: endedAt),
             winner_id: MatchSaveRules.memberWinnerId(winnerId: winnerId, players: playersToSave)?.uuidString,
+            match_format: matchFormat,
             metadata: MatchMetadata(
                 match_format: matchFormat,
                 legs_won: legsWon.mapKeys { $0.uuidString },
