@@ -29,7 +29,7 @@ struct PreGameHypeView: View {
         } else if let lives = killerLives {
             router.push(.killerGameplay(game: game, players: players, startingLives: lives))
         } else if game.title == "Cricket" {
-            router.push(.cricketGameplay(game: game, players: players))
+            router.push(.cricketGameplay(game: game, players: players, matchFormat: matchFormat))
         } else {
             router.push(.countdownGameplay(game: game, players: players, matchFormat: matchFormat))
         }

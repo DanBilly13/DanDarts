@@ -11,6 +11,8 @@ import SwiftUI
 struct CricketGameplayView: View {
     let game: Game
     let players: [Player]
+    let matchFormat: Int
+    private let scoring: CricketScoring
 
     @StateObject private var viewModel: CricketViewModel
     @EnvironmentObject private var router: Router
@@ -19,10 +21,13 @@ struct CricketGameplayView: View {
     @State private var showInstructions = false
     @State private var showExitConfirmation = false
 
-    init(game: Game, players: [Player]) {
+    init(game: Game, players: [Player], matchFormat: Int = 1) {
         self.game = game
         self.players = players
-        _viewModel = StateObject(wrappedValue: CricketViewModel(players: players))
+        self.matchFormat = matchFormat
+        let scoring = CricketScoring(matchFormat: matchFormat)
+        self.scoring = scoring
+        _viewModel = StateObject(wrappedValue: CricketViewModel(players: players, scoring: scoring))
     }
 
     private var boardColumns: [CricketBoardColumn] {
@@ -137,10 +142,17 @@ struct CricketGameplayView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text(game.title)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(AppColor.justWhite)
+                VStack(spacing: 2) {
+                    Text(game.title)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColor.justWhite)
+                    if scoring == .cutThroat {
+                        Text("Cut-Throat")
+                            .font(.caption)
+                            .foregroundColor(AppColor.textSecondary)
+                    }
+                }
             }
 
             ToolbarItem(placement: .topBarTrailing) {
@@ -184,7 +196,7 @@ struct CricketGameplayView: View {
                     players: viewModel.players,
                     onPlayAgain: {
                         router.pop()
-                        router.push(.preGameHype(game: game, players: players, matchFormat: 1))
+                        router.push(.preGameHype(game: game, players: players, matchFormat: matchFormat))
                     },
                     onBackToGames: {
                         router.popToRoot()
