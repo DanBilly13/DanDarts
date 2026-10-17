@@ -148,7 +148,7 @@ struct PermissionsOnboardingView: View {
         // 1. Notifications: only request if user left toggle on
         if notificationsIntent {
             do {
-                try await NotificationService.shared.setNotificationsEnabled(true)
+                try await NotificationService.shared.setNotificationsEnabled(true, source: "onboarding")
                 print("✅ [PermissionsOnboarding] Notifications enabled")
             } catch NotificationService.NotificationError.permissionDenied {
                 print("ℹ️ [PermissionsOnboarding] Notifications permission denied by user")

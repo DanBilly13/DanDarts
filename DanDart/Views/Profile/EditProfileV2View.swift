@@ -237,6 +237,7 @@ struct EditProfileV2View: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
         }
+        .trackScreen("EditProfile")
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

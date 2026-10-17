@@ -215,6 +215,7 @@ struct HalveItGameplayView: View {
         .alert("Exit Game", isPresented: $showExitAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Leave Game", role: .destructive) {
+                viewModel.logGameAbandoned()
                 router.popToRoot()
             }
         } message: {

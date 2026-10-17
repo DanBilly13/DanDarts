@@ -702,6 +702,7 @@ class RemoteMatchService: ObservableObject {
             }
             
             print("✅ Challenge created: \(matchId)")
+            AnalyticsService.shared.logRemoteChallengeSent(gameType: gameType, matchFormat: matchFormat, isRematch: isReplay)
             
             return matchId
         } catch {
@@ -963,6 +964,7 @@ class RemoteMatchService: ObservableObject {
             ))
         
         print("✅ Challenge accepted: \(matchId)")
+        AnalyticsService.shared.logRemoteChallengeAccepted()
     }
     
     // MARK: - Enter Lobby
@@ -1184,6 +1186,9 @@ class RemoteMatchService: ObservableObject {
         // Log request details
         print("🔍 [cancelChallenge] match=\(matchId.uuidString.prefix(8)) auth=yes")
         
+        // Same edge function for both; a pending incoming challenge is a decline, anything else is the sender cancelling.
+        let isDecline = pendingChallenges.contains(where: { $0.match.id == matchId })
+        
         do {
             let _: EmptyResponse = try await supabaseService.client.functions
                 .invoke("cancel-match", options: FunctionInvokeOptions(
@@ -1192,6 +1197,11 @@ class RemoteMatchService: ObservableObject {
                 ))
             
             print("✅ [CancelChallenge] Challenge cancelled: \(matchId)")
+            if isDecline {
+                AnalyticsService.shared.logRemoteChallengeDeclined()
+            } else {
+                AnalyticsService.shared.logRemoteChallengeCancelled()
+            }
             
             // Immediate local cleanup - remove from all published arrays
             await MainActor.run {

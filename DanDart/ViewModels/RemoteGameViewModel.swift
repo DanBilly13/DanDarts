@@ -889,7 +889,8 @@ class RemoteGameViewModel: ObservableObject {
             winnerType: winnerType,
             durationSeconds: Int(matchDuration),
             totalThrows: totalThrows,
-            matchFormat: matchFormat
+            matchFormat: matchFormat,
+            isRemote: true
         )
         
         // Capture current user ID before entering Task (to avoid race conditions)

@@ -45,12 +45,42 @@ final class CricketViewModel: ObservableObject {
     private var dartSnapshots: [CricketState] = []
     private var playerTurnHistory: [UUID: [MatchTurn]] = [:]
 
+    private let analytics = AnalyticsService.shared
+
     init(players: [Player], scoring: CricketScoring = .standard, shuffle: Bool = true, persistsMatch: Bool = true) {
         let order = shuffle ? players.shuffled() : players
         self.players = order
         self.scoring = scoring
         self.state = CricketState(playerIds: order.map(\.id), scoring: scoring)
         self.persistsMatch = persistsMatch
+        
+        logGameStarted()
+    }
+    
+    // MARK: - Analytics
+    
+    private func logGameStarted() {
+        analytics.logGameStarted(
+            gameType: "cricket",
+            playerCount: players.count,
+            hasGuests: players.contains(where: { $0.userId == nil }),
+            matchFormat: scoring.matchFormat
+        )
+    }
+    
+    private func logGameCompleted(winner: Player, matchResult: MatchResult) {
+        analytics.logGameCompleted(
+            gameType: "cricket",
+            winnerType: winner.userId != nil ? "user" : "guest",
+            durationSeconds: Int(Date().timeIntervalSince(startedAt)),
+            totalThrows: matchResult.players.reduce(0) { $0 + $1.totalDartsThrown },
+            matchFormat: scoring.matchFormat
+        )
+    }
+    
+    /// The player chose to leave through the menu before the match finished.
+    func logGameAbandoned() {
+        analytics.logGameAbandoned(gameType: "cricket", playerCount: players.count)
     }
 
     // MARK: - Derived
@@ -227,6 +257,7 @@ final class CricketViewModel: ObservableObject {
         guard let payload = makeMatchPayload(), let winner else { return }
         let matchResult = payload.matchResult
         let winnerMatchId = matchPlayerId(for: winner)
+        logGameCompleted(winner: winner, matchResult: matchResult)
 
         MatchStorageManager.shared.saveMatch(matchResult)
         MatchStorageManager.shared.updatePlayerStats(for: matchResult.players, winnerId: winnerMatchId)

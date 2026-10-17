@@ -63,6 +63,11 @@ class HalveItViewModel: ObservableObject {
         currentThrow.count == 3
     }
     
+
+    private let analytics = AnalyticsService.shared
+    /// Only for analytics durations; reset when the game restarts.
+    private var analyticsStartedAt = Date()
+
     // MARK: - Initialization
     init(players: [Player], difficulty: HalveItDifficulty, gameId: UUID) {
         // Randomize player order for fair play
@@ -76,6 +81,33 @@ class HalveItViewModel: ObservableObject {
         for player in self.players {
             playerScores[player.id] = 50
         }
+        
+        logGameStarted()
+    }
+    
+    // MARK: - Analytics
+    
+    private func logGameStarted() {
+        analytics.logGameStarted(
+            gameType: "halve_it",
+            playerCount: players.count,
+            hasGuests: players.contains(where: { $0.userId == nil }),
+            matchFormat: (HalveItDifficulty.allCases.firstIndex(of: difficulty) ?? 0)
+        )
+    }
+    
+    private func logGameCompleted(winner: Player) {
+        analytics.logGameCompleted(
+            gameType: "halve_it",
+            winnerType: winner.userId != nil ? "user" : "guest",
+            durationSeconds: Int(Date().timeIntervalSince(analyticsStartedAt)),
+            matchFormat: (HalveItDifficulty.allCases.firstIndex(of: difficulty) ?? 0)
+        )
+    }
+    
+    /// The player chose to leave through the menu before the match finished.
+    func logGameAbandoned() {
+        analytics.logGameAbandoned(gameType: "halve_it", playerCount: players.count)
     }
     
     // MARK: - Dart Input
@@ -279,6 +311,7 @@ class HalveItViewModel: ObservableObject {
     /// Save match result to local storage and Supabase
     private func saveMatchResult() {
         guard let winner = winner else { return }
+        logGameCompleted(winner: winner)
         
         // Create match players with final scores
         let matchPlayers = players.map { player in
@@ -429,6 +462,8 @@ class HalveItViewModel: ObservableObject {
     // MARK: - Game Reset
     
     func resetGame() {
+        logGameStarted()
+        analyticsStartedAt = Date()
         currentPlayerIndex = 0
         currentRound = 0
         currentThrow.removeAll()

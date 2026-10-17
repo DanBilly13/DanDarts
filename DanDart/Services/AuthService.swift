@@ -907,6 +907,7 @@ class AuthService: ObservableObject {
         }
         
         // Account is deleted server-side. Clear local caches and session state.
+        AnalyticsService.shared.logAccountDeleted()
         FriendRequestToastManager.shared.clearAll()
         NotificationService.shared.resetLoadedState()
         MatchStorageManager.shared.deleteAllMatches()
