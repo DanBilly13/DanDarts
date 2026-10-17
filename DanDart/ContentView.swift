@@ -20,10 +20,12 @@ struct ContentView: View {
                     // User is in password reset flow - show password change screen
                     ChangePasswordView()
                         .environmentObject(authService)
+                        .trackScreen("ChangePassword")
                 } else if authService.isAuthenticated && authService.needsPermissionsOnboarding {
                     // New sign-up has completed profile setup; show one-time permissions screen
                     PermissionsOnboardingView()
                         .environmentObject(authService)
+                        .trackScreen("PermissionsOnboarding")
                 } else if authService.isAuthenticated {
                     // User is authenticated - show main app
                     MainTabView()
@@ -32,10 +34,12 @@ struct ContentView: View {
                     // User signed up but needs to complete profile setup
                     ProfileSetupView()
                         .environmentObject(authService)
+                        .trackScreen("ProfileSetup")
                 } else {
                     // User is not authenticated - show splash/auth flow
                     SplashView()
                         .environmentObject(authService)
+                        .trackScreen("Welcome")
                 }
             }
         }

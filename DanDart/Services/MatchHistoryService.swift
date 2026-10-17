@@ -131,6 +131,7 @@ class MatchHistoryService: ObservableObject {
         } catch {
             isLoading = false
             loadError = "Couldn't sync with cloud"
+            AnalyticsService.shared.logHistoryRemoteRefreshFailed()
             // print("❌ Refresh error: \(error)")
             
             // Fall back to local matches on error
@@ -395,6 +396,7 @@ class MatchHistoryService: ObservableObject {
         } catch {
             isLoading = false
             loadError = "Couldn't sync with cloud"
+            AnalyticsService.shared.logHistoryRemoteRefreshFailed()
             // print("❌ Refresh summaries error: \(error)")
         }
     }

@@ -93,6 +93,9 @@ class SuddenDeathViewModel: ObservableObject {
     
     // MARK: - Initialization
     
+
+    private let analytics = AnalyticsService.shared
+
     init(players: [Player], startingLives: Int) {
         // Randomize player order for fair play
         self.players = players.shuffled()
@@ -106,6 +109,33 @@ class SuddenDeathViewModel: ObservableObject {
         
         // Start with first active player
         currentPlayerIndex = 0
+        
+        logGameStarted()
+    }
+    
+    // MARK: - Analytics
+    
+    private func logGameStarted() {
+        analytics.logGameStarted(
+            gameType: "sudden_death",
+            playerCount: players.count,
+            hasGuests: players.contains(where: { $0.userId == nil }),
+            matchFormat: startingLives
+        )
+    }
+    
+    private func logGameCompleted(winner: Player) {
+        analytics.logGameCompleted(
+            gameType: "sudden_death",
+            winnerType: winner.userId != nil ? "user" : "guest",
+            durationSeconds: Int(Date().timeIntervalSince(matchStartTime)),
+            matchFormat: startingLives
+        )
+    }
+    
+    /// The player chose to leave through the menu before the match finished.
+    func logGameAbandoned() {
+        analytics.logGameAbandoned(gameType: "sudden_death", playerCount: players.count)
     }
     
     // MARK: - Game Actions
@@ -388,6 +418,7 @@ class SuddenDeathViewModel: ObservableObject {
     }
     
     func restartGame() {
+        logGameStarted()
         // Reset lives and state, keep player order
         for player in players {
             playerLives[player.id] = startingLives
@@ -485,6 +516,7 @@ class SuddenDeathViewModel: ObservableObject {
             return
         }
         hasBeenSaved = true
+        logGameCompleted(winner: winner)
         
         let duration = Date().timeIntervalSince(matchStartTime)
         

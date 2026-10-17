@@ -59,6 +59,13 @@ struct SettingsView: View {
         .background(AppColor.surfacePrimary)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("Settings")
+        .onChange(of: soundManager.soundEffectsEnabled) { _, newValue in
+            AnalyticsService.shared.logSettingsChanged(settingName: "sound_effects", enabled: newValue)
+        }
+        .onChange(of: gameplaySettings.autoSaveEnabled) { _, newValue in
+            AnalyticsService.shared.logSettingsChanged(settingName: "auto_save", enabled: newValue)
+        }
         .task {
             voicePermissionManager.logState("settings task")
             // Re-read every time Settings appears, not just the first time: the token can be
@@ -268,6 +275,7 @@ struct SettingsView: View {
                         isOn: Binding(
                             get: { notificationService.notificationsEnabled },
                             set: { newValue in
+                                AnalyticsService.shared.logSettingsChanged(settingName: "notifications", enabled: newValue)
                                 Task {
                                     do {
                                         try await notificationService.setNotificationsEnabled(newValue)
@@ -463,6 +471,7 @@ struct SettingsView: View {
                     get: { voicePermissionManager.isVoiceEnabledInApp },
                     set: { newValue in
                         print("🎤 [Settings] Voice Chat toggle set to: \(newValue)")
+                        AnalyticsService.shared.logSettingsChanged(settingName: "voice_chat", enabled: newValue)
                         voicePermissionManager.setVoiceEnabled(newValue)
                     }
                 ))

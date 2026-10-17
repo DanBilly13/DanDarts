@@ -281,7 +281,7 @@ struct ProfileSetupView: View {
             
             // Log profile setup completed event
             let hasAvatar = selectedAvatarImage != nil
-            let signupMethod = authService.currentUser?.email?.contains("@") == true ? "email" : "google"
+            let signupMethod = authService.currentUser?.authProvider?.rawValue ?? "email"
             analytics.logProfileSetupCompleted(hasAvatar: hasAvatar, signupMethod: signupMethod)
             
             // Navigate to main app

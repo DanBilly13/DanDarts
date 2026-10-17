@@ -244,6 +244,7 @@ struct CountdownGameplayView: View {
             .alert("Exit Game", isPresented: $showExitAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Leave Game", role: .destructive) {
+                    gameViewModel.logGameAbandoned()
                     // Pop to root (games list)
                     router.popToRoot()
                 }

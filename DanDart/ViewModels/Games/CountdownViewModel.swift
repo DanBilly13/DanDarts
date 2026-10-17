@@ -208,15 +208,25 @@ class CountdownViewModel: ObservableObject {
             legsWon[player.id] = 0
         }
         
-        // Log game started event
-        let gameType = game.title.contains("301") ? "301" : "501"
-        let hasGuests = players.contains(where: { $0.userId == nil })
+        logGameStarted()
+    }
+    
+    // MARK: - Analytics
+    
+    private var analyticsGameType: String { game.title.contains("301") ? "301" : "501" }
+    
+    private func logGameStarted() {
         analytics.logGameStarted(
-            gameType: gameType,
+            gameType: analyticsGameType,
             playerCount: players.count,
-            hasGuests: hasGuests,
+            hasGuests: players.contains(where: { $0.userId == nil }),
             matchFormat: matchFormat
         )
+    }
+    
+    /// The player chose to leave through the menu before the match finished.
+    func logGameAbandoned() {
+        analytics.logGameAbandoned(gameType: analyticsGameType, playerCount: players.count)
     }
     
     // MARK: - Game Actions
@@ -555,6 +565,7 @@ class CountdownViewModel: ObservableObject {
     
     /// Restart the game with same players
     func restartGame() {
+        logGameStarted()
         // Reset all scores
         for player in players {
             playerScores[player.id] = startingScore

@@ -93,6 +93,9 @@ class KnockoutViewModel: ObservableObject {
     
     // MARK: - Initialization
     
+
+    private let analytics = AnalyticsService.shared
+
     init(players: [Player], startingLives: Int) {
         // Store original player order for consistent color assignment
         self.originalPlayerOrder = players
@@ -110,6 +113,33 @@ class KnockoutViewModel: ObservableObject {
         // First player is automatically player to beat
         playerToBeatIndex = 0
         scoreToBeat = 0
+        
+        logGameStarted()
+    }
+    
+    // MARK: - Analytics
+    
+    private func logGameStarted() {
+        analytics.logGameStarted(
+            gameType: "knockout",
+            playerCount: players.count,
+            hasGuests: players.contains(where: { $0.userId == nil }),
+            matchFormat: startingLives
+        )
+    }
+    
+    private func logGameCompleted(winner: Player) {
+        analytics.logGameCompleted(
+            gameType: "knockout",
+            winnerType: winner.userId != nil ? "user" : "guest",
+            durationSeconds: Int(Date().timeIntervalSince(matchStartTime)),
+            matchFormat: startingLives
+        )
+    }
+    
+    /// The player chose to leave through the menu before the match finished.
+    func logGameAbandoned() {
+        analytics.logGameAbandoned(gameType: "knockout", playerCount: players.count)
     }
     
     // MARK: - Game Actions
@@ -375,6 +405,7 @@ class KnockoutViewModel: ObservableObject {
             return
         }
         hasBeenSaved = true
+        logGameCompleted(winner: winner)
         
         // Calculate match duration
         let duration = Date().timeIntervalSince(matchStartTime)
@@ -502,6 +533,7 @@ class KnockoutViewModel: ObservableObject {
     }
     
     func restartGame() {
+        logGameStarted()
         // Reset all state
         currentPlayerIndex = 0
         playerToBeatIndex = 0

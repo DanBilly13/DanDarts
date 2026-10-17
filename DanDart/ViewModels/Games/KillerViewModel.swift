@@ -102,6 +102,10 @@ class KillerViewModel: ObservableObject {
     /// One snapshot per dart in `currentThrow`, oldest first. Cleared when the turn ends.
     private var dartSnapshots: [DartSnapshot] = []
 
+    private let analytics = AnalyticsService.shared
+    /// Only for analytics durations; reset when the game restarts.
+    private var analyticsStartedAt = Date()
+
     init(players: [Player], startingLives: Int) {
         self.players = players
         self.startingLives = startingLives
@@ -116,6 +120,33 @@ class KillerViewModel: ObservableObject {
             displayPlayerLives[player.id] = startingLives
             isKiller[player.id] = false
         }
+        
+        logGameStarted()
+    }
+    
+    // MARK: - Analytics
+    
+    private func logGameStarted() {
+        analytics.logGameStarted(
+            gameType: "killer",
+            playerCount: players.count,
+            hasGuests: players.contains(where: { $0.userId == nil }),
+            matchFormat: startingLives
+        )
+    }
+    
+    private func logGameCompleted(winner: Player) {
+        analytics.logGameCompleted(
+            gameType: "killer",
+            winnerType: winner.userId != nil ? "user" : "guest",
+            durationSeconds: Int(Date().timeIntervalSince(analyticsStartedAt)),
+            matchFormat: startingLives
+        )
+    }
+    
+    /// The player chose to leave through the menu before the match finished.
+    func logGameAbandoned() {
+        analytics.logGameAbandoned(gameType: "killer", playerCount: players.count)
     }
     
     // MARK: - Number Assignment
@@ -369,6 +400,7 @@ class KillerViewModel: ObservableObject {
     
     private func saveMatch() {
         guard let winner = winner else { return }
+        logGameCompleted(winner: winner)
         
         // Create match players with their individual turns
         let matchPlayers = players.map { player in

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 import FirebaseAnalytics
 
 class AnalyticsService {
@@ -24,20 +25,25 @@ class AnalyticsService {
         ])
     }
     
-    func logGameCompleted(gameType: String, winnerType: String, durationSeconds: Int, totalThrows: Int, matchFormat: Int = 1) {
-        Analytics.logEvent("game_completed", parameters: [
+    /// `durationSeconds` and `totalThrows` are omitted when unknown (e.g. remote matches have no client-side start time).
+    /// `isRemote` is always sent so remote and local matches can be told apart; Android logs the same parameters.
+    func logGameCompleted(gameType: String, winnerType: String, durationSeconds: Int? = nil, totalThrows: Int? = nil, matchFormat: Int = 1, isRemote: Bool = false) {
+        var parameters: [String: Any] = [
             "game_type": gameType,
             "winner_type": winnerType,
-            "duration_seconds": durationSeconds,
-            "total_throws": totalThrows,
-            "match_format": matchFormat
-        ])
+            "match_format": matchFormat,
+            "is_remote": isRemote
+        ]
+        if let durationSeconds { parameters["duration_seconds"] = durationSeconds }
+        if let totalThrows { parameters["total_throws"] = totalThrows }
+        Analytics.logEvent("game_completed", parameters: parameters)
     }
     
-    func logGameAbandoned(gameType: String, progressPercentage: Int, reason: String) {
+    /// The player left a match through the menu before it finished. Android logs the same event and parameters.
+    func logGameAbandoned(gameType: String, playerCount: Int, reason: String = "quit") {
         Analytics.logEvent("game_abandoned", parameters: [
             "game_type": gameType,
-            "progress_percentage": progressPercentage,
+            "player_count": playerCount,
             "reason": reason
         ])
     }
@@ -84,10 +90,53 @@ class AnalyticsService {
         ])
     }
     
-    func logSettingsChanged(settingName: String) {
+    func logSettingsChanged(settingName: String, enabled: Bool) {
         Analytics.logEvent("settings_changed", parameters: [
-            "setting_name": settingName
+            "setting_name": settingName,
+            "enabled": enabled
         ])
+    }
+    
+    /// The cross-device history refresh failed (the user sees "Couldn't sync with cloud").
+    func logHistoryRemoteRefreshFailed() {
+        Analytics.logEvent("history_remote_refresh_failed", parameters: nil)
+    }
+    
+    /// Result of the OS notification prompt; `source` is where it was shown ("onboarding" or "settings").
+    func logNotificationPermission(granted: Bool, source: String) {
+        Analytics.logEvent("notification_permission", parameters: [
+            "granted": granted,
+            "source": source
+        ])
+    }
+    
+    func logAccountDeleted() {
+        Analytics.logEvent("account_deleted", parameters: nil)
+    }
+    
+    // MARK: - Remote Match Events
+    
+    /// Remote challenges are named "Remote 301"/"Remote 501" in places; Android and the game_* events use "301"/"501".
+    func logRemoteChallengeSent(gameType: String, matchFormat: Int, isRematch: Bool) {
+        Analytics.logEvent("remote_challenge_sent", parameters: [
+            "game_type": gameType.replacingOccurrences(of: "Remote ", with: ""),
+            "match_format": matchFormat,
+            "is_rematch": isRematch
+        ])
+    }
+    
+    func logRemoteChallengeAccepted() {
+        Analytics.logEvent("remote_challenge_accepted", parameters: nil)
+    }
+    
+    /// The receiver turning down a pending challenge.
+    func logRemoteChallengeDeclined() {
+        Analytics.logEvent("remote_challenge_declined", parameters: nil)
+    }
+    
+    /// The sender withdrawing a challenge that hasn't started.
+    func logRemoteChallengeCancelled() {
+        Analytics.logEvent("remote_challenge_cancelled", parameters: nil)
     }
     
     // MARK: - Onboarding Events
@@ -108,10 +157,19 @@ class AnalyticsService {
     
     // MARK: - Screen View Events
     
-    func logScreenView(screenName: String, screenClass: String) {
+    /// Screen names match Android's route names (GamesList, FriendsList, RemoteTab, History, Settings, ...) so both platforms chart together.
+    func logScreenView(screenName: String, screenClass: String = "SwiftUI") {
         Analytics.logEvent(AnalyticsEventScreenView, parameters: [
             AnalyticsParameterScreenName: screenName,
             AnalyticsParameterScreenClass: screenClass
         ])
+    }
+}
+
+extension View {
+    /// Logs a `screen_view` each time this view appears. Firebase's automatic screen reporting is turned off in Info.plist
+    /// because SwiftUI reports every screen as the same hosting controller.
+    func trackScreen(_ name: String) -> some View {
+        onAppear { AnalyticsService.shared.logScreenView(screenName: name) }
     }
 }

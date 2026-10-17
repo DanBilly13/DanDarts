@@ -41,6 +41,13 @@ struct MainTabView: View {
 
     @State private var inviteTokenToClaim: InviteTokenToClaim? = nil
     
+    /// Same screen names as Android's routes, so both platforms chart together.
+    private func logTabScreen(_ tab: Int) {
+        let names = ["GamesList", "FriendsList", "RemoteTab", "History"]
+        guard tab < names.count else { return }
+        AnalyticsService.shared.logScreenView(screenName: names[tab])
+    }
+    
     private var rootNavTitle: String {
         switch selectedTab {
         case 0: return "Games"
@@ -365,7 +372,9 @@ struct MainTabView: View {
                 }
             }
         }
+        .onAppear { logTabScreen(selectedTab) }
         .onChange(of: selectedTab) { oldValue, newValue in
+            logTabScreen(newValue)
             // Update toast suppression based on selected tab
             // Tab 1 = Friends tab, suppress requestReceived toasts there
             toastManager.suppressRequestReceivedToasts = (newValue == 1)

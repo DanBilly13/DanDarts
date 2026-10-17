@@ -436,7 +436,8 @@ class NotificationService: NSObject, ObservableObject {
     }
     
     /// Toggle notifications on/off (called from Settings UI)
-    func setNotificationsEnabled(_ enabled: Bool) async throws {
+    /// `source` is only for analytics: where the OS permission prompt was triggered from.
+    func setNotificationsEnabled(_ enabled: Bool, source: String = "settings") async throws {
         guard !isTogglingNotifications else {
             print("🔔[NOTIF] toggle skip - already in progress")
             return
@@ -487,6 +488,7 @@ class NotificationService: NSObject, ObservableObject {
                 
                 // Check result
                 await checkAuthorizationStatus()
+                AnalyticsService.shared.logNotificationPermission(granted: authorizationStatus == .authorized, source: source)
                 if authorizationStatus == .authorized {
                     await activateCurrentDeviceToken()
                     notificationsEnabled = true

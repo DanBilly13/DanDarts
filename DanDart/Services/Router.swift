@@ -184,6 +184,7 @@ class Router: ObservableObject {
         lastNavTime = now
         
         print("[Router] push(.\(destinationType)) @ \(file):\(line)")
+        AnalyticsService.shared.logScreenView(screenName: screenName(for: destination))
         pushClosure?(destination)
     }
     
@@ -288,6 +289,21 @@ class Router: ObservableObject {
     }
     
     // MARK: - Helper Methods
+    
+    /// Analytics screen name; matches Android's route names, and every game's play screen is just "Gameplay" there.
+    private func screenName(for destination: Destination) -> String {
+        switch destination {
+        case .gameSetup: return "GameSetup"
+        case .preGameHype: return "PreGameHype"
+        case .countdownGameplay, .halveItGameplay, .knockoutGameplay,
+             .suddenDeathGameplay, .killerGameplay, .cricketGameplay: return "Gameplay"
+        case .remoteGameSetup: return "ChallengeFriend"
+        case .remoteLobby: return "RemoteLobby"
+        case .remoteGameplay: return "RemoteGameplay"
+        case .gameEnd: return "GameEnd"
+        case .remoteGameEnd: return "RemoteGameEnd"
+        }
+    }
     
     /// Get a human-readable name for a destination (for logging)
     private func destinationName(for destination: Destination) -> String {

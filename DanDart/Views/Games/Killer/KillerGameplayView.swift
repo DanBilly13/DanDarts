@@ -184,6 +184,7 @@ struct KillerGameplayView: View {
         .alert("Exit Game?", isPresented: $showExitConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Exit", role: .destructive) {
+                viewModel.logGameAbandoned()
                 router.popToRoot()
             }
         } message: {
