@@ -278,7 +278,7 @@ class Router: ObservableObject {
     
     /// Build the appropriate view for a given route with selectedTab binding (for remote game setup)
     @ViewBuilder
-    func view(for route: Route, selectedTab: Binding<Int>) -> some View {
+    func view(for route: Route, selectedTab: Binding<AppTab>) -> some View {
         switch route.destination {
         case .remoteGameSetup(let game, let opponent):
             RemoteGameSetupView(game: game, preselectedOpponent: opponent, selectedTab: selectedTab)
