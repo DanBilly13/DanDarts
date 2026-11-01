@@ -125,6 +125,26 @@ struct ClubPreview: Identifiable, Equatable, Decodable {
     }
 }
 
+/// What anyone holding a club's join code may see of it, Open or Invite-only (`preview_club_by_code`).
+/// Deliberately small: no members and no avatars.
+struct ClubCodePreview: Identifiable, Equatable, Decodable {
+    let id: UUID
+    let name: String
+    let town: String?
+    let visibility: ClubVisibility
+    let memberCount: Int
+    let isMember: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id = "club_id"
+        case name
+        case town
+        case visibility
+        case memberCount = "member_count"
+        case isMember = "is_member"
+    }
+}
+
 /// A member of a club the caller belongs to (`club_members_list`).
 struct ClubMember: Identifiable, Equatable, Decodable {
     let id: UUID

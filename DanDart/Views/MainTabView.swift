@@ -41,6 +41,13 @@ struct MainTabView: View {
     }
 
     @State private var inviteTokenToClaim: InviteTokenToClaim? = nil
+
+    private struct ClubCodeToJoin: Identifiable {
+        let code: String
+        var id: String { code }
+    }
+
+    @State private var clubCodeToJoin: ClubCodeToJoin? = nil
     
     private func logTabScreen(_ tab: AppTab) {
         AnalyticsService.shared.logScreenView(screenName: tab.analyticsScreenName)
@@ -299,6 +306,16 @@ struct MainTabView: View {
             InviteClaimView(token: token.token)
                 .modernSheet(title: "Invite", detents: [.medium], background: AppColor.surfacePrimary)
         }
+        .sheet(item: $clubCodeToJoin) { item in
+            JoinClubSheet(code: item.code) {
+                selectedTab = .clubs
+                router.popToRoot()
+            }
+            .modernSheet(title: "Join a club", detents: [.medium], background: AppColor.surfacePrimary)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
+            presentPendingClubCode()
+        }
         .fullScreenCover(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
@@ -336,6 +353,7 @@ struct MainTabView: View {
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
             }
+            presentPendingClubCode()
             
             // Setup realtime subscriptions on app launch if user is authenticated
             if let userId = authService.currentUser?.id {
@@ -422,6 +440,7 @@ struct MainTabView: View {
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
             }
+            presentPendingClubCode()
             
             // Setup or remove realtime subscriptions based on user state
             if let userId = newValue {
@@ -451,6 +470,13 @@ struct MainTabView: View {
         }
     }
     
+    /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).
+    private func presentPendingClubCode() {
+        guard clubCodeToJoin == nil, authService.currentUser != nil,
+              let code = PendingClubCodeStore.shared.consumeCode() else { return }
+        clubCodeToJoin = ClubCodeToJoin(code: code)
+    }
+
     private func loadPendingRequestCount() {
         print("🎯 [MainTabView] loadPendingRequestCount() called")
         print("🎯 [MainTabView] Current user: \(authService.currentUser?.id.uuidString ?? "nil")")
