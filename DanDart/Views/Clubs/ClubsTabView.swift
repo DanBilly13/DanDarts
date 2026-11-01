@@ -146,6 +146,8 @@ struct ClubsTabView: View {
             clubs = try await clubsService.myClubs()
             loadFailed = false
         } catch {
+            // Leaving the tab or a cancelled refresh isn't a failure; the task runs again on return.
+            guard !Task.isCancelled else { return }
             // Keep what is already on screen if a refresh fails.
             loadFailed = true
             print("❌ [Clubs] Failed to load my clubs: \(error)")

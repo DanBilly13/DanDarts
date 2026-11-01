@@ -50,7 +50,8 @@ struct FindClubView: View {
         .background(AppColor.backgroundPrimary)
         .navigationTitle("Find a club")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { clubsService.cancelSearch() }
+        // Searches again on the way back from Create, because leaving cleared the shared results.
+        .onAppear { clubsService.search(query: query) }
         .onDisappear { clubsService.cancelSearch() }
         .onChange(of: query) { _, newValue in
             clubsService.search(query: newValue)

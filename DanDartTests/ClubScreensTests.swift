@@ -34,6 +34,23 @@ struct ClubScreensTests {
         #expect(ClubText.subtitle(town: "", memberCount: 6, extra: "You're admin") == "6 players · You're admin")
     }
 
+    @Test func lengthLimitCountsCodePointsLikeTheDatabase() {
+        #expect(CreateClubView.clamped("abcdef", to: 4) == "abcd")
+        #expect(CreateClubView.clamped("abc", to: 4) == "abc")
+        // "é" written as e + combining accent is one character but two code points.
+        let accented = String(repeating: "e\u{0301}", count: 25)
+        #expect(accented.count == 25)
+        #expect(CreateClubView.clamped(accented, to: 40).unicodeScalars.count == 40)
+    }
+
+    @Test func clubDestinationsCompareAndHashByTheirValues() {
+        #expect(Destination.findClub == Destination.findClub)
+        #expect(Destination.createClub(name: "Crown") == Destination.createClub(name: "Crown"))
+        #expect(Destination.createClub(name: "Crown") != Destination.createClub(name: "Lion"))
+        #expect(Destination.findClub != Destination.createClub(name: ""))
+        #expect(Destination.createClub(name: "Crown").hashValue == Destination.createClub(name: "Crown").hashValue)
+    }
+
     @Test func nameNeedsThreeLettersOrNumbers() {
         #expect(CreateClubView.isValidName("The Crown"))
         #expect(CreateClubView.isValidName("501"))

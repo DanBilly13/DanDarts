@@ -24,7 +24,13 @@ struct CreateClubView: View {
     static let maxTownLength = 40
 
     init(initialName: String = "") {
-        _name = State(initialValue: String(initialName.prefix(Self.maxNameLength)))
+        _name = State(initialValue: Self.clamped(initialName, to: Self.maxNameLength))
+    }
+
+    /// The database counts code points, not characters, so an emoji-heavy name is cut the same way.
+    static func clamped(_ text: String, to limit: Int) -> String {
+        guard text.unicodeScalars.count > limit else { return text }
+        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(limit)))
     }
 
     /// The database wants at least 3 letters or numbers in the name.
@@ -83,10 +89,12 @@ struct CreateClubView: View {
         .navigationTitle("Create a club")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: name) { _, newValue in
-            if newValue.count > Self.maxNameLength { name = String(newValue.prefix(Self.maxNameLength)) }
+            let clamped = Self.clamped(newValue, to: Self.maxNameLength)
+            if clamped != newValue { name = clamped }
         }
         .onChange(of: town) { _, newValue in
-            if newValue.count > Self.maxTownLength { town = String(newValue.prefix(Self.maxTownLength)) }
+            let clamped = Self.clamped(newValue, to: Self.maxTownLength)
+            if clamped != newValue { town = clamped }
         }
         .alert("Couldn't create the club", isPresented: Binding(
             get: { errorMessage != nil },
