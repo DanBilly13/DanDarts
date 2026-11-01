@@ -59,4 +59,69 @@ struct ClubScreensTests {
         #expect(!CreateClubView.isValidName("---  ---"))
         #expect(!CreateClubView.isValidName(""))
     }
+
+    // MARK: - Club page
+
+    private func member(_ relationship: ClubRelationship, role: ClubRole = .member) -> ClubMember {
+        ClubMember(id: UUID(), displayName: "Sam", nickname: "sam", avatarURL: nil, role: role, joinedAt: Date(), relationship: relationship)
+    }
+
+    @Test func codeIsShownInTwoReadableHalves() {
+        #expect(ClubLink.displayCode("FL7K2Q") == "FL7 K2Q")
+        #expect(ClubLink.displayCode("ABC") == "ABC")
+        #expect(ClubLink.shortLink(forCode: "FL7K2Q") == "dartfreak.com/c/FL7K2Q")
+    }
+
+    @Test func leaveMessageDependsOnWhoLeaves() {
+        #expect(ClubText.leaveMessage(isAdmin: true, memberCount: 1).contains("deleted"))
+        #expect(ClubText.leaveMessage(isAdmin: false, memberCount: 1).contains("deleted"))
+        #expect(ClubText.leaveMessage(isAdmin: true, memberCount: 5).contains("admin"))
+        #expect(ClubText.leaveMessage(isAdmin: false, memberCount: 5).contains("rejoin"))
+    }
+
+    @Test func joinedTextShowsTheMonthAndYear() throws {
+        let date = try #require(Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 10, day: 15)))
+        let text = ClubText.joinedText(date)
+        #expect(text.contains("2026"))
+        #expect(!text.contains("15"))
+    }
+
+    @Test func friendCountOnlyCountsFriends() {
+        let members = [member(.friend), member(.friend), member(.requestSent), member(.none), member(.selfUser)]
+        #expect(ClubText.friendCount(in: members) == 2)
+        #expect(ClubText.friendCount(in: []) == 0)
+    }
+
+    @Test func updatingAMemberChangesOnlyTheRelationship() {
+        let original = member(.none, role: .admin)
+        let changed = original.updating(relationship: .requestSent)
+        #expect(changed.relationship == .requestSent)
+        #expect(changed.id == original.id)
+        #expect(changed.role == .admin)
+        #expect(changed.displayName == original.displayName)
+    }
+
+    @Test func updatingAClubKeepsTheRest() throws {
+        let id = try #require(UUID(uuidString: "11111111-2222-3333-4444-555555555555"))
+        let club = Club(id: id, name: "Crown", town: "Leeds", visibility: .open, memberCount: 4, joinCode: "ABC234", role: .admin, joinedAt: Date())
+        let changed = club.updating(visibility: .invite, joinCode: "XYZ567")
+        #expect(changed.visibility == .invite)
+        #expect(changed.joinCode == "XYZ567")
+        #expect(changed.memberCount == 4)
+        #expect(changed.isAdmin)
+        #expect(club.updating(memberCount: 3).memberCount == 3)
+        #expect(club.updating().joinCode == "ABC234")
+    }
+
+    @Test func clubDetailDestinationsCompareByClubId() throws {
+        let id = try #require(UUID(uuidString: "11111111-2222-3333-4444-555555555555"))
+        let other = try #require(UUID(uuidString: "99999999-2222-3333-4444-555555555555"))
+        let a = Club(id: id, name: "Crown", town: nil, visibility: .open, memberCount: 4, joinCode: "ABC234", role: .member, joinedAt: Date())
+        let sameClubLater = a.updating(memberCount: 9)
+        let b = Club(id: other, name: "Lion", town: nil, visibility: .open, memberCount: 4, joinCode: "ABC235", role: .member, joinedAt: Date())
+        #expect(Destination.clubDetail(a) == Destination.clubDetail(sameClubLater))
+        #expect(Destination.clubDetail(a).hashValue == Destination.clubDetail(sameClubLater).hashValue)
+        #expect(Destination.clubDetail(a) != Destination.clubDetail(b))
+        #expect(Destination.clubDetail(a) != Destination.findClub)
+    }
 }

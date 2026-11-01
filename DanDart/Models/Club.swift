@@ -54,6 +54,20 @@ struct Club: Identifiable, Equatable, Decodable {
 
     var isAdmin: Bool { role == .admin }
 
+    /// The same club with what an admin action changed; the rest stays as it was.
+    func updating(visibility: ClubVisibility? = nil, joinCode: String? = nil, memberCount: Int? = nil) -> Club {
+        Club(
+            id: id,
+            name: name,
+            town: town,
+            visibility: visibility ?? self.visibility,
+            memberCount: memberCount ?? self.memberCount,
+            joinCode: joinCode ?? self.joinCode,
+            role: role,
+            joinedAt: joinedAt
+        )
+    }
+
     /// The link members share. The bare domain on purpose: `www.dartfreak.com` redirects, and
     /// Apple does not follow redirects when it checks which links open the app.
     var shareURL: URL? { ClubLink.url(forCode: joinCode) }
@@ -120,6 +134,19 @@ struct ClubMember: Identifiable, Equatable, Decodable {
     let role: ClubRole
     let joinedAt: Date
     let relationship: ClubRelationship
+
+    /// The same member after the caller's friendship with them changed.
+    func updating(relationship: ClubRelationship) -> ClubMember {
+        ClubMember(
+            id: id,
+            displayName: displayName,
+            nickname: nickname,
+            avatarURL: avatarURL,
+            role: role,
+            joinedAt: joinedAt,
+            relationship: relationship
+        )
+    }
 
     enum CodingKeys: String, CodingKey {
         case id = "user_id"
@@ -243,6 +270,17 @@ enum ClubLink {
         let cleaned = String(raw.uppercased().filter { $0.isLetter || $0.isNumber })
         guard cleaned.count == codeLength, cleaned.allSatisfy({ alphabet.contains($0) }) else { return nil }
         return cleaned
+    }
+
+    /// "FL7K2Q" shown as "FL7 K2Q" so it is easy to read out loud.
+    static func displayCode(_ code: String) -> String {
+        guard code.count == codeLength else { return code }
+        return "\(code.prefix(3)) \(code.suffix(3))"
+    }
+
+    /// `dartfreak.com/c/<CODE>` without the scheme, for showing on screen.
+    static func shortLink(forCode code: String) -> String {
+        "dartfreak.com/c/\(code)"
     }
 
     /// `https://dartfreak.com/c/<CODE>`, the link members share.

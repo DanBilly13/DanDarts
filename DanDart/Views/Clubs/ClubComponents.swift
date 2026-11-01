@@ -83,6 +83,27 @@ enum ClubText {
         if let extra { parts.append(extra) }
         return parts.joined(separator: " · ")
     }
+
+    /// What the confirmation says before someone leaves, since the club's future depends on who they are.
+    static func leaveMessage(isAdmin: Bool, memberCount: Int) -> String {
+        if memberCount <= 1 {
+            return "You're the only member, so the club will be deleted."
+        }
+        if isAdmin {
+            return "The longest-standing member will become the admin."
+        }
+        return "You can rejoin later if it's an Open club, or with its link or code."
+    }
+
+    /// "Oct 2026", for the Joined figure.
+    static func joinedText(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).year())
+    }
+
+    /// How many of the listed members the caller is already friends with.
+    static func friendCount(in members: [ClubMember]) -> Int {
+        members.filter { $0.relationship == .friend }.count
+    }
 }
 
 // MARK: - My clubs row
