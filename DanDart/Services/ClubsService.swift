@@ -175,12 +175,16 @@ final class ClubsService: ObservableObject {
         return found.first?.clubDiscoverable ?? true
     }
 
+    /// Throws if no row was updated, so the switch never shows a choice that wasn't saved.
     func setDiscoverable(_ discoverable: Bool, userId: UUID) async throws {
-        try await supabaseService.client
+        let updated: [DiscoverableRow] = try await supabaseService.client
             .from("users")
             .update(["club_discoverable": discoverable])
             .eq("id", value: userId.uuidString)
+            .select("club_discoverable")
             .execute()
+            .value
+        guard !updated.isEmpty else { throw ClubsServiceError.settingNotSaved }
     }
 
     // MARK: - RPC plumbing
@@ -301,6 +305,16 @@ final class ClubsService: ObservableObject {
             case targetType = "p_target_type"
             case targetId = "p_target_id"
             case reason = "p_reason"
+        }
+    }
+}
+
+enum ClubsServiceError: LocalizedError {
+    case settingNotSaved
+
+    var errorDescription: String? {
+        switch self {
+        case .settingNotSaved: return "Your setting couldn't be saved. Please try again."
         }
     }
 }

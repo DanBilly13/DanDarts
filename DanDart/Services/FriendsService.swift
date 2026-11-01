@@ -1018,7 +1018,7 @@ enum FriendsError: LocalizedError {
     
     /// True when the database refused a request because the person hit the daily limit.
     static func isRequestLimit(_ error: Error) -> Bool {
-        "\(error)".contains("friend_request_limit") || error.localizedDescription.contains("friend_request_limit")
+        (error as? PostgrestError)?.message == "friend_request_limit"
     }
     
     var errorDescription: String? {

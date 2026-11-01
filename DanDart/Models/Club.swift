@@ -253,13 +253,14 @@ enum ClubLink {
     /// Pulls a club code out of `https://dartfreak.com/c/<code>` (also `www.`) or
     /// `dartfreak://club?code=<code>`. Nil for anything else, or an invalid code.
     static func code(from url: URL) -> String? {
-        if url.scheme == "dartfreak", url.host == "club" {
+        if url.scheme?.lowercased() == "dartfreak", url.host?.lowercased() == "club" {
             let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "code" })?.value
             return value.flatMap(normalizedCode)
         }
-        guard url.scheme == "https",
-              url.host == "dartfreak.com" || url.host == "www.dartfreak.com" else { return nil }
+        let host = url.host?.lowercased()
+        guard url.scheme?.lowercased() == "https",
+              host == "dartfreak.com" || host == "www.dartfreak.com" else { return nil }
         let parts = url.pathComponents.filter { $0 != "/" }
         guard parts.count == 2, parts[0] == "c" else { return nil }
         return normalizedCode(parts[1])

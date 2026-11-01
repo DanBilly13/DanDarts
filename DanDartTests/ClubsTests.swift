@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Supabase
 import Testing
 @testable import DanDart
 
@@ -179,6 +180,13 @@ struct ClubLinkTests {
         #expect(ClubLink.code(from: www) == "K7M2QX")
     }
 
+    @Test func hostAndSchemeCaseDoNotMatter() throws {
+        let web = try #require(URL(string: "HTTPS://DartFreak.com/c/K7M2QX"))
+        let custom = try #require(URL(string: "DartFreak://Club?code=K7M2QX"))
+        #expect(ClubLink.code(from: web) == "K7M2QX")
+        #expect(ClubLink.code(from: custom) == "K7M2QX")
+    }
+
     @Test func codeIsReadFromTheCustomScheme() throws {
         let url = try #require(URL(string: "dartfreak://club?code=k7m2qx"))
         #expect(ClubLink.code(from: url) == "K7M2QX")
@@ -205,16 +213,13 @@ struct ClubLinkTests {
 
 struct FriendRequestLimitTests {
 
-    private struct LimitError: Error, CustomStringConvertible {
-        let description: String
-    }
-
     @Test func databaseLimitMessageIsRecognised() {
-        #expect(FriendsError.isRequestLimit(LimitError(description: "PostgrestError(message: \"friend_request_limit\")")))
+        #expect(FriendsError.isRequestLimit(PostgrestError(code: "P0001", message: "friend_request_limit")))
     }
 
     @Test func otherErrorsAreNot() {
-        #expect(!FriendsError.isRequestLimit(LimitError(description: "duplicate key value")))
+        #expect(!FriendsError.isRequestLimit(PostgrestError(code: "23505", message: "duplicate key value")))
+        #expect(!FriendsError.isRequestLimit(PostgrestError(message: "not friend_request_limit exactly")))
         #expect(!FriendsError.isRequestLimit(URLError(.notConnectedToInternet)))
     }
 
