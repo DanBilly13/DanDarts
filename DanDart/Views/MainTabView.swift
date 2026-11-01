@@ -18,7 +18,7 @@ struct MainTabView: View {
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     @State private var pendingChallengeCount: Int = 0
-    @State private var selectedTab: Int = 0
+    @State private var selectedTab: AppTab = .games
     @State private var showPasswordChangeAlert = false
     @Environment(\.scenePhase) private var scenePhase
     
@@ -41,21 +41,12 @@ struct MainTabView: View {
 
     @State private var inviteTokenToClaim: InviteTokenToClaim? = nil
     
-    /// Same screen names as Android's routes, so both platforms chart together.
-    private func logTabScreen(_ tab: Int) {
-        let names = ["GamesList", "FriendsList", "RemoteTab", "History"]
-        guard tab < names.count else { return }
-        AnalyticsService.shared.logScreenView(screenName: names[tab])
+    private func logTabScreen(_ tab: AppTab) {
+        AnalyticsService.shared.logScreenView(screenName: tab.analyticsScreenName)
     }
     
     private var rootNavTitle: String {
-        switch selectedTab {
-        case 0: return "Games"
-        case 1: return "Friends"
-        case 2: return "Remote matches"
-        case 3: return "History"
-        default: return ""
-        }
+        selectedTab.title
     }
     
     @ToolbarContentBuilder
@@ -73,14 +64,14 @@ struct MainTabView: View {
         
         if navigationPath.isEmpty {
             switch selectedTab {
-            case 0:
+            case .games:
                 // Games tab
                 ToolbarItem(placement: .topBarTrailing) {
                     ToolbarAvatarButton(avatarURL: authService.currentUser?.avatarURL) {
                         showProfile = true
                     }
                 }
-            case 1:
+            case .friends:
                 // Friends tab
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -111,7 +102,7 @@ struct MainTabView: View {
                             .foregroundColor(AppColor.justWhite)
                     }
                 }
-            case 2:
+            case .remote:
                 // Remote tab
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -123,7 +114,7 @@ struct MainTabView: View {
                     }
                     .frame(minWidth: 44)
                 }
-            case 3:
+            case .history:
                 // History tab
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     
@@ -136,10 +127,6 @@ struct MainTabView: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(AppColor.justWhite)
                     }
-                }
-            default:
-                ToolbarItem(placement: .topBarTrailing) {
-                    EmptyView()
                 }
             }
         }
@@ -160,7 +147,7 @@ struct MainTabView: View {
                             .font(.system(size: 17, weight: .semibold))
                         //Text("Games")
                     }
-                    .tag(0)
+                    .tag(AppTab.games)
                     
                     // Friends Tab
                     Group {
@@ -177,7 +164,7 @@ struct MainTabView: View {
                                     //Text("Friends")
                                 }
                                 .badge(pendingRequestCount)
-                                .tag(1)
+                                .tag(AppTab.friends)
                         } else {
                             FriendsTabView(
                                 showProfile: $showProfile,
@@ -190,7 +177,7 @@ struct MainTabView: View {
                                         .font(.system(size: 22, weight: .semibold))
                                     //Text("Friends")
                                 }
-                                .tag(1)
+                                .tag(AppTab.friends)
                         }
                     }
                     
@@ -204,7 +191,7 @@ struct MainTabView: View {
                                     //Text("Remote")
                                 }
                                 .badge(pendingChallengeCount)
-                                .tag(2)
+                                .tag(AppTab.remote)
                         } else {
                             RemoteGamesTab(showGameSelection: $remoteShowGameSelection)
                                 .tabItem {
@@ -212,7 +199,7 @@ struct MainTabView: View {
                                         .font(.system(size: 17, weight: .semibold))
                                     //Text("Remote")
                                 }
-                                .tag(2)
+                                .tag(AppTab.remote)
                         }
                     }
                     
@@ -227,7 +214,7 @@ struct MainTabView: View {
                                 .fontWeight(.bold)
                             //Text("History")
                         }
-                        .tag(3)
+                        .tag(AppTab.history)
                 }
                 .background(AppColor.backgroundPrimary)
                 .accentColor(AppColor.interactivePrimaryBackground)
@@ -312,7 +299,7 @@ struct MainTabView: View {
             loadPendingChallengeCount()
             
             // Set toast suppression based on current tab
-            toastManager.suppressRequestReceivedToasts = (selectedTab == 1)
+            toastManager.suppressRequestReceivedToasts = (selectedTab == .friends)
 
             if inviteTokenToClaim == nil, let token = PendingInviteStore.shared.getToken() {
                 inviteTokenToClaim = InviteTokenToClaim(id: token, token: token)
@@ -376,15 +363,11 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { oldValue, newValue in
             logTabScreen(newValue)
             // Update toast suppression based on selected tab
-            // Tab 1 = Friends tab, suppress requestReceived toasts there
-            toastManager.suppressRequestReceivedToasts = (newValue == 1)
+            // Suppress requestReceived toasts while the Friends tab is showing
+            toastManager.suppressRequestReceivedToasts = (newValue == .friends)
             
             // Replay navigation diagnostics
-            let tabNames = ["Games", "Friends", "Remote matches", "History"]
-            let oldTabName = oldValue < tabNames.count ? tabNames[oldValue] : "Unknown(\(oldValue))"
-            let newTabName = newValue < tabNames.count ? tabNames[newValue] : "Unknown(\(newValue))"
-            
-            print("[ReplayNavTrace] MainTabView.selectedTab | \(oldTabName) → \(newTabName) | isInRemoteFlow: \(remoteMatchService.isInRemoteFlow) | flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "none") | \(Date())")
+            print("[ReplayNavTrace] MainTabView.selectedTab | \(oldValue.title) → \(newValue.title) | isInRemoteFlow: \(remoteMatchService.isInRemoteFlow) | flowMatchId: \(remoteMatchService.flowMatchId?.uuidString.prefix(8) ?? "none") | \(Date())")
         }
         .onChange(of: notificationService.pendingIntent) { _, intent in
             guard let intent = intent else { return }
@@ -392,9 +375,9 @@ struct MainTabView: View {
             // Route based on destination
             switch intent.destination {
             case .remoteTab:
-                selectedTab = 2  // Remote matches tab
+                selectedTab = .remote
             case .friendsTab:
-                selectedTab = 1  // Friends tab
+                selectedTab = .friends
             }
             
             // Clear intent after consumption
@@ -500,10 +483,10 @@ struct MainTabView: View {
         switch toast.type {
         case .requestReceived:
             // Navigate to Friends tab (where requests are shown)
-            selectedTab = 1
+            selectedTab = .friends
         case .requestAccepted:
             // Navigate to Friends tab to see new friend
-            selectedTab = 1
+            selectedTab = .friends
         case .requestDenied:
             // Just dismiss - no navigation needed
             break
@@ -663,7 +646,7 @@ struct GamesTabView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
     @Binding var showProfile: Bool
-    @Binding var selectedTab: Int
+    @Binding var selectedTab: AppTab
     
     var body: some View {
         ZStack {
@@ -747,7 +730,7 @@ private struct GameHeroSourceModifier: ViewModifier {
 struct FriendsTabView: View {
     @EnvironmentObject private var router: Router
     @Binding var showProfile: Bool
-    @Binding var selectedTab: Int
+    @Binding var selectedTab: AppTab
     @Binding var showSearch: Bool
     @Binding var isCreatingInvite: Bool
     

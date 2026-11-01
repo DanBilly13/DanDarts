@@ -14,7 +14,7 @@ struct RemoteGameplayView: View {
     let challenger: User
     let receiver: User
     let currentUserId: UUID
-    @Binding var selectedTab: Int
+    @Binding var selectedTab: AppTab
     
     // MARK: - Phase 15-A Investigation
     
@@ -753,7 +753,7 @@ struct RemoteGameplayView: View {
         }
     }
     
-    init(matchId: UUID, gameName: String, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<Int>) {
+    init(matchId: UUID, gameName: String, challenger: User, receiver: User, currentUserId: UUID, selectedTab: Binding<AppTab>) {
         let instanceId = UUID()
         self._viewInstanceId = State(initialValue: instanceId)
         self.matchId = matchId
@@ -1099,7 +1099,7 @@ struct RemoteGameplayView: View {
                                 remoteMatchService.exitRemoteFlow()
                                 
                                 router.popToRoot()
-                                selectedTab = 0  // Switch to main Games tab
+                                selectedTab = .games  // Switch to main Games tab
                             },
                             matchFormat: gameViewModel.isMultiLegMatch ? gameViewModel.matchFormat : nil,
                             legsWon: gameViewModel.isMultiLegMatch ? gameViewModel.legsWon : nil,
