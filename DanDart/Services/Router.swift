@@ -33,6 +33,10 @@ enum Destination: Hashable {
     case remoteLobby(match: RemoteMatch, opponent: User, currentUser: User, cancelledMatchIds: Binding<Set<UUID>>, onCancel: () -> Void, onUnfreeze: () -> Void)
     case remoteGameplay(matchId: UUID, gameName: String, challenger: User, receiver: User, currentUserId: UUID)
     
+    // Clubs
+    case findClub
+    case createClub(name: String)
+
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?, matchResult: MatchResult?)
     case remoteGameEnd(game: Game, winner: Player, players: [Player], onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?, matchResult: MatchResult?)
@@ -62,6 +66,10 @@ enum Destination: Hashable {
             return m1.id == m2.id && o1.id == o2.id && c1.id == c2.id
         case (.remoteGameplay(let id1, let g1, let ch1, let r1, let u1), .remoteGameplay(let id2, let g2, let ch2, let r2, let u2)):
             return id1 == id2 && g1 == g2 && ch1.id == ch2.id && r1.id == r2.id && u1 == u2
+        case (.findClub, .findClub):
+            return true
+        case (.createClub(let n1), .createClub(let n2)):
+            return n1 == n2
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
         case (.remoteGameEnd, .remoteGameEnd):
@@ -127,6 +135,11 @@ enum Destination: Hashable {
             hasher.combine(challenger.id)
             hasher.combine(receiver.id)
             hasher.combine(currentUserId)
+        case .findClub:
+            hasher.combine("findClub")
+        case .createClub(let name):
+            hasher.combine("createClub")
+            hasher.combine(name)
         case .gameEnd:
             hasher.combine("gameEnd")
         case .remoteGameEnd:
@@ -273,9 +286,15 @@ class Router: ObservableObject {
                 matchId: matchId,
                 matchResult: matchResult
             )
+
+        case .findClub:
+            FindClubView()
+
+        case .createClub(let name):
+            CreateClubView(initialName: name)
         }
     }
-    
+
     /// Build the appropriate view for a given route with selectedTab binding (for remote game setup)
     @ViewBuilder
     func view(for route: Route, selectedTab: Binding<AppTab>) -> some View {
@@ -302,6 +321,8 @@ class Router: ObservableObject {
         case .remoteGameplay: return "RemoteGameplay"
         case .gameEnd: return "GameEnd"
         case .remoteGameEnd: return "RemoteGameEnd"
+        case .findClub: return "FindClub"
+        case .createClub: return "CreateClub"
         }
     }
     
@@ -321,6 +342,8 @@ class Router: ObservableObject {
         case .remoteGameplay: return "remoteGameplay"
         case .gameEnd: return "gameEnd"
         case .remoteGameEnd: return "remoteGameEnd"
+        case .findClub: return "findClub"
+        case .createClub: return "createClub"
         }
     }
 }

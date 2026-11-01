@@ -14,6 +14,7 @@ struct AppTabTests {
     @Test func analyticsScreenNamesMatchAndroid() {
         #expect(AppTab.games.analyticsScreenName == "GamesList")
         #expect(AppTab.friends.analyticsScreenName == "FriendsList")
+        #expect(AppTab.clubs.analyticsScreenName == "ClubsList")
         #expect(AppTab.remote.analyticsScreenName == "RemoteTab")
         #expect(AppTab.history.analyticsScreenName == "History")
     }
@@ -21,8 +22,13 @@ struct AppTabTests {
     @Test func titlesAreWhatTheUserSees() {
         #expect(AppTab.games.title == "Games")
         #expect(AppTab.friends.title == "Friends")
+        #expect(AppTab.clubs.title == "Clubs")
         #expect(AppTab.remote.title == "Remote matches")
         #expect(AppTab.history.title == "History")
+    }
+
+    @Test func clubsSitsBetweenFriendsAndRemote() {
+        #expect(AppTab.allCases == [.games, .friends, .clubs, .remote, .history])
     }
 
     @Test func everyTabHasADistinctScreenName() {

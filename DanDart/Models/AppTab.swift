@@ -11,6 +11,7 @@ import Foundation
 enum AppTab: Hashable, CaseIterable {
     case games
     case friends
+    case clubs
     case remote
     case history
 
@@ -19,6 +20,7 @@ enum AppTab: Hashable, CaseIterable {
         switch self {
         case .games: return "Games"
         case .friends: return "Friends"
+        case .clubs: return "Clubs"
         case .remote: return "Remote matches"
         case .history: return "History"
         }
@@ -29,6 +31,7 @@ enum AppTab: Hashable, CaseIterable {
         switch self {
         case .games: return "GamesList"
         case .friends: return "FriendsList"
+        case .clubs: return "ClubsList"
         case .remote: return "RemoteTab"
         case .history: return "History"
         }

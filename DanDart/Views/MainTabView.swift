@@ -12,6 +12,7 @@ struct MainTabView: View {
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var notificationService: NotificationService
     @StateObject private var friendsService = FriendsService()
+    @StateObject private var clubsService = ClubsService()
     @StateObject private var remoteMatchService = RemoteMatchService()
     @StateObject private var voiceChatService = VoiceChatService.shared
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
@@ -102,6 +103,26 @@ struct MainTabView: View {
                             .foregroundColor(AppColor.justWhite)
                     }
                 }
+            case .clubs:
+                // Clubs tab
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        router.push(.createClub(name: ""))
+                    } label: {
+                        Text("Create")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundColor(AppColor.justWhite)
+                    }
+
+                    Button {
+                        router.push(.findClub)
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(AppColor.justWhite)
+                    }
+                    .accessibilityLabel("Find a club")
+                }
             case .remote:
                 // Remote tab
                 ToolbarItem(placement: .topBarTrailing) {
@@ -181,6 +202,15 @@ struct MainTabView: View {
                         }
                     }
                     
+                    // Clubs Tab
+                    ClubsTabView()
+                        .tabItem {
+                            Image(systemName: "shield.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                            //Text("Clubs")
+                        }
+                        .tag(AppTab.clubs)
+
                     // Remote Tab
                     Group {
                         if pendingChallengeCount > 0 {
@@ -248,6 +278,7 @@ struct MainTabView: View {
                     .environmentObject(router)
                     .environmentObject(authService)
                     .environmentObject(friendsService)
+                    .environmentObject(clubsService)
                     .environmentObject(remoteMatchService)
                     .environmentObject(voiceChatService)
             }
@@ -259,6 +290,7 @@ struct MainTabView: View {
         .environmentObject(router)
         .environmentObject(authService)
         .environmentObject(friendsService)
+        .environmentObject(clubsService)
         .environmentObject(remoteMatchService)
         .environmentObject(voiceChatService)
         .sheet(item: $inviteTokenToClaim, onDismiss: {
