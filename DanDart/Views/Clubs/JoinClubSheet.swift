@@ -36,6 +36,7 @@ struct JoinClubSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
         .padding(.bottom, 16)
+        .interactiveDismissDisabled(isJoining)
         .task { await load() }
     }
 

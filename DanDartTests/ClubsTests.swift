@@ -73,6 +73,19 @@ struct ClubsDecodingTests {
         #expect(!preview.isMember)
     }
 
+    @Test func codePreviewDecodesForAnInviteOnlyClub() throws {
+        let json = """
+        [{"club_id":"33333333-3333-3333-3333-333333333333","name":"Friday Lads","town":null,
+          "visibility":"invite","member_count":6,"is_member":true}]
+        """
+        let preview = try #require(try decode([ClubCodePreview].self, json).first)
+        #expect(preview.name == "Friday Lads")
+        #expect(preview.town == nil)
+        #expect(preview.visibility == .invite)
+        #expect(preview.memberCount == 6)
+        #expect(preview.isMember)
+    }
+
     @Test func membersDecodeEveryRelationshipAndTolerateUnknownOnes() throws {
         let relationships = ["self", "friend", "request_sent", "request_received", "blocked", "none", "something_new"]
         let rows = relationships.enumerated().map { index, value in
