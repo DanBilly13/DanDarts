@@ -34,6 +34,9 @@ BEGIN
 END;
 $$;
 
+-- A trigger function is not meant to be called directly (EXECUTE is checked when the trigger is created).
+REVOKE ALL ON FUNCTION public.friendships_request_cap() FROM PUBLIC, anon, authenticated;
+
 DROP TRIGGER IF EXISTS friendships_request_cap ON public.friendships;
 CREATE TRIGGER friendships_request_cap
   BEFORE INSERT ON public.friendships

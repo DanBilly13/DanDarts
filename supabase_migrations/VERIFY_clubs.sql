@@ -135,7 +135,12 @@ BEGIN
   SELECT r.result INTO v_res FROM public.join_club(c1) r;
   ASSERT v_res = 'ok', 'u2 joins the open club too: got ' || coalesce(v_res, 'null');
 
+  -- Everything here runs in one transaction, so every join shares one timestamp. Give the
+  -- members distinct join dates so "longest-standing member" is well defined, as it is in real use.
   RESET ROLE;
+  UPDATE public.club_members SET joined_at = now() - interval '3 days' WHERE club_id = c1 AND user_id = u1;
+  UPDATE public.club_members SET joined_at = now() - interval '2 days' WHERE club_id = c1 AND user_id = u3;
+  UPDATE public.club_members SET joined_at = now() - interval '1 day'  WHERE club_id = c1 AND user_id = u2;
   SELECT cl.join_code INTO v_code FROM public.clubs cl WHERE cl.id = c2;
   PERFORM pg_temp.as_user(u4); SET LOCAL ROLE authenticated;
 

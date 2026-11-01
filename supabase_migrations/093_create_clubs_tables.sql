@@ -121,7 +121,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.generate_club_code() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.generate_club_code() FROM PUBLIC, anon, authenticated;
 
 DO $$
 BEGIN

@@ -364,13 +364,13 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_club(TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.search_clubs(TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_club_preview(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.join_club(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.join_club_by_code(TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.leave_club(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.my_clubs() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_club(TEXT, TEXT, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.search_clubs(TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_club_preview(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.join_club(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.join_club_by_code(TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.leave_club(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.my_clubs() FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION public.create_club(TEXT, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.search_clubs(TEXT) TO authenticated;

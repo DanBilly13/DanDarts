@@ -94,9 +94,9 @@ CREATE TRIGGER club_members_after_delete
   AFTER DELETE ON public.club_members
   FOR EACH ROW EXECUTE FUNCTION public.club_members_after_delete();
 
-REVOKE ALL ON FUNCTION public.club_members_before_insert() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.club_members_after_insert() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.club_members_after_delete() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.club_members_before_insert() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.club_members_after_insert() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.club_members_after_delete() FROM PUBLIC, anon, authenticated;
 
 DO $$
 BEGIN

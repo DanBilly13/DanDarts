@@ -305,14 +305,14 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.is_club_admin(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.set_club_visibility(UUID, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.regenerate_club_code(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.remove_club_member(UUID, UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.club_members_list(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.club_suggestions(INTEGER) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.dismiss_club_suggestion(UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.report_content(TEXT, UUID, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_club_admin(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.set_club_visibility(UUID, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.regenerate_club_code(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.remove_club_member(UUID, UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.club_members_list(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.club_suggestions(INTEGER) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.dismiss_club_suggestion(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.report_content(TEXT, UUID, TEXT) FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION public.is_club_admin(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.set_club_visibility(UUID, TEXT) TO authenticated;

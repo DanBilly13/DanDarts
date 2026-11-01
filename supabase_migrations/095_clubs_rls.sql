@@ -40,7 +40,7 @@ AS $$
   );
 $$;
 
-REVOKE ALL ON FUNCTION public.is_club_member(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_club_member(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.is_club_member(UUID) TO authenticated;
 
 DROP POLICY IF EXISTS "Members can read their clubs" ON public.clubs;
