@@ -30,6 +30,9 @@ final class ClubsService: ObservableObject {
 
     // MARK: - My clubs
 
+    /// Goes up each time the caller's clubs change (created, joined, left), so the Clubs tab knows to reload.
+    @Published private(set) var myClubsVersion = 0
+
     func myClubs() async throws -> [Club] {
         try await rows("my_clubs")
     }
@@ -94,21 +97,28 @@ final class ClubsService: ObservableObject {
             town: (trimmedTown?.isEmpty ?? true) ? nil : trimmedTown,
             visibility: visibility.rawValue
         )
-        return try await outcome("create_club", params: params)
+        return noteChange(in: try await outcome("create_club", params: params))
     }
 
     /// One-tap join for Open clubs.
     func joinClub(clubId: UUID) async throws -> ClubOutcome {
-        try await outcome("join_club", params: ClubIdParams(clubId: clubId))
+        noteChange(in: try await outcome("join_club", params: ClubIdParams(clubId: clubId)))
     }
 
     /// Joins any club, Open or Invite-only. Spaces, dashes and case in the code don't matter.
     func joinClub(code: String) async throws -> ClubOutcome {
-        try await outcome("join_club_by_code", params: CodeParams(code: code))
+        noteChange(in: try await outcome("join_club_by_code", params: CodeParams(code: code)))
     }
 
     func leaveClub(clubId: UUID) async throws -> ClubActionResult {
-        try await code("leave_club", params: ClubIdParams(clubId: clubId))
+        let result = try await code("leave_club", params: ClubIdParams(clubId: clubId))
+        if result.isOk { myClubsVersion += 1 }
+        return result
+    }
+
+    private func noteChange(in outcome: ClubOutcome) -> ClubOutcome {
+        if outcome.result.isOk { myClubsVersion += 1 }
+        return outcome
     }
 
     // MARK: - Members and admin
