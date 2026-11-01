@@ -21,41 +21,41 @@ struct PendingClubCodeStoreTests {
 
     @Test func aValidCodeIsKeptInTidyForm() throws {
         let store = try makeStore()
-        store.setCode("fl7 k2q")
-        #expect(store.getCode() == "FL7K2Q")
+        store.setCode("kt7 m2q")
+        #expect(store.getCode() == "KT7M2Q")
     }
 
     @Test func anInvalidCodeIsIgnored() throws {
         let store = try makeStore()
         store.setCode("hello")
-        store.setCode("FL7K2")
-        store.setCode("FL0K2Q") // 0 is not in the alphabet
+        store.setCode("KT7M2")
+        store.setCode("KT0M2Q") // 0 is not in the alphabet
         #expect(store.getCode() == nil)
     }
 
     @Test func aBadCodeDoesNotReplaceAGoodOne() throws {
         let store = try makeStore()
-        store.setCode("FL7K2Q")
+        store.setCode("KT7M2Q")
         store.setCode("nope")
-        #expect(store.getCode() == "FL7K2Q")
+        #expect(store.getCode() == "KT7M2Q")
     }
 
     @Test func consumingReturnsTheCodeOnlyOnce() throws {
         let store = try makeStore()
-        store.setCode("FL7K2Q")
-        #expect(store.consumeCode() == "FL7K2Q")
+        store.setCode("KT7M2Q")
+        #expect(store.consumeCode() == "KT7M2Q")
         #expect(store.consumeCode() == nil)
     }
 
     @Test func clubLinksAreStoredAndOtherLinksAreNot() throws {
         let store = try makeStore()
-        let web = try #require(URL(string: "https://dartfreak.com/c/FL7K2Q"))
+        let web = try #require(URL(string: "https://dartfreak.com/c/KT7M2Q"))
         let scheme = try #require(URL(string: "dartfreak://club?code=ab23cd"))
         let invite = try #require(URL(string: "https://dartfreak.com/invite?token=abc"))
         let auth = try #require(URL(string: "dartfreak://auth"))
 
         #expect(store.receive(web))
-        #expect(store.getCode() == "FL7K2Q")
+        #expect(store.getCode() == "KT7M2Q")
 
         #expect(store.receive(scheme))
         #expect(store.getCode() == "AB23CD")
