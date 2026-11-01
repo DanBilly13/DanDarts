@@ -78,9 +78,9 @@ users.club_discoverable boolean not null default true
 
 **Triggers:** maintain `member_count`; on `club_members` delete, promote an admin or delete the empty club; on `friendships` insert, enforce the daily cap; limit 5 clubs per user on `club_members` insert.
 
-**RLS:** tables are not directly writable by clients. `clubs` and `club_members` are readable only by members (via a `security definer` helper `is_club_member(club_id)` to avoid policy recursion). Everything else goes through RPCs, so non-members never receive a member list. `reports` is insert-only for the reporter.
+**RLS:** tables are not directly writable by clients. `clubs` and `club_members` are readable only by members (via a `security definer` helper `is_club_member(club_id)` to avoid policy recursion). Everything else goes through RPCs, so non-members never receive a member list. `reports` can be written only through `report_content`, which also ignores a repeat report of the same target by the same person within 24 hours.
 
-**RPCs** (house convention from migrations 041, 089, 091: `SECURITY DEFINER`, `SET search_path = public`, `REVOKE ALL ... FROM PUBLIC; GRANT EXECUTE ... TO authenticated`): `search_clubs(p_query)`, `get_club_preview(p_club_id)`, `create_club(p_name, p_town, p_visibility)`, `join_club(p_club_id)`, `join_club_by_code(p_code)`, `leave_club(p_club_id)`, `set_club_visibility(p_club_id, p_visibility)`, `regenerate_club_code(p_club_id)`, `remove_club_member(p_club_id, p_user_id)`, `club_suggestions(p_limit)`, `dismiss_club_suggestion(p_user_id)`, `report_content(p_target_type, p_target_id, p_reason)`. Join and create RPCs return a result code string like `claim_invite` does (`ok`, `full`, `invalid_code`, `name_not_allowed`, `duplicate`, ...).
+**RPCs** (house convention from migrations 041, 089, 091: `SECURITY DEFINER`, `SET search_path = public`, `REVOKE ALL ... FROM PUBLIC; GRANT EXECUTE ... TO authenticated`): `search_clubs(p_query)`, `get_club_preview(p_club_id)`, `create_club(p_name, p_town, p_visibility)`, `join_club(p_club_id)`, `join_club_by_code(p_code)`, `leave_club(p_club_id)`, `set_club_visibility(p_club_id, p_visibility)`, `regenerate_club_code(p_club_id)`, `remove_club_member(p_club_id, p_user_id)`, `club_suggestions(p_limit)`, `dismiss_club_suggestion(p_user_id)`, `report_content(p_target_type, p_target_id, p_reason)`. Join and create RPCs return a result code string like `claim_invite` does (`ok`, `club_limit`, `invalid_code`, `name_not_allowed`, `duplicate`, `try_again`, ...).
 
 **Account deletion.** Memberships and dismissals cascade from `users`; `clubs.created_by` becomes null; the membership trigger fixes admin and empty clubs. `delete-account` needs no new code, but add a test case to the verification script.
 
@@ -124,6 +124,13 @@ users.club_discoverable boolean not null default true
 3. ~~Sign-up club step mockup~~ Done (artboard 24).
 4. **Friend-request cap** of 50 per 24 hours is a judgement; check against normal use after launch.
 5. **Club pictures.** Clubs use a coloured circle with the first letter. No photos in v1.
+
+## Known limits (accepted for v1)
+
+- **Code guessing.** `join_club_by_code` has no attempt limit. Six characters from a 31-letter alphabet is about 887 million codes, so guessing is slow, but Invite-only privacy rests on the code staying secret. Add a failed-attempt limiter if abuse appears.
+- **Cap evasion.** The friend-request cap counts existing rows, so withdrawing a request frees a slot. A spammer could send 50, withdraw, and send 50 more. A log table would close it.
+- **Concurrent joins.** The five-club limit is a count in a trigger, so two simultaneous joins from one person could land them in six clubs.
+- **Non-ASCII names** depend on the database locale being UTF-8 (`VERIFY_clubs.sql` checks this).
 
 ## Testing
 
