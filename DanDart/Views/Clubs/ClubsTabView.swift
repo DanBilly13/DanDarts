@@ -59,7 +59,12 @@ struct ClubsTabView: View {
 
             VStack(spacing: 12) {
                 ForEach(clubs) { club in
-                    ClubRow(club: club)
+                    Button {
+                        router.push(.clubDetail(club))
+                    } label: {
+                        ClubRow(club: club)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

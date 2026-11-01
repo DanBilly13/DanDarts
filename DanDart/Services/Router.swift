@@ -36,6 +36,7 @@ enum Destination: Hashable {
     // Clubs
     case findClub
     case createClub(name: String)
+    case clubDetail(Club)
 
     // End game
     case gameEnd(game: Game, winner: Player, players: [Player], onPlayAgain: () -> Void, onBackToGames: () -> Void, matchFormat: Int?, legsWon: [UUID: Int]?, matchId: UUID?, matchResult: MatchResult?)
@@ -70,6 +71,8 @@ enum Destination: Hashable {
             return true
         case (.createClub(let n1), .createClub(let n2)):
             return n1 == n2
+        case (.clubDetail(let c1), .clubDetail(let c2)):
+            return c1.id == c2.id
         case (.gameEnd, .gameEnd):
             return true // Special case - can't compare closures
         case (.remoteGameEnd, .remoteGameEnd):
@@ -140,6 +143,9 @@ enum Destination: Hashable {
         case .createClub(let name):
             hasher.combine("createClub")
             hasher.combine(name)
+        case .clubDetail(let club):
+            hasher.combine("clubDetail")
+            hasher.combine(club.id)
         case .gameEnd:
             hasher.combine("gameEnd")
         case .remoteGameEnd:
@@ -292,6 +298,9 @@ class Router: ObservableObject {
 
         case .createClub(let name):
             CreateClubView(initialName: name)
+
+        case .clubDetail(let club):
+            ClubDetailView(club: club)
         }
     }
 
@@ -323,6 +332,7 @@ class Router: ObservableObject {
         case .remoteGameEnd: return "RemoteGameEnd"
         case .findClub: return "FindClub"
         case .createClub: return "CreateClub"
+        case .clubDetail: return "ClubDetail"
         }
     }
     
@@ -344,6 +354,7 @@ class Router: ObservableObject {
         case .remoteGameEnd: return "remoteGameEnd"
         case .findClub: return "findClub"
         case .createClub: return "createClub"
+        case .clubDetail: return "clubDetail"
         }
     }
 }

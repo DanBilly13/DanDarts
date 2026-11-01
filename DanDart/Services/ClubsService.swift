@@ -129,18 +129,24 @@ final class ClubsService: ObservableObject {
     }
 
     func setVisibility(clubId: UUID, visibility: ClubVisibility) async throws -> ClubActionResult {
-        try await code("set_club_visibility", params: SetVisibilityParams(clubId: clubId, visibility: visibility.rawValue))
+        let result = try await code("set_club_visibility", params: SetVisibilityParams(clubId: clubId, visibility: visibility.rawValue))
+        if result.isOk { myClubsVersion += 1 }
+        return result
     }
 
     /// The old code stops working immediately. Returns the new code on success.
     func regenerateCode(clubId: UUID) async throws -> (result: ClubActionResult, joinCode: String?) {
         let found: [RegenerateRow] = try await rows("regenerate_club_code", params: ClubIdParams(clubId: clubId))
         guard let row = found.first else { return (.unknown("empty"), nil) }
-        return (ClubActionResult(code: row.result), row.joinCode)
+        let result = ClubActionResult(code: row.result)
+        if result.isOk { myClubsVersion += 1 }
+        return (result, row.joinCode)
     }
 
     func removeMember(clubId: UUID, userId: UUID) async throws -> ClubActionResult {
-        try await code("remove_club_member", params: RemoveMemberParams(clubId: clubId, userId: userId))
+        let result = try await code("remove_club_member", params: RemoveMemberParams(clubId: clubId, userId: userId))
+        if result.isOk { myClubsVersion += 1 }
+        return result
     }
 
     // MARK: - Suggestions
