@@ -27,13 +27,13 @@ Let a player say which club or team they play with, and let the app suggest othe
 
 ## Behaviour
 
-**Create.** Name 3-40 characters, trimmed; town optional, up to 40. The name must pass the word filter. If an Open club with the same normalised name and town exists, show "Did you mean...?" with a Join button and block the duplicate. Invite-only duplicates are allowed because they are hidden. The creator becomes admin and a member. Every club gets a join code.
+**Create.** Name 3-40 characters, trimmed; town optional, up to 40. The name must pass the word filter. If an Open club with the same normalised name and town exists, show "Did you mean...?" with a Join button and block the duplicate. Invite-only duplicates are allowed because they are hidden. The same rule applies when an Invite-only club is switched to Open: if an Open club with the same name and town exists, `set_club_visibility` returns `duplicate` and the club stays Invite-only. The creator becomes admin and a member. Every club gets a join code.
 
 **Find.** Search by name or town, 2+ characters, Open clubs only, 20 results, most members first. Each row: name, town, member count, up to 3 avatars, Join. If nothing matches, offer "Create 'X' as a new club". A "Have a code?" box joins any club, Open or Invite-only.
 
 **Join.** Open: one tap, maximum 5 clubs (show a clear message at 5). By code or link: works for both visibilities. Unknown or old code shows "That code doesn't work. Ask the club for a new one."
 
-**Share.** Every club has a code (6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, case-insensitive, unique) and a link `https://www.dartfreak.com/c/<CODE>`. Unlike the single-use friend invite, a club code works for many people. The admin can regenerate it; the old one stops working. Any member can share an Open club's link; only the admin sees the code and regenerate button of an Invite-only club.
+**Share.** Every club has a code (6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, case-insensitive, unique) and a link `https://www.dartfreak.com/c/<CODE>`. Unlike the single-use friend invite, a club code works for many people. The admin can regenerate it; the old one stops working. Any member can share the club's link, Open or Invite-only, so a group of mates can bring each other in. Only the admin sees the code itself and the Regenerate button; if a link leaks, the admin regenerates the code.
 
 **Club page.** Members after joining, each row with Add, "Request sent" or "Friend" (reusing the friendship state). Shared-friend count. Report club, Leave club. Admin adds: switch Open/Invite-only, code and Regenerate, remove a member.
 
@@ -49,7 +49,7 @@ Let a player say which club or team they play with, and let the app suggest othe
 
 **Name filter.** `create_club` checks the normalised name against a `blocked_words` table the owner maintains; a hit returns `name_not_allowed` and the app asks for a different name. Applies to club creation and to renaming if added later.
 
-**Sign-up.** (1) Every new account must tick "I'm 13 or over" before the account is created; nothing is stored. It sits where the existing "By continuing, you agree to the Terms" text is, gating the email, Google and Apple buttons. Exact screens to confirm in the plan: iOS `SignUpView`; Android's Welcome, SignUp and Google paths (Google can reach account creation from the SignIn screen). (2) After profile setup and before the permissions screen, new accounts see a skippable "Part of a club or team?" step (artboard 24: search, a Joined state, Create, Have a code?, Continue and Skip for now): the Find a club search, "Create a club", "Have a code?", Skip. Existing users get no forced step; the empty Clubs tab explains the feature.
+**Sign-up.** (1) Every new account must tick "I'm 13 or over" before the account is created; nothing is stored. It sits where the existing "By continuing, you agree to the Terms" text is, gating the email, Google and Apple buttons. Exact screens to confirm in the plan: iOS `SignUpView`; Android's Welcome, SignUp and Google paths (Google can reach account creation from the SignIn screen). (2) After profile setup and before the permissions screen, new accounts see a skippable "Part of a club or team?" step (artboard 24): the Find a club search with a Joined state on rows, "Create a club", "Have a code?", Continue and Skip for now. Existing users get no forced step; the empty Clubs tab explains the feature.
 
 ## Data model (migrations 093 onward, `supabase_migrations/`, applied by hand in the SQL editor)
 
@@ -88,7 +88,7 @@ users.club_discoverable boolean not null default true
 
 ## Components
 
-**iOS** (`DanDart/DanDart/`): new `Services/ClubsService.swift` (`@MainActor ObservableObject`, mirrors `FriendsService`; `Codable` models `Club`, `ClubPreview`, `ClubMember`, `ClubSuggestion` in `Models/`); new `Views/Clubs/` with `ClubsTabView`, `FindClubView`, `CreateClubView`, `ClubDetailView`, `ClubSignUpStepView`; a "People from your clubs" section in `FriendsListView`; a Settings toggle for `club_discoverable`; Report actions on the club page and member rows. Reuse `PlayerCard`, `AppButton`, `EmptyState`, `DartTextField`, `ShareSheet`, and the search field style from `FriendSearchView`.
+**iOS** (`DanDart/`): new `Services/ClubsService.swift` (`@MainActor ObservableObject`, mirrors `FriendsService`; `Codable` models `Club`, `ClubPreview`, `ClubMember`, `ClubSuggestion` in `Models/`); new `Views/Clubs/` with `ClubsTabView`, `FindClubView`, `CreateClubView`, `ClubDetailView`, `ClubSignUpStepView`; a "People from your clubs" section in `FriendsListView`; a Settings toggle for `club_discoverable`; Report actions on the club page and member rows. Reuse `PlayerCard`, `AppButton`, `EmptyState`, `DartTextField`, `ShareSheet`, and the search field style from `FriendSearchView`.
 
 **Tabs.** `MainTabView` uses magic integers for tabs (tags 0-3, plus the `logTabScreen` names, `rootNavTitle`, `toolbarContent`, toast suppression, notification routing and `handleToastNavigation`). Inserting Clubs at index 2 shifts Remote and History. First task in the plan: replace the integers with an enum, then add the tab.
 
