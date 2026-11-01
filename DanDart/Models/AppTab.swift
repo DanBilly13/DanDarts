@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum AppTab: Hashable {
+enum AppTab: Hashable, CaseIterable {
     case games
     case friends
     case remote
