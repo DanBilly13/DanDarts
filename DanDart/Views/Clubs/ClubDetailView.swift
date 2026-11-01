@@ -22,6 +22,7 @@ struct ClubDetailView: View {
     @State private var membersFailed = false
     @State private var addingId: UUID?
     @State private var isBusy = false
+    @State private var isReporting = false
     @State private var showShareSheet = false
     @State private var justCopied = false
     @State private var pending: Pending?
@@ -538,6 +539,8 @@ struct ClubDetailView: View {
     // MARK: - Loading
 
     private func refresh() async {
+        // The member list doesn't depend on the club refresh, so load both at once.
+        async let loadedMembers: Void = loadMembers()
         do {
             let mine = try await clubsService.myClubs()
             if let fresh = mine.first(where: { $0.id == club.id }) {
@@ -552,7 +555,7 @@ struct ClubDetailView: View {
             guard !Task.isCancelled else { return }
             print("❌ [Clubs] Failed to refresh club: \(error)")
         }
-        await loadMembers()
+        await loadedMembers
     }
 
     private func loadMembers() async {
@@ -687,7 +690,10 @@ struct ClubDetailView: View {
     }
 
     private func report(_ target: ClubsService.ReportTarget, id: UUID, title: String) {
+        guard !isReporting else { return }
+        isReporting = true
         Task {
+            defer { isReporting = false }
             do {
                 let result = try await clubsService.report(target, id: id)
                 if result.isOk {

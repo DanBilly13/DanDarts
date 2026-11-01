@@ -79,6 +79,13 @@ struct ClubScreensTests {
         #expect(ClubText.leaveMessage(isAdmin: false, memberCount: 5).contains("rejoin"))
     }
 
+    @Test func joinedTextShowsTheMonthAndYear() throws {
+        let date = try #require(Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 10, day: 15)))
+        let text = ClubText.joinedText(date)
+        #expect(text.contains("2026"))
+        #expect(!text.contains("15"))
+    }
+
     @Test func friendCountOnlyCountsFriends() {
         let members = [member(.friend), member(.friend), member(.requestSent), member(.none), member(.selfUser)]
         #expect(ClubText.friendCount(in: members) == 2)
