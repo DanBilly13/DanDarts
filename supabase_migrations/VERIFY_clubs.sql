@@ -1,5 +1,5 @@
 -- VERIFY_clubs.sql
--- Purpose: end-to-end check of migrations 093-098 (Clubs). Run it AFTER applying the migrations.
+-- Purpose: end-to-end check of migrations 093-098 and 100 (Clubs). Run it AFTER applying the migrations.
 -- Names:   Test clubs use the made-up prefix 'Zzvfy' and the town 'Verifyville', so the script still
 --          passes after real clubs and blocked words have been added.
 -- Safety:  Everything happens inside one transaction that ends in ROLLBACK, so no test users,
@@ -175,9 +175,19 @@ BEGIN
   SELECT r.result INTO v_res FROM public.join_club_by_code('NOPE99') r;
   ASSERT v_res = 'invalid_code', 'unknown code: got ' || coalesce(v_res, 'null');
 
+  SELECT count(*) INTO v_n FROM public.preview_club_by_code('NOPE99');
+  ASSERT v_n = 0, 'preview by unknown code returns nothing: got ' || v_n;
+
+  SELECT count(*) INTO v_n FROM public.preview_club_by_code(lower(substr(v_code, 1, 3)) || ' ' || substr(v_code, 4))
+  WHERE club_id = c2 AND visibility = 'invite' AND NOT is_member AND name LIKE 'Zzvfy%';
+  ASSERT v_n = 1, 'preview by code names an invite-only club for a non-member (case and spaces ignored): got ' || v_n;
+
   SELECT r.result, r.club_id INTO v_res, v_id
   FROM public.join_club_by_code(lower(substr(v_code, 1, 3)) || ' ' || substr(v_code, 4)) r;
   ASSERT v_res = 'ok' AND v_id = c2, 'join invite-only club by code (case and spaces ignored): got ' || coalesce(v_res, 'null');
+
+  SELECT count(*) INTO v_n FROM public.preview_club_by_code(v_code) WHERE is_member AND member_count >= 2;
+  ASSERT v_n = 1, 'preview by code shows is_member once joined: got ' || v_n;
 
   -- ---------- five-club limit ----------
   RESET ROLE; PERFORM pg_temp.as_user(u5); SET LOCAL ROLE authenticated;

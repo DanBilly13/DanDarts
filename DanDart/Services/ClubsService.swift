@@ -87,6 +87,13 @@ final class ClubsService: ObservableObject {
         return found.first
     }
 
+    /// For the "Join The Crown?" sheet. Nil when the code doesn't match a club (including old codes
+    /// the admin has replaced). Works for Invite-only clubs too, because holding the code is what lets you join.
+    func preview(code: String) async throws -> ClubCodePreview? {
+        let found: [ClubCodePreview] = try await rows("preview_club_by_code", params: CodeParams(code: code))
+        return found.first
+    }
+
     // MARK: - Create and join
 
     /// For `.duplicate` the outcome's club id is the existing Open club, so the app can offer to join it.

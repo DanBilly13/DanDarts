@@ -84,6 +84,8 @@ struct DartFreakApp: App {
 
                         guard url.host == "www.dartfreak.com" || url.host == "dartfreak.com" else { return }
 
+                        if PendingClubCodeStore.shared.receive(url) { return }
+
                         if url.path == "/invite" || url.path == "/invite/" {
                             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
                             let queryItems = components?.queryItems ?? []
@@ -110,6 +112,11 @@ struct DartFreakApp: App {
                             return
                         }
                         
+                        // Club links: https://dartfreak.com/c/<code> and dartfreak://club?code=<code>
+                        if PendingClubCodeStore.shared.receive(url) {
+                            return
+                        }
+
                         // Handle password reset deep link
                         if url.scheme == "dandarts" && url.host == "reset-password" {
                             // Extract tokens from URL fragment
