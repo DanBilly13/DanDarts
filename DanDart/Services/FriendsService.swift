@@ -576,10 +576,18 @@ class FriendsService: ObservableObject {
         )
         
         // Insert new friend request
-        try await supabaseService.client
-            .from("friendships")
-            .insert(friendship)
-            .execute()
+        do {
+            try await supabaseService.client
+                .from("friendships")
+                .insert(friendship)
+                .execute()
+        } catch {
+            // The database allows 50 new requests per person per 24 hours (migration 098)
+            if FriendsError.isRequestLimit(error) {
+                throw FriendsError.requestLimit
+            }
+            throw error
+        }
         
         print("✅ [SendRequest] Friend request created successfully")
         
@@ -1006,6 +1014,12 @@ enum FriendsError: LocalizedError {
     case userBlocked
     case userNotFound
     case networkError
+    case requestLimit
+    
+    /// True when the database refused a request because the person hit the daily limit.
+    static func isRequestLimit(_ error: Error) -> Bool {
+        "\(error)".contains("friend_request_limit") || error.localizedDescription.contains("friend_request_limit")
+    }
     
     var errorDescription: String? {
         switch self {
@@ -1019,6 +1033,8 @@ enum FriendsError: LocalizedError {
             return "User not found"
         case .networkError:
             return "Network error. Please try again"
+        case .requestLimit:
+            return "You've sent a lot of friend requests today. Try again tomorrow"
         }
     }
 }
