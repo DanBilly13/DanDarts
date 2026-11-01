@@ -1,5 +1,7 @@
 -- VERIFY_clubs.sql
 -- Purpose: end-to-end check of migrations 093-098 (Clubs). Run it AFTER applying the migrations.
+-- Names:   Test clubs use the made-up prefix 'Zzvfy' and the town 'Verifyville', so the script still
+--          passes after real clubs and blocked words have been added.
 -- Safety:  Everything happens inside one transaction that ends in ROLLBACK, so no test users,
 --          clubs or friendships are kept. It creates throw-away rows in auth.users and public.users
 --          with @verify.invalid emails. Run it as the default postgres role in the Supabase SQL editor.
@@ -51,13 +53,39 @@ BEGIN
   SELECT x, 'Verify ' || substr(x::TEXT, 1, 4), 'vfy_' || substr(replace(x::TEXT, '-', ''), 1, 8)
   FROM unnest(ARRAY[u1, u2, u3, u4, u5]) AS x;
 
+  -- ---------- name normaliser keeps non-ASCII letters (needs a UTF-8 database locale) ----------
+  ASSERT public.club_normalize('Café  Ünï, Ärrows!') = 'café ünï ärrows',
+    'club_normalize must keep accented letters: got ' || public.club_normalize('Café  Ünï, Ärrows!');
+
+  -- ---------- signed-out users and direct writes are refused ----------
+  RESET ROLE; SET LOCAL ROLE anon;
+  BEGIN
+    PERFORM public.create_club('Zzvfy Anon Club');
+    RAISE EXCEPTION 'anon was allowed to call create_club';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  RESET ROLE; PERFORM pg_temp.as_user(u1); SET LOCAL ROLE authenticated;
+  BEGIN
+    INSERT INTO public.reports (reporter_id, target_type, target_id) VALUES (u1, 'user', u2);
+    RAISE EXCEPTION 'a signed-in user was allowed to insert into reports directly';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  BEGIN
+    INSERT INTO public.clubs (name, name_key, join_code) VALUES ('Zzvfy Direct', 'zzvfy direct', 'DIRECT');
+    RAISE EXCEPTION 'a signed-in user was allowed to insert into clubs directly';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
   -- ---------- create ----------
   RESET ROLE; PERFORM pg_temp.as_user(u1); SET LOCAL ROLE authenticated;
 
-  SELECT r.result, r.club_id INTO v_res, c1 FROM public.create_club('The Crown', 'Leeds', 'open') r;
+  SELECT r.result, r.club_id INTO v_res, c1 FROM public.create_club('Zzvfy Crown Inn', 'Verifyville', 'open') r;
   ASSERT v_res = 'ok' AND c1 IS NOT NULL, 'create open club: got ' || coalesce(v_res, 'null');
 
-  SELECT r.result, r.club_id INTO v_res, v_id FROM public.create_club('The Crown', 'Leeds', 'open') r;
+  SELECT r.result, r.club_id INTO v_res, v_id FROM public.create_club('Zzvfy Crown Inn', 'Verifyville', 'open') r;
   ASSERT v_res = 'duplicate' AND v_id = c1, 'exact duplicate open club: got ' || coalesce(v_res, 'null');
 
   SELECT r.result INTO v_res FROM public.create_club('ab', NULL, 'open') r;
@@ -66,38 +94,38 @@ BEGIN
   SELECT r.result INTO v_res FROM public.create_club('Fine Name', NULL, 'secret') r;
   ASSERT v_res = 'invalid_visibility', 'bad visibility: got ' || coalesce(v_res, 'null');
 
-  SELECT r.result, r.club_id INTO v_res, c2 FROM public.create_club('Friday Lads', NULL, 'invite') r;
+  SELECT r.result, r.club_id INTO v_res, c2 FROM public.create_club('Zzvfy Lads', NULL, 'invite') r;
   ASSERT v_res = 'ok', 'create invite-only club: got ' || coalesce(v_res, 'null');
 
   RESET ROLE; PERFORM pg_temp.as_user(u2); SET LOCAL ROLE authenticated;
 
-  SELECT r.result INTO v_res FROM public.create_club('the  CROWN!', 'leeds', 'open') r;
+  SELECT r.result INTO v_res FROM public.create_club('zzvfy  CROWN inn!', 'verifyville', 'open') r;
   ASSERT v_res = 'duplicate', 'duplicate after normalising name and town: got ' || coalesce(v_res, 'null');
 
-  SELECT r.result, r.club_id INTO v_res, c3 FROM public.create_club('Friday Lads', NULL, 'invite') r;
+  SELECT r.result, r.club_id INTO v_res, c3 FROM public.create_club('Zzvfy Lads', NULL, 'invite') r;
   ASSERT v_res = 'ok', 'invite-only duplicates are allowed: got ' || coalesce(v_res, 'null');
 
   -- ---------- name filter (whole words only) ----------
   RESET ROLE;
-  INSERT INTO public.blocked_words (word) VALUES ('badword'), ('ass');
+  INSERT INTO public.blocked_words (word) VALUES ('badword'), ('ass') ON CONFLICT DO NOTHING;
   PERFORM pg_temp.as_user(u2); SET LOCAL ROLE authenticated;
 
   SELECT r.result INTO v_res FROM public.create_club('The Badword Inn', NULL, 'open') r;
   ASSERT v_res = 'name_not_allowed', 'blocked word is rejected: got ' || coalesce(v_res, 'null');
 
-  SELECT r.result INTO v_res FROM public.create_club('Glasshouse Arms', NULL, 'open') r;
+  SELECT r.result INTO v_res FROM public.create_club('Zzvfy Glasshouse Arms', NULL, 'open') r;
   ASSERT v_res = 'ok', 'a blocked word inside another word is allowed: got ' || coalesce(v_res, 'null');
 
   -- ---------- search and visibility ----------
   RESET ROLE; PERFORM pg_temp.as_user(u3); SET LOCAL ROLE authenticated;
 
-  SELECT count(*) INTO v_n FROM public.search_clubs('crown');
+  SELECT count(*) INTO v_n FROM public.search_clubs('zzvfy crown');
   ASSERT v_n = 1, 'search finds the open club: got ' || v_n;
 
-  SELECT count(*) INTO v_n FROM public.search_clubs('leeds');
+  SELECT count(*) INTO v_n FROM public.search_clubs('verifyville');
   ASSERT v_n = 1, 'search matches the town: got ' || v_n;
 
-  SELECT count(*) INTO v_n FROM public.search_clubs('friday');
+  SELECT count(*) INTO v_n FROM public.search_clubs('zzvfy lads');
   ASSERT v_n = 0, 'invite-only clubs are hidden from search: got ' || v_n;
 
   SELECT count(*) INTO v_n FROM public.search_clubs('c');
@@ -155,11 +183,11 @@ BEGIN
   RESET ROLE; PERFORM pg_temp.as_user(u5); SET LOCAL ROLE authenticated;
 
   FOR i IN 1..5 LOOP
-    SELECT r.result INTO v_res FROM public.create_club('Limit Club ' || i, NULL, 'invite') r;
+    SELECT r.result INTO v_res FROM public.create_club('Zzvfy Limit ' || i, NULL, 'invite') r;
     ASSERT v_res = 'ok', 'club ' || i || ' of 5 for one user: got ' || coalesce(v_res, 'null');
   END LOOP;
 
-  SELECT r.result INTO v_res FROM public.create_club('Limit Club 6', NULL, 'invite') r;
+  SELECT r.result INTO v_res FROM public.create_club('Zzvfy Limit 6', NULL, 'invite') r;
   ASSERT v_res = 'club_limit', 'sixth club is refused: got ' || coalesce(v_res, 'null');
 
   SELECT r.result INTO v_res FROM public.join_club(c1) r;
@@ -221,7 +249,7 @@ BEGIN
 
   RESET ROLE; PERFORM pg_temp.as_user(u2); SET LOCAL ROLE authenticated;
   SELECT public.set_club_visibility(c3, 'open') INTO v_res;
-  ASSERT v_res = 'ok', 'u2 opens its own Friday Lads (no open twin yet): got ' || coalesce(v_res, 'null');
+  ASSERT v_res = 'ok', 'u2 opens its own Zzvfy Lads (no open twin yet): got ' || coalesce(v_res, 'null');
 
   RESET ROLE; PERFORM pg_temp.as_user(u1); SET LOCAL ROLE authenticated;
   SELECT public.set_club_visibility(c2, 'open') INTO v_res;
@@ -237,6 +265,12 @@ BEGIN
   ASSERT v_res = 'ok', 'report a club: got ' || coalesce(v_res, 'null');
   SELECT public.report_content('user', u2, NULL) INTO v_res;
   ASSERT v_res = 'ok', 'report a user: got ' || coalesce(v_res, 'null');
+  SELECT public.report_content('user', u2, 'again') INTO v_res;
+  ASSERT v_res = 'ok', 'a repeat report is accepted quietly: got ' || coalesce(v_res, 'null');
+  RESET ROLE;
+  SELECT count(*) INTO v_n FROM public.reports WHERE reporter_id = u1 AND target_id = u2;
+  ASSERT v_n = 1, 'a repeat report within 24 hours is not stored twice: got ' || v_n;
+  PERFORM pg_temp.as_user(u1); SET LOCAL ROLE authenticated;
   SELECT public.report_content('team', u2, NULL) INTO v_res;
   ASSERT v_res = 'invalid_type', 'bad report type: got ' || coalesce(v_res, 'null');
   SELECT public.report_content('club', gen_random_uuid(), NULL) INTO v_res;
@@ -268,7 +302,7 @@ BEGIN
 
   -- ---------- account deletion ----------
   DELETE FROM public.users WHERE id = u5;
-  SELECT count(*) INTO v_n FROM public.clubs WHERE created_by IS NULL AND name LIKE 'Limit Club %';
+  SELECT count(*) INTO v_n FROM public.clubs WHERE created_by IS NULL AND name LIKE 'Zzvfy Limit %';
   ASSERT v_n = 0, 'deleting the only member removes their clubs: got ' || v_n;
 
   -- ---------- friend-request cap ----------

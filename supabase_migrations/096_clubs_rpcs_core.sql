@@ -7,7 +7,8 @@
 --          REVOKE ALL FROM PUBLIC, GRANT EXECUTE TO authenticated. Functions that change data
 --          return a result code instead of raising, so the apps can show a clear message:
 --            ok, not_authenticated, invalid_name, invalid_town, invalid_visibility,
---            name_not_allowed, duplicate, club_limit, not_found, already_member, invalid_code.
+--            name_not_allowed, duplicate, club_limit, not_found, already_member, invalid_code,
+--            try_again (a join-code collision that survived three retries; practically never).
 --          '#variable_conflict use_column' stops output column names (club_id, name, ...) from
 --          clashing with table columns inside the function bodies.
 
@@ -32,6 +33,7 @@ DECLARE
   v_town_key TEXT;
   v_existing UUID;
   v_new UUID;
+  v_attempt INTEGER;
 BEGIN
   IF v_uid IS NULL THEN
     RETURN QUERY SELECT 'not_authenticated'::TEXT, NULL::UUID;
@@ -85,15 +87,35 @@ BEGIN
     END IF;
   END IF;
 
-  BEGIN
-    INSERT INTO public.clubs (name, name_key, town, town_key, visibility, join_code, created_by)
-    VALUES (v_name, v_name_key, v_town, v_town_key, p_visibility, public.generate_club_code(), v_uid)
-    RETURNING id INTO v_new;
-  EXCEPTION
-    WHEN unique_violation THEN
-      RETURN QUERY SELECT 'duplicate'::TEXT, NULL::UUID;
-      RETURN;
-  END;
+  -- A unique violation is either a racing duplicate of an Open club or (very rarely) the same
+  -- random join code picked twice; tell them apart and retry with a fresh code in the second case.
+  FOR v_attempt IN 1..3 LOOP
+    BEGIN
+      INSERT INTO public.clubs (name, name_key, town, town_key, visibility, join_code, created_by)
+      VALUES (v_name, v_name_key, v_town, v_town_key, p_visibility, public.generate_club_code(), v_uid)
+      RETURNING id INTO v_new;
+      EXIT;
+    EXCEPTION
+      WHEN unique_violation THEN
+        v_new := NULL;
+        IF p_visibility = 'open' THEN
+          SELECT c.id INTO v_existing
+          FROM public.clubs c
+          WHERE c.visibility = 'open'
+            AND c.name_key = v_name_key
+            AND coalesce(c.town_key, '') = coalesce(v_town_key, '');
+          IF FOUND THEN
+            RETURN QUERY SELECT 'duplicate'::TEXT, v_existing;
+            RETURN;
+          END IF;
+        END IF;
+    END;
+  END LOOP;
+
+  IF v_new IS NULL THEN
+    RETURN QUERY SELECT 'try_again'::TEXT, NULL::UUID;
+    RETURN;
+  END IF;
 
   INSERT INTO public.club_members (club_id, user_id, role) VALUES (v_new, v_uid, 'admin');
 

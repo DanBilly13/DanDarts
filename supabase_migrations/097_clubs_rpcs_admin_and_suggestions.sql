@@ -298,6 +298,17 @@ BEGIN
 
   v_reason := nullif(left(btrim(coalesce(p_reason, '')), 500), '');
 
+  -- The same person reporting the same target again within a day changes nothing.
+  IF EXISTS (
+    SELECT 1 FROM public.reports r
+    WHERE r.reporter_id = v_uid
+      AND r.target_type = p_target_type
+      AND r.target_id = p_target_id
+      AND r.created_at > now() - interval '24 hours'
+  ) THEN
+    RETURN 'ok';
+  END IF;
+
   INSERT INTO public.reports (reporter_id, target_type, target_id, reason)
   VALUES (v_uid, p_target_type, p_target_id, v_reason);
 

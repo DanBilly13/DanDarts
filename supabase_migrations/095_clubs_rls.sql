@@ -17,7 +17,6 @@ REVOKE ALL ON public.blocked_words FROM anon, authenticated;
 GRANT SELECT ON public.clubs TO authenticated;
 GRANT SELECT ON public.club_members TO authenticated;
 GRANT SELECT, DELETE ON public.club_suggestion_dismissals TO authenticated;
-GRANT INSERT ON public.reports TO authenticated;
 
 ALTER TABLE public.clubs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_members ENABLE ROW LEVEL SECURITY;
@@ -71,14 +70,11 @@ CREATE POLICY "Users can undo their dismissals"
   TO authenticated
   USING (user_id = auth.uid());
 
+-- reports: written only through report_content (097), which validates the target and drops
+-- repeat reports. Remove the direct-insert policy if an earlier draft of this file created it.
 DROP POLICY IF EXISTS "Users can file reports" ON public.reports;
-CREATE POLICY "Users can file reports"
-  ON public.reports
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (reporter_id = auth.uid());
 
--- blocked_words: RLS on and no policies, so clients cannot read or change it.
+-- reports and blocked_words: RLS on and no policies, so clients cannot read or change them directly.
 
 DO $$
 BEGIN
