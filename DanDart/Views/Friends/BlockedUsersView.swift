@@ -70,6 +70,7 @@ struct BlockedUsersView: View {
                 }
             }
         }
+        .preferredColorScheme(.dark)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
