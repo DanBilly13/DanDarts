@@ -125,3 +125,38 @@ struct ClubScreensTests {
         #expect(Destination.clubDetail(a) != Destination.findClub)
     }
 }
+
+struct ClubSuggestionTests {
+
+    private func suggestion(_ name: String, club: String? = "The Crown", shared: Int = 1) -> ClubSuggestion {
+        ClubSuggestion(id: UUID(), displayName: name, nickname: nil, avatarURL: nil, clubName: club, sharedCount: shared)
+    }
+
+    @Test func subtitleNamesTheClubAndCountsTheOthers() {
+        #expect(ClubText.suggestionSubtitle(clubName: "The Crown", sharedCount: 1) == "The Crown")
+        #expect(ClubText.suggestionSubtitle(clubName: "The Crown", sharedCount: 3) == "The Crown +2")
+        #expect(ClubText.suggestionSubtitle(clubName: nil, sharedCount: 1) == "In a club with you")
+        #expect(ClubText.suggestionSubtitle(clubName: "", sharedCount: 2) == "In a club with you")
+    }
+
+    @Test func onlyTheFirstThreeShowUntilSeeAll() {
+        let all = (1...6).map { suggestion("P\($0)") }
+        #expect(ClubSuggestionList.visible(all, showAll: false).map(\.displayName) == ["P1", "P2", "P3"])
+        #expect(ClubSuggestionList.visible(all, showAll: true).count == 6)
+        #expect(ClubSuggestionList.visible(Array(all.prefix(2)), showAll: false).count == 2)
+        #expect(ClubSuggestionList.visible([], showAll: false).isEmpty)
+    }
+
+    @Test func aFailedDismissPutsThePersonBackInPlace() {
+        let a = suggestion("A"), b = suggestion("B"), c = suggestion("C")
+        let afterDismiss = [a, c]
+        #expect(ClubSuggestionList.restoring(b, at: 1, into: afterDismiss).map(\.displayName) == ["A", "B", "C"])
+        #expect(ClubSuggestionList.restoring(b, at: 99, into: afterDismiss).map(\.displayName) == ["A", "C", "B"])
+        #expect(ClubSuggestionList.restoring(b, at: -4, into: afterDismiss).map(\.displayName) == ["B", "A", "C"])
+    }
+
+    @Test func restoringNeverDuplicatesSomeoneAlreadyListed() {
+        let a = suggestion("A")
+        #expect(ClubSuggestionList.restoring(a, at: 0, into: [a]).count == 1)
+    }
+}

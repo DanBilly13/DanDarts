@@ -10,6 +10,7 @@ import SwiftUI
 struct FriendsListView: View {
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var friendsService: FriendsService
+    @EnvironmentObject private var clubsService: ClubsService
     @StateObject private var inviteService = InviteService()
     
     @Binding var showSearch: Bool
@@ -32,6 +33,16 @@ struct FriendsListView: View {
     @State private var loadError: String?
     @State private var processingRequestId: UUID? = nil
     
+    // People who share a club with the signed-in user ("People from your clubs")
+    @State private var suggestions: [ClubSuggestion] = []
+    @State private var showAllSuggestions: Bool = false
+    @State private var addingSuggestionId: UUID? = nil
+    /// People hidden during this visit, so a reload already in flight cannot bring them back.
+    @State private var hiddenSuggestionIds: Set<UUID> = []
+    /// Only the newest reload may replace the list.
+    @State private var suggestionsLoadId: Int = 0
+    @State private var suggestionError: String? = nil
+
     // Guest players loaded from local storage
     @State private var guests: [Player] = []
     @State private var showDeleteGuestConfirmation: Bool = false
@@ -41,6 +52,40 @@ struct FriendsListView: View {
     
     private var listContent: some View {
         List {
+            // People from your clubs (hidden when there is nobody to suggest)
+            if !suggestions.isEmpty {
+                Section {
+                    ForEach(ClubSuggestionList.visible(suggestions, showAll: showAllSuggestions)) { suggestion in
+                        ClubSuggestionCard(
+                            suggestion: suggestion,
+                            isAdding: addingSuggestionId == suggestion.id,
+                            onAdd: { addSuggestion(suggestion) },
+                            onDismiss: { dismissSuggestion(suggestion) }
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    }
+                } header: {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("People from your clubs")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(AppColor.textPrimary)
+
+                        Spacer()
+
+                        if suggestions.count > ClubSuggestionList.collapsedCount {
+                            Button(showAllSuggestions ? "Show less" : "See all \(suggestions.count)") {
+                                withAnimation { showAllSuggestions.toggle() }
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(AppColor.textSecondary)
+                        }
+                    }
+                    .textCase(nil)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+
             // Received Requests Section (only show if any exist)
             if !receivedRequests.isEmpty {
                 Section {
@@ -232,11 +277,20 @@ struct FriendsListView: View {
             loadFriends()
             loadRequests()
             loadGuests()
+            loadSuggestions()
         }
         .onReceive(friendsService.$friendshipChanged) { _ in
             // Reload friends and requests when friendship changes detected
             loadFriends()
             loadRequests()
+            loadSuggestions()
+        }
+        .onChange(of: suggestions.count) { _, count in
+            if count <= ClubSuggestionList.collapsedCount { showAllSuggestions = false }
+        }
+        .onReceive(clubsService.$myClubsVersion.dropFirst()) { _ in
+            // Joining or leaving a club changes who is suggested
+            loadSuggestions()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MatchCompleted"))) { _ in
             // Reload friends when a match completes to update stats
@@ -268,6 +322,14 @@ struct FriendsListView: View {
                 .environmentObject(authService)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
+        }
+        .alert("Couldn't update suggestions", isPresented: Binding(
+            get: { suggestionError != nil },
+            set: { if !$0 { suggestionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { suggestionError = nil }
+        } message: {
+            Text(suggestionError ?? "")
         }
         .alert("Invite Error", isPresented: $showInviteError) {
             Button("OK", role: .cancel) {
@@ -330,6 +392,72 @@ struct FriendsListView: View {
         }
     }
     
+    /// Load people who share a club with me. A nice-to-have, so a failure keeps what is on screen.
+    private func loadSuggestions() {
+        suggestionsLoadId += 1
+        let loadId = suggestionsLoadId
+        Task {
+            do {
+                let loaded = try await clubsService.suggestions()
+                guard loadId == suggestionsLoadId else { return }
+                suggestions = loaded.filter { !hiddenSuggestionIds.contains($0.id) }
+            } catch {
+                guard !Task.isCancelled else { return }
+                print("❌ Load club suggestions error: \(error)")
+            }
+        }
+    }
+
+    /// Add sends a normal friend request; the person then shows under Requests Sent.
+    private func addSuggestion(_ suggestion: ClubSuggestion) {
+        guard addingSuggestionId == nil, let currentUserId = authService.currentUser?.id else { return }
+        addingSuggestionId = suggestion.id
+
+        Task {
+            defer { addingSuggestionId = nil }
+            do {
+                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: suggestion.id)
+                suggestions.removeAll { $0.id == suggestion.id }
+                NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+                loadRequests()
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch FriendsError.alreadyFriends, FriendsError.requestPending {
+                // Already handled on another device: refresh instead of showing an error
+                suggestions.removeAll { $0.id == suggestion.id }
+                loadRequests()
+                loadFriends()
+            } catch let error as FriendsError {
+                suggestionError = error.localizedDescription
+            } catch {
+                print("❌ Add club suggestion error: \(error)")
+                suggestionError = "Couldn't send the request. Check your connection and try again."
+            }
+        }
+    }
+
+    /// Hides the person straight away; puts them back if the server could not save it.
+    private func dismissSuggestion(_ suggestion: ClubSuggestion) {
+        guard let index = suggestions.firstIndex(where: { $0.id == suggestion.id }) else { return }
+        suggestions.remove(at: index)
+        hiddenSuggestionIds.insert(suggestion.id)
+
+        Task {
+            do {
+                let result = try await clubsService.dismissSuggestion(userId: suggestion.id)
+                if !result.isOk {
+                    hiddenSuggestionIds.remove(suggestion.id)
+                    suggestions = ClubSuggestionList.restoring(suggestion, at: index, into: suggestions)
+                    suggestionError = result.userMessage ?? "Please try again."
+                }
+            } catch {
+                print("❌ Dismiss club suggestion error: \(error)")
+                hiddenSuggestionIds.remove(suggestion.id)
+                suggestions = ClubSuggestionList.restoring(suggestion, at: index, into: suggestions)
+                suggestionError = "Couldn't hide this suggestion. Check your connection and try again."
+            }
+        }
+    }
+
     /// Load friends from Supabase
     private func loadFriends() {
         guard let currentUserId = authService.currentUser?.id else {

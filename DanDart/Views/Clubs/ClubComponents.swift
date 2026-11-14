@@ -95,6 +95,12 @@ enum ClubText {
         return "You can rejoin later if it's an Open club, or with its link or code."
     }
 
+    /// "The Crown", "The Crown +1" when they share more clubs with you, or a plain line if the club is unknown.
+    static func suggestionSubtitle(clubName: String?, sharedCount: Int) -> String {
+        guard let clubName, !clubName.isEmpty else { return "In a club with you" }
+        return sharedCount > 1 ? "\(clubName) +\(sharedCount - 1)" : clubName
+    }
+
     /// "Oct 2026", for the Joined figure.
     static func joinedText(_ date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).year())
