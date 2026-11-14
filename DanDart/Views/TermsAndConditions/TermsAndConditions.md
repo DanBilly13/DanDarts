@@ -39,8 +39,7 @@ You agree not to abuse or harass other users, attempt to exploit or reverse-engi
 We have zero tolerance for objectionable content or abusive behavior, including in club names, towns, display names, and avatars. Club names are checked against a list of blocked words.
 
 ## 6. Reporting and Enforcement
-You can report a club or a person from inside the app. We review reports and may remove clubs and suspend or remove accounts, at our discretion and without notice.
-You can also block people from the Friends tab.
+You can report a club, or a person in a club you belong to, from inside the app. We review reports and may remove clubs and suspend or remove accounts, at our discretion and without notice.
 
 ## 7. Availability & Changes
 We do not guarantee uninterrupted service. Features may change, be added, or removed at any time.

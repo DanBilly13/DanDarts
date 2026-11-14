@@ -30,9 +30,9 @@ If you use clubs, we store:
 - For clubs you create: the name, the optional town, whether it is Open or Invite-only, and its join code
 - Your choice for "Let club members find me" in Settings
 - People you hide from friend suggestions
-- Reports you send: who or what you reported, an optional reason, and when
+- Reports you send: who or what you reported, and when
 
-Other people can see some of this. Before joining an Open club, people can see its name, town, number of members, and up to three profile pictures of members who allow it. Once you are in a club, its members can see your display name, nickname, and profile picture. If you turn off "Let club members find me", you are left out of club previews and friend suggestions.
+Other people can see some of this. Before joining an Open club, people can see its name, town, number of members, and up to three profile pictures of members who allow it. Anyone who has the link or code of an Invite-only club can see its name, town, and number of members before joining. Once you are in a club, its members can see your display name, nickname, and profile picture. If you turn off "Let club members find me", you are left out of club previews and friend suggestions.
 
 We use the clubs you share with other people to suggest them to you as friends, and to suggest you to them, unless you have turned that off. You can hide a suggestion at any time.
 
