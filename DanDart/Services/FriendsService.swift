@@ -869,14 +869,28 @@ class FriendsService: ObservableObject {
             .execute()
             .value
         
-        if let existingFriendship = existing.first {
-            // Update existing friendship to 'blocked'
+        switch FriendshipBlockPlan.make(existing: existing, me: userId) {
+        case .reuse(let keep, let extra):
+            // One row says "I blocked them": I must be the requester, whoever sent the original request.
             try await supabaseService.client
                 .from("friendships")
-                .update(["status": "blocked"])
-                .eq("id", value: existingFriendship.id)
+                .update([
+                    "requester_id": userId.uuidString,
+                    "addressee_id": blockedUserId.uuidString,
+                    "status": "blocked"
+                ])
+                .eq("id", value: keep)
                 .execute()
-        } else {
+
+            // A pair can have a row in each direction; only one may remain.
+            for id in extra {
+                try await supabaseService.client
+                    .from("friendships")
+                    .delete()
+                    .eq("id", value: id)
+                    .execute()
+            }
+        case .insert:
             // Create new friendship record with 'blocked' status
             let friendship = Friendship(
                 requesterId: userId,
@@ -1004,6 +1018,27 @@ struct FriendRequest: Identifiable {
         formatter.unitsStyle = .full
         return formatter.localizedString(for: createdAt, relativeTo: Date())
     }
+}
+
+// MARK: - Blocking
+
+/// How to record "I blocked them" given the friendship rows that already exist between us.
+/// The blocker has to be the requester, because the block list reads rows where I am the requester.
+enum FriendshipBlockPlan: Equatable {
+    case insert
+    case reuse(keep: UUID, deleteExtra: [UUID])
+
+    static func make(existing: [Friendship], me: UUID) -> FriendshipBlockPlan {
+        guard !existing.isEmpty else { return .insert }
+        let keep = existing.first(where: { $0.requesterId == me }) ?? existing[0]
+        return .reuse(keep: keep.id, deleteExtra: existing.filter { $0.id != keep.id }.map(\.id))
+    }
+}
+
+/// What the confirmation says before blocking, the same wherever Block appears.
+enum BlockText {
+    static func title(for name: String) -> String { "Block \(name)?" }
+    static let message = "They'll be removed from your friends and can't send you friend requests or challenges. You can unblock them in Settings under Blocked Users."
 }
 
 // MARK: - Errors

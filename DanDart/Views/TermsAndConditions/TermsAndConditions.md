@@ -40,6 +40,7 @@ We have zero tolerance for objectionable content or abusive behavior, including 
 
 ## 6. Reporting and Enforcement
 You can report a club, or a person in a club you belong to, from inside the app. We review reports and may remove clubs and suspend or remove accounts, at our discretion and without notice.
+You can block a person from a club's member list, your Friends tab, or your friend suggestions, and unblock them in Settings under Blocked Users.
 
 ## 7. Availability & Changes
 We do not guarantee uninterrupted service. Features may change, be added, or removed at any time.

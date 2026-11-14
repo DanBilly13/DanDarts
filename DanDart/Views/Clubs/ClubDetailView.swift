@@ -35,6 +35,7 @@ struct ClubDetailView: View {
         case newCode
         case reportMember(ClubMember)
         case removeMember(ClubMember)
+        case blockMember(ClubMember)
     }
 
     private struct Notice: Identifiable {
@@ -447,6 +448,13 @@ struct ClubDetailView: View {
             } label: {
                 Label("Report \(member.displayName)", systemImage: "flag")
             }
+            if member.relationship != .blocked {
+                Button(role: .destructive) {
+                    pending = .blockMember(member)
+                } label: {
+                    Label("Block \(member.displayName)", systemImage: "hand.raised")
+                }
+            }
             if club.isAdmin {
                 Button(role: .destructive) {
                     pending = .removeMember(member)
@@ -521,6 +529,13 @@ struct ClubDetailView: View {
                 button: "Report",
                 isDestructive: true
             )
+        case .blockMember(let member):
+            return DialogText(
+                title: BlockText.title(for: member.displayName),
+                message: BlockText.message,
+                button: "Block",
+                isDestructive: true
+            )
         case .removeMember(let member):
             return DialogText(
                 title: "Remove \(member.displayName)?",
@@ -540,6 +555,7 @@ struct ClubDetailView: View {
         case .newCode: regenerateCode()
         case .reportMember(let member): report(.user, id: member.id, title: "Reported")
         case .removeMember(let member): remove(member)
+        case .blockMember(let member): block(member)
         }
     }
 
@@ -672,6 +688,22 @@ struct ClubDetailView: View {
             } catch {
                 print("❌ [Clubs] Remove member failed: \(error)")
                 connectionNotice("Couldn't remove \(member.displayName)")
+            }
+        }
+    }
+
+    private func block(_ member: ClubMember) {
+        guard let currentUserId = authService.currentUser?.id else { return }
+        Task {
+            do {
+                try await friendsService.blockUser(userId: currentUserId, blockedUserId: member.id)
+                setRelationship(.blocked, for: member.id)
+                NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                notice = Notice(title: "\(member.displayName) blocked", message: "You can unblock them in Settings under Blocked Users.")
+            } catch {
+                print("❌ [Clubs] Block failed: \(error)")
+                connectionNotice("Couldn't block \(member.displayName)")
             }
         }
     }
