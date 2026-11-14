@@ -70,8 +70,14 @@ struct BlockedUsersView: View {
                 }
             }
         }
-        .navigationTitle("Blocked Users")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Blocked Users")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(AppColor.textPrimary)
+            }
+        }
         .onAppear {
             loadBlockedUsers()
         }
