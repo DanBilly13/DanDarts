@@ -19,6 +19,7 @@ struct SettingsView: View {
     @StateObject private var soundManager = SoundManager.shared
     @StateObject private var gameplaySettings = GameplaySettings.shared
     @StateObject private var notificationService = NotificationService.shared
+    @StateObject private var clubsService = ClubsService()
     @Environment(\.dismiss) private var dismiss
     @State private var showLogoutConfirmation: Bool = false
     @State private var showDeleteAccountConfirmation: Bool = false
@@ -30,6 +31,10 @@ struct SettingsView: View {
     @State private var showVoicePermissionAlert = false
     @State private var showNotificationPermissionAlert = false
     @State private var voiceAlertMessage = ""
+    /// "Let club members find me": nil while loading, so the switch never shows a guess.
+    @State private var clubDiscoverable: Bool? = nil
+    @State private var clubDiscoverableLoadFailed = false
+    @State private var clubDiscoverableError: String? = nil
     
     var body: some View {
         ScrollView {
@@ -73,6 +78,15 @@ struct SettingsView: View {
             // permission can change in the Settings app. A reload with `hasLoadedState`
             // already true updates the value without a spinner or animation.
             await notificationService.loadNotificationState(force: true)
+            await loadClubDiscoverable()
+        }
+        .alert("Couldn't save that", isPresented: Binding(
+            get: { clubDiscoverableError != nil },
+            set: { if !$0 { clubDiscoverableError = nil } }
+        )) {
+            Button("OK", role: .cancel) { clubDiscoverableError = nil }
+        } message: {
+            Text(clubDiscoverableError ?? "")
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Coming back from iOS Settings after changing the notification permission.
@@ -320,6 +334,13 @@ struct SettingsView: View {
                     .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
+                // Let club members find me
+                clubDiscoverableRow
+
+                Divider()
+                    .background(AppColor.textSecondary.opacity(0.2))
+                    .padding(.leading, 44)
+
                 // Voice Chat Setting
                 voiceChatSettingRow
                 
@@ -447,6 +468,95 @@ struct SettingsView: View {
         }
     }
     
+    @ViewBuilder
+    private var clubDiscoverableRow: some View {
+        if let value = clubDiscoverable {
+            SettingsToggleRow(
+                icon: Image(systemName: "shield"),
+                title: "Let club members find me",
+                isOn: Binding(
+                    get: { value },
+                    set: { saveClubDiscoverable($0) }
+                )
+            )
+
+            Text("When this is off, you're left out of club previews and friend suggestions.")
+                .font(.footnote)
+                .foregroundColor(AppColor.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.leading, 44)
+                .padding(.bottom, 12)
+        } else if clubDiscoverableLoadFailed {
+            Button {
+                Task { await loadClubDiscoverable() }
+            } label: {
+                HStack(spacing: 16) {
+                    Image(systemName: "shield")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Let club members find me")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+                        Text("Couldn't load. Tap to try again.")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundColor(AppColor.textSecondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+        } else {
+            HStack(spacing: 16) {
+                Image(systemName: "shield")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                    .frame(width: 28)
+                Text("Let club members find me")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppColor.textPrimary)
+                Spacer()
+                ProgressView()
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+    }
+
+    private func loadClubDiscoverable() async {
+        guard let userId = authService.currentUser?.id else { return }
+        do {
+            clubDiscoverable = try await clubsService.isDiscoverable(userId: userId)
+            clubDiscoverableLoadFailed = false
+        } catch {
+            guard !Task.isCancelled else { return }
+            print("❌ [Settings] Couldn't load club_discoverable: \(error)")
+            if clubDiscoverable == nil { clubDiscoverableLoadFailed = true }
+        }
+    }
+
+    /// Shows the new choice at once and puts the old one back if it couldn't be saved.
+    private func saveClubDiscoverable(_ newValue: Bool) {
+        guard let userId = authService.currentUser?.id, let previous = clubDiscoverable, previous != newValue else { return }
+        clubDiscoverable = newValue
+        AnalyticsService.shared.logSettingsChanged(settingName: "club_discoverable", enabled: newValue)
+        Task {
+            do {
+                try await clubsService.setDiscoverable(newValue, userId: userId)
+            } catch {
+                print("❌ [Settings] Couldn't save club_discoverable: \(error)")
+                clubDiscoverable = previous
+                clubDiscoverableError = "Check your connection and try again."
+            }
+        }
+    }
+
     private var voiceChatSettingRow: some View {
         HStack(spacing: 16) {
             Image(systemName: "mic.fill")

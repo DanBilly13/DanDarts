@@ -59,6 +59,7 @@ class AuthService: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var needsProfileSetup: Bool = false // Track if new user needs profile setup
     @Published var needsPermissionsOnboarding: Bool = false // Track if new user needs to see the permissions onboarding screen
+    @Published var needsClubOnboarding: Bool = false // Track if a new account should see the optional "part of a club?" step
     @Published var isInRecoveryMode: Bool = false // Track if user is in password reset flow
     
     // MARK: - Private Properties
@@ -144,6 +145,7 @@ class AuthService: ObservableObject {
             currentUser = newUser
             needsProfileSetup = true // Mark that profile setup is needed
             needsPermissionsOnboarding = true // New sign-up will see the permissions onboarding step after profile setup
+            needsClubOnboarding = true // ...and, before that, the optional club step
             // Don't call updateAuthenticationState() yet - wait for profile setup
             
             print("🎉 Sign up complete! User: \(newUser.displayName) - Profile setup needed")
@@ -519,6 +521,7 @@ class AuthService: ObservableObject {
                 currentUser = newUser
                 needsProfileSetup = true
                 needsPermissionsOnboarding = true // New sign-up will see the permissions onboarding step after profile setup
+                needsClubOnboarding = true // ...and, before that, the optional club step
                 // Don't call updateAuthenticationState() yet - wait for profile setup
                 
                 // Skip preload for new users - they have no matches yet
@@ -715,6 +718,7 @@ class AuthService: ObservableObject {
                 currentUser = newUser
                 needsProfileSetup = true
                 needsPermissionsOnboarding = true // New sign-up will see the permissions onboarding step after profile setup
+                needsClubOnboarding = true // ...and, before that, the optional club step
                 // Don't call updateAuthenticationState() yet - wait for profile setup
                 
                 // Skip preload for new users - they have no matches yet
@@ -1395,6 +1399,11 @@ class AuthService: ObservableObject {
         // explicitly; existing user sign-in paths leave it false. ContentView routes on it.
     }
     
+    /// The optional club step is done (joined, skipped or continued); on to the permissions screen.
+    func completeClubOnboarding() {
+        needsClubOnboarding = false
+    }
+
     /// Mark the permissions onboarding screen as completed for the current user.
     /// Persists a per-user UserDefaults flag so the screen never re-appears.
     func completePermissionsOnboarding() {
@@ -1410,6 +1419,7 @@ class AuthService: ObservableObject {
         isAuthenticated = false
         needsProfileSetup = false
         needsPermissionsOnboarding = false
+        needsClubOnboarding = false
         ProfileStatsService.shared.clearPersistedStats()
     }
     
