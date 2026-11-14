@@ -21,6 +21,11 @@ struct ContentView: View {
                     ChangePasswordView()
                         .environmentObject(authService)
                         .trackScreen("ChangePassword")
+                } else if authService.isAuthenticated && authService.needsClubOnboarding {
+                    // New sign-up has finished profile setup; offer the optional "part of a club?" step
+                    ClubSignUpStepView()
+                        .environmentObject(authService)
+                        .trackScreen("ClubSignUpStep")
                 } else if authService.isAuthenticated && authService.needsPermissionsOnboarding {
                     // New sign-up has completed profile setup; show one-time permissions screen
                     PermissionsOnboardingView()

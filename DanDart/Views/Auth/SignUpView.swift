@@ -16,6 +16,7 @@ struct SignUpView: View {
     @State private var showErrors = false
     @State private var errorMessage = ""
     @State private var useEmail = false
+    @State private var hasAgreed = false
     @State private var showTerms = false
     @State private var showPrivacy = false
     @State private var isLoadingEmail = false
@@ -61,12 +62,22 @@ struct SignUpView: View {
                             .foregroundColor(AppColor.textPrimary)
                     }
                     .padding(.top, 24)
+
+                    // Age and terms: the buttons below stay off until this is ticked
+                    AgeAndTermsCheckbox(isChecked: $hasAgreed, showTerms: $showTerms, showPrivacy: $showPrivacy)
+
+                    if useEmail && !hasAgreed {
+                        Text("Tick the box above to sign up.")
+                            .font(.footnote)
+                            .foregroundColor(AppColor.textSecondary)
+                            .padding(.top, -12)
+                    }
                     
                     // Google Sign Up Button
                     AppButton(
                         role: .primary,
                         controlSize: .extraLarge,
-                        isDisabled: isAnyLoading,
+                        isDisabled: isAnyLoading || !hasAgreed,
                         compact: true,
                         action: {
                             Task { await handleGoogleSignUp() }
@@ -94,7 +105,7 @@ struct SignUpView: View {
                     AppButton(
                         role: .primary,
                         controlSize: .extraLarge,
-                        isDisabled: isAnyLoading,
+                        isDisabled: isAnyLoading || !hasAgreed,
                         compact: true,
                         action: {
                             Task {
@@ -162,7 +173,7 @@ struct SignUpView: View {
                                 password: $password,
                                 confirmPassword: $confirmPassword,
                                 isLoading: isLoadingEmail,
-                                isFormValid: isFormValid,
+                                isFormValid: SignUpGate.allowsSignUp(hasAgreed: hasAgreed, formIsValid: isFormValid),
                                 errorMessage: $errorMessage,
                                 onSubmit: {
                                     Task { await handleSignUp() }
@@ -183,9 +194,6 @@ struct SignUpView: View {
                             .padding(.top, 4)
                         }
                     }
-                    
-                    TermsAndPrivacyText(showTerms: $showTerms, showPrivacy: $showPrivacy)
-                        .padding(.top, 8)
                     
                     Button(action: {
                         onSwitchToSignIn?()
@@ -248,6 +256,11 @@ struct SignUpView: View {
         showErrors = true
         errorMessage = ""
         
+        guard hasAgreed else {
+            errorMessage = "Please confirm you're 13 or over and agree to the Terms and Privacy Policy"
+            return
+        }
+
         guard isFormValid else {
             errorMessage = "Please fill in all fields correctly"
             return
@@ -292,6 +305,7 @@ struct SignUpView: View {
     }
     
     private func handleGoogleSignUp() async {
+        guard hasAgreed else { return }
         errorMessage = ""
         isLoadingGoogle = true
         
@@ -317,6 +331,7 @@ struct SignUpView: View {
     }
     
     private func signUpWithApple() async {
+        guard hasAgreed else { return }
         errorMessage = ""
         isLoadingApple = true
         

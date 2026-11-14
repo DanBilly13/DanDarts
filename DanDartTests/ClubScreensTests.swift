@@ -160,3 +160,32 @@ struct ClubSuggestionTests {
         #expect(ClubSuggestionList.restoring(a, at: 0, into: [a]).count == 1)
     }
 }
+
+struct SignUpGateTests {
+
+    @Test func nothingIsAllowedUntilTheBoxIsTicked() {
+        #expect(!SignUpGate.allowsSignUp(hasAgreed: false))
+        #expect(!SignUpGate.allowsSignUp(hasAgreed: false, formIsValid: true))
+        #expect(SignUpGate.allowsSignUp(hasAgreed: true))
+    }
+
+    @Test func aTickedBoxStillNeedsAValidForm() {
+        #expect(!SignUpGate.allowsSignUp(hasAgreed: true, formIsValid: false))
+        #expect(SignUpGate.allowsSignUp(hasAgreed: true, formIsValid: true))
+    }
+}
+
+struct ClubOnboardingFlagTests {
+
+    @Test @MainActor func theClubStepEndsWhenCompleted() {
+        let auth = AuthService()
+        auth.needsClubOnboarding = true
+        auth.completeClubOnboarding()
+        #expect(!auth.needsClubOnboarding)
+    }
+
+    @Test @MainActor func existingUsersNeverSeeTheClubStep() {
+        let auth = AuthService()
+        #expect(!auth.needsClubOnboarding)
+    }
+}
