@@ -21,6 +21,7 @@ struct SignInView: View {
     @State private var showTerms = false
     @State private var showPrivacy = false
     @State private var showForgotPassword = false
+    @State private var hasAgreed = false
     
     // Focus state for password field
     @FocusState private var passwordFieldIsFocused: Bool
@@ -57,7 +58,7 @@ struct SignInView: View {
                         AppButton(
                             role: .primary,
                             controlSize: .extraLarge,
-                            isDisabled: isAnyLoading,
+                            isDisabled: isAnyLoading || !hasAgreed,
                             compact: true,
                             action: {
                                 Task {
@@ -87,7 +88,7 @@ struct SignInView: View {
                         AppButton(
                             role: .primary,
                             controlSize: .extraLarge,
-                            isDisabled: isAnyLoading,
+                            isDisabled: isAnyLoading || !hasAgreed,
                             compact: true,
                             action: {
                                 Task {
@@ -113,8 +114,10 @@ struct SignInView: View {
                         
                     }
                     .padding(.horizontal, 32)
-                    
-                    
+
+                    // Google and Apple also create an account for someone new, so they need the same tick-box.
+                    // Signing in with email can't create an account, so it stays open.
+                    AgeAndTermsCheckbox(isChecked: $hasAgreed, showTerms: $showTerms, showPrivacy: $showPrivacy)
                     
                     // Divider
                     HStack {
@@ -308,6 +311,7 @@ struct SignInView: View {
     
     /// Sign in with Google OAuth
     private func signInWithGoogle() async {
+        guard hasAgreed else { return }
         // Clear previous error
         errorMessage = ""
         
@@ -346,6 +350,7 @@ struct SignInView: View {
     
     /// Sign in with Apple OAuth
     private func signInWithApple() async {
+        guard hasAgreed else { return }
         // Clear previous error
         errorMessage = ""
         
