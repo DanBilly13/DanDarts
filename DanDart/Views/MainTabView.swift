@@ -311,6 +311,8 @@ struct MainTabView: View {
                 selectedTab = .clubs
                 router.popToRoot()
             }
+            // A sheet does not inherit the environment objects above it, so pass them on.
+            .environmentObject(clubsService)
             .modernSheet(title: "Join a club", detents: [.medium], background: AppColor.surfacePrimary)
         }
         .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
