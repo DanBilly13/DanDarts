@@ -64,9 +64,14 @@ struct ClubSignUpStepView: View {
                 AppButton(role: .primary, controlSize: .large, action: finish) {
                     Text("Continue")
                 }
-                AppButton(role: .tertiary, controlSize: .regular, action: finish) {
+                Button(action: finish) {
                     Text("Skip for now")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)

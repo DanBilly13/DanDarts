@@ -41,7 +41,7 @@ struct AgeAndTermsCheckbox: View {
 
             Text(attributedLabel)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundColor(AppColor.textSecondary)
                 .tint(AppColor.justWhite)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
