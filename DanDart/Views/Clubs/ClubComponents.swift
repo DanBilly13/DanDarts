@@ -124,7 +124,7 @@ struct ClubRow: View {
                 Text(ClubText.subtitle(town: club.town, memberCount: club.memberCount, extra: club.isAdmin ? "You're admin" : nil))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(AppColor.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
 
             Spacer(minLength: 8)

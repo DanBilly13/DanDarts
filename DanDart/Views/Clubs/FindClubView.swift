@@ -75,7 +75,7 @@ struct FindClubView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(AppColor.textSecondary)
 
-            TextField("Search by club name or town", text: $query)
+            TextField("Search by club name or town", text: $query, prompt: Text("Search by club name or town").foregroundColor(AppColor.textSecondary))
                 .font(.system(size: 17))
                 .foregroundColor(AppColor.textPrimary)
                 .autocorrectionDisabled()
@@ -192,7 +192,7 @@ struct FindClubView: View {
                 .foregroundColor(AppColor.textPrimary)
 
             HStack(spacing: 10) {
-                TextField("Enter club code", text: $code)
+                TextField("Enter club code", text: $code, prompt: Text("Enter club code").foregroundColor(AppColor.textSecondary))
                     .font(.system(size: 17, design: .monospaced))
                     .foregroundColor(AppColor.textPrimary)
                     .textInputAutocapitalization(.characters)

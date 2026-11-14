@@ -52,7 +52,7 @@ struct JoinClubSheet: View {
             message(
                 icon: "questionmark.circle",
                 title: "That code doesn't work",
-                detail: ClubActionResult.invalidCode.userMessage ?? "",
+                detail: "Ask the club for a new link or code.",
                 primary: ("OK", { dismiss() })
             )
         case .failed:
