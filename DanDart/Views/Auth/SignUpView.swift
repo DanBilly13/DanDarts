@@ -65,6 +65,13 @@ struct SignUpView: View {
 
                     // Age and terms: the buttons below stay off until this is ticked
                     AgeAndTermsCheckbox(isChecked: $hasAgreed, showTerms: $showTerms, showPrivacy: $showPrivacy)
+
+                    if useEmail && !hasAgreed {
+                        Text("Tick the box above to sign up.")
+                            .font(.footnote)
+                            .foregroundColor(AppColor.textSecondary)
+                            .padding(.top, -12)
+                    }
                     
                     // Google Sign Up Button
                     AppButton(

@@ -35,6 +35,7 @@ struct SettingsView: View {
     @State private var clubDiscoverable: Bool? = nil
     @State private var clubDiscoverableLoadFailed = false
     @State private var clubDiscoverableError: String? = nil
+    @State private var isSavingClubDiscoverable = false
     
     var body: some View {
         ScrollView {
@@ -78,6 +79,8 @@ struct SettingsView: View {
             // permission can change in the Settings app. A reload with `hasLoadedState`
             // already true updates the value without a spinner or animation.
             await notificationService.loadNotificationState(force: true)
+        }
+        .task {
             await loadClubDiscoverable()
         }
         .alert("Couldn't save that", isPresented: Binding(
@@ -543,12 +546,15 @@ struct SettingsView: View {
 
     /// Shows the new choice at once and puts the old one back if it couldn't be saved.
     private func saveClubDiscoverable(_ newValue: Bool) {
-        guard let userId = authService.currentUser?.id, let previous = clubDiscoverable, previous != newValue else { return }
+        guard let userId = authService.currentUser?.id, let previous = clubDiscoverable,
+              previous != newValue, !isSavingClubDiscoverable else { return }
         clubDiscoverable = newValue
-        AnalyticsService.shared.logSettingsChanged(settingName: "club_discoverable", enabled: newValue)
+        isSavingClubDiscoverable = true
         Task {
+            defer { isSavingClubDiscoverable = false }
             do {
                 try await clubsService.setDiscoverable(newValue, userId: userId)
+                AnalyticsService.shared.logSettingsChanged(settingName: "club_discoverable", enabled: newValue)
             } catch {
                 print("❌ [Settings] Couldn't save club_discoverable: \(error)")
                 clubDiscoverable = previous
