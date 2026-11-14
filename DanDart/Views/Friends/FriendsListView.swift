@@ -37,6 +37,10 @@ struct FriendsListView: View {
     @State private var suggestions: [ClubSuggestion] = []
     @State private var showAllSuggestions: Bool = false
     @State private var addingSuggestionId: UUID? = nil
+    /// People hidden during this visit, so a reload already in flight cannot bring them back.
+    @State private var hiddenSuggestionIds: Set<UUID> = []
+    /// Only the newest reload may replace the list.
+    @State private var suggestionsLoadId: Int = 0
     @State private var suggestionError: String? = nil
 
     // Guest players loaded from local storage
@@ -281,6 +285,9 @@ struct FriendsListView: View {
             loadRequests()
             loadSuggestions()
         }
+        .onChange(of: suggestions.count) { _, count in
+            if count <= ClubSuggestionList.collapsedCount { showAllSuggestions = false }
+        }
         .onReceive(clubsService.$myClubsVersion.dropFirst()) { _ in
             // Joining or leaving a club changes who is suggested
             loadSuggestions()
@@ -387,9 +394,13 @@ struct FriendsListView: View {
     
     /// Load people who share a club with me. A nice-to-have, so a failure keeps what is on screen.
     private func loadSuggestions() {
+        suggestionsLoadId += 1
+        let loadId = suggestionsLoadId
         Task {
             do {
-                suggestions = try await clubsService.suggestions()
+                let loaded = try await clubsService.suggestions()
+                guard loadId == suggestionsLoadId else { return }
+                suggestions = loaded.filter { !hiddenSuggestionIds.contains($0.id) }
             } catch {
                 guard !Task.isCancelled else { return }
                 print("❌ Load club suggestions error: \(error)")
@@ -428,16 +439,19 @@ struct FriendsListView: View {
     private func dismissSuggestion(_ suggestion: ClubSuggestion) {
         guard let index = suggestions.firstIndex(where: { $0.id == suggestion.id }) else { return }
         suggestions.remove(at: index)
+        hiddenSuggestionIds.insert(suggestion.id)
 
         Task {
             do {
                 let result = try await clubsService.dismissSuggestion(userId: suggestion.id)
                 if !result.isOk {
+                    hiddenSuggestionIds.remove(suggestion.id)
                     suggestions = ClubSuggestionList.restoring(suggestion, at: index, into: suggestions)
                     suggestionError = result.userMessage ?? "Please try again."
                 }
             } catch {
                 print("❌ Dismiss club suggestion error: \(error)")
+                hiddenSuggestionIds.remove(suggestion.id)
                 suggestions = ClubSuggestionList.restoring(suggestion, at: index, into: suggestions)
                 suggestionError = "Couldn't hide this suggestion. Check your connection and try again."
             }
