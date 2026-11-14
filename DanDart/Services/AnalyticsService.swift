@@ -76,6 +76,13 @@ class AnalyticsService {
         Analytics.logEvent("friend_searched", parameters: nil)
     }
     
+    // MARK: - Club Events
+
+    /// See `ClubAnalyticsEvent`. Android logs the same events and parameters.
+    func logClub(_ event: ClubAnalyticsEvent) {
+        Analytics.logEvent(event.name, parameters: event.parameters)
+    }
+
     // MARK: - Engagement Events
     
     func logMatchHistoryViewed(totalMatches: Int) {

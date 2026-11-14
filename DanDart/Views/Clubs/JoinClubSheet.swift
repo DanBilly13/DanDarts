@@ -105,7 +105,7 @@ struct JoinClubSheet: View {
                     }
                 } else {
                     AppButton(role: .primary, controlSize: .regular, isDisabled: isJoining) {
-                        join()
+                        join(visibility: club.visibility)
                     } label: {
                         if isJoining {
                             ProgressView().tint(AppColor.justWhite)
@@ -178,14 +178,14 @@ struct JoinClubSheet: View {
         }
     }
 
-    private func join() {
+    private func join(visibility: ClubVisibility) {
         guard !isJoining else { return }
         isJoining = true
         errorMessage = nil
         Task {
             defer { isJoining = false }
             do {
-                let outcome = try await clubsService.joinClub(code: code)
+                let outcome = try await clubsService.joinClub(code: code, source: .link, visibility: visibility)
                 switch outcome.result {
                 case .ok, .alreadyMember:
                     dismiss()
