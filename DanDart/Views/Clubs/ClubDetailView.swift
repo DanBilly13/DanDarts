@@ -184,7 +184,7 @@ struct ClubDetailView: View {
     private var shareButton: some View {
         if club.shareURL != nil {
             AppButton(role: .primary, controlSize: .large) {
-                showShareSheet = true
+                shareLink()
             } label: {
                 Label("Share club link", systemImage: "square.and.arrow.up")
             }
@@ -241,7 +241,7 @@ struct ClubDetailView: View {
                 }
 
                 AppButton(role: .primary, controlSize: .regular) {
-                    showShareSheet = true
+                    shareLink()
                 } label: {
                     Label("Share link", systemImage: "square.and.arrow.up")
                 }
@@ -252,8 +252,15 @@ struct ClubDetailView: View {
         }
     }
 
+    /// Opens the share sheet. Counts as sharing when it is opened, since the sheet does not say what the person picked.
+    private func shareLink() {
+        AnalyticsService.shared.logClub(.shared)
+        showShareSheet = true
+    }
+
     private func copyLink() {
         guard let url = club.shareURL else { return }
+        AnalyticsService.shared.logClub(.shared)
         UIPasteboard.general.string = url.absoluteString
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         justCopied = true

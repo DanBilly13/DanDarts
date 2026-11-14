@@ -274,7 +274,7 @@ struct ClubSignUpStepView: View {
         Task {
             defer { joiningId = nil }
             do {
-                let outcome = try await clubsService.joinClub(clubId: club.id)
+                let outcome = try await clubsService.joinClub(clubId: club.id, source: .signup)
                 switch outcome.result {
                 case .ok, .alreadyMember:
                     joinedIds.insert(club.id)
@@ -298,7 +298,7 @@ struct ClubSignUpStepView: View {
         Task {
             defer { isJoiningByCode = false }
             do {
-                let outcome = try await clubsService.joinClub(code: clean)
+                let outcome = try await clubsService.joinClub(code: clean, source: .signup)
                 switch outcome.result {
                 case .ok:
                     code = ""
@@ -349,7 +349,7 @@ struct ClubSignUpStepView: View {
         duplicateClubId = nil
         Task {
             do {
-                let outcome = try await clubsService.joinClub(clubId: id)
+                let outcome = try await clubsService.joinClub(clubId: id, source: .signup)
                 switch outcome.result {
                 case .ok, .alreadyMember:
                     joinedIds.insert(id)

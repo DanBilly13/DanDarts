@@ -1,6 +1,6 @@
 # Privacy Policy – Dart Freak
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-11-14_
 
 Dart Freak respects your privacy. This Privacy Policy explains what information we collect, how we use it, and your rights as a user.
 
@@ -24,6 +24,18 @@ To provide core app functionality, we store:
 
 This data is associated with your account and used only within Dart Freak.
 
+### Clubs
+If you use clubs, we store:
+- The clubs you create or join, when you joined, and whether you are the admin
+- For clubs you create: the name, the optional town, whether it is Open or Invite-only, and its join code
+- Your choice for "Let club members find me" in Settings
+- People you hide from friend suggestions
+- Reports you send: who or what you reported, and when
+
+Other people can see some of this. Before joining an Open club, people can see its name, town, number of members, and up to three profile pictures of members who allow it. Anyone who has the link or code of an Invite-only club can see its name, town, and number of members before joining. Once you are in a club, its members can see your display name, nickname, and profile picture. If you turn off "Let club members find me", you are left out of club previews and friend suggestions.
+
+We use the clubs you share with other people to suggest them to you as friends, and to suggest you to them, unless you have turned that off. You can hide a suggestion at any time.
+
 ### Camera & Photos
 If you choose to set a profile photo, Dart Freak requests camera access so you can take a picture. Photos are only used for your profile avatar and are stored with your account. We do not access your photo library or camera for any other purpose.
 
@@ -35,7 +47,7 @@ If you enable notifications, we register your device with Apple Push Notificatio
 
 ### Analytics & Diagnostics
 We collect limited technical data to improve app quality:
-- App usage events (via Firebase Analytics)
+- App usage events (via Firebase Analytics), including whether you create, join, leave, or share a club. We do not record what you type in search or the names of clubs.
 - Crash reports and diagnostics (via Firebase Crashlytics)
 - Performance data (via Firebase Performance Monitoring)
 - Device type, OS version, and app version
@@ -45,7 +57,9 @@ This data is pseudonymous and is not used for advertising or for tracking you ac
 ## 2. How We Use Your Data
 We use your data to:
 - Create and manage your account
-- Enable gameplay, social, and voice features
+- Enable gameplay, social, club, and voice features
+- Suggest people you may know from your clubs
+- Review reports and keep the app safe
 - Send you relevant notifications
 - Improve app stability and performance
 - Understand which features are used
@@ -64,20 +78,23 @@ Dart Freak uses the following third-party services:
 ## 4. Data Retention
 We retain your data for as long as your account is active.
 
-If you delete your account, your account information, profile data, and match history will be permanently deleted from our systems within a reasonable timeframe.
+If you delete your account, your account information, profile data, club memberships, and match history will be permanently deleted from our systems within a reasonable timeframe. A club you ran passes to another member, or is deleted if no one else is in it. Reports you sent are kept so we can act on them, but they are no longer linked to your account.
 
 ## 5. Your Rights
 You have the right to:
 - Access your personal data
 - Update or correct your information
 - Delete your account from within the app
+- Leave any club at any time, and turn off "Let club members find me" in Settings
 - Request data deletion or export via support
 
 ## 6. Security
 We take reasonable measures to protect your data, including secure authentication, encrypted connections, and restricted access.
 
 ## 7. Children’s Privacy
-Dart Freak is not intended for children under 13.
+Dart Freak is not intended for children under 13, and you must be at least 13 to create an account. When you sign up, we ask you to confirm that you are 13 or over. We do not store your date of birth or this confirmation.
+
+We do not knowingly collect personal information from children under 13. If you believe a child under 13 has an account, contact us at support@dartfreak.com and we will delete it.
 
 ## 8. Changes to This Policy
 We may update this Privacy Policy from time to time. Changes will be posted on this page.

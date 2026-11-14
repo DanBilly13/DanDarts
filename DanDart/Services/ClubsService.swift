@@ -104,22 +104,32 @@ final class ClubsService: ObservableObject {
             town: (trimmedTown?.isEmpty ?? true) ? nil : trimmedTown,
             visibility: visibility.rawValue
         )
-        return noteChange(in: try await outcome("create_club", params: params))
+        let result = noteChange(in: try await outcome("create_club", params: params))
+        if result.result.isOk { AnalyticsService.shared.logClub(.created(visibility: visibility)) }
+        return result
     }
 
-    /// One-tap join for Open clubs.
-    func joinClub(clubId: UUID) async throws -> ClubOutcome {
-        noteChange(in: try await outcome("join_club", params: ClubIdParams(clubId: clubId)))
+    /// One-tap join for Open clubs (joining by id only works for Open ones), so the visibility is known.
+    func joinClub(clubId: UUID, source: ClubJoinSource = .search) async throws -> ClubOutcome {
+        let result = noteChange(in: try await outcome("join_club", params: ClubIdParams(clubId: clubId)))
+        if result.result.isOk { AnalyticsService.shared.logClub(.joined(source: source, visibility: .open)) }
+        return result
     }
 
     /// Joins any club, Open or Invite-only. Spaces, dashes and case in the code don't matter.
-    func joinClub(code: String) async throws -> ClubOutcome {
-        noteChange(in: try await outcome("join_club_by_code", params: CodeParams(code: code)))
+    /// `visibility` is passed when the caller already showed a preview of the club.
+    func joinClub(code: String, source: ClubJoinSource = .code, visibility: ClubVisibility? = nil) async throws -> ClubOutcome {
+        let result = noteChange(in: try await outcome("join_club_by_code", params: CodeParams(code: code)))
+        if result.result.isOk { AnalyticsService.shared.logClub(.joined(source: source, visibility: visibility)) }
+        return result
     }
 
     func leaveClub(clubId: UUID) async throws -> ClubActionResult {
         let result = try await code("leave_club", params: ClubIdParams(clubId: clubId))
-        if result.isOk { myClubsVersion += 1 }
+        if result.isOk {
+            myClubsVersion += 1
+            AnalyticsService.shared.logClub(.left)
+        }
         return result
     }
 
@@ -174,7 +184,9 @@ final class ClubsService: ObservableObject {
     }
 
     func report(_ target: ReportTarget, id: UUID, reason: String? = nil) async throws -> ClubActionResult {
-        try await code("report_content", params: ReportParams(targetType: target.rawValue, targetId: id, reason: reason))
+        let result = try await code("report_content", params: ReportParams(targetType: target.rawValue, targetId: id, reason: reason))
+        if result.isOk { AnalyticsService.shared.logClub(.reported(target: target)) }
+        return result
     }
 
     // MARK: - "Let club members find me"

@@ -277,7 +277,7 @@ struct FriendsListView: View {
             loadFriends()
             loadRequests()
             loadGuests()
-            loadSuggestions()
+            loadSuggestions(logView: true)
         }
         .onReceive(friendsService.$friendshipChanged) { _ in
             // Reload friends and requests when friendship changes detected
@@ -393,7 +393,8 @@ struct FriendsListView: View {
     }
     
     /// Load people who share a club with me. A nice-to-have, so a failure keeps what is on screen.
-    private func loadSuggestions() {
+    /// `logView` is true only when the Friends tab appears, so reloads don't count as new views.
+    private func loadSuggestions(logView: Bool = false) {
         suggestionsLoadId += 1
         let loadId = suggestionsLoadId
         Task {
@@ -401,6 +402,9 @@ struct FriendsListView: View {
                 let loaded = try await clubsService.suggestions()
                 guard loadId == suggestionsLoadId else { return }
                 suggestions = loaded.filter { !hiddenSuggestionIds.contains($0.id) }
+                if logView && !suggestions.isEmpty {
+                    AnalyticsService.shared.logClub(.suggestionsViewed(count: suggestions.count))
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 print("❌ Load club suggestions error: \(error)")
@@ -418,6 +422,7 @@ struct FriendsListView: View {
             do {
                 try await friendsService.sendFriendRequest(userId: currentUserId, friendId: suggestion.id)
                 suggestions.removeAll { $0.id == suggestion.id }
+                AnalyticsService.shared.logClub(.suggestionAdded)
                 NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
                 loadRequests()
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -444,7 +449,9 @@ struct FriendsListView: View {
         Task {
             do {
                 let result = try await clubsService.dismissSuggestion(userId: suggestion.id)
-                if !result.isOk {
+                if result.isOk {
+                    AnalyticsService.shared.logClub(.suggestionDismissed)
+                } else {
                     hiddenSuggestionIds.remove(suggestion.id)
                     suggestions = ClubSuggestionList.restoring(suggestion, at: index, into: suggestions)
                     suggestionError = result.userMessage ?? "Please try again."
