@@ -11,6 +11,7 @@ enum SettingsDestination: Hashable {
     case privacy
     case terms
     case support
+    case blockedUsers
 }
 
 struct SettingsView: View {
@@ -351,6 +352,36 @@ struct SettingsView: View {
                     .background(AppColor.textSecondary.opacity(0.2))
                     .padding(.leading, 44)
                 
+                NavigationLink(value: SettingsDestination.blockedUsers) {
+                    HStack(spacing: 16) {
+                        Image(systemName: "hand.raised")
+                            .resizable()
+                            .renderingMode(.template)
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 20, height: 20)
+                            .foregroundColor(AppColor.interactivePrimaryBackground)
+                            .frame(width: 28)
+
+                        Text("Blocked Users")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppColor.textPrimary)
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColor.textSecondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                Divider()
+                    .background(AppColor.textSecondary.opacity(0.2))
+                    .padding(.leading, 44)
+
                 NavigationLink(value: SettingsDestination.support) {
                     HStack(spacing: 16) {
                         Image(systemName: "questionmark.circle")

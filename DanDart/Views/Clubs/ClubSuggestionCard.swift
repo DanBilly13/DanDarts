@@ -13,6 +13,7 @@ struct ClubSuggestionCard: View {
     let isAdding: Bool
     let onAdd: () -> Void
     let onDismiss: () -> Void
+    let onBlock: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -67,6 +68,11 @@ struct ClubSuggestionCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppColor.inputBackground)
         .clipShape(Capsule())
+        .contextMenu {
+            Button(role: .destructive, action: onBlock) {
+                Label("Block \(suggestion.displayName)", systemImage: "hand.raised")
+            }
+        }
     }
 }
 

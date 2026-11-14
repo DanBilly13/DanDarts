@@ -321,6 +321,7 @@ struct MainTabView: View {
         .fullScreenCover(isPresented: $showProfile) {
             ProfileView()
                 .environmentObject(authService)
+                .environmentObject(friendsService)
         }
         .onAppear {
             // Wire router closures to @State path (coalesced to next runloop)

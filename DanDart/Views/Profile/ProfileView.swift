@@ -157,6 +157,9 @@ struct ProfileView: View {
                 case .support:
                     Support()
                         .background(AppColor.surfacePrimary)
+                case .blockedUsers:
+                    BlockedUsersView()
+                        .background(AppColor.surfacePrimary)
                 }
             }
         }

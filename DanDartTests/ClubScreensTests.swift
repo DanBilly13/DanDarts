@@ -189,3 +189,38 @@ struct ClubOnboardingFlagTests {
         #expect(!auth.needsClubOnboarding)
     }
 }
+
+struct BlockTests {
+
+    private func row(_ requester: UUID, _ addressee: UUID, status: String = "accepted") -> Friendship {
+        Friendship(requesterId: requester, addresseeId: addressee, status: status, createdAt: Date())
+    }
+
+    @Test func blockingAStrangerInsertsANewRow() {
+        #expect(FriendshipBlockPlan.make(existing: [], me: UUID()) == .insert)
+    }
+
+    @Test func blockingSomeoneWhoSentTheRequestReusesTheirRow() {
+        let me = UUID(), them = UUID()
+        let theirs = row(them, me)
+        #expect(FriendshipBlockPlan.make(existing: [theirs], me: me) == .reuse(keep: theirs.id, deleteExtra: []))
+    }
+
+    @Test func blockingSomeoneIAskedReusesMyRow() {
+        let me = UUID(), them = UUID()
+        let mine = row(me, them, status: "pending")
+        #expect(FriendshipBlockPlan.make(existing: [mine], me: me) == .reuse(keep: mine.id, deleteExtra: []))
+    }
+
+    @Test func aPairWithRowsBothWaysKeepsMineAndDropsTheOther() {
+        let me = UUID(), them = UUID()
+        let theirs = row(them, me, status: "pending")
+        let mine = row(me, them, status: "pending")
+        #expect(FriendshipBlockPlan.make(existing: [theirs, mine], me: me) == .reuse(keep: mine.id, deleteExtra: [theirs.id]))
+    }
+
+    @Test func theConfirmationNamesThePersonAndSaysHowToUndo() {
+        #expect(BlockText.title(for: "Nina") == "Block Nina?")
+        #expect(BlockText.message.contains("Blocked Users"))
+    }
+}

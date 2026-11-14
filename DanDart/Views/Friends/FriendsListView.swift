@@ -23,6 +23,14 @@ struct FriendsListView: View {
     @State private var showInviteError: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var friendToDelete: Player? = nil
+    @State private var personToBlock: PersonToBlock? = nil
+
+    /// Someone the signed-in user is about to block, from a friend row or a suggestion.
+    private struct PersonToBlock: Identifiable {
+        let userId: UUID
+        let name: String
+        var id: UUID { userId }
+    }
     
     // Friends data loaded from Supabase
     @State private var friends: [Player] = []
@@ -60,7 +68,8 @@ struct FriendsListView: View {
                             suggestion: suggestion,
                             isAdding: addingSuggestionId == suggestion.id,
                             onAdd: { addSuggestion(suggestion) },
-                            onDismiss: { dismissSuggestion(suggestion) }
+                            onDismiss: { dismissSuggestion(suggestion) },
+                            onBlock: { personToBlock = PersonToBlock(userId: suggestion.id, name: suggestion.displayName) }
                         )
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     }
@@ -169,6 +178,16 @@ struct FriendsListView: View {
                                     .foregroundColor(.red)
                             }
                             .tint(.clear)
+
+                            if let userId = friend.userId {
+                                Button {
+                                    personToBlock = PersonToBlock(userId: userId, name: friend.displayName)
+                                } label: {
+                                    Image(systemName: "hand.raised")
+                                        .foregroundColor(.orange)
+                                }
+                                .tint(.clear)
+                            }
                         }
                     }
                 } header: {
@@ -351,6 +370,18 @@ struct FriendsListView: View {
                 Text("Are you sure you want to remove \(friend.displayName) from your friends?")
             }
         }
+        .alert(personToBlock.map { BlockText.title(for: $0.name) } ?? "Block?", isPresented: Binding(
+            get: { personToBlock != nil },
+            set: { if !$0 { personToBlock = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { personToBlock = nil }
+            Button("Block", role: .destructive) {
+                if let person = personToBlock { block(person) }
+                personToBlock = nil
+            }
+        } message: {
+            Text(BlockText.message)
+        }
         .alert("Delete Guest?", isPresented: $showDeleteGuestConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -507,6 +538,33 @@ struct FriendsListView: View {
         showSuccessAlert = true
     }
     
+    /// Block someone. They leave the friends, requests and suggestions lists straight away.
+    private func block(_ person: PersonToBlock) {
+        guard let currentUserId = authService.currentUser?.id else { return }
+
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        friends.removeAll { $0.userId == person.userId }
+        suggestions.removeAll { $0.id == person.userId }
+
+        Task {
+            do {
+                try await friendsService.blockUser(userId: currentUserId, blockedUserId: person.userId)
+                successMessage = "\(person.name) blocked"
+                showSuccessAlert = true
+                loadFriends()
+                loadRequests()
+                loadSuggestions()
+            } catch {
+                print("❌ Block error: \(error)")
+                // Put everything back as the server has it
+                loadFriends()
+                loadRequests()
+                loadSuggestions()
+                suggestionError = "Couldn't block \(person.name). Check your connection and try again."
+            }
+        }
+    }
+
     /// Remove friend with confirmation
     private func removeFriend(_ player: Player) {
         guard let currentUserId = authService.currentUser?.id,
