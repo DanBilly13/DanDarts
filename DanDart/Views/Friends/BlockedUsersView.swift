@@ -9,7 +9,6 @@
 import SwiftUI
 
 struct BlockedUsersView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var friendsService: FriendsService
     
@@ -71,28 +70,8 @@ struct BlockedUsersView: View {
                 }
             }
         }
+        .navigationTitle("Blocked Users")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Blocked Users")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(AppColor.textPrimary)
-            }
-            
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    dismiss()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                        Text("Back")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
-                }
-            }
-        }
         .onAppear {
             loadBlockedUsers()
         }
