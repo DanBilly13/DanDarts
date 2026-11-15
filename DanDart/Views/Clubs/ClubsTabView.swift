@@ -76,7 +76,6 @@ struct ClubsTabView: View {
                 imageName: "empty-friends",
                 title: "Join your darts club",
                 message: "Find your pub team or darts club, or start one for your mates.",
-                secondaryMessage: "People from your clubs show up as friend suggestions in the Friends tab.",
                 actionTitle: "Find a club",
                 action: { router.push(.findClub) }
             )
@@ -119,13 +118,6 @@ struct ClubsTabView: View {
             }
 
             haveACodeButton
-
-            Text("People from your clubs show up as friend suggestions in the Friends tab.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppColor.textSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 300)
-                .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 24)
