@@ -77,7 +77,7 @@ struct ClubsTabView: View {
                 title: "Join your darts club",
                 message: "Find your pub team or darts club, or start one for your mates.",
                 secondaryMessage: "People from your clubs show up as friend suggestions in the Friends tab.",
-                actionTitle: "Find or create a club",
+                actionTitle: "Find a club",
                 action: { router.push(.findClub) }
             )
 
@@ -115,7 +115,7 @@ struct ClubsTabView: View {
             AppButton(role: .primary, controlSize: .large) {
                 router.push(.findClub)
             } label: {
-                Label("Find or create a club", systemImage: "magnifyingglass")
+                Label("Find a club", systemImage: "magnifyingglass")
             }
 
             haveACodeButton

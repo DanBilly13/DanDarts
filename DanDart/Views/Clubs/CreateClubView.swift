@@ -3,7 +3,8 @@
 //  Dart Freak
 //
 //  Create a club: a name, an optional town to tell same-named pubs apart, and whether it is
-//  Open (found in search, one-tap join) or Invite-only (joined with a link or code).
+//  Open (found in search, one-tap join) or Invite-only (joined with a link or code). Kept to
+//  placeholders and one short line per choice, so the form reads at a glance.
 //
 
 import SwiftUI
@@ -45,29 +46,19 @@ struct CreateClubView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    DartTextField(
-                        label: "Club name",
-                        placeholder: "The Red Lion Arrows",
-                        text: $name,
-                        autocapitalization: .words,
-                        submitLabel: .next
-                    )
+                VStack(alignment: .leading, spacing: 12) {
+                    // The titles are the VoiceOver labels; sighted people read the placeholders.
+                    TextField("Club name", text: $name, prompt: Text("Club name").foregroundColor(AppColor.textSecondary))
+                        .textFieldStyle(DartTextFieldStyle())
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.next)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        DartTextField(
-                            label: "Town (optional)",
-                            placeholder: "Leeds",
-                            text: $town,
-                            autocapitalization: .words
-                        )
-                        Text("Helps people tell apart pubs with the same name.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
-                            .padding(.horizontal, 4)
-                    }
+                    TextField("Town", text: $town, prompt: Text("Town (optional)").foregroundColor(AppColor.textSecondary))
+                        .textFieldStyle(DartTextFieldStyle())
+                        .textInputAutocapitalization(.words)
 
                     visibilityChoice
+                        .padding(.top, 8)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -118,26 +109,9 @@ struct CreateClubView: View {
     // MARK: - Open / Invite-only
 
     private var visibilityChoice: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Who can join?")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(AppColor.textPrimary)
-
-            visibilityCard(
-                .open,
-                title: "Open",
-                detail: "Anyone can find it in search and join with one tap. Best for pub teams and darts clubs."
-            )
-            visibilityCard(
-                .invite,
-                title: "Invite-only",
-                detail: "Hidden from search. People join with a link or code that you share. Best for groups of mates."
-            )
-
-            Text("You can change this later in the club settings.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppColor.textSecondary)
-                .padding(.horizontal, 4)
+        VStack(alignment: .leading, spacing: 12) {
+            visibilityCard(.open, title: "Open", detail: "Anyone can find it and join")
+            visibilityCard(.invite, title: "Invite-only", detail: "Hidden. People join with a link or code")
         }
     }
 
@@ -146,13 +120,12 @@ struct CreateClubView: View {
         return Button {
             visibility = option
         } label: {
-            HStack(alignment: .top, spacing: 14) {
+            HStack(spacing: 14) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 22))
                     .foregroundColor(selected ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
-                    .padding(.top, 1)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .foregroundColor(AppColor.textPrimary)
@@ -163,7 +136,8 @@ struct CreateClubView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppColor.inputBackground)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
