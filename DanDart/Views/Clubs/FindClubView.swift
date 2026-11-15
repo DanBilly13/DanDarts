@@ -109,14 +109,7 @@ struct FindClubView: View {
     @ViewBuilder
     private var results: some View {
         if !hasSearchableQuery {
-            VStack(spacing: 8) {
-                Text("Search for your pub team or darts club")
-                    .font(.subheadline)
-                    .foregroundColor(AppColor.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            EmptyView()
         } else if clubsService.isSearching {
             ProgressView()
                 .tint(AppColor.interactivePrimaryBackground)
@@ -218,11 +211,6 @@ struct FindClubView: View {
                 }
                 .frame(width: 84)
             }
-
-            Text("Codes work for Open and Invite-only clubs.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppColor.textSecondary)
-                .padding(.horizontal, 4)
         }
     }
 
