@@ -16,6 +16,7 @@ struct MainTabView: View {
     @StateObject private var remoteMatchService = RemoteMatchService()
     @StateObject private var voiceChatService = VoiceChatService.shared
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     @State private var pendingChallengeCount: Int = 0
@@ -170,6 +171,7 @@ struct MainTabView: View {
                         showProfile: $showProfile,
                         selectedTab: $selectedTab
                     )
+                    .safeAreaInset(edge: .top) { TrialBanner() }
                     .tabItem {
                         Image(systemName: "target")
                             .font(.system(size: 17, weight: .semibold))
@@ -314,6 +316,15 @@ struct MainTabView: View {
             // A sheet does not inherit the environment objects above it, so pass them on.
             .environmentObject(clubsService)
             .modernSheet(title: "Join a club", detents: [.medium], background: AppColor.surfacePrimary)
+        }
+        .sheet(item: $entitlements.paywall) { reason in
+            PaywallView(reason: reason)
+                .modernSheet(title: "DartFreak Full", detents: [.large], background: AppColor.surfacePrimary)
+        }
+        .task { entitlements.start() }
+        .task(id: authService.currentUser?.id) {
+            await entitlements.refresh()
+            showTrialEndedOnce()
         }
         .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
             presentPendingClubCode()
@@ -473,6 +484,16 @@ struct MainTabView: View {
         }
     }
     
+    /// The "your 4 weeks are up" screen, once per account, the first time we notice.
+    private func showTrialEndedOnce() {
+        guard let userId = authService.currentUser?.id,
+              entitlements.state == .free else { return }
+        let key = "trialEndedNoticeShown.\(userId.uuidString)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        entitlements.showPaywall(.trialEnded)
+    }
+
     /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).
     private func presentPendingClubCode() {
         guard clubCodeToJoin == nil, authService.currentUser != nil,
