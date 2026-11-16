@@ -1,0 +1,41 @@
+//
+//  PaidFeatureTests.swift
+//  DanDartTests
+//
+//  301 and 501 stay free forever; every other game needs DartFreak Full after the trial.
+//
+
+import Testing
+@testable import DanDart
+
+struct PaidFeatureTests {
+
+    @Test func threeOhOneAndFiveOhOneAreFree() {
+        #expect(GameAccess.isFree(gameType: "301"))
+        #expect(GameAccess.isFree(gameType: "501"))
+        #expect(GameAccess.isFree(gameType: " 501 "))
+    }
+
+    @Test func partyGamesAreNotFree() {
+        for type in ["cricket", "Cricket", "halve_it", "halve it", "knockout", "sudden_death", "sudden death", "killer", "Killer"] {
+            #expect(!GameAccess.isFree(gameType: type), "\(type) should be locked")
+        }
+    }
+
+    @Test func everyFeatureHasCopy() {
+        for feature in PaidFeature.allCases {
+            #expect(!feature.lockedTitle.isEmpty)
+            #expect(!feature.lockedMessage.isEmpty)
+        }
+    }
+
+    @Test func paywallReasonsHaveDistinctIds() {
+        let reasons = PaidFeature.allCases.map(PaywallReason.feature) + [.trialEnded]
+        #expect(Set(reasons.map(\.id)).count == reasons.count)
+    }
+
+    @Test func lockedErrorNamesTheFeature() {
+        let error = PaidFeatureLockedError(feature: .remoteMatches)
+        #expect(error.errorDescription == "Remote matches need DartFreak Full.")
+    }
+}

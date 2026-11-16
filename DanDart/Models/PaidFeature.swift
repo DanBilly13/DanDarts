@@ -1,0 +1,83 @@
+//
+//  PaidFeature.swift
+//  DanDart
+//
+//  The parts of DartFreak that need DartFreak Full once the 4-week trial ends.
+//  Everything else (account, local 301/501, friends, history list) is free forever.
+//  Locks only change what is SHOWN. Match data is always saved for everyone.
+//
+
+import Foundation
+
+enum PaidFeature: String, CaseIterable, Identifiable {
+    case partyGames
+    case remoteMatches
+    case clubs
+    case headToHead
+    case fullStats
+    case fullHistory
+
+    var id: String { rawValue }
+
+    var lockedTitle: String {
+        switch self {
+        case .partyGames: return "More games"
+        case .remoteMatches: return "Remote matches"
+        case .clubs: return "Clubs"
+        case .headToHead: return "Head-to-head"
+        case .fullStats: return "Your full stats"
+        case .fullHistory: return "Match details"
+        }
+    }
+
+    var lockedMessage: String {
+        switch self {
+        case .partyGames: return "Cricket, Halve-It, Knockout, Sudden Death and Killer come with DartFreak Full."
+        case .remoteMatches: return "Play your mates live from anywhere, with voice chat."
+        case .clubs: return "Join and run clubs with the people you play with."
+        case .headToHead: return "See who's really winning between you two."
+        case .fullStats: return "Your trends, scoring and personal bests have been saved since day one."
+        case .fullHistory: return "Every throw of this match has been saved. Unlock to see it."
+        }
+    }
+}
+
+/// Why the unlock screen is showing.
+enum PaywallReason: Identifiable, Equatable {
+    case feature(PaidFeature)
+    case trialEnded
+
+    var id: String {
+        switch self {
+        case .feature(let feature): return "feature-\(feature.rawValue)"
+        case .trialEnded: return "trial-ended"
+        }
+    }
+
+    var analyticsName: String {
+        switch self {
+        case .feature(let feature): return feature.rawValue
+        case .trialEnded: return "trial_ended"
+        }
+    }
+}
+
+enum GameAccess {
+    /// Game types that are free forever. Matched against both stored `gameType`
+    /// values and local game titles, which are "301" and "501" for these two.
+    static let freeGameTypes: Set<String> = ["301", "501"]
+
+    static func isFree(gameType: String) -> Bool {
+        freeGameTypes.contains(gameType.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+}
+
+/// Thrown by service-level guards so a locked feature can't start by a side route
+/// (a rematch button or a notification), even if a view forgot to check.
+struct PaidFeatureLockedError: LocalizedError {
+    let feature: PaidFeature
+
+    var errorDescription: String? {
+        "\(feature.lockedTitle) need DartFreak Full."
+    }
+}
