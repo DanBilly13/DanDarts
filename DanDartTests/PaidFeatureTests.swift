@@ -50,8 +50,16 @@ struct PaidFeatureTests {
     }
 
     @Test func paywallReasonsHaveDistinctIds() {
-        let reasons = PaidFeature.allCases.map(PaywallReason.feature) + [.trialEnded]
+        let reasons = PaidFeature.allCases.map(PaywallReason.feature) + [.trialEnded, .trialEnding(daysLeft: 3)]
         #expect(Set(reasons.map(\.id)).count == reasons.count)
+        #expect(Set(reasons.map(\.analyticsName)).count == reasons.count)
+    }
+
+    @Test func trialEndingCopyCountsTheDaysLeft() {
+        #expect(PaywallReason.trialEnding(daysLeft: 3).headline == "3 days left of your free trial")
+        #expect(PaywallReason.trialEnding(daysLeft: 1).headline == "1 day left of your free trial")
+        #expect(PaywallReason.trialEnding(daysLeft: 3).analyticsName == "trial_ending")
+        #expect(PaywallReason.trialEnding(daysLeft: 3).headline != PaywallReason.trialEnded.headline)
     }
 
     @Test func lockedErrorNamesTheFeature() {

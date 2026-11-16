@@ -23,11 +23,11 @@ struct PaywallView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(headline)
+                    Text(reason.headline)
                         .font(.system(.title2, design: .rounded))
                         .fontWeight(.bold)
                         .foregroundColor(AppColor.textPrimary)
-                    Text(subheadline)
+                    Text(reason.subheadline)
                         .font(.system(size: 15))
                         .foregroundColor(AppColor.textSecondary)
                 }
@@ -70,22 +70,6 @@ struct PaywallView: View {
                 .frame(maxWidth: .infinity)
             }
             .padding(24)
-        }
-    }
-
-    private var headline: String {
-        switch reason {
-        case .trialEnded: return "Your free 4 weeks are up"
-        case .feature(let feature): return feature.lockedTitle
-        }
-    }
-
-    private var subheadline: String {
-        switch reason {
-        case .trialEnded:
-            return "301, 501 and your friends stay free forever. Unlock DartFreak Full to keep everything else."
-        case .feature(let feature):
-            return feature.lockedMessage
         }
     }
 }

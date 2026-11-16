@@ -14,7 +14,7 @@ struct TrialBanner: View {
     var body: some View {
         if case .trial(let daysLeft) = store.state, daysLeft <= 5 {
             Button {
-                store.showPaywall(.trialEnded)
+                store.showPaywall(.trialEnding(daysLeft: daysLeft))
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "clock")

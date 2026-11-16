@@ -45,11 +45,15 @@ enum PaidFeature: String, CaseIterable, Identifiable {
 /// Why the unlock screen is showing.
 enum PaywallReason: Identifiable, Equatable {
     case feature(PaidFeature)
+    /// Opened from the banner in the last days of the trial.
+    case trialEnding(daysLeft: Int)
+    /// Shown once, the first time we notice the trial is over.
     case trialEnded
 
     var id: String {
         switch self {
         case .feature(let feature): return "feature-\(feature.rawValue)"
+        case .trialEnding: return "trial-ending"
         case .trialEnded: return "trial-ended"
         }
     }
@@ -57,7 +61,27 @@ enum PaywallReason: Identifiable, Equatable {
     var analyticsName: String {
         switch self {
         case .feature(let feature): return feature.rawValue
+        case .trialEnding: return "trial_ending"
         case .trialEnded: return "trial_ended"
+        }
+    }
+
+    var headline: String {
+        switch self {
+        case .feature(let feature): return feature.lockedTitle
+        case .trialEnding(let daysLeft):
+            return daysLeft == 1 ? "1 day left of your free trial" : "\(daysLeft) days left of your free trial"
+        case .trialEnded: return "Your free 4 weeks are up"
+        }
+    }
+
+    var subheadline: String {
+        switch self {
+        case .feature(let feature): return feature.lockedMessage
+        case .trialEnding:
+            return "Unlock DartFreak Full now to keep everything when the trial ends. 301, 501 and your friends stay free forever."
+        case .trialEnded:
+            return "301, 501 and your friends stay free forever. Unlock DartFreak Full to keep everything else."
         }
     }
 }
