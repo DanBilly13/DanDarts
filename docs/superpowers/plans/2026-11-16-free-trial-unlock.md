@@ -37,6 +37,7 @@ Apple's guideline 3.1.1 says a non-subscription app *may* offer a time-based fre
 
 - **Locks are enforced in the app, not on the server.** The remote-match edge functions don't check entitlements. For a small one-time price this is fine. Revisit only if abuse shows up.
 - **Deleting and recreating an account gives a new trial.** That's acceptable.
+- **Refunds don't reach the server yet.** iOS ignores `source = 'apple'` rows (StoreKit is the truth there, so an Apple refund re-locks iOS), but a refunded Apple purchase stays unlocked on Android until an App Store Server Notifications endpoint removes the row. Add that endpoint with the Android work.
 - **A purchase is tied to one DartFreak account on the server.** The same Apple ID buying on a second account still unlocks iOS locally (StoreKit), but the server returns 409 and doesn't share it to Android for the second account.
 
 ## Release order (important)
@@ -835,11 +836,10 @@ final class EntitlementStore: ObservableObject {
         isLegacyPaidCustomer = await Self.isLegacyDownload()
         hasServerEntitlement = await Self.fetchServerEntitlement()
 
-        // Bought on iOS but not on the server yet (first purchase, or a reinstall): record it,
-        // so the unlock also shows on Android.
-        if let unlockTransactionId, !hasServerEntitlement {
+        // Bought on iOS: make sure the server knows (first purchase, or a reinstall), so the
+        // unlock also shows on Android. The function is idempotent for the same account.
+        if let unlockTransactionId {
             await Self.reportToServer(transactionId: unlockTransactionId)
-            hasServerEntitlement = await Self.fetchServerEntitlement()
         }
     }
 
@@ -851,7 +851,13 @@ final class EntitlementStore: ObservableObject {
         defer { isPurchasing = false }
 
         do {
-            let result = try await product.purchase()
+            // Ties the purchase to this DartFreak account; verify-apple-purchase rejects a
+            // transaction whose appAccountToken belongs to someone else.
+            var options: Set<Product.PurchaseOption> = []
+            if let userId = AuthService.shared.currentUser?.id {
+                options.insert(.appAccountToken(userId))
+            }
+            let result = try await product.purchase(options: options)
             if case .success(.verified(let transaction)) = result {
                 await transaction.finish()
                 AnalyticsService.shared.logUnlockPurchased()
@@ -897,20 +903,22 @@ final class EntitlementStore: ObservableObject {
     }
 
     private struct EntitlementRow: Decodable {
-        let user_id: UUID
+        let source: String
     }
 
+    /// A row from ANOTHER platform (Android, or granted by hand). Apple rows are ignored here:
+    /// on iOS, StoreKit is the truth for Apple purchases, so an Apple refund re-locks iOS.
     private static func fetchServerEntitlement() async -> Bool {
         guard let userId = AuthService.shared.currentUser?.id else { return false }
         do {
             let rows: [EntitlementRow] = try await SupabaseService.shared.client
                 .from("user_entitlements")
-                .select("user_id")
+                .select("source")
                 .eq("user_id", value: userId.uuidString)
                 .limit(1)
                 .execute()
                 .value
-            return !rows.isEmpty
+            return rows.contains { $0.source != "apple" }
         } catch {
             print("⚠️ [Entitlements] Server check failed: \(error)")
             return false
@@ -1523,8 +1531,8 @@ Order matters. Do it top to bottom.
   - Display name `DartFreak Full`. Description "Every game, remote matches, clubs, head-to-head and full stats. One payment, no subscription."
   - Review screenshot: the unlock screen.
 - [ ] **3. Create an In-App Purchase key.** Users and Access › Integrations › In-App Purchase. Note the Issuer ID and Key ID, and download the `.p8` (it can only be downloaded once).
-- [ ] **4. Backend.** Apply `099_user_entitlements.sql` in the SQL Editor and run `VERIFY_user_entitlements.sql` (all rows true). Set the function secrets `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` and `APPLE_BUNDLE_ID=com.dandarts.DartFreak`. Deploy `verify-apple-purchase`.
-- [ ] **5. TestFlight.** A sandbox purchase from TestFlight should create a `user_entitlements` row (`source = 'apple'`).
+- [ ] **4. Backend.** Apply `099_user_entitlements.sql` in the SQL Editor and run `VERIFY_user_entitlements.sql` (all rows true). Set the function secrets `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` and `APPLE_BUNDLE_ID=com.dandarts.DartFreak`, plus `APPLE_ALLOW_SANDBOX=true` for testing only. Deploy `verify-apple-purchase`.
+- [ ] **5. TestFlight.** A sandbox purchase from TestFlight should create a `user_entitlements` row (`source = 'apple'`). Then **remove `APPLE_ALLOW_SANDBOX`** (sandbox purchases are free, so they must not unlock Android in production) and delete the test rows.
 - [ ] **6. Submit the version with the IAP attached.** Keep the app **paid** while it's in review. In the review notes, explain the free tier, the automatic 4-week trial and the one-time unlock. Set the release to **manual**.
 - [ ] **7. Go free in one move.** Once it's approved: release the version, **then straight away** set Pricing to Free. Don't set it to Free before the new build is live (see "Release order" at the top).
 - [ ] **8. Words.** Update the App Store description ("Free to download. Every feature free for 4 weeks. Then 301, 501 and friends stay free forever, or unlock everything with one payment. No subscription."), the website and the terms if they mention price.
