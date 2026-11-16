@@ -83,6 +83,30 @@ final class EntitlementStore: ObservableObject {
         return Date()
     }
 
+    // MARK: - Trial-ended notice
+
+    private static func trialEndedNoticeKey(_ userId: UUID) -> String {
+        "trialEndedNoticeShown.\(userId.uuidString)"
+    }
+
+    /// Opens the "your 4 weeks are up" screen once per account, the first time we're sure.
+    /// The flag is only set when the screen actually appears (markTrialEndedNoticeShown).
+    func showTrialEndedNoticeIfNeeded(userId: UUID) {
+        guard paywall == nil else { return }
+        let show = TrialEndedNotice.shouldShow(
+            state: state,
+            alreadyShown: defaults.bool(forKey: Self.trialEndedNoticeKey(userId)),
+            inputsLoaded: lastRefreshComplete && refreshedUserId == userId
+        )
+        if show { showPaywall(.trialEnded) }
+    }
+
+    /// Called by the unlock screen when it appears with `.trialEnded`.
+    func markTrialEndedNoticeShown() {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+        defaults.set(true, forKey: Self.trialEndedNoticeKey(userId))
+    }
+
     // MARK: - Lifecycle
 
     func start() {

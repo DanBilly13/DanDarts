@@ -327,7 +327,10 @@ struct MainTabView: View {
         .task { entitlements.start() }
         .task(id: authService.currentUser?.id) {
             await entitlements.refresh()
-            showTrialEndedOnce()
+            showTrialEndedNoticeIfNeeded()
+        }
+        .onChange(of: showProfile) { _, isShowing in
+            if !isShowing { showTrialEndedNoticeIfNeeded() }
         }
         .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
             presentPendingClubCode()
@@ -476,6 +479,13 @@ struct MainTabView: View {
             }
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Back in the app: a purchase, refund or the trial's end may have happened meanwhile.
+            if newPhase == .active, authService.currentUser != nil {
+                Task {
+                    await entitlements.refresh()
+                    showTrialEndedNoticeIfNeeded()
+                }
+            }
             // Check for pending requests when app returns to foreground
             if newPhase == .active && oldPhase == .background {
                 print("🔄 [App] App returned to foreground")
@@ -488,14 +498,12 @@ struct MainTabView: View {
         }
     }
     
-    /// The "your 4 weeks are up" screen, once per account, the first time we notice.
-    private func showTrialEndedOnce() {
+    /// The "your 4 weeks are up" screen, once per account. Not while a link sheet or Profile
+    /// is up: the unlock screen would land on top of what they opened.
+    private func showTrialEndedNoticeIfNeeded() {
         guard let userId = authService.currentUser?.id,
-              entitlements.state == .free else { return }
-        let key = "trialEndedNoticeShown.\(userId.uuidString)"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        UserDefaults.standard.set(true, forKey: key)
-        entitlements.showPaywall(.trialEnded)
+              !showProfile, inviteTokenToClaim == nil, clubCodeToJoin == nil else { return }
+        entitlements.showTrialEndedNoticeIfNeeded(userId: userId)
     }
 
     /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).

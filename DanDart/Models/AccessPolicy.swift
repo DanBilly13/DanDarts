@@ -50,3 +50,12 @@ enum AccessPolicy {
         return .trial(daysLeft: Int((remaining / 86_400).rounded(.up)))
     }
 }
+
+/// Whether to open the "your 4 weeks are up" screen. Once per account, only on the free
+/// tier, and only when every input loaded: a failed check counts as "locked", and telling a
+/// paying customer their trial is over would be wrong.
+enum TrialEndedNotice {
+    static func shouldShow(state: AccessState, alreadyShown: Bool, inputsLoaded: Bool) -> Bool {
+        state == .free && !alreadyShown && inputsLoaded
+    }
+}

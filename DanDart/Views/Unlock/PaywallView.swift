@@ -106,7 +106,10 @@ struct PaywallView: View {
             }
             .padding(24)
         }
-        .onAppear { store.purchaseMessage = nil }
+        .onAppear {
+            store.purchaseMessage = nil
+            if reason == .trialEnded { store.markTrialEndedNoticeShown() }
+        }
         .task {
             // The price is loaded once at refresh; if that failed, try again here.
             if store.product == nil { await store.loadProduct() }
