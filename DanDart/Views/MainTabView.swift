@@ -310,6 +310,7 @@ struct MainTabView: View {
         }) { token in
             InviteClaimView(token: token.token)
                 .modernSheet(title: "Invite", detents: [.medium], background: AppColor.surfacePrimary)
+                .paywallSheet()
         }
         .sheet(item: $clubCodeToJoin) { item in
             JoinClubSheet(code: item.code) {
@@ -319,11 +320,10 @@ struct MainTabView: View {
             // A sheet does not inherit the environment objects above it, so pass them on.
             .environmentObject(clubsService)
             .modernSheet(title: "Join a club", detents: [.medium], background: AppColor.surfacePrimary)
+            .paywallSheet()
         }
-        .sheet(item: $entitlements.paywall) { reason in
-            PaywallView(reason: reason)
-                .modernSheet(title: "DartFreak Full", detents: [.large], background: AppColor.surfacePrimary)
-        }
+        // Off while a cover or sheet with its own .paywallSheet() is up, so only one presents.
+        .paywallSheet(isEnabled: !showProfile && clubCodeToJoin == nil && inviteTokenToClaim == nil)
         .task { entitlements.start() }
         .task(id: authService.currentUser?.id) {
             await entitlements.refresh()
@@ -336,6 +336,7 @@ struct MainTabView: View {
             ProfileView()
                 .environmentObject(authService)
                 .environmentObject(friendsService)
+                .paywallSheet()
         }
         .onAppear {
             // Wire router closures to @State path (coalesced to next runloop)
