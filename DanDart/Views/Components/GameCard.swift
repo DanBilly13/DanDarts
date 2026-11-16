@@ -10,6 +10,8 @@ import UIKit
 
 struct GameCard: View {
     let game: Game
+    /// Needs DartFreak Full: shows a lock badge and the button reads "Unlock".
+    var isLocked: Bool = false
     let onPlayTapped: () -> Void
     
     var body: some View {
@@ -51,6 +53,11 @@ struct GameCard: View {
                 .padding(.bottom, 12)
             }
             .frame(maxWidth: .infinity)
+            .overlay(alignment: .topTrailing) {
+                if isLocked {
+                    LockBadge().padding(12)
+                }
+            }
             
             // Info + Play section
             HStack(alignment: .center) {
@@ -81,10 +88,15 @@ struct GameCard: View {
                 AppButton(role: .primary, controlSize: .regular, compact: true) {
                     onPlayTapped()
                 } label: {
-                    Text("Play")
-                        .bold()
+                    if isLocked {
+                        Label("Unlock", systemImage: "lock.fill")
+                            .bold()
+                    } else {
+                        Text("Play")
+                            .bold()
+                    }
                 }
-                .frame(width: 88)
+                .frame(width: isLocked ? 112 : 88)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)

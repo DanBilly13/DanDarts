@@ -29,6 +29,19 @@ struct PaidFeatureTests {
         }
     }
 
+    /// Runs against the real catalogue (the test host loads darts_games.json from the app bundle),
+    /// so a game added later is locked unless it's deliberately made free.
+    @Test func onlyThreeOhOneAndFiveOhOneInTheCatalogueAreFree() {
+        let games = Game.loadGames()
+        #expect(games.count > 2)
+        for game in games {
+            let shouldBeFree = game.title == "301" || game.title == "501"
+            #expect(GameAccess.isFree(gameType: game.title) == shouldBeFree, "\(game.title)")
+        }
+        #expect(games.contains { $0.title == "301" })
+        #expect(games.contains { $0.title == "501" })
+    }
+
     @Test func everyFeatureHasCopy() {
         for feature in PaidFeature.allCases {
             #expect(!feature.lockedTitle.isEmpty)

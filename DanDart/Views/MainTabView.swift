@@ -730,8 +730,24 @@ struct GamesTabView: View {
     let gameHeroNamespace: Namespace.ID
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @Binding var showProfile: Bool
     @Binding var selectedTab: AppTab
+
+    /// 301 and 501 are free forever; the other games need DartFreak Full after the trial.
+    private func isLocked(_ game: Game) -> Bool {
+        !GameAccess.isFree(gameType: game.title) && !entitlements.canUse(.partyGames)
+    }
+
+    private func openSetup(for game: Game) {
+        guard GameAccess.isFree(gameType: game.title) || entitlements.requireAccess(to: .partyGames) else { return }
+        router.push(.gameSetup(game: game))
+    }
+
+    private func openRemoteSetup(for game: Game) {
+        guard entitlements.requireAccess(to: .remoteMatches) else { return }
+        router.push(.remoteGameSetup(game: game, opponent: nil))
+    }
     
     var body: some View {
         ZStack {
@@ -751,13 +767,13 @@ struct GamesTabView: View {
                             .padding(.horizontal, 16)
                         
                         VStack(spacing: 12) {
-                            GameCardRemote(game: Game.remote301) {
-                                router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
+                            GameCardRemote(game: Game.remote301, isLocked: !entitlements.canUse(.remoteMatches)) {
+                                openRemoteSetup(for: Game.remote301)
                             }
                             .modifier(GameHeroSourceModifier(game: Game.remote301, namespace: gameHeroNamespace))
                             
-                            GameCardRemote(game: Game.remote501) {
-                                router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
+                            GameCardRemote(game: Game.remote501, isLocked: !entitlements.canUse(.remoteMatches)) {
+                                openRemoteSetup(for: Game.remote501)
                             }
                             .modifier(GameHeroSourceModifier(game: Game.remote501, namespace: gameHeroNamespace))
                         }
@@ -774,8 +790,8 @@ struct GamesTabView: View {
                         
                         LazyVStack(spacing: 16) {
                             ForEach(games) { game in
-                                GameCard(game: game) {
-                                    router.push(.gameSetup(game: game))
+                                GameCard(game: game, isLocked: isLocked(game)) {
+                                    openSetup(for: game)
                                 }
                                 .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
                             }
