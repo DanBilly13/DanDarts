@@ -65,6 +65,16 @@ class AnalyticsService {
     func logFriendRequestAccepted() {
         Analytics.logEvent("friend_request_accepted", parameters: nil)
     }
+
+    // MARK: - Unlock Events
+
+    func logPaywallShown(reason: String) {
+        Analytics.logEvent("paywall_shown", parameters: ["reason": reason])
+    }
+
+    func logUnlockPurchased() {
+        Analytics.logEvent("unlock_purchased", parameters: nil)
+    }
     
     func logMatchVsFriend(gameType: String) {
         Analytics.logEvent("match_vs_friend", parameters: [
