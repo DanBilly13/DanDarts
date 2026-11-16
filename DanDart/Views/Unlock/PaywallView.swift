@@ -10,6 +10,8 @@ import SwiftUI
 struct PaywallView: View {
     let reason: PaywallReason
     @ObservedObject private var store = EntitlementStore.shared
+    @State private var finishedFirstProductLoad = false
+    @State private var isRestoring = false
 
     private let benefits: [(icon: String, text: String)] = [
         ("target", "Cricket, Halve-It, Knockout, Sudden Death and Killer"),
@@ -52,7 +54,7 @@ struct PaywallView: View {
                 AppButton(role: .primary, controlSize: .large) {
                     Task { await store.purchase() }
                 } label: {
-                    if store.isPurchasing {
+                    if store.isPurchasing || (store.product == nil && store.isLoadingProduct) {
                         ProgressView()
                     } else if let product = store.product {
                         Text("Unlock for \(product.displayPrice)")
@@ -62,14 +64,57 @@ struct PaywallView: View {
                 }
                 .disabled(store.product == nil || store.isPurchasing)
 
-                Button("Restore Purchases") {
-                    Task { await store.restore() }
+                if productUnavailable {
+                    VStack(spacing: 8) {
+                        Text("Couldn't reach the App Store.")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppColor.textSecondary)
+                        Button("Try again") {
+                            Task { await store.loadProduct() }
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(AppColor.interactivePrimaryBackground)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
+
+                if let message = store.purchaseMessage {
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppColor.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                }
+
+                Button {
+                    isRestoring = true
+                    Task {
+                        await store.restore()
+                        isRestoring = false
+                    }
+                } label: {
+                    if isRestoring {
+                        ProgressView()
+                    } else {
+                        Text("Restore Purchases")
+                    }
+                }
+                .disabled(isRestoring || store.isPurchasing)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(AppColor.textSecondary)
                 .frame(maxWidth: .infinity)
             }
             .padding(24)
         }
+        .onAppear { store.purchaseMessage = nil }
+        .task {
+            // The price is loaded once at refresh; if that failed, try again here.
+            if store.product == nil { await store.loadProduct() }
+            finishedFirstProductLoad = true
+        }
+    }
+
+    private var productUnavailable: Bool {
+        finishedFirstProductLoad && store.product == nil && !store.isLoadingProduct
     }
 }
