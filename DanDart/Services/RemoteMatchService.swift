@@ -642,6 +642,9 @@ class RemoteMatchService: ObservableObject {
         isReplay: Bool = false,
         replaySourceMatchId: UUID? = nil
     ) async throws -> UUID {
+        guard EntitlementStore.shared.requireAccess(to: .remoteMatches) else {
+            throw PaidFeatureLockedError(feature: .remoteMatches)
+        }
         // Validate not challenging self
         guard receiverId != currentUserId else {
             throw RemoteMatchError.notAuthorized
@@ -948,6 +951,9 @@ class RemoteMatchService: ObservableObject {
     
     /// Accept a challenge and transition to ready (calls Edge Function)
     func acceptChallenge(matchId: UUID) async throws {
+        guard EntitlementStore.shared.requireAccess(to: .remoteMatches) else {
+            throw PaidFeatureLockedError(feature: .remoteMatches)
+        }
         struct AcceptRequest: Encodable {
             let match_id: String
         }

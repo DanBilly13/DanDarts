@@ -13,6 +13,7 @@ struct RemoteGamesTab: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var notificationService: NotificationService
     @StateObject private var expiredChallengeService = ExpiredChallengeService.shared
+    @ObservedObject private var entitlements = EntitlementStore.shared
     
     @Binding var showGameSelection: Bool
     
@@ -204,6 +205,7 @@ struct RemoteGamesTab: View {
                             isProcessing: remoteMatchService.processingMatchId == matchWithPlayers.match.id,
                             expiresAt: matchWithPlayers.match.challengeExpiresAt,
                             onAccept: {
+                                guard entitlements.requireAccess(to: .remoteMatches) else { return }
                                 acceptChallenge(matchId: matchWithPlayers.match.id)
                             },
                             onDecline: { declineChallenge(matchId: matchWithPlayers.match.id) }
@@ -529,6 +531,7 @@ struct RemoteGamesTab: View {
             secondaryMessage: "Matches expire if not joined within 5 minutes",
             actionTitle: "Challenge a Friend",
             action: {
+                guard entitlements.requireAccess(to: .remoteMatches) else { return }
                 showGameSelection = true
             }
         )

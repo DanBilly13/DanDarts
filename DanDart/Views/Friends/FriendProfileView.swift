@@ -13,6 +13,7 @@ struct FriendProfileView: View {
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var router: Router
     @StateObject private var matchesService = MatchesService()
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @StateObject private var friendsService = FriendsService()
     
     @State private var showRemoveConfirmation: Bool = false
@@ -30,6 +31,7 @@ struct FriendProfileView: View {
                 
                 // Challenge Button
                 AppButton(role: .primary, controlSize: .large) {
+                    guard entitlements.requireAccess(to: .remoteMatches) else { return }
                     showGameSelection = true
                 } label: {
                     HStack(spacing: 8) {

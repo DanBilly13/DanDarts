@@ -135,6 +135,7 @@ struct MainTabView: View {
                 // Remote tab
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        guard entitlements.requireAccess(to: .remoteMatches) else { return }
                         remoteShowGameSelection = true
                     } label: {
                         Text("Challenge")
