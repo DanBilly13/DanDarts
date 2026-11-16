@@ -106,6 +106,7 @@ struct FriendProfileView: View {
                             currentUserId: authService.currentUser?.id ?? UUID(),
                             friendId: friend.userId ?? friend.id
                         )
+                        .lockedOverlay(.headToHead)
                     }
                 }
             }
