@@ -49,8 +49,9 @@ struct MainTabView: View {
     }
 
     @State private var clubCodeToJoin: ClubCodeToJoin? = nil
-    /// The club link we already showed the unlock screen for this session (clubs are locked).
-    @State private var lockedClubCodePrompted: String? = nil
+    /// The club link whose unlock screen is open (clubs are locked). Closing it without
+    /// unlocking forgets the link; unlocking opens the join sheet.
+    @State private var clubPaywallCode: String? = nil
     
     private func logTabScreen(_ tab: AppTab) {
         AnalyticsService.shared.logScreenView(screenName: tab.analyticsScreenName)
@@ -336,14 +337,16 @@ struct MainTabView: View {
             // A club link that waited behind the unlock screen opens once they unlock.
             if hasAccess { presentPendingClubCode() }
         }
-        .onChange(of: showProfile) { _, isShowing in
-            if !isShowing { showTrialEndedNoticeIfNeeded() }
+        .onChange(of: navigationPath.isEmpty) { _, isEmpty in
+            if isEmpty { showTrialEndedNoticeIfNeeded() }
+        }
+        .onChange(of: entitlements.paywall) { _, reason in
+            if reason == nil { paywallClosed() }
         }
         .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
-            lockedClubCodePrompted = nil // a fresh tap deserves an answer, even for the same club
             presentPendingClubCode()
         }
-        .fullScreenCover(isPresented: $showProfile) {
+        .fullScreenCover(isPresented: $showProfile, onDismiss: showTrialEndedNoticeIfNeeded) {
             ProfileView()
                 .environmentObject(authService)
                 .environmentObject(friendsService)
@@ -488,7 +491,9 @@ struct MainTabView: View {
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             // Back in the app: a purchase, refund or the trial's end may have happened meanwhile.
-            if newPhase == .active, authService.currentUser != nil {
+            // Only from the background: an alert (such as an Apple Account prompt) also makes the
+            // app inactive, and refreshing after each one could loop.
+            if newPhase == .active, oldPhase == .background, authService.currentUser != nil {
                 Task {
                     await entitlements.refresh()
                     showTrialEndedNoticeIfNeeded()
@@ -506,32 +511,53 @@ struct MainTabView: View {
         }
     }
     
-    /// The "your 4 weeks are up" screen, once per account. Not while a link sheet or Profile
-    /// is up: the unlock screen would land on top of what they opened.
+    /// The "your 4 weeks are up" screen, once per account. Not while a link sheet, Profile or a
+    /// navigation flow (a game, a match) is up: it would land on top of what they opened.
     private func showTrialEndedNoticeIfNeeded() {
-        guard let userId = authService.currentUser?.id,
-              !showProfile, inviteTokenToClaim == nil, clubCodeToJoin == nil else { return }
-        entitlements.showTrialEndedNoticeIfNeeded(userId: userId)
+        guard let userId = authService.currentUser?.id else { return }
+        let screenBusy = showProfile || inviteTokenToClaim != nil || clubCodeToJoin != nil || !navigationPath.isEmpty
+        entitlements.showTrialEndedNoticeIfNeeded(userId: userId, screenBusy: screenBusy)
     }
 
     /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).
-    /// Clubs need DartFreak Full after the trial: then the unlock screen shows instead and the code
-    /// stays pending, so the join sheet opens once they unlock.
+    /// Clubs need DartFreak Full after the trial: then the unlock screen shows instead and the
+    /// code waits while it's open, so the join sheet opens if they unlock.
     private func presentPendingClubCode() {
         guard clubCodeToJoin == nil, let userId = authService.currentUser?.id,
               let code = PendingClubCodeStore.shared.getCode() else { return }
-        // Until this account's entitlement has loaded, state is the optimistic "new account"
-        // trial, which would let anyone join. refresh() calls back here when it's done.
-        guard entitlements.refreshedUserId == userId else { return }
-        guard entitlements.canUse(.clubs) else {
-            if lockedClubCodePrompted != code, entitlements.paywall == nil {
-                lockedClubCodePrompted = code
-                entitlements.showPaywall(.feature(.clubs))
-            }
+        let paywallOpenForCode = clubPaywallCode == code && entitlements.paywall != nil
+        let decision = ClubLinkDecision.decide(
+            entitlementLoaded: entitlements.refreshedUserId == userId,
+            canUseClubs: entitlements.canUse(.clubs),
+            paywallOpenForCode: paywallOpenForCode,
+            otherPaywallShowing: entitlements.paywall != nil && !paywallOpenForCode
+        )
+        switch decision {
+        case .wait:
             return
+        case .presentJoin:
+            clubPaywallCode = nil
+            entitlements.paywall = nil
+            PendingClubCodeStore.shared.clearCode()
+            clubCodeToJoin = ClubCodeToJoin(code: code)
+        case .showPaywall:
+            clubPaywallCode = code
+            entitlements.showPaywall(.feature(.clubs))
         }
-        PendingClubCodeStore.shared.clearCode()
-        clubCodeToJoin = ClubCodeToJoin(code: code)
+    }
+
+    /// The unlock screen closed (bought, restored, or swiped away).
+    private func paywallClosed() {
+        if let code = clubPaywallCode {
+            clubPaywallCode = nil
+            if !entitlements.canUse(.clubs), PendingClubCodeStore.shared.getCode() == code {
+                // Closed without unlocking: forget the link rather than asking on every launch.
+                PendingClubCodeStore.shared.clearCode()
+                return
+            }
+        }
+        // Unlocked, or a link was waiting behind a different unlock screen.
+        presentPendingClubCode()
     }
 
     private func loadPendingRequestCount() {
