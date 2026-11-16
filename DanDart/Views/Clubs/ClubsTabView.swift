@@ -10,6 +10,7 @@ import SwiftUI
 struct ClubsTabView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var clubsService: ClubsService
+    @ObservedObject private var entitlements = EntitlementStore.shared
 
     @State private var clubs: [Club] = []
     @State private var hasLoaded = false
@@ -34,7 +35,13 @@ struct ClubsTabView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !hasLoaded && !loadFailed {
+        if !entitlements.canUse(.clubs) {
+            LockedFeatureCard(feature: .clubs) {
+                entitlements.showPaywall(.feature(.clubs))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 48)
+        } else if !hasLoaded && !loadFailed {
             ProgressView()
                 .tint(AppColor.interactivePrimaryBackground)
                 .frame(maxWidth: .infinity)
