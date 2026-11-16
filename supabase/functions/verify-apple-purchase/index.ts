@@ -6,6 +6,7 @@
 //
 // Requires env: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
 //   ASC_ISSUER_ID, ASC_KEY_ID, ASC_PRIVATE_KEY (In-App Purchase .p8 key, PEM), APPLE_BUNDLE_ID
+// Optional (testing only): APPLE_ALLOW_SANDBOX=true accepts sandbox/TestFlight/Xcode transactions
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
@@ -70,7 +71,8 @@ async function appStoreServerToken(): Promise<string> {
 // signed payload can be decoded without re-verifying Apple's certificate chain.
 function decodeJwsPayload(jws: string): Record<string, unknown> {
   const part = jws.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-  return JSON.parse(atob(part + '='.repeat((4 - (part.length % 4)) % 4)))
+  const padded = part + '='.repeat((4 - (part.length % 4)) % 4)
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))))
 }
 
 // Production first; a 404 there means it may be a sandbox (TestFlight / Xcode) purchase.
@@ -81,7 +83,11 @@ async function fetchTransaction(transactionId: string): Promise<Record<string, u
     const res = await fetch(`${host}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (res.status === 404) continue
+    if (res.status === 404) {
+      const errBody = await res.json().catch(() => null)
+      if (errBody?.errorCode === 4040010) continue // TransactionIdNotFound: try sandbox
+      throw new Error(`App Store Server API 404 errorCode=${errBody?.errorCode ?? 'unknown'}`)
+    }
     if (!res.ok) throw new Error(`App Store Server API returned ${res.status}`)
     const body = await res.json()
     return decodeJwsPayload(body.signedTransactionInfo)
@@ -94,24 +100,40 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-    })
-    const { data: { user } } = await userClient.auth.getUser()
-    if (!user) return json(401, { error: 'not_authenticated' })
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!jwt) return json(401, { error: 'not_authenticated' })
 
-    const { transaction_id } = await req.json()
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: { user }, error: userError } = await userClient.auth.getUser(jwt)
+    if (userError || !user) return json(401, { error: 'not_authenticated' })
+
+    const body = await req.json().catch(() => null)
+    const transaction_id = body?.transaction_id
     if (typeof transaction_id !== 'string' || !/^\d+$/.test(transaction_id)) {
       return json(400, { error: 'invalid_transaction_id' })
     }
 
     const tx = await fetchTransaction(transaction_id)
     if (!tx) return json(404, { error: 'transaction_not_found' })
-    if (tx.bundleId !== Deno.env.get('APPLE_BUNDLE_ID') || tx.productId !== PRODUCT_ID || tx.revocationDate) {
+    if (
+      tx.bundleId !== Deno.env.get('APPLE_BUNDLE_ID') || tx.productId !== PRODUCT_ID || tx.revocationDate ||
+      typeof tx.originalTransactionId !== 'string'
+    ) {
       return json(403, { error: 'not_a_valid_unlock' })
     }
+    if (tx.environment !== 'Production' && Deno.env.get('APPLE_ALLOW_SANDBOX') !== 'true') {
+      return json(403, { error: 'sandbox_not_allowed' })
+    }
+    if (typeof tx.appAccountToken === 'string' && tx.appAccountToken.toLowerCase() !== user.id.toLowerCase()) {
+      return json(403, { error: 'account_mismatch' })
+    }
 
-    const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
+    const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
     const { error } = await admin.from('user_entitlements').upsert(
       {
         user_id: user.id,
