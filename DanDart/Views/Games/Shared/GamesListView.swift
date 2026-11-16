@@ -50,11 +50,7 @@ struct GamesListViewLegacy: View {
                 HStack(spacing: cardSpacing) {
                     ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                         GameCard(game: game) {
-                            AppButton(role: .primary, controlSize: .small) {
-                                onGameSelected(game)
-                            } label: {
-                                Text("Play")
-                            }
+                            GamePlayButton(game: game, onGameSelected: onGameSelected)
                         }
                         .frame(width: cardWidth)
                         .scaleEffect(index == currentIndex ? 1.0 : 0.95)
@@ -131,15 +127,38 @@ struct GamesListViewVertical: View {
             LazyVStack(spacing: 16) {
                 ForEach(games) { game in
                     GameCard(game: game) {
-                        AppButton(role: .primary, controlSize: .small) {
-                            onGameSelected(game)
-                        } label: {
-                            Text("Play")
-                        }
+                        GamePlayButton(game: game, onGameSelected: onGameSelected)
                     }
                 }
             }
             .padding(.vertical, 20)
+        }
+    }
+}
+
+// MARK: - Play button with free-tier lock
+
+/// Shared by both list layouts. 301 and 501 are always free; the other games
+/// show "Unlock" and open the unlock screen once the trial has ended.
+private struct GamePlayButton: View {
+    let game: Game
+    let onGameSelected: (Game) -> Void
+    @ObservedObject private var entitlements = EntitlementStore.shared
+
+    var body: some View {
+        let locked = !GameAccess.isFree(gameType: game.title) && !entitlements.canUse(.partyGames)
+        AppButton(role: .primary, controlSize: .small) {
+            if locked {
+                entitlements.showPaywall(.feature(.partyGames))
+            } else {
+                onGameSelected(game)
+            }
+        } label: {
+            if locked {
+                Label("Unlock", systemImage: "lock.fill")
+            } else {
+                Text("Play")
+            }
         }
     }
 }
