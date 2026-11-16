@@ -504,7 +504,8 @@ struct EndGameViewRemote: View {
                 
                 await MainActor.run {
                     isCreatingReplay = false
-                    replayError = error.localizedDescription
+                    // Locked: the unlock screen is already explaining it.
+                    if !(error is PaidFeatureLockedError) { replayError = error.localizedDescription }
                     
                     // Error haptic
                     #if canImport(UIKit)
@@ -666,7 +667,8 @@ struct EndGameViewRemote: View {
                     remoteMatchService.clearAcceptPresentationFreeze(matchId: matchId)
                     
                     isCreatingReplay = false
-                    replayError = error.localizedDescription
+                    // Locked: the unlock screen is already explaining it.
+                    if !(error is PaidFeatureLockedError) { replayError = error.localizedDescription }
                     
                     // Error haptic
                     #if canImport(UIKit)
@@ -869,7 +871,8 @@ struct EndGameViewRemote: View {
                     remoteMatchService.clearAcceptPresentationFreeze(matchId: match.id)
                     
                     isCreatingReplay = false
-                    replayError = error.localizedDescription
+                    // Locked: the unlock screen is already explaining it.
+                    if !(error is PaidFeatureLockedError) { replayError = error.localizedDescription }
                     
                     // Error haptic
                     #if canImport(UIKit)
