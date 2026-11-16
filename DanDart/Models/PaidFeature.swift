@@ -66,23 +66,21 @@ enum PaywallReason: Identifiable, Equatable {
         }
     }
 
-    var headline: String {
+    /// The one line under "DartFreak Full" on the unlock screen. The list of what you get
+    /// does the explaining, so this stays short.
+    var tagline: String {
         switch self {
-        case .feature(let feature): return feature.lockedTitle
+        case .feature: return "Pay once. Keep it forever."
         case .trialEnding(let daysLeft):
             return daysLeft == 1 ? "1 day left of your free trial" : "\(daysLeft) days left of your free trial"
-        case .trialEnded: return "Your free 4 weeks are up"
+        case .trialEnded: return "Your free trial has ended"
         }
     }
 
-    var subheadline: String {
-        switch self {
-        case .feature(let feature): return feature.lockedMessage
-        case .trialEnding:
-            return "Unlock DartFreak Full now to keep everything when the trial ends. 301, 501 and your friends stay free forever."
-        case .trialEnded:
-            return "301, 501 and your friends stay free forever. Unlock DartFreak Full to keep everything else."
-        }
+    /// The feature that brought the user here, highlighted in the list.
+    var feature: PaidFeature? {
+        if case .feature(let feature) = self { return feature }
+        return nil
     }
 }
 

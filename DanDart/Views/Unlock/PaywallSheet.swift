@@ -19,7 +19,7 @@ private struct PaywallSheetModifier: ViewModifier {
             set: { store.paywall = $0 }
         )) { reason in
             PaywallView(reason: reason)
-                .modernSheet(title: "DartFreak Full", detents: [.large], background: AppColor.surfacePrimary)
+                .modernSheet(showCloseButton: false, detents: [.large], background: AppColor.surfacePrimary)
         }
     }
 }

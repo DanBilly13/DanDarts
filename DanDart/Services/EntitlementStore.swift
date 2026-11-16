@@ -179,7 +179,8 @@ final class EntitlementStore: ObservableObject {
         }
         let userId = user.id
 
-        if product == nil { await loadProduct() }
+        // The price is only needed on the unlock screen; don't hold up working out the locks.
+        if product == nil { Task { await self.loadProduct() } }
 
         let purchasesBefore = purchaseCount
         let unlockTransactionId = await Self.currentUnlockTransactionId()

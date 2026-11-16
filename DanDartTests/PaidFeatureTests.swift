@@ -56,10 +56,10 @@ struct PaidFeatureTests {
     }
 
     @Test func trialEndingCopyCountsTheDaysLeft() {
-        #expect(PaywallReason.trialEnding(daysLeft: 3).headline == "3 days left of your free trial")
-        #expect(PaywallReason.trialEnding(daysLeft: 1).headline == "1 day left of your free trial")
+        #expect(PaywallReason.trialEnding(daysLeft: 3).tagline == "3 days left of your free trial")
+        #expect(PaywallReason.trialEnding(daysLeft: 1).tagline == "1 day left of your free trial")
         #expect(PaywallReason.trialEnding(daysLeft: 3).analyticsName == "trial_ending")
-        #expect(PaywallReason.trialEnding(daysLeft: 3).headline != PaywallReason.trialEnded.headline)
+        #expect(PaywallReason.trialEnding(daysLeft: 3).tagline != PaywallReason.trialEnded.tagline)
     }
 
     @Test func lockedErrorNamesTheFeature() {
