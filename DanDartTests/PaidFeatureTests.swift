@@ -16,6 +16,13 @@ struct PaidFeatureTests {
         #expect(GameAccess.isFree(gameType: " 501 "))
     }
 
+    @Test func remoteThreeOhOneAndFiveOhOneAreFree() {
+        for type in ["Remote 301", "Remote 501", "remote 501"] {
+            #expect(GameAccess.isFree(gameType: type), "\(type) should be free")
+        }
+        #expect(!GameAccess.isFree(gameType: "Remote Cricket"))
+    }
+
     @Test func partyGamesAreNotFree() {
         for type in ["cricket", "Cricket", "halve_it", "halve it", "knockout", "sudden_death", "sudden death", "killer", "Killer"] {
             #expect(!GameAccess.isFree(gameType: type), "\(type) should be locked")

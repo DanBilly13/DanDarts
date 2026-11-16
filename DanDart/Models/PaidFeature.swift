@@ -65,10 +65,16 @@ enum PaywallReason: Identifiable, Equatable {
 enum GameAccess {
     /// Game types that are free forever. Matched against both stored `gameType`
     /// values and local game titles, which are "301" and "501" for these two.
+    /// Remote matches are saved as "Remote 301" / "Remote 501" and count too.
     static let freeGameTypes: Set<String> = ["301", "501"]
 
     static func isFree(gameType: String) -> Bool {
-        freeGameTypes.contains(gameType.trimmingCharacters(in: .whitespaces).lowercased())
+        var normalized = gameType.trimmingCharacters(in: .whitespaces).lowercased()
+        if normalized.hasPrefix("remote ") {
+            normalized = String(normalized.dropFirst("remote ".count))
+                .trimmingCharacters(in: .whitespaces)
+        }
+        return freeGameTypes.contains(normalized)
     }
 }
 
