@@ -41,20 +41,36 @@ final class EntitlementStore: ObservableObject {
     private var updatesTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var refreshAgain = false
+    /// Bumped by a successful purchase, so a refresh that read StoreKit before it can't undo it.
+    private var purchaseCount = 0
+    /// AppTransaction failed once this session: don't ask again (it can show an Apple Account
+    /// prompt, and dismissing that re-activates the app) unless Restore asks for it.
+    private var appTransactionFailed = false
+    private var allowAppTransactionRetry = false
     private let defaults = UserDefaults.standard
+    private static let legacyCacheKey = "legacyPaidCustomer"
 
     private init() {}
 
     // MARK: - Access
 
-    var state: AccessState {
-        AccessPolicy.evaluate(AccessInputs(
+    var inputs: AccessInputs {
+        AccessInputs(
             hasPurchasedUnlock: hasPurchasedUnlock,
             isLegacyPaidCustomer: isLegacyPaidCustomer,
             hasServerEntitlement: hasServerEntitlement,
             accountCreatedAt: accountCreatedAt,
             now: Self.now
-        ))
+        )
+    }
+
+    var state: AccessState {
+        AccessPolicy.evaluate(inputs)
+    }
+
+    /// Bought, paid-app customer or unlocked elsewhere (not just "in the trial").
+    private var isUnlocked: Bool {
+        hasPurchasedUnlock || isLegacyPaidCustomer || hasServerEntitlement
     }
 
     func canUse(_ feature: PaidFeature) -> Bool {
@@ -91,12 +107,13 @@ final class EntitlementStore: ObservableObject {
 
     /// Opens the "your 4 weeks are up" screen once per account, the first time we're sure.
     /// The flag is only set when the screen actually appears (markTrialEndedNoticeShown).
-    func showTrialEndedNoticeIfNeeded(userId: UUID) {
-        guard paywall == nil else { return }
+    /// `screenBusy`: something else is on screen (a sheet, a cover, a navigation flow).
+    func showTrialEndedNoticeIfNeeded(userId: UUID, screenBusy: Bool) {
         let show = TrialEndedNotice.shouldShow(
-            state: state,
+            inputs: inputs,
             alreadyShown: defaults.bool(forKey: Self.trialEndedNoticeKey(userId)),
-            inputsLoaded: lastRefreshComplete && refreshedUserId == userId
+            inputsLoaded: lastRefreshComplete && refreshedUserId == userId,
+            screenBusy: screenBusy || paywall != nil
         )
         if show { showPaywall(.trialEnded) }
     }
@@ -143,57 +160,66 @@ final class EntitlementStore: ObservableObject {
         await task.value
     }
 
+    /// Forgets everything tied to the signed-in account. Called on sign-out and account deletion.
+    /// (A StoreKit purchase belongs to the Apple ID, so hasPurchasedUnlock stays.)
+    func reset() {
+        hasServerEntitlement = false
+        accountCreatedAt = nil
+        refreshedUserId = nil
+        lastRefreshComplete = false
+        paywall = nil
+        purchaseMessage = nil
+    }
+
     private func performRefresh() async {
         guard let user = AuthService.shared.currentUser else {
             // Signed out: forget the account's inputs and leave StoreKit alone.
-            hasServerEntitlement = false
-            accountCreatedAt = nil
-            refreshedUserId = nil
-            lastRefreshComplete = false
+            reset()
             return
         }
         let userId = user.id
-        accountCreatedAt = user.createdAt
 
         if product == nil { await loadProduct() }
 
+        let purchasesBefore = purchaseCount
         let unlockTransactionId = await Self.currentUnlockTransactionId()
-        hasPurchasedUnlock = unlockTransactionId != nil
 
-        let legacyKnown = resolveLegacy(await Self.isLegacyDownload())
+        let mayAskAppTransaction = !appTransactionFailed || allowAppTransactionRetry
+        allowAppTransactionRetry = false
+        var live: Bool?
+        if mayAskAppTransaction {
+            live = await Self.isLegacyDownload()
+            appTransactionFailed = live == nil
+        }
 
         let server = await Self.fetchServerEntitlement(userId: userId)
-        hasServerEntitlement = server ?? false
 
-        // The account may have changed while we waited; its own refresh follows.
+        // The account may have changed while we waited: write nothing, its own refresh follows.
         guard AuthService.shared.currentUser?.id == userId else { return }
+
+        hasPurchasedUnlock = unlockTransactionId != nil || purchaseCount != purchasesBefore
+
+        let legacy = LegacyResolution.resolve(live: live, cached: defaults.bool(forKey: Self.legacyCacheKey))
+        if legacy.cache {
+            defaults.set(true, forKey: Self.legacyCacheKey)
+        } else {
+            defaults.removeObject(forKey: Self.legacyCacheKey)
+        }
+        isLegacyPaidCustomer = legacy.isLegacy
+
+        hasServerEntitlement = server ?? false
+        accountCreatedAt = user.createdAt
         refreshedUserId = userId
-        lastRefreshComplete = legacyKnown && server != nil && accountCreatedAt != nil
+        lastRefreshComplete = legacy.isKnown && server != nil
+
+        // An unlock landed (Ask to Buy approved, Android purchase): drop any unlock screen still
+        // waiting, including one held back by a disabled .paywallSheet.
+        if isUnlocked { paywall = nil }
 
         // Bought on iOS: make sure the server knows (first purchase, or a reinstall), so the
         // unlock also shows on Android. Once per account and transaction.
         if let unlockTransactionId {
             await reportToServerIfNeeded(userId: userId, transactionId: unlockTransactionId)
-        }
-    }
-
-    /// Applies the AppTransaction answer. A verified "paid download" is remembered, so a paid
-    /// customer who is offline (AppTransaction fails) isn't locked out. Returns whether the
-    /// answer is known.
-    private func resolveLegacy(_ answer: Bool?) -> Bool {
-        let cacheKey = "legacyPaidCustomer"
-        switch answer {
-        case .some(true):
-            defaults.set(true, forKey: cacheKey)
-            isLegacyPaidCustomer = true
-            return true
-        case .some(false):
-            isLegacyPaidCustomer = false
-            return true
-        case .none:
-            let cached = defaults.bool(forKey: cacheKey)
-            isLegacyPaidCustomer = cached
-            return cached
         }
     }
 
@@ -216,6 +242,7 @@ final class EntitlementStore: ObservableObject {
             switch result {
             case .success(.verified(let transaction)):
                 await transaction.finish()
+                purchaseCount += 1
                 hasPurchasedUnlock = true
                 AnalyticsService.shared.logUnlockPurchased()
                 paywall = nil
@@ -246,9 +273,10 @@ final class EntitlementStore: ObservableObject {
             purchaseMessage = "Couldn't reach the App Store."
             return
         }
+        allowAppTransactionRetry = true
         await refresh()
         // Only an actual unlock counts: during the trial hasFullAccess is true anyway.
-        if hasPurchasedUnlock || isLegacyPaidCustomer || hasServerEntitlement {
+        if isUnlocked {
             paywall = nil
         } else {
             purchaseMessage = "No previous purchase found for this Apple ID."
@@ -310,6 +338,11 @@ final class EntitlementStore: ObservableObject {
         }
     }
 
+    /// A 4xx other than 401 (signed out / token expired) and 429 (rate limited).
+    private static func isPermanentRejection(_ code: Int) -> Bool {
+        (400..<500).contains(code) && code != 401 && code != 429
+    }
+
     private struct VerifyPayload: Encodable {
         let transaction_id: String
     }
@@ -323,8 +356,10 @@ final class EntitlementStore: ObservableObject {
                 options: FunctionInvokeOptions(body: VerifyPayload(transaction_id: String(transactionId)))
             )
             defaults.set(true, forKey: key)
-        } catch FunctionsError.httpError(code: 409, _) {
-            // Already recorded for another account; asking again won't change that.
+        } catch FunctionsError.httpError(let code, _) where Self.isPermanentRejection(code) {
+            // 409 linked to another account, 403 mismatch / sandbox / not an unlock, 400, 404:
+            // asking again won't change the answer.
+            print("⚠️ [Entitlements] Server declined the purchase record (\(code)); not retrying.")
             defaults.set(true, forKey: key)
         } catch {
             // Not fatal: iOS still unlocks from StoreKit. It will retry on the next refresh.
