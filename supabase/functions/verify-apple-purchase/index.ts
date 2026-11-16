@@ -134,6 +134,19 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', {
       auth: { autoRefreshToken: false, persistSession: false },
     })
+
+    // Keep an existing Google or manual grant: overwriting it with an Apple row would hide it
+    // from iOS (which ignores apple rows) and lose where the unlock came from.
+    const { data: existing, error: existingError } = await admin
+      .from('user_entitlements')
+      .select('source')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (existingError) throw existingError
+    if (existing && existing.source !== 'apple') {
+      return json(200, { ok: true, kept: existing.source })
+    }
+
     const { error } = await admin.from('user_entitlements').upsert(
       {
         user_id: user.id,
