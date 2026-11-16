@@ -92,6 +92,7 @@ struct ProfileView: View {
                                 )
                             }
                         }
+                        .lockedOverlay(.fullStats)
                     }
                 }
                 .padding(.horizontal, 16)
