@@ -39,6 +39,7 @@ Apple's guideline 3.1.1 says a non-subscription app *may* offer a time-based fre
 - **Deleting and recreating an account gives a new trial.** That's acceptable.
 - **Refunds don't reach the server yet.** iOS ignores `source = 'apple'` rows (StoreKit is the truth there, so an Apple refund re-locks iOS), but a refunded Apple purchase stays unlocked on Android until an App Store Server Notifications endpoint removes the row. Add that endpoint with the Android work.
 - **A purchase is tied to one DartFreak account on the server.** The same Apple ID buying on a second account still unlocks iOS locally (StoreKit), but the server returns 409 and doesn't share it to Android for the second account.
+- **A party game already in progress when the trial ends can keep restarting in place** (the in-game Restart in Knockout, Sudden Death and Halve-It isn't gated) until the user leaves it.
 
 ## Release order (important)
 
