@@ -49,6 +49,8 @@ struct MainTabView: View {
     }
 
     @State private var clubCodeToJoin: ClubCodeToJoin? = nil
+    /// The club link we already showed the unlock screen for this session (clubs are locked).
+    @State private var lockedClubCodePrompted: String? = nil
     
     private func logTabScreen(_ tab: AppTab) {
         AnalyticsService.shared.logScreenView(screenName: tab.analyticsScreenName)
@@ -327,12 +329,18 @@ struct MainTabView: View {
         .task { entitlements.start() }
         .task(id: authService.currentUser?.id) {
             await entitlements.refresh()
+            presentPendingClubCode()
             showTrialEndedNoticeIfNeeded()
+        }
+        .onChange(of: entitlements.state.hasFullAccess) { _, hasAccess in
+            // A club link that waited behind the unlock screen opens once they unlock.
+            if hasAccess { presentPendingClubCode() }
         }
         .onChange(of: showProfile) { _, isShowing in
             if !isShowing { showTrialEndedNoticeIfNeeded() }
         }
         .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
+            lockedClubCodePrompted = nil // a fresh tap deserves an answer, even for the same club
             presentPendingClubCode()
         }
         .fullScreenCover(isPresented: $showProfile) {
@@ -507,9 +515,22 @@ struct MainTabView: View {
     }
 
     /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).
+    /// Clubs need DartFreak Full after the trial: then the unlock screen shows instead and the code
+    /// stays pending, so the join sheet opens once they unlock.
     private func presentPendingClubCode() {
-        guard clubCodeToJoin == nil, authService.currentUser != nil,
-              let code = PendingClubCodeStore.shared.consumeCode() else { return }
+        guard clubCodeToJoin == nil, let userId = authService.currentUser?.id,
+              let code = PendingClubCodeStore.shared.getCode() else { return }
+        // Until this account's entitlement has loaded, state is the optimistic "new account"
+        // trial, which would let anyone join. refresh() calls back here when it's done.
+        guard entitlements.refreshedUserId == userId else { return }
+        guard entitlements.canUse(.clubs) else {
+            if lockedClubCodePrompted != code, entitlements.paywall == nil {
+                lockedClubCodePrompted = code
+                entitlements.showPaywall(.feature(.clubs))
+            }
+            return
+        }
+        PendingClubCodeStore.shared.clearCode()
         clubCodeToJoin = ClubCodeToJoin(code: code)
     }
 
