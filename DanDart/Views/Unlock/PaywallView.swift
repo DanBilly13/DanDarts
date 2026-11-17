@@ -87,7 +87,8 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: 14) {
-            Image("DartFreakIcon")
+            // A copy of the current app icon (AppIcon sets can't be loaded as images).
+            Image("AppIconArtwork")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 84, height: 84)

@@ -154,6 +154,7 @@ struct CreateClubView: View {
 
     private func create() {
         guard canCreate else { return }
+        guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         isCreating = true
         Task {
             defer { isCreating = false }

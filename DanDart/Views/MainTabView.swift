@@ -127,7 +127,6 @@ struct MainTabView: View {
                     }
 
                     Button {
-                        guard entitlements.requireAccess(to: .clubs) else { return }
                         router.push(.findClub)
                     } label: {
                         Image(systemName: "magnifyingglass")

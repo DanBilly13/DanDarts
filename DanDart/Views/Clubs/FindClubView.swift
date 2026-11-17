@@ -156,6 +156,7 @@ struct FindClubView: View {
 
     private var createRow: some View {
         Button {
+            guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
             router.push(.createClub(name: trimmedQuery))
         } label: {
             HStack(spacing: 10) {
@@ -218,6 +219,7 @@ struct FindClubView: View {
 
     private func join(_ club: ClubSearchResult) {
         guard joiningId == nil else { return }
+        guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         joiningId = club.id
         Task {
             defer { joiningId = nil }
@@ -238,6 +240,7 @@ struct FindClubView: View {
 
     private func joinByCode() {
         guard !isJoiningByCode else { return }
+        guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         guard let clean = ClubLink.normalizedCode(code) else {
             notice = Notice(title: "Check the code", message: ClubActionResult.invalidCode.userMessage ?? "")
             return

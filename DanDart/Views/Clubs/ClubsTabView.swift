@@ -35,13 +35,7 @@ struct ClubsTabView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !entitlements.canUse(.clubs) {
-            LockedFeatureCard(feature: .clubs) {
-                entitlements.showPaywall(.feature(.clubs))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 48)
-        } else if !hasLoaded && !loadFailed {
+        if !hasLoaded && !loadFailed {
             ProgressView()
                 .tint(AppColor.interactivePrimaryBackground)
                 .frame(maxWidth: .infinity)
@@ -67,6 +61,7 @@ struct ClubsTabView: View {
             VStack(spacing: 12) {
                 ForEach(clubs) { club in
                     Button {
+                        guard entitlements.requireAccess(to: .clubs) else { return }
                         router.push(.clubDetail(club))
                     } label: {
                         ClubRow(club: club)
@@ -80,7 +75,8 @@ struct ClubsTabView: View {
     private var emptyState: some View {
         VStack(spacing: 0) {
             EmptyState(
-                imageName: "empty-friends",
+                // Placeholder art until Clubs has its own empty-state illustration.
+                imageName: "empty-remote",
                 title: "Join your darts club",
                 message: "Find your pub team or darts club, or start one for your mates.",
                 actionTitle: "Find a club",
