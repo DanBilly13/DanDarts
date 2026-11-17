@@ -9,7 +9,7 @@ import SwiftUI
 
 struct GameCardRemote: View {
     let game: Game
-    /// Remote matches need DartFreak Full after the trial: shows a lock badge.
+    /// Remote matches need DartFreak Pro after the trial: shows the PRO chip.
     var isLocked: Bool = false
     let onTapped: () -> Void
     
@@ -53,7 +53,7 @@ struct GameCardRemote: View {
         .frame(height: 120)
         .overlay(alignment: .topTrailing) {
             if isLocked {
-                LockBadge().padding(10)
+                ProBadge().padding(10)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

@@ -2,7 +2,7 @@
 //  EntitlementStore.swift
 //  DanDart
 //
-//  Gathers what AccessPolicy needs: a StoreKit purchase of DartFreak Full, whether the
+//  Gathers what AccessPolicy needs: a StoreKit purchase of DartFreak Pro, whether the
 //  first download was a paid build, a user_entitlements row (an Android purchase) and the
 //  account's creation date. Views ask canUse(_:) / requireAccess(to:). Locks never stop data
 //  being saved.

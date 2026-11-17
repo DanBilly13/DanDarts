@@ -10,6 +10,7 @@ import SwiftUI
 struct ScoringDistributionChart: View {
     let distribution: ScoringDistribution
     let isLoading: Bool
+    @Environment(\.proDataLocked) private var proDataLocked
     
     private let donutSize: CGFloat = 140
     private let donutThickness: CGFloat = 28
@@ -18,7 +19,8 @@ struct ScoringDistributionChart: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Scoring Distribution (\(distribution.totalVisits) visits)")
+            // The visit count is data too: hidden on the free tier.
+            Text(proDataLocked ? "Scoring Distribution" : "Scoring Distribution (\(distribution.totalVisits) visits)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColor.textSecondary)
 
@@ -26,6 +28,7 @@ struct ScoringDistributionChart: View {
                 loadingState
             } else {
                 chartView
+                    .proLockedData()
             }
         }
     }

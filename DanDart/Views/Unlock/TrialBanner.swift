@@ -20,7 +20,7 @@ struct TrialBanner: View {
                     Image(systemName: "clock")
                     Text(daysLeft == 1 ? "1 day left of your free trial" : "\(daysLeft) days left of your free trial")
                     Spacer()
-                    Text("Unlock").fontWeight(.semibold)
+                    Text("Get Pro").fontWeight(.semibold)
                 }
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(AppColor.justWhite)

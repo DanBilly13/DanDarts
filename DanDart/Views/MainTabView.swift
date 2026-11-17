@@ -519,7 +519,7 @@ struct MainTabView: View {
     }
 
     /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).
-    /// Clubs need DartFreak Full after the trial: then the unlock screen shows instead and the
+    /// Clubs need DartFreak Pro after the trial: then the unlock screen shows instead and the
     /// code waits while it's open, so the join sheet opens if they unlock.
     private func presentPendingClubCode() {
         guard clubCodeToJoin == nil, let userId = authService.currentUser?.id,
@@ -789,7 +789,7 @@ struct GamesTabView: View {
     @Binding var showProfile: Bool
     @Binding var selectedTab: AppTab
 
-    /// 301 and 501 are free forever; the other games need DartFreak Full after the trial.
+    /// 301 and 501 are free forever; the other games need DartFreak Pro after the trial.
     private func isLocked(_ game: Game) -> Bool {
         !GameAccess.isFree(gameType: game.title) && !entitlements.canUse(.partyGames)
     }

@@ -9,7 +9,7 @@
 import Foundation
 
 enum UnlockReason: Equatable {
-    case purchased       // bought DartFreak Full on this Apple ID
+    case purchased       // bought DartFreak Pro on this Apple ID
     case legacyPaidApp   // first downloaded DartFreak when it was a paid app
     case otherPlatform   // unlocked on Android (or granted by hand) — user_entitlements row
 }

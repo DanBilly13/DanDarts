@@ -180,7 +180,7 @@ struct JoinClubSheet: View {
 
     private func join(visibility: ClubVisibility) {
         guard !isJoining else { return }
-        // Backstop: the link flow checks first, but clubs need DartFreak Full after the trial.
+        // Backstop: the link flow checks first, but clubs need DartFreak Pro after the trial.
         guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         isJoining = true
         errorMessage = nil

@@ -33,6 +33,7 @@ struct RecentFormTracker: View {
                 loadingState
             } else {
                 formView
+                    .proLockedData()
             }
         }
     }

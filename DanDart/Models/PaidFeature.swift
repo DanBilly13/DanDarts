@@ -2,7 +2,7 @@
 //  PaidFeature.swift
 //  DanDart
 //
-//  The parts of DartFreak that need DartFreak Full once the 4-week trial ends.
+//  The parts of DartFreak that need DartFreak Pro once the 4-week trial ends.
 //  Everything else (account, local 301/501, friends, history list) is free forever.
 //  Locks only change what is SHOWN. Match data is always saved for everyone.
 //
@@ -32,7 +32,7 @@ enum PaidFeature: String, CaseIterable, Identifiable {
 
     var lockedMessage: String {
         switch self {
-        case .partyGames: return "Cricket, Halve-It, Knockout, Sudden Death and Killer come with DartFreak Full."
+        case .partyGames: return "Cricket, Halve-It, Knockout, Sudden Death and Killer come with DartFreak Pro."
         case .remoteMatches: return "Play your mates live from anywhere, with voice chat."
         case .clubs: return "Join and run clubs with the people you play with."
         case .headToHead: return "See who's really winning between you two."
@@ -66,7 +66,7 @@ enum PaywallReason: Identifiable, Equatable {
         }
     }
 
-    /// The one line under "DartFreak Full" on the unlock screen. The list of what you get
+    /// The one line under "DartFreak Pro" on the unlock screen. The list of what you get
     /// does the explaining, so this stays short.
     var tagline: String {
         switch self {
@@ -106,6 +106,6 @@ struct PaidFeatureLockedError: LocalizedError {
     let feature: PaidFeature
 
     var errorDescription: String? {
-        "\(feature.lockedTitle) need DartFreak Full."
+        "\(feature.lockedTitle) need DartFreak Pro."
     }
 }

@@ -96,7 +96,7 @@ struct PaywallView: View {
                 .shadow(color: .black.opacity(0.35), radius: 12, y: 6)
 
             VStack(spacing: 6) {
-                Text("DartFreak Full")
+                Text("DartFreak Pro")
                     .font(.system(.largeTitle, design: .rounded))
                     .fontWeight(.bold)
                     .foregroundColor(AppColor.textPrimary)
@@ -161,9 +161,9 @@ struct PaywallView: View {
                 if store.isPurchasing || store.isLoadingProduct {
                     ProgressView()
                 } else if let product = store.product {
-                    Text("Unlock for \(product.displayPrice)")
+                    Text("Get Pro for \(product.displayPrice)")
                 } else {
-                    Text("Unlock")
+                    Text("Get Pro")
                 }
             }
             .disabled(store.isPurchasing || isRestoring)

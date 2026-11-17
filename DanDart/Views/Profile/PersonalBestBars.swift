@@ -44,6 +44,7 @@ struct PersonalBestBars: View {
                         suffix: "%"
                     )
                 }
+                .proLockedData()
             }
         }
     }

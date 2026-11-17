@@ -291,9 +291,7 @@ struct MatchHistoryView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .overlay(alignment: .topTrailing) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppColor.textSecondary)
+                    ProBadge()
                         .padding(10)
                 }
         }

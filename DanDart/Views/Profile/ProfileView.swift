@@ -57,7 +57,9 @@ struct ProfileView: View {
                                 isLoading: statsService.isLoading,
                                 yScale: trendScale
                             )
-                            
+
+                            ProPrompt(feature: .fullStats)
+
                             DartsThrownPerLegBar(
                                 avgDarts: statsService.avgDartsPerLeg,
                                 rank: statsService.avgDartsRank,
@@ -92,7 +94,7 @@ struct ProfileView: View {
                                 )
                             }
                         }
-                        .lockedOverlay(.fullStats)
+                        .proLocked(.fullStats)
                     }
                 }
                 .padding(.horizontal, 16)

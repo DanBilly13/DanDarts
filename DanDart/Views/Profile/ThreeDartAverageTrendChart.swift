@@ -51,6 +51,7 @@ struct ThreeDartAverageTrendChart: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .allowsHitTesting(false)
+                .proLockedData()
                 
                 if dataPoints.count == 1 {
                     // A lone session has no trend to draw: say so instead of a mostly-empty chart.
@@ -60,6 +61,7 @@ struct ThreeDartAverageTrendChart: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     chartArea
+                        .proLockedData()
                     dateRange
                 }
             }

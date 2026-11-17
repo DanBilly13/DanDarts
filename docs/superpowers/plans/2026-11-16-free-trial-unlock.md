@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make DartFreak free to download on iOS. New users get every feature free for 4 weeks. After that, a free tier stays usable forever, and one payment ("DartFreak Full") unlocks everything else. There is no subscription, ever.
+**Goal:** Make DartFreak free to download on iOS. New users get every feature free for 4 weeks. After that, a free tier stays usable forever, and one payment ("DartFreak Pro") unlocks everything else. There is no subscription, ever.
 
 **Architecture:** One pure function (`AccessPolicy`) decides the user's access from five inputs: an App Store purchase, a legacy paid download, a server entitlement (a purchase on another platform), the account creation date and the current time. `EntitlementStore` gathers those inputs from StoreKit 2 and Supabase and exposes `canUse(_:)` and `requireAccess(to:)`. The UI shows locked features (blurred, with a lock badge) instead of hiding them. Match data is **always saved**; locks only change what is shown. Purchases are recorded in a new `user_entitlements` table through an edge function that checks the purchase with Apple, so the unlock follows the account to Android.
 
@@ -12,7 +12,7 @@
 
 ## What was decided
 
-| Free forever | DartFreak Full (one-time, same price as the app costs today) |
+| Free forever | DartFreak Pro (one-time, same price as the app costs today) |
 |---|---|
 | Account and profile (header stats: wins, losses, rank) | Cricket, Halve-It, Knockout, Sudden Death, Killer |
 | Local 301 and 501, with guests and friends | Remote matches: sending **and** accepting, voice included |
@@ -101,7 +101,7 @@ git checkout -b feature/free-trial-unlock
 
 ```sql
 -- 099_user_entitlements.sql
--- DartFreak Full: one row per account that has unlocked the full app.
+-- DartFreak Pro: one row per account that has unlocked the full app.
 -- Written only by edge functions (service role) or by hand (source 'manual', e.g. Android testers).
 -- Each signed-in user can read their own row, so both iOS and Android can show the unlock.
 -- Match data is unaffected: free users' matches are saved exactly as before.
@@ -166,7 +166,7 @@ The app sends a transaction ID. The function asks Apple's App Store Server API f
 
 ```ts
 // Edge Function: verify-apple-purchase
-// Records a DartFreak Full purchase made on iOS against the calling user's account, so the
+// Records a DartFreak Pro purchase made on iOS against the calling user's account, so the
 // unlock follows them to Android. Looks the transaction up with Apple's App Store Server API
 // (rather than trusting the app), checks it is our unlock and not refunded, then upserts
 // public.user_entitlements with the service role.
@@ -324,7 +324,7 @@ git commit -m "feat(unlock): verify-apple-purchase edge function"
 //  PaidFeatureTests.swift
 //  DanDartTests
 //
-//  301 and 501 stay free forever; every other game needs DartFreak Full after the trial.
+//  301 and 501 stay free forever; every other game needs DartFreak Pro after the trial.
 //
 
 import Testing
@@ -358,7 +358,7 @@ struct PaidFeatureTests {
 
     @Test func lockedErrorNamesTheFeature() {
         let error = PaidFeatureLockedError(feature: .remoteMatches)
-        #expect(error.errorDescription == "Remote matches need DartFreak Full.")
+        #expect(error.errorDescription == "Remote matches need DartFreak Pro.")
     }
 }
 ```
@@ -377,7 +377,7 @@ xcodebuild test -project DanDart.xcodeproj -scheme DanDart -destination 'platfor
 //  PaidFeature.swift
 //  DanDart
 //
-//  The parts of DartFreak that need DartFreak Full once the 4-week trial ends.
+//  The parts of DartFreak that need DartFreak Pro once the 4-week trial ends.
 //  Everything else (account, local 301/501, friends, history list) is free forever.
 //  Locks only change what is SHOWN. Match data is always saved for everyone.
 //
@@ -407,7 +407,7 @@ enum PaidFeature: String, CaseIterable, Identifiable {
 
     var lockedMessage: String {
         switch self {
-        case .partyGames: return "Cricket, Halve-It, Knockout, Sudden Death and Killer come with DartFreak Full."
+        case .partyGames: return "Cricket, Halve-It, Knockout, Sudden Death and Killer come with DartFreak Pro."
         case .remoteMatches: return "Play your mates live from anywhere, with voice chat."
         case .clubs: return "Join and run clubs with the people you play with."
         case .headToHead: return "See who's really winning between you two."
@@ -453,7 +453,7 @@ struct PaidFeatureLockedError: LocalizedError {
     let feature: PaidFeature
 
     var errorDescription: String? {
-        "\(feature.lockedTitle) need DartFreak Full."
+        "\(feature.lockedTitle) need DartFreak Pro."
     }
 }
 ```
@@ -484,7 +484,7 @@ git commit -m "feat(unlock): paid features and free game rule"
 //  DanDartTests
 //
 //  4 weeks of everything from account creation, then the free tier,
-//  unless they bought DartFreak Full, bought the paid app, or unlocked on Android.
+//  unless they bought DartFreak Pro, bought the paid app, or unlocked on Android.
 //
 
 import Foundation
@@ -569,7 +569,7 @@ xcodebuild test -project DanDart.xcodeproj -scheme DanDart -destination 'platfor
 import Foundation
 
 enum UnlockReason: Equatable {
-    case purchased       // bought DartFreak Full on this Apple ID
+    case purchased       // bought DartFreak Pro on this Apple ID
     case legacyPaidApp   // first downloaded DartFreak when it was a paid app
     case otherPlatform   // unlocked on Android (or granted by hand) — user_entitlements row
 }
@@ -742,7 +742,7 @@ git commit -m "feat(unlock): paywall and purchase analytics events"
 - Create: `DanDart/Services/EntitlementStore.swift`
 - Create: `DanDart/DartFreak.storekit` (in Xcode)
 
-- [ ] **Step 1: Create the StoreKit config in Xcode.** File › New › File › *StoreKit Configuration File*, name it `DartFreak`, and leave "Sync with App Store Connect" off. Add a **Non-Consumable**: reference name `DartFreak Full`, product ID `com.dandarts.DartFreak.full`, price the same as today's app price, and display name `DartFreak Full`. Then go to Product › Scheme › Edit Scheme › Run › Options › StoreKit Configuration and choose `DartFreak.storekit`.
+- [ ] **Step 1: Create the StoreKit config in Xcode.** File › New › File › *StoreKit Configuration File*, name it `DartFreak`, and leave "Sync with App Store Connect" off. Add a **Non-Consumable**: reference name `DartFreak Pro`, product ID `com.dandarts.DartFreak.full`, price the same as today's app price, and display name `DartFreak Pro`. Then go to Product › Scheme › Edit Scheme › Run › Options › StoreKit Configuration and choose `DartFreak.storekit`.
 
 - [ ] **Step 2: Write the store**
 
@@ -751,7 +751,7 @@ git commit -m "feat(unlock): paywall and purchase analytics events"
 //  EntitlementStore.swift
 //  DanDart
 //
-//  Gathers what AccessPolicy needs: a StoreKit purchase of DartFreak Full, whether the
+//  Gathers what AccessPolicy needs: a StoreKit purchase of DartFreak Pro, whether the
 //  first download was a paid build, and a user_entitlements row (an Android purchase).
 //  Views ask canUse(_:) / requireAccess(to:). Locks never stop data being saved.
 //
@@ -1024,7 +1024,7 @@ struct PaywallView: View {
                     } else if let product = store.product {
                         Text("Unlock for \(product.displayPrice)")
                     } else {
-                        Text("Unlock DartFreak Full")
+                        Text("Unlock DartFreak Pro")
                     }
                 }
                 .disabled(store.product == nil || store.isPurchasing)
@@ -1050,7 +1050,7 @@ struct PaywallView: View {
     private var subheadline: String {
         switch reason {
         case .trialEnded:
-            return "301, 501 and your friends stay free forever. Unlock DartFreak Full to keep everything else."
+            return "301, 501 and your friends stay free forever. Unlock DartFreak Pro to keep everything else."
         case .feature(let feature):
             return feature.lockedMessage
         }
@@ -1087,7 +1087,7 @@ struct LockedFeatureCard: View {
                 .foregroundColor(AppColor.textSecondary)
                 .multilineTextAlignment(.center)
             AppButton(role: .primary, controlSize: .small, action: onUnlock) {
-                Text("Unlock DartFreak Full")
+                Text("Unlock DartFreak Pro")
             }
         }
         .padding(20)
@@ -1126,7 +1126,7 @@ extension View {
 }
 ```
 
-> If `AppButton` doesn't accept an `action:` label in this position, use the trailing-closure form already used in the app: `AppButton(role: .primary, controlSize: .small) { onUnlock() } label: { Text("Unlock DartFreak Full") }`.
+> If `AppButton` doesn't accept an `action:` label in this position, use the trailing-closure form already used in the app: `AppButton(role: .primary, controlSize: .small) { onUnlock() } label: { Text("Unlock DartFreak Pro") }`.
 
 - [ ] **Step 3: The trial banner**
 
@@ -1207,7 +1207,7 @@ git commit -m "feat(unlock): unlock screen, lock card and trial banner"
 ```swift
         .sheet(item: $entitlements.paywall) { reason in
             PaywallView(reason: reason)
-                .modernSheet(title: "DartFreak Full", detents: [.large], background: AppColor.surfacePrimary)
+                .modernSheet(title: "DartFreak Pro", detents: [.large], background: AppColor.surfacePrimary)
         }
         .task { entitlements.start() }
         .task(id: authService.currentUser?.id) {
@@ -1337,7 +1337,7 @@ Invites still arrive and show who sent them. Tapping Accept on the free tier ope
 
 ```bash
 git add DanDart/Views/Remote/RemoteGamesTab.swift DanDart/Views/Friends/FriendProfileView.swift DanDart/Services/RemoteMatchService.swift
-git commit -m "feat(unlock): remote matches need DartFreak Full after the trial"
+git commit -m "feat(unlock): remote matches need DartFreak Pro after the trial"
 ```
 
 ---
@@ -1368,7 +1368,7 @@ The tab stays visible. Club membership is kept in the database, so unlocking lat
 
 ```bash
 git add DanDart/Views/Clubs/ClubsTabView.swift
-git commit -m "feat(unlock): clubs need DartFreak Full after the trial"
+git commit -m "feat(unlock): clubs need DartFreak Pro after the trial"
 ```
 
 ---
@@ -1527,9 +1527,9 @@ Order matters. Do it top to bottom.
 
 - [ ] **1. Check build numbers.** In App Store Connect › TestFlight, confirm every build ever released on the App Store is a plain whole number, all below the build you'll ship. Set `LegacyPurchase.firstFreeBuild` to that build number exactly (55 if nothing else ships first) and commit.
 - [ ] **2. Create the in-app purchase.** App Store Connect › DartFreak › Monetization › In-App Purchases › **Non-Consumable**:
-  - Reference name `DartFreak Full`, Product ID `com.dandarts.DartFreak.full`.
+  - Reference name `DartFreak Pro`, Product ID `com.dandarts.DartFreak.full`.
   - Price: **the same as the app's current price** (Pricing and Availability shows it).
-  - Display name `DartFreak Full`. Description "Every game, remote matches, clubs, head-to-head and full stats. One payment, no subscription."
+  - Display name `DartFreak Pro`. Description "Every game, remote matches, clubs, head-to-head and full stats. One payment, no subscription."
   - Review screenshot: the unlock screen.
 - [ ] **3. Create an In-App Purchase key.** Users and Access › Integrations › In-App Purchase. Note the Issuer ID and Key ID, and download the `.p8` (it can only be downloaded once).
 - [ ] **4. Backend.** Apply `099_user_entitlements.sql` in the SQL Editor and run `VERIFY_user_entitlements.sql` (all rows true). Set the function secrets `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` and `APPLE_BUNDLE_ID=com.dandarts.DartFreak`, plus `APPLE_ALLOW_SANDBOX=true` for testing only. Deploy `verify-apple-purchase`.

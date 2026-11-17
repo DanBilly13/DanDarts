@@ -98,6 +98,8 @@ struct FriendProfileView: View {
                         .background(AppColor.inputBackground)
                         .cornerRadius(12)
                     } else if !headToHeadMatches.isEmpty {
+                        ProPrompt(feature: .headToHead)
+
                         // Game-specific stats using existing StatCategorySection component
                         HeadToHeadStatsView(
                             matches: headToHeadMatches,
@@ -106,7 +108,7 @@ struct FriendProfileView: View {
                             currentUserId: authService.currentUser?.id ?? UUID(),
                             friendId: friend.userId ?? friend.id
                         )
-                        .lockedOverlay(.headToHead)
+                        .proLocked(.headToHead)
                     }
                 }
             }
@@ -365,6 +367,7 @@ struct HeadToHeadStatsView: View {
                         // User's score (right box)
                         ScoreBox(score: stat.currentUserWins)
                     }
+                    .proLockedData()
                 }
                 .padding(16)
                 .background(AppColor.inputBackground)
