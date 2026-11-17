@@ -2,7 +2,7 @@
 //  PaidFeatureTests.swift
 //  DanDartTests
 //
-//  301 and 501 stay free forever; every other game needs DartFreak Full after the trial.
+//  301 and 501 stay free forever; every other game needs DartFreak Pro after the trial.
 //
 
 import Testing
@@ -64,6 +64,6 @@ struct PaidFeatureTests {
 
     @Test func lockedErrorNamesTheFeature() {
         let error = PaidFeatureLockedError(feature: .remoteMatches)
-        #expect(error.errorDescription == "Remote matches need DartFreak Full.")
+        #expect(error.errorDescription == "Remote matches need DartFreak Pro.")
     }
 }

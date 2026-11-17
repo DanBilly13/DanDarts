@@ -3,7 +3,7 @@
 //  DanDartTests
 //
 //  4 weeks of everything from account creation, then the free tier,
-//  unless they bought DartFreak Full, bought the paid app, or unlocked on Android.
+//  unless they bought DartFreak Pro, bought the paid app, or unlocked on Android.
 //
 
 import Foundation

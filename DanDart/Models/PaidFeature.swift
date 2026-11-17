@@ -30,6 +30,24 @@ enum PaidFeature: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Headline on the pinned Get Pro panel over a locked stats screen.
+    var proHeadline: String {
+        switch self {
+        case .headToHead: return "Who's really winning?"
+        case .fullStats: return "Every stat, saved."
+        default: return lockedTitle
+        }
+    }
+
+    /// The one line under that headline.
+    var proBody: String {
+        switch self {
+        case .headToHead: return "Every match between you two, in one place."
+        case .fullStats: return "Trends, scoring and personal bests since your first game."
+        default: return lockedMessage
+        }
+    }
+
     var lockedMessage: String {
         switch self {
         case .partyGames: return "Cricket, Halve-It, Knockout, Sudden Death and Killer come with DartFreak Pro."

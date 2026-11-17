@@ -23,7 +23,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
-                VStack(spacing: 24) {
+                LazyVStack(spacing: 24, pinnedViews: [.sectionHeaders]) {
                     if let currentUser = authService.currentUser {
                         ProfileHeaderView(
                             player: currentUser.toPlayer()
@@ -51,14 +51,13 @@ struct ProfileView: View {
                             (statsService.threeDartAverageHistory + statsService.practice.threeDartAverageHistory).map(\.average)
                         )
 
+                        Section {
                         VStack(spacing: 48) {
                             ThreeDartAverageTrendChart(
                                 dataPoints: statsService.threeDartAverageHistory,
                                 isLoading: statsService.isLoading,
                                 yScale: trendScale
                             )
-
-                            ProPrompt(feature: .fullStats)
 
                             DartsThrownPerLegBar(
                                 avgDarts: statsService.avgDartsPerLeg,
@@ -95,11 +94,16 @@ struct ProfileView: View {
                             }
                         }
                         .proLocked(.fullStats)
+                        } header: {
+                            // Free users: one Get Pro panel pinned under the title, stats blurred behind it.
+                            ProPanel(feature: .fullStats)
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
             }
             .background(AppColor.surfacePrimary)
+            .proPanelBar(.fullStats)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .task {

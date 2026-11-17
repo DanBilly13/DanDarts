@@ -24,7 +24,7 @@ struct FriendProfileView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24, pinnedViews: [.sectionHeaders]) {
                 // Profile Header (Reusable Component)
                 ProfileHeaderView(player: refreshedFriend ?? friend)
                     .padding(.top, 24)
@@ -45,6 +45,7 @@ struct FriendProfileView: View {
                 .padding(.horizontal, 16)
                 
                 // Head-to-Head Section
+                Section {
                 VStack(alignment: .leading, spacing: 16) {
                     // Header with title and avatars
                     HStack {
@@ -98,8 +99,6 @@ struct FriendProfileView: View {
                         .background(AppColor.inputBackground)
                         .cornerRadius(12)
                     } else if !headToHeadMatches.isEmpty {
-                        ProPrompt(feature: .headToHead)
-
                         // Game-specific stats using existing StatCategorySection component
                         HeadToHeadStatsView(
                             matches: headToHeadMatches,
@@ -111,11 +110,18 @@ struct FriendProfileView: View {
                         .proLocked(.headToHead)
                     }
                 }
+                } header: {
+                    // Free users with matches together: the Get Pro panel pins above the blurred stats.
+                    if !headToHeadMatches.isEmpty {
+                        ProPanel(feature: .headToHead, background: AppColor.backgroundPrimary)
+                    }
+                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
         }
         .background(AppColor.backgroundPrimary)
+        .proPanelBar(.headToHead, color: AppColor.backgroundPrimary)
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
