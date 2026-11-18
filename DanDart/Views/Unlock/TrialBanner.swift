@@ -20,13 +20,19 @@ struct TrialBanner: View {
                     Image(systemName: "clock")
                     Text(daysLeft == 1 ? "1 day left of your free trial" : "\(daysLeft) days left of your free trial")
                     Spacer()
-                    Text("Get Pro").fontWeight(.semibold)
+                    // Get Pro is always the white pill, so the banner itself stays quiet.
+                    Text("Get Pro")
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppColor.justBlack)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(AppColor.justWhite, in: Capsule())
                 }
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(AppColor.justWhite)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AppColor.interactivePrimaryBackground)
+                .padding(.vertical, 8)
+                .background(AppColor.inputBackground)
             }
             .buttonStyle(.plain)
         }

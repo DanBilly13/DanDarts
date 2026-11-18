@@ -100,7 +100,7 @@ struct ProPanel: View {
                     .foregroundColor(AppColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                AppButton(role: .primary, controlSize: .regular) {
+                AppButton(role: .pro, controlSize: .regular) {
                     store.showPaywall(.feature(feature))
                 } label: {
                     Text("Get Pro")

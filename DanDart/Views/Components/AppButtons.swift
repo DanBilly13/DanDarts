@@ -6,6 +6,7 @@ import SwiftUI
 /// - primaryOutline: red outline, white text, red icon
 /// - secondaryOutline: red outline, black text, red icon, white background
 /// - tertiaryOutline: red outline variant, white text, red icon
+/// - pro: solid white background, black text & icon. Only for Get Pro, so Pro has its own look.
 enum AppButtonRole {
     case primary
     case secondary
@@ -13,6 +14,7 @@ enum AppButtonRole {
     case primaryOutline
     case secondaryOutline
     case tertiaryOutline
+    case pro
 }
 // MARK: - AppButton
 struct AppButton<Label: View>: View {
@@ -105,11 +107,13 @@ private struct AppButtonStyle: ButtonStyle {
                 return AppColor.interactiveSecondaryBackground
             case .tertiary, .tertiaryOutline:
                 return AppColor.interactiveTertiaryBackground
+            case .pro:
+                return AppColor.justWhite
             }
         }()
 
         switch role {
-        case .primary, .secondary, .tertiary:
+        case .primary, .secondary, .tertiary, .pro:
             let bg: Color = {
                 // disabled filled background button opacity
                 if !isEnabled { return base.opacity(0.2) }
@@ -303,6 +307,9 @@ private extension View {
         case .secondaryOutline: // red outline → black text, red icon, white background
             textColor = dim(AppColor.justBlack)
             iconTint = primaryBase
+        case .pro: // white fill → black text & icon
+            textColor = dim(AppColor.justBlack)
+            iconTint = dim(AppColor.justBlack)
         }
 
         return self

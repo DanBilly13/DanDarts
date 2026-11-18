@@ -155,7 +155,7 @@ struct PaywallView: View {
                     .multilineTextAlignment(.center)
             }
 
-            AppButton(role: .primary, controlSize: .large) {
+            AppButton(role: .pro, controlSize: .large) {
                 Task { await buy() }
             } label: {
                 if store.isPurchasing || store.isLoadingProduct {
