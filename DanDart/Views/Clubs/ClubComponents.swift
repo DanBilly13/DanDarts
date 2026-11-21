@@ -107,15 +107,15 @@ enum ClubNavigation {
 // MARK: - Text helpers
 
 enum ClubText {
-    static func players(_ count: Int) -> String {
-        count == 1 ? "1 player" : "\(count) players"
+    static func members(_ count: Int) -> String {
+        count == 1 ? "1 member" : "\(count) members"
     }
 
-    /// "Leeds · 14 players", or just "14 players" when the club has no town.
+    /// "Leeds · 14 members", or just "14 members" when the club has no town.
     static func subtitle(town: String?, memberCount: Int, extra: String? = nil) -> String {
         var parts: [String] = []
         if let town, !town.isEmpty { parts.append(town) }
-        parts.append(players(memberCount))
+        parts.append(members(memberCount))
         if let extra { parts.append(extra) }
         return parts.joined(separator: " · ")
     }
@@ -147,6 +147,22 @@ enum ClubText {
     /// How many of the listed members the caller is already friends with.
     static func friendCount(in members: [ClubMember]) -> Int {
         members.filter { $0.relationship == .friend }.count
+    }
+
+    /// True when someone in the list (not you) isn't your friend yet.
+    static func hasNonFriends(in members: [ClubMember]) -> Bool {
+        members.contains { $0.relationship != .selfUser && $0.relationship != .friend }
+    }
+
+    /// The club's rank: the average of its ranked members' ranks, turned back into a rank the same
+    /// way a player's is. Members with no ranked wins yet don't count. None ranked = unranked.
+    static func clubRank(of members: [ClubMember]) -> RankTier {
+        let ranked = members.filter { $0.rankedWinsCount > 0 }
+        guard !ranked.isEmpty else { return .unranked }
+        let average = ranked
+            .map { Double($0.rankedTierScoreTotal) / Double($0.rankedWinsCount) }
+            .reduce(0, +) / Double(ranked.count)
+        return RankingHelper.profileRankFromAverageTierScore(average)
     }
 }
 

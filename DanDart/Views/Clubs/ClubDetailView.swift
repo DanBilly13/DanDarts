@@ -214,36 +214,33 @@ struct ClubDetailView: View {
         .padding(.top, 8)
     }
 
-    /// "Leeds · Open club", or "Invite-only club" when there is no town. "You're admin" added for the admin.
+    /// "Leeds · Open club · Started Nov ’26". The admin started the club; everyone else joined it.
+    /// (Being admin shows on your own member card, so it isn't repeated here.)
     private var visibilityLine: String {
         var parts: [String] = []
         if let town = club.town, !town.isEmpty { parts.append(town) }
         parts.append(club.visibility == .open ? "Open club" : "Invite-only club")
-        if club.isAdmin { parts.append("You're admin") }
+        parts.append("\(club.isAdmin ? "Started" : "Joined") \(ClubText.joinedText(club.joinedAt))")
         return parts.joined(separator: " · ")
     }
 
+    /// The club as a big player: members, your friends in it, and its rank (the average of its
+    /// ranked members), in the same cards as a player's profile.
     private var statsRow: some View {
-        HStack(spacing: 8) {
-            stat(value: "\(club.memberCount)", label: "Players")
-            stat(value: membersLoaded ? "\(ClubText.friendCount(in: members))" : "–", label: "Your friends")
-            // The admin started the club; everyone else joined it.
-            stat(value: ClubText.joinedText(club.joinedAt), label: club.isAdmin ? "Started" : "Joined")
+        let rank = ClubText.clubRank(of: members)
+        return HStack(spacing: 8) {
+            StatCard(title: "Members", value: "\(club.memberCount)", icon: "person.3.fill")
+            StatCard(
+                title: "Your friends",
+                value: membersLoaded ? "\(ClubText.friendCount(in: members))" : "–",
+                icon: "person.2.fill"
+            )
+            StatCard(
+                title: "Rank",
+                value: membersLoaded ? rank.displayName : "–",
+                icon: rank.iconName
+            )
         }
-        .padding(.vertical, 4)
-    }
-
-    private func stat(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(AppColor.textPrimary)
-            Text(label)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(AppColor.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Invite players
@@ -530,16 +527,15 @@ struct ClubDetailView: View {
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColor.textPrimary)
                 Spacer()
-                Text("\(club.memberCount)")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(AppColor.textSecondary)
-                    .padding(.trailing, 8)
             }
 
-            Text("Add people as friends to challenge them and see your head-to-head.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppColor.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Only worth saying when someone here isn't your friend yet.
+            if ClubText.hasNonFriends(in: members) {
+                Text("Club members aren't friends automatically.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if !membersLoaded && !membersFailed {
                 ProgressView()
@@ -576,10 +572,20 @@ struct ClubDetailView: View {
             AsyncAvatarImage(avatarURL: member.avatarURL, size: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(isSelf ? "You" : member.displayName)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColor.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(isSelf ? "You" : member.displayName)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                        .lineLimit(1)
+                    if member.rank != .unranked {
+                        Image(member.rank.iconName)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+                            .foregroundColor(AppColor.brandPrimary)
+                            .accessibilityLabel("Rank \(member.rank.displayName)")
+                    }
+                }
 
                 if let detail = memberDetail(member, isSelf: isSelf) {
                     Text(detail)

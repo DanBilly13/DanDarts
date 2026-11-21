@@ -29,9 +29,9 @@ struct ClubScreensTests {
     }
 
     @Test func subtitleReadsNaturally() {
-        #expect(ClubText.subtitle(town: "Leeds", memberCount: 14) == "Leeds · 14 players")
-        #expect(ClubText.subtitle(town: nil, memberCount: 1) == "1 player")
-        #expect(ClubText.subtitle(town: "", memberCount: 6, extra: "You're admin") == "6 players · You're admin")
+        #expect(ClubText.subtitle(town: "Leeds", memberCount: 14) == "Leeds · 14 members")
+        #expect(ClubText.subtitle(town: nil, memberCount: 1) == "1 member")
+        #expect(ClubText.subtitle(town: "", memberCount: 6, extra: "You're admin") == "6 members · You're admin")
     }
 
     @Test func lengthLimitCountsCodePointsLikeTheDatabase() {
@@ -85,6 +85,28 @@ struct ClubScreensTests {
         #expect(text.hasSuffix("\u{2019}26"))
         #expect(!text.contains("2026"))
         #expect(!text.contains("15"))
+    }
+
+    @Test func clubRankAveragesRankedMembersOnly() {
+        func ranked(wins: Int, total: Int) -> ClubMember {
+            ClubMember(id: UUID(), displayName: "Sam", nickname: nil, avatarURL: nil, role: .member,
+                       joinedAt: Date(), relationship: .friend, rankedWinsCount: wins, rankedTierScoreTotal: total)
+        }
+        // Nobody ranked yet.
+        #expect(ClubText.clubRank(of: []) == .unranked)
+        #expect(ClubText.clubRank(of: [member(.selfUser)]) == .unranked)
+        // An Elite (5.0) and a Solid (2.0) average 3.5 = Pro. The unranked member doesn't drag it down.
+        let club = [ranked(wins: 5, total: 25), ranked(wins: 2, total: 4), member(.none)]
+        #expect(ClubText.clubRank(of: club) == .proLevel)
+        #expect(ranked(wins: 5, total: 25).rank == .worldClass)
+        #expect(member(.none).rank == .unranked)
+    }
+
+    @Test func notFriendsLineOnlyWhenSomeoneIsntAFriend() {
+        #expect(!ClubText.hasNonFriends(in: [member(.selfUser)]))
+        #expect(!ClubText.hasNonFriends(in: [member(.selfUser), member(.friend)]))
+        #expect(ClubText.hasNonFriends(in: [member(.selfUser), member(.none)]))
+        #expect(ClubText.hasNonFriends(in: [member(.requestSent)]))
     }
 
     @Test func friendCountOnlyCountsFriends() {

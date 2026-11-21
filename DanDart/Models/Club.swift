@@ -190,19 +190,24 @@ struct ClubMember: Identifiable, Equatable, Decodable {
     let avatarURL: String?
     let role: ClubRole
     let joinedAt: Date
-    let relationship: ClubRelationship
+    var relationship: ClubRelationship
+    /// 301/501 rank inputs, as on the player's profile. Zero until they have a ranked win.
+    var rankedWinsCount: Int = 0
+    var rankedTierScoreTotal: Int = 0
+
+    /// The member's rank, worked out the same way as on their profile.
+    var rank: RankTier {
+        guard rankedWinsCount > 0 else { return .unranked }
+        return RankingHelper.profileRankFromAverageTierScore(
+            Double(rankedTierScoreTotal) / Double(rankedWinsCount)
+        )
+    }
 
     /// The same member after the caller's friendship with them changed.
     func updating(relationship: ClubRelationship) -> ClubMember {
-        ClubMember(
-            id: id,
-            displayName: displayName,
-            nickname: nickname,
-            avatarURL: avatarURL,
-            role: role,
-            joinedAt: joinedAt,
-            relationship: relationship
-        )
+        var copy = self
+        copy.relationship = relationship
+        return copy
     }
 
     enum CodingKeys: String, CodingKey {
@@ -213,6 +218,36 @@ struct ClubMember: Identifiable, Equatable, Decodable {
         case role
         case joinedAt = "joined_at"
         case relationship
+        case rankedWinsCount = "ranked_wins_count"
+        case rankedTierScoreTotal = "ranked_tier_score_total"
+    }
+
+    init(
+        id: UUID, displayName: String, nickname: String?, avatarURL: String?, role: ClubRole,
+        joinedAt: Date, relationship: ClubRelationship, rankedWinsCount: Int = 0, rankedTierScoreTotal: Int = 0
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.nickname = nickname
+        self.avatarURL = avatarURL
+        self.role = role
+        self.joinedAt = joinedAt
+        self.relationship = relationship
+        self.rankedWinsCount = rankedWinsCount
+        self.rankedTierScoreTotal = rankedTierScoreTotal
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        displayName = try c.decode(String.self, forKey: .displayName)
+        nickname = try c.decodeIfPresent(String.self, forKey: .nickname)
+        avatarURL = try c.decodeIfPresent(String.self, forKey: .avatarURL)
+        role = try c.decode(ClubRole.self, forKey: .role)
+        joinedAt = try c.decode(Date.self, forKey: .joinedAt)
+        relationship = try c.decode(ClubRelationship.self, forKey: .relationship)
+        rankedWinsCount = try c.decodeIfPresent(Int.self, forKey: .rankedWinsCount) ?? 0
+        rankedTierScoreTotal = try c.decodeIfPresent(Int.self, forKey: .rankedTierScoreTotal) ?? 0
     }
 }
 
