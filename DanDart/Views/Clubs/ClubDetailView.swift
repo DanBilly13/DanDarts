@@ -10,6 +10,7 @@
 
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct ClubDetailView: View {
     @EnvironmentObject private var router: Router
@@ -35,6 +36,9 @@ struct ClubDetailView: View {
     @State private var welcome: ClubWelcome
     /// A short line at the bottom, e.g. "Friend request sent to Sam".
     @State private var toast: String?
+    @State private var showPhotoPicker = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var isSavingPhoto = false
 
     /// Something that needs a "Are you sure?" before it happens.
     private enum Pending {
@@ -99,6 +103,12 @@ struct ClubDetailView: View {
             try? await Task.sleep(for: .seconds(4))
             withAnimation { welcome = .none }
         }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            photoItem = nil
+            savePhoto(item)
+        }
         .sheet(isPresented: $showInvite) {
             inviteSheet
                 .presentationDetents([.medium, .large])
@@ -111,8 +121,16 @@ struct ClubDetailView: View {
             titleVisibility: .visible,
             presenting: pending
         ) { item in
-            Button(dialog(for: item).button, role: dialog(for: item).isDestructive ? .destructive : nil) {
-                perform(item)
+            if case .reportClub = item, club.imageURL != nil {
+                // A club with a photo: say whether it's the photo or the club itself.
+                Button("Report the photo", role: .destructive) {
+                    report(.club, id: club.id, title: "Photo reported", reason: "photo")
+                }
+                Button("Report the club", role: .destructive) { perform(item) }
+            } else {
+                Button(dialog(for: item).button, role: dialog(for: item).isDestructive ? .destructive : nil) {
+                    perform(item)
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: { item in
@@ -143,7 +161,43 @@ struct ClubDetailView: View {
                     .transition(.opacity)
             }
 
-            ClubTile(id: club.id, name: club.name, size: 96)
+            if club.isAdmin {
+                // The admin taps the tile to pick a photo (or remove it).
+                Menu {
+                    Button {
+                        showPhotoPicker = true
+                    } label: {
+                        Label(club.imageURL == nil ? "Add a photo" : "Change photo", systemImage: "photo")
+                    }
+                    if club.imageURL != nil {
+                        Button(role: .destructive) {
+                            removePhoto()
+                        } label: {
+                            Label("Remove photo", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    ClubTile(id: club.id, name: club.name, size: 96, imageURL: club.imageURL)
+                        .overlay {
+                            if isSavingPhoto {
+                                Circle().fill(.black.opacity(0.45))
+                                ProgressView().tint(AppColor.justWhite)
+                            }
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppColor.justBlack)
+                                .frame(width: 30, height: 30)
+                                .background(AppColor.justWhite, in: Circle())
+                                .overlay(Circle().stroke(AppColor.backgroundPrimary, lineWidth: 3))
+                        }
+                }
+                .disabled(isSavingPhoto)
+                .accessibilityLabel("Club photo")
+            } else {
+                ClubTile(id: club.id, name: club.name, size: 96, imageURL: club.imageURL)
+            }
 
             VStack(spacing: 4) {
                 Text(club.name)
@@ -161,7 +215,6 @@ struct ClubDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
-        .accessibilityElement(children: .combine)
     }
 
     /// "Leeds · Open club", or "Invite-only club" when there is no town. "You're admin" added for the admin.
@@ -733,6 +786,52 @@ struct ClubDetailView: View {
         }
     }
 
+    /// Square-crops and shrinks the picked photo (512px JPEG), uploads it and sets it as the club photo.
+    private func savePhoto(_ item: PhotosPickerItem) {
+        guard !isSavingPhoto else { return }
+        isSavingPhoto = true
+        Task {
+            defer { isSavingPhoto = false }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data),
+                      let jpeg = image.squareCropped().resized(toMaxDimension: 512).jpegData(compressionQuality: 0.8)
+                else {
+                    notice = Notice(title: "Couldn't use that photo", message: "Please try a different one.")
+                    return
+                }
+                let saved = try await clubsService.setPhoto(clubId: club.id, jpeg: jpeg)
+                if saved.result.isOk, let url = saved.url {
+                    club = club.updating(imageURL: .some(url))
+                } else {
+                    notice = Notice(title: "Couldn't save the photo", message: saved.result.userMessage ?? "Please try again.")
+                }
+            } catch {
+                print("❌ [Clubs] Save photo failed: \(error)")
+                connectionNotice("Couldn't save the photo")
+            }
+        }
+    }
+
+    private func removePhoto() {
+        guard !isSavingPhoto else { return }
+        isSavingPhoto = true
+        Task {
+            defer { isSavingPhoto = false }
+            do {
+                let result = try await clubsService.removePhoto(clubId: club.id)
+                if result.isOk {
+                    club = club.updating(imageURL: .some(nil))
+                } else {
+                    notice = Notice(title: "Couldn't remove the photo", message: result.userMessage ?? "Please try again.")
+                }
+            } catch {
+                print("❌ [Clubs] Remove photo failed: \(error)")
+                connectionNotice("Couldn't remove the photo")
+            }
+        }
+    }
+
     private func remove(_ member: ClubMember) {
         guard !isBusy else { return }
         isBusy = true
@@ -790,13 +889,13 @@ struct ClubDetailView: View {
         }
     }
 
-    private func report(_ target: ClubsService.ReportTarget, id: UUID, title: String) {
+    private func report(_ target: ClubsService.ReportTarget, id: UUID, title: String, reason: String? = nil) {
         guard !isReporting else { return }
         isReporting = true
         Task {
             defer { isReporting = false }
             do {
-                let result = try await clubsService.report(target, id: id)
+                let result = try await clubsService.report(target, id: id, reason: reason)
                 if result.isOk {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     notice = Notice(title: title, message: "Thanks for telling us. We'll take a look.")

@@ -163,6 +163,28 @@ final class ClubsService: ObservableObject {
         return result
     }
 
+    // MARK: - Club photo (admin)
+
+    /// Uploads a JPEG to club-images/<club id>/<random>.jpg, sets it as the club's photo and returns its URL.
+    /// Only the admin may write that folder (storage rules) or set the photo (set_club_image).
+    func setPhoto(clubId: UUID, jpeg: Data) async throws -> (result: ClubActionResult, url: String?) {
+        let path = "\(clubId.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
+        try await supabaseService.client.storage
+            .from("club-images")
+            .upload(path, data: jpeg, options: .init(contentType: "image/jpeg", upsert: false))
+        let url = try supabaseService.client.storage.from("club-images").getPublicURL(path: path).absoluteString
+        let result = try await code("set_club_image", params: SetImageParams(clubId: clubId, url: url))
+        if result.isOk { myClubsVersion += 1 }
+        return (result, result.isOk ? url : nil)
+    }
+
+    /// Back to the letter tile.
+    func removePhoto(clubId: UUID) async throws -> ClubActionResult {
+        let result = try await code("set_club_image", params: SetImageParams(clubId: clubId, url: nil))
+        if result.isOk { myClubsVersion += 1 }
+        return result
+    }
+
     /// The old code stops working immediately. Returns the new code on success.
     func regenerateCode(clubId: UUID) async throws -> (result: ClubActionResult, joinCode: String?) {
         let found: [RegenerateRow] = try await rows("regenerate_club_code", params: ClubIdParams(clubId: clubId))
@@ -309,6 +331,23 @@ final class ClubsService: ObservableObject {
         let query: String
 
         enum CodingKeys: String, CodingKey { case query = "p_query" }
+    }
+
+    private struct SetImageParams: Encodable, Sendable {
+        let clubId: UUID
+        let url: String?
+
+        enum CodingKeys: String, CodingKey {
+            case clubId = "p_club_id"
+            case url = "p_url"
+        }
+
+        // Encode a nil URL as an explicit null, so the function gets its p_url argument.
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(clubId, forKey: .clubId)
+            try container.encode(url, forKey: .url)
+        }
     }
 
     private struct SetVisibilityParams: Encodable, Sendable {

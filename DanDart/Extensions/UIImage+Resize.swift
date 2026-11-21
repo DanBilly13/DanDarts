@@ -51,4 +51,16 @@ extension UIImage {
     func resizedToSquare(size: CGFloat) -> UIImage {
         return resized(toMaxDimension: size)
     }
+
+    /// The largest centred square, for round photos (club photos) that shouldn't be squashed.
+    func squareCropped() -> UIImage {
+        let side = min(size.width, size.height)
+        guard side > 0, size.width != size.height else { return self }
+        let origin = CGPoint(x: (size.width - side) / 2, y: (size.height - side) / 2)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+            draw(at: CGPoint(x: -origin.x, y: -origin.y))
+        }
+    }
 }

@@ -70,7 +70,7 @@ struct JoinClubSheet: View {
 
     private func found(_ club: ClubCodePreview) -> some View {
         VStack(spacing: 16) {
-            ClubTile(id: club.id, name: club.name, size: 72)
+            ClubTile(id: club.id, name: club.name, size: 72, imageURL: club.imageURL)
 
             VStack(spacing: 6) {
                 Text(club.isMember ? "You're already in" : "Join this club?")

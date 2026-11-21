@@ -36,14 +36,33 @@ struct ClubTile: View {
     let id: UUID
     let name: String
     var size: CGFloat = 48
+    /// The club photo, if the admin set one. Until it loads (or if it fails) the letter tile shows.
+    var imageURL: String? = nil
 
     var body: some View {
+        letterTile
+            .overlay {
+                if let imageURL, let url = URL(string: imageURL) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Color.clear
+                        }
+                    }
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                }
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var letterTile: some View {
         Text(ClubTileStyle.letter(for: name))
             .font(.system(size: size * 0.46, weight: .heavy, design: .rounded))
             .foregroundColor(AppColor.justBlack)
             .frame(width: size, height: size)
             .background(Circle().fill(ClubTileStyle.color(for: id)))
-            .accessibilityHidden(true)
     }
 }
 
@@ -136,7 +155,7 @@ struct ClubRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ClubTile(id: club.id, name: club.name)
+            ClubTile(id: club.id, name: club.name, imageURL: club.imageURL)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -182,7 +201,7 @@ struct ClubSearchRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
-                    ClubTile(id: club.id, name: club.name, size: 44)
+                    ClubTile(id: club.id, name: club.name, size: 44, imageURL: club.imageURL)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(club.name)

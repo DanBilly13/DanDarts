@@ -51,11 +51,15 @@ struct Club: Identifiable, Equatable, Decodable {
     let joinCode: String
     let role: ClubRole
     let joinedAt: Date
+    /// The club photo the admin picked; nil shows the letter tile.
+    var imageURL: String? = nil
 
     var isAdmin: Bool { role == .admin }
 
     /// The same club with what an admin action changed; the rest stays as it was.
-    func updating(visibility: ClubVisibility? = nil, joinCode: String? = nil, memberCount: Int? = nil) -> Club {
+    /// `imageURL: .some(nil)` clears the photo.
+    func updating(visibility: ClubVisibility? = nil, joinCode: String? = nil, memberCount: Int? = nil,
+                  imageURL: String?? = .none) -> Club {
         Club(
             id: id,
             name: name,
@@ -64,7 +68,8 @@ struct Club: Identifiable, Equatable, Decodable {
             memberCount: memberCount ?? self.memberCount,
             joinCode: joinCode ?? self.joinCode,
             role: role,
-            joinedAt: joinedAt
+            joinedAt: joinedAt,
+            imageURL: imageURL ?? self.imageURL
         )
     }
 
@@ -81,6 +86,7 @@ struct Club: Identifiable, Equatable, Decodable {
         case joinCode = "join_code"
         case role
         case joinedAt = "joined_at"
+        case imageURL = "image_url"
     }
 }
 
@@ -93,6 +99,7 @@ struct ClubSearchResult: Identifiable, Equatable, Decodable {
     /// Up to three avatar URLs, only from members who allow being found.
     let avatars: [String]
     let isMember: Bool
+    var imageURL: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id = "club_id"
@@ -101,6 +108,7 @@ struct ClubSearchResult: Identifiable, Equatable, Decodable {
         case memberCount = "member_count"
         case avatars
         case isMember = "is_member"
+        case imageURL = "image_url"
     }
 }
 
@@ -134,6 +142,7 @@ struct ClubCodePreview: Identifiable, Equatable, Decodable {
     let visibility: ClubVisibility
     let memberCount: Int
     let isMember: Bool
+    var imageURL: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id = "club_id"
@@ -142,6 +151,7 @@ struct ClubCodePreview: Identifiable, Equatable, Decodable {
         case visibility
         case memberCount = "member_count"
         case isMember = "is_member"
+        case imageURL = "image_url"
     }
 }
 
