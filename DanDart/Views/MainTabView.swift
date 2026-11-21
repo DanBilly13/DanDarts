@@ -476,6 +476,9 @@ struct MainTabView: View {
                 selectedTab = .remote
             case .friendsTab:
                 selectedTab = .friends
+            case .clubsTab:
+                selectedTab = .clubs
+                router.popToRoot()
             }
             
             // Clear intent after consumption

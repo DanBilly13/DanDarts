@@ -39,6 +39,11 @@ struct ClubDetailView: View {
     @State private var showPhotoPicker = false
     @State private var photoItem: PhotosPickerItem?
     @State private var isSavingPhoto = false
+    /// The Invite sheet's "Your friends" list.
+    @State private var friends: [User] = []
+    @State private var friendsLoaded = false
+    @State private var invitedIds: Set<UUID> = []
+    @State private var invitingId: UUID?
 
     /// Something that needs a "Are you sure?" before it happens.
     private enum Pending {
@@ -279,21 +284,30 @@ struct ClubDetailView: View {
                         .foregroundColor(AppColor.textSecondary)
                 }
 
-                if club.isAdmin && club.visibility == .invite {
-                    codeRow
-                }
+                friendsSection
 
-                AppButton(role: .primary, controlSize: .large) {
-                    shareLink()
-                } label: {
-                    Label("Share invite", systemImage: "square.and.arrow.up")
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Or send a link")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(AppColor.textPrimary)
+
+                    if club.isAdmin && club.visibility == .invite {
+                        codeRow
+                    }
+
+                    AppButton(role: .primary, controlSize: .large) {
+                        shareLink()
+                    } label: {
+                        Label("Share invite", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(club.shareURL == nil)
                 }
-                .disabled(club.shareURL == nil)
             }
             .padding(.horizontal, 20)
             .padding(.top, 28)
             .padding(.bottom, 24)
         }
+        .task { await loadFriendsForInvite() }
         .sheet(isPresented: $showShareSheet) {
             if let url = club.shareURL {
                 ShareSheet(activityItems: ["Join \(club.name) on Dart Freak:", url])
@@ -314,6 +328,107 @@ struct ClubDetailView: View {
         }
         .alert(item: $sheetNotice) { notice in
             Alert(title: Text(notice.title), message: Text(notice.message), dismissButton: .default(Text("OK")))
+        }
+    }
+
+    /// Your DartFreak friends, each with Invite (or "In club" / "Invited"). They get a notification and
+    /// a Join / No thanks card on their Clubs tab. Nobody is added without saying yes.
+    @ViewBuilder
+    private var friendsSection: some View {
+        let memberIds = Set(members.map(\.id))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your friends")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(AppColor.textPrimary)
+
+            if !friendsLoaded {
+                ProgressView()
+                    .tint(AppColor.interactivePrimaryBackground)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            } else if friends.isEmpty {
+                Text("When you have friends on DartFreak, you can invite them here with one tap.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 8) {
+                    // People you can still invite first, then the ones already invited or in.
+                    ForEach(friends.sorted { rank($0, memberIds) < rank($1, memberIds) }) { friend in
+                        friendRow(friend, inClub: memberIds.contains(friend.id))
+                    }
+                }
+            }
+        }
+    }
+
+    private func rank(_ friend: User, _ memberIds: Set<UUID>) -> Int {
+        if memberIds.contains(friend.id) { return 2 }
+        if invitedIds.contains(friend.id) { return 1 }
+        return 0
+    }
+
+    private func friendRow(_ friend: User, inClub: Bool) -> some View {
+        HStack(spacing: 12) {
+            AsyncAvatarImage(avatarURL: friend.avatarURL, size: 40)
+            Text(friend.displayName)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundColor(AppColor.textPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            if inClub {
+                statusLabel("In club")
+            } else if invitedIds.contains(friend.id) {
+                statusLabel("Invited")
+            } else {
+                AppButton(role: .primary, controlSize: .small, isDisabled: invitingId != nil) {
+                    inviteFriend(friend)
+                } label: {
+                    if invitingId == friend.id {
+                        ProgressView().tint(AppColor.justWhite)
+                    } else {
+                        Text("Invite")
+                    }
+                }
+                .fixedSize()
+                .accessibilityLabel("Invite \(friend.displayName) to \(club.name)")
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 14)
+        .frame(height: 60)
+        .background(AppColor.inputBackground, in: Capsule())
+    }
+
+    private func loadFriendsForInvite() async {
+        guard let userId = authService.currentUser?.id else { return }
+        async let pending = try? clubsService.pendingInvitees(clubId: club.id)
+        friends = (try? await friendsService.loadFriends(userId: userId)) ?? []
+        invitedIds = await pending ?? []
+        friendsLoaded = true
+    }
+
+    private func inviteFriend(_ friend: User) {
+        guard invitingId == nil else { return }
+        invitingId = friend.id
+        Task {
+            defer { invitingId = nil }
+            do {
+                let invited = try await clubsService.invite(clubId: club.id, clubName: club.name, userIds: [friend.id])
+                if invited.contains(friend.id) {
+                    invitedIds.insert(friend.id)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                } else {
+                    // Already in, already invited by someone else, or no longer friends: refresh.
+                    await loadFriendsForInvite()
+                    if !invitedIds.contains(friend.id) {
+                        sheetNotice = Notice(title: "Couldn't invite \(friend.displayName)", message: "Please try again.")
+                    }
+                }
+            } catch {
+                print("❌ [Clubs] Invite failed: \(error)")
+                sheetNotice = Notice(title: "Couldn't invite \(friend.displayName)", message: "Check your connection and try again.")
+            }
         }
     }
 

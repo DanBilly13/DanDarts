@@ -189,6 +189,53 @@ struct ClubRow: View {
     }
 }
 
+// MARK: - Invite card (Clubs tab)
+
+/// "Dan invited you to The Crown" with Join and No thanks.
+struct ClubInviteCard: View {
+    let invite: ClubInvite
+    let isBusy: Bool
+    let onJoin: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ClubTile(id: invite.clubId, name: invite.clubName, size: 52, imageURL: invite.clubImageURL)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(invite.inviterName) invited you to")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                    Text(invite.clubName)
+                        .font(.system(size: 19, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                        .lineLimit(1)
+                    Text(ClubText.subtitle(town: invite.clubTown, memberCount: invite.memberCount))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                AppButton(role: .tertiaryOutline, controlSize: .regular, isDisabled: isBusy, action: onDecline) {
+                    Text("No thanks")
+                }
+                AppButton(role: .primary, controlSize: .regular, isDisabled: isBusy, action: onJoin) {
+                    if isBusy {
+                        ProgressView().tint(AppColor.justWhite)
+                    } else {
+                        Text("Join")
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(AppColor.inputBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+}
+
 // MARK: - Search result row
 
 struct ClubSearchRow: View {

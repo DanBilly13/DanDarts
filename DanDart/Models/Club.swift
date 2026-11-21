@@ -155,6 +155,33 @@ struct ClubCodePreview: Identifiable, Equatable, Decodable {
     }
 }
 
+/// An invite from a friend waiting for the caller (`my_club_invites`).
+struct ClubInvite: Identifiable, Equatable, Decodable {
+    let id: UUID
+    let clubId: UUID
+    let clubName: String
+    let clubTown: String?
+    let clubImageURL: String?
+    let memberCount: Int
+    let inviterId: UUID
+    let inviterName: String
+    let inviterAvatarURL: String?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id = "invite_id"
+        case clubId = "club_id"
+        case clubName = "club_name"
+        case clubTown = "club_town"
+        case clubImageURL = "club_image_url"
+        case memberCount = "member_count"
+        case inviterId = "inviter_id"
+        case inviterName = "inviter_name"
+        case inviterAvatarURL = "inviter_avatar_url"
+        case createdAt = "created_at"
+    }
+}
+
 /// A member of a club the caller belongs to (`club_members_list`).
 struct ClubMember: Identifiable, Equatable, Decodable {
     let id: UUID
