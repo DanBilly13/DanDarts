@@ -56,7 +56,7 @@ final class EntitlementStore: ObservableObject {
 
     var inputs: AccessInputs {
         AccessInputs(
-            hasPurchasedUnlock: hasPurchasedUnlock,
+            hasPurchasedUnlock: hasPurchasedUnlock || Self.debugForcePro,
             isLegacyPaidCustomer: isLegacyPaidCustomer,
             hasServerEntitlement: hasServerEntitlement,
             accountCreatedAt: accountCreatedAt,
@@ -89,6 +89,15 @@ final class EntitlementStore: ObservableObject {
         purchaseMessage = nil
         paywall = reason
         AnalyticsService.shared.logPaywallShown(reason: reason.analyticsName)
+    }
+
+    /// Launch with `-debugForcePro YES` (Scheme › Arguments) to test as a Pro owner without buying.
+    private static var debugForcePro: Bool {
+        #if DEBUG
+        return UserDefaults.standard.bool(forKey: "debugForcePro")
+        #else
+        return false
+        #endif
     }
 
     /// Launch with `-debugForceTrialEnded YES` (Scheme › Arguments) to test the free tier.
