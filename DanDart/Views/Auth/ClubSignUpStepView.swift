@@ -3,8 +3,8 @@
 //  Dart Freak
 //
 //  The optional "Part of a club or team?" step for new accounts, between profile setup and the
-//  permissions screen. Search and join, create a club, or enter a code; Continue and Skip both
-//  move on, so nobody has to join anything.
+//  permissions screen. Search and join, create a club, or enter a code. One button moves on:
+//  a quiet "Skip for now" until you've joined or created a club, then a red "Continue".
 //
 
 import SwiftUI
@@ -15,6 +15,8 @@ struct ClubSignUpStepView: View {
 
     @State private var query = ""
     @State private var joinedIds: Set<UUID> = []
+    /// Joined by code: there's no search row to tick, but it still counts as done.
+    @State private var joinedByCode = false
     @State private var joiningId: UUID?
     @State private var showCodeField = false
     @State private var code = ""
@@ -29,6 +31,10 @@ struct ClubSignUpStepView: View {
         let id = UUID()
         let title: String
         let message: String
+    }
+
+    private var hasJoinedAnything: Bool {
+        !joinedIds.isEmpty || joinedByCode
     }
 
     private var trimmedQuery: String {
@@ -60,19 +66,23 @@ struct ClubSignUpStepView: View {
             }
             .scrollDismissesKeyboard(.interactively)
 
-            VStack(spacing: 12) {
-                AppButton(role: .primary, controlSize: .large, action: finish) {
-                    Text("Continue")
+            Group {
+                if hasJoinedAnything {
+                    AppButton(role: .primary, controlSize: .large, action: finish) {
+                        Text("Continue")
+                    }
+                } else {
+                    Button(action: finish) {
+                        Text("Skip for now")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundColor(AppColor.textSecondary)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                Button(action: finish) {
-                    Text("Skip for now")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundColor(AppColor.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
+            .animation(.easeOut(duration: 0.2), value: hasJoinedAnything)
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
@@ -112,7 +122,7 @@ struct ClubSignUpStepView: View {
             Text("Part of a club or team?")
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(AppColor.textPrimary)
-            Text("Find your club to see which of your mates are already here. You can skip this and do it later.")
+            Text("Find your club to see which of your mates are already here.")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(AppColor.textSecondary)
         }
@@ -303,8 +313,10 @@ struct ClubSignUpStepView: View {
                 case .ok:
                     code = ""
                     showCodeField = false
+                    joinedByCode = true
                     notice = Notice(title: "You're in", message: "You've joined the club.")
                 case .alreadyMember:
+                    joinedByCode = true
                     notice = Notice(title: "Already in", message: outcome.result.userMessage ?? "")
                 default:
                     notice = Notice(title: "Couldn't join", message: outcome.result.userMessage ?? "Please try again.")

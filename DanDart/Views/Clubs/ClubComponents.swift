@@ -2,7 +2,7 @@
 //  ClubComponents.swift
 //  Dart Freak
 //
-//  Pieces shared by the Clubs screens: the coloured initial tile, the Open / Invite chip,
+//  Pieces shared by the Clubs screens: the coloured initial tile, the Invite-only padlock,
 //  and the rows for "My clubs" and search results.
 //
 
@@ -47,24 +47,18 @@ struct ClubTile: View {
     }
 }
 
-// MARK: - Open / Invite chip
+// MARK: - Invite-only mark
 
-struct ClubVisibilityChip: View {
-    let visibility: ClubVisibility
+/// A small grey padlock after an Invite-only club's name. Open is the normal kind, so it gets nothing.
+/// (It used to be an "Open" / "Invite" chip, which sat where a button would and read like one.)
+struct ClubInviteOnlyMark: View {
+    var size: CGFloat = 13
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: visibility == .open ? "globe" : "lock.fill")
-                .font(.system(size: 11, weight: .semibold))
-            Text(visibility == .open ? "Open" : "Invite")
-                .font(.system(size: 13, weight: .semibold))
-        }
-        .foregroundColor(visibility == .open ? AppColor.textPrimary : AppColor.textSecondary)
-        .padding(.horizontal, 10)
-        .frame(height: 26)
-        .background(Capsule().fill(AppColor.backgroundPrimary))
-        .overlay(Capsule().stroke(AppColor.borderMuted, lineWidth: 1))
-        .accessibilityLabel(visibility == .open ? "Open club" : "Invite-only club")
+        Image(systemName: "lock.fill")
+            .font(.system(size: size, weight: .semibold))
+            .foregroundColor(AppColor.textSecondary)
+            .accessibilityLabel("Invite-only")
     }
 }
 
@@ -122,10 +116,13 @@ struct ClubRow: View {
             ClubTile(id: club.id, name: club.name)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(club.name)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColor.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(club.name)
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                        .lineLimit(1)
+                    if club.visibility == .invite { ClubInviteOnlyMark() }
+                }
 
                 Text(ClubText.subtitle(town: club.town, memberCount: club.memberCount, extra: club.isAdmin ? "You're admin" : nil))
                     .font(.system(size: 13, weight: .medium))
@@ -135,7 +132,10 @@ struct ClubRow: View {
 
             Spacer(minLength: 8)
 
-            ClubVisibilityChip(visibility: club.visibility)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppColor.textSecondary)
+                .accessibilityHidden(true)
         }
         .padding(.leading, 16)
         .padding(.trailing, 20)

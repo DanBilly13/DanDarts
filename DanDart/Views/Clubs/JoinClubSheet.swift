@@ -87,7 +87,11 @@ struct JoinClubSheet: View {
                     .foregroundColor(AppColor.textSecondary)
             }
 
-            ClubVisibilityChip(visibility: club.visibility)
+            if club.visibility == .invite {
+                Label("Invite-only club", systemImage: "lock.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+            }
 
             if let errorMessage {
                 Text(errorMessage)

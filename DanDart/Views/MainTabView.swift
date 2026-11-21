@@ -121,10 +121,12 @@ struct MainTabView: View {
                         guard entitlements.requireAccess(to: .clubs) else { return }
                         router.push(.createClub(name: ""))
                     } label: {
-                        Text("Create")
-                            .font(.system(size: 17, weight: .regular))
+                        // An icon, not the word: a word gets squeezed in the shared glass pill.
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(AppColor.justWhite)
                     }
+                    .accessibilityLabel("Create a club")
 
                     Button {
                         router.push(.findClub)
