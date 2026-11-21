@@ -9,6 +9,10 @@ import SwiftUI
 import PhotosUI
 
 struct ProfileView: View {
+    /// Close Profile and open a club (or Find a club) on the Clubs tab.
+    var onOpenClub: (Club) -> Void = { _ in }
+    var onFindClub: () -> Void = {}
+
     private enum ProfileDestination: Hashable {
         case editProfile
         case settings
@@ -98,6 +102,11 @@ struct ProfileView: View {
                             // Free users: one Get Pro panel pinned under the title, stats blurred behind it.
                             ProPanel(feature: .fullStats)
                         }
+
+                        // After the stats (so the Pro panel has scrolled away by here), never blurred.
+                        ProfileClubsSection(onOpenClub: onOpenClub, onFindClub: onFindClub)
+                            .padding(.top, 24)
+                            .padding(.bottom, 32)
                     }
                 }
                 .padding(.horizontal, 16)

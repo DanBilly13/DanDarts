@@ -350,7 +350,20 @@ struct MainTabView: View {
             presentPendingClubCode()
         }
         .fullScreenCover(isPresented: $showProfile, onDismiss: showTrialEndedNoticeIfNeeded) {
-            ProfileView()
+            ProfileView(
+                onOpenClub: { club in
+                    showProfile = false
+                    selectedTab = .clubs
+                    router.popToRoot()
+                    router.push(.clubDetail(club))
+                },
+                onFindClub: {
+                    showProfile = false
+                    selectedTab = .clubs
+                    router.popToRoot()
+                    router.push(.findClub)
+                }
+            )
                 .environmentObject(authService)
                 .environmentObject(friendsService)
                 .paywallSheet()
