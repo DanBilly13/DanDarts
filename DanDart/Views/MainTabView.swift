@@ -317,9 +317,11 @@ struct MainTabView: View {
                 .paywallSheet()
         }
         .sheet(item: $clubCodeToJoin) { item in
-            JoinClubSheet(code: item.code) {
+            JoinClubSheet(code: item.code) { clubId in
                 selectedTab = .clubs
-                router.popToRoot()
+                Task {
+                    await ClubNavigation.open(clubId: clubId, welcome: .joined, clubsService: clubsService, router: router)
+                }
             }
             // A sheet does not inherit the environment objects above it, so pass them on.
             .environmentObject(clubsService)

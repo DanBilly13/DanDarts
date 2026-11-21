@@ -14,7 +14,7 @@ struct JoinClubSheet: View {
 
     let code: String
     /// Called after a successful join, so the app can show the Clubs tab.
-    let onJoined: () -> Void
+    let onJoined: (UUID?) -> Void
 
     @State private var phase: Phase = .loading
     @State private var isJoining = false
@@ -195,7 +195,7 @@ struct JoinClubSheet: View {
                 switch outcome.result {
                 case .ok, .alreadyMember:
                     dismiss()
-                    onJoined()
+                    onJoined(outcome.clubId)
                 default:
                     errorMessage = outcome.result.userMessage ?? "Please try again."
                 }

@@ -62,6 +62,29 @@ struct ClubInviteOnlyMark: View {
     }
 }
 
+// MARK: - Opening a club after joining or creating
+
+/// Why a club page was opened, so it can say a short hello at the top.
+enum ClubWelcome: Hashable {
+    case none
+    /// "You're in The Crown"
+    case joined
+    /// "The Crown is ready", and the Invite sheet opens by itself.
+    case created
+}
+
+enum ClubNavigation {
+    /// After joining or creating, go straight to that club's page (Back goes to the Clubs tab,
+    /// not the search screen). Falls back to the Clubs tab if the club can't be loaded.
+    @MainActor
+    static func open(clubId: UUID?, welcome: ClubWelcome, clubsService: ClubsService, router: Router) async {
+        router.popToRoot()
+        guard let clubId,
+              let club = try? await clubsService.myClubs().first(where: { $0.id == clubId }) else { return }
+        router.push(.clubDetail(club, welcome: welcome))
+    }
+}
+
 // MARK: - Text helpers
 
 enum ClubText {
