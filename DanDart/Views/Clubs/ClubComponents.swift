@@ -137,9 +137,11 @@ enum ClubText {
         return sharedCount > 1 ? "\(clubName) +\(sharedCount - 1)" : clubName
     }
 
-    /// "Oct 2026", for the Joined figure.
+    /// "Oct ’26", for the Joined / Started figure: short, so it sits like the other two numbers.
     static func joinedText(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.abbreviated).year())
+        let month = date.formatted(.dateTime.month(.abbreviated))
+        let year = date.formatted(.dateTime.year(.twoDigits))
+        return "\(month) \u{2019}\(year)"
     }
 
     /// How many of the listed members the caller is already friends with.

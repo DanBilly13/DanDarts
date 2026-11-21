@@ -82,7 +82,8 @@ struct ClubScreensTests {
     @Test func joinedTextShowsTheMonthAndYear() throws {
         let date = try #require(Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 10, day: 15)))
         let text = ClubText.joinedText(date)
-        #expect(text.contains("2026"))
+        #expect(text.hasSuffix("\u{2019}26"))
+        #expect(!text.contains("2026"))
         #expect(!text.contains("15"))
     }
 

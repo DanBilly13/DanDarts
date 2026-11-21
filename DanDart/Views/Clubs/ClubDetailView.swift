@@ -103,10 +103,12 @@ struct ClubDetailView: View {
                 try? await Task.sleep(for: .milliseconds(400))
                 showInvite = true
             }
-            // The hello line is only for the first few seconds.
-            guard welcome != .none else { return }
-            try? await Task.sleep(for: .seconds(4))
-            withAnimation { welcome = .none }
+            // Joined: a short "You're in …" at the bottom instead of leaving people to guess.
+            if welcome == .joined {
+                try? await Task.sleep(for: .milliseconds(400))
+                showToast("You're in \(club.name)")
+            }
+            welcome = .none
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -156,16 +158,6 @@ struct ClubDetailView: View {
 
     private var header: some View {
         VStack(spacing: 12) {
-            if welcome != .none {
-                Text(welcome == .created ? "“\(club.name)” is ready" : "You're in \(club.name)")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColor.justWhite)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(AppColor.interactiveSecondaryBackground, in: Capsule())
-                    .transition(.opacity)
-            }
-
             if club.isAdmin {
                 // The admin taps the tile to pick a photo (or remove it).
                 Menu {
@@ -235,7 +227,8 @@ struct ClubDetailView: View {
         HStack(spacing: 8) {
             stat(value: "\(club.memberCount)", label: "Players")
             stat(value: membersLoaded ? "\(ClubText.friendCount(in: members))" : "–", label: "Your friends")
-            stat(value: ClubText.joinedText(club.joinedAt), label: "Joined")
+            // The admin started the club; everyone else joined it.
+            stat(value: ClubText.joinedText(club.joinedAt), label: club.isAdmin ? "Started" : "Joined")
         }
         .padding(.vertical, 4)
     }
@@ -276,12 +269,6 @@ struct ClubDetailView: View {
 
                 if club.isAdmin {
                     visibilityPicker
-                } else {
-                    Text(club.visibility == .open
-                         ? "Anyone can find \(club.name) in search, or you can send them the link."
-                         : "\(club.name) is Invite-only: send people the link to bring them in.")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(AppColor.textSecondary)
                 }
 
                 friendsSection
@@ -494,39 +481,40 @@ struct ClubDetailView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(AppColor.textPrimary)
 
-            HStack(spacing: 4) {
-                visibilityOption(.open, title: "Open", icon: "globe")
-                visibilityOption(.invite, title: "Invite-only", icon: "lock.fill")
-            }
-            .padding(4)
-            .frame(height: 44)
-            .background(AppColor.inputBackground)
-            .clipShape(Capsule())
-
-            Text(club.visibility == .open
-                 ? "Anyone can find this club in search and join with one tap."
-                 : "Hidden from search. People join with the link or the code.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppColor.textSecondary)
-                .padding(.horizontal, 4)
+            // The same radio cards as Create a club: a choice, not a button.
+            visibilityOption(.open, title: "Open", detail: "Anyone can find it and join")
+            visibilityOption(.invite, title: "Invite-only", detail: "Hidden. People join with a link or code")
         }
     }
 
-    private func visibilityOption(_ option: ClubVisibility, title: String, icon: String) -> some View {
+    private func visibilityOption(_ option: ClubVisibility, title: String, detail: String) -> some View {
         let selected = club.visibility == option
         return Button {
             setVisibility(option)
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+            HStack(spacing: 14) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(selected ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                    Text(detail)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
             }
-            .foregroundColor(selected ? AppColor.justWhite : AppColor.textSecondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Capsule().fill(selected ? AppColor.interactivePrimaryBackground : Color.clear))
-            .contentShape(Capsule())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColor.inputBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(selected ? AppColor.interactivePrimaryBackground : Color.clear, lineWidth: 2)
+            )
         }
         .buttonStyle(.plain)
         .disabled(isBusy)
