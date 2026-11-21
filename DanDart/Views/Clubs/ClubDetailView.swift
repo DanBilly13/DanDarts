@@ -670,7 +670,7 @@ struct ClubDetailView: View {
         Task {
             defer { addingId = nil }
             do {
-                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: member.id)
+                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: member.id, clubName: club.name)
                 setRelationship(.requestSent, for: member.id)
                 NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)

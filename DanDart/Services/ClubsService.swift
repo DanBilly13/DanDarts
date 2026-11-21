@@ -145,6 +145,18 @@ final class ClubsService: ObservableObject {
         try await rows("club_members_list", params: ClubIdParams(clubId: clubId))
     }
 
+    /// The name of a club you're both in, so a friend request can say where it came from
+    /// ("Sam · The Crown"). At most five clubs, so this is a handful of small calls; nil if none.
+    func sharedClubName(with userId: UUID) async -> String? {
+        guard let clubs = try? await myClubs() else { return nil }
+        for club in clubs {
+            if let members = try? await members(clubId: club.id), members.contains(where: { $0.id == userId }) {
+                return club.name
+            }
+        }
+        return nil
+    }
+
     func setVisibility(clubId: UUID, visibility: ClubVisibility) async throws -> ClubActionResult {
         let result = try await code("set_club_visibility", params: SetVisibilityParams(clubId: clubId, visibility: visibility.rawValue))
         if result.isOk { myClubsVersion += 1 }
