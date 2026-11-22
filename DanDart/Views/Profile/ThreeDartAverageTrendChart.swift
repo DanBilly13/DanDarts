@@ -38,30 +38,37 @@ struct ThreeDartAverageTrendChart: View {
 
             if isLoading {
                 loadingState
-            } else if dataPoints.isEmpty {
-                noDataState
             } else {
-                // Value overlay sits above the chart with its own spacing
-                Group {
-                    if let selected = selectedPoint {
-                        dataOverlay(point: selected)
-                    } else if let lastPoint = dataPoints.last {
-                        dataOverlay(point: lastPoint)
+                // Free tier: everything under the title is blurred, empty states and dates included,
+                // so a locked chart never shows a mix of sharp and blurred bits.
+                VStack(alignment: .leading, spacing: 12) {
+                    if dataPoints.isEmpty {
+                        noDataState
+                    } else {
+                        // Value overlay sits above the chart with its own spacing
+                        Group {
+                            if let selected = selectedPoint {
+                                dataOverlay(point: selected)
+                            } else if let lastPoint = dataPoints.last {
+                                dataOverlay(point: lastPoint)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .allowsHitTesting(false)
+
+                        if dataPoints.count == 1 {
+                            // A lone session has no trend to draw: say so instead of a mostly-empty chart.
+                            Text("First session · your trend appears after your next one")
+                                .font(.caption)
+                                .foregroundColor(AppColor.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            chartArea
+                            dateRange
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .allowsHitTesting(false)
-                
-                if dataPoints.count == 1 {
-                    // A lone session has no trend to draw: say so instead of a mostly-empty chart.
-                    Text("First session · your trend appears after your next one")
-                        .font(.caption)
-                        .foregroundColor(AppColor.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                } else {
-                    chartArea
-                    dateRange
-                }
+                .proLockedData()
             }
         }
     }

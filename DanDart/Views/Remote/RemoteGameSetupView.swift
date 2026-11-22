@@ -346,8 +346,11 @@ struct RemoteGameSetupView: View {
                 
                 await MainActor.run {
                     isCreating = false
-                    errorMessage = "Failed to create challenge: \(error.localizedDescription)"
-                    showError = true
+                    // Locked: the unlock screen is already explaining it.
+                    if !(error is PaidFeatureLockedError) {
+                        errorMessage = "Failed to create challenge: \(error.localizedDescription)"
+                        showError = true
+                    }
                 }
                 
                 // Error haptic

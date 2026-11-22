@@ -60,7 +60,7 @@ let cachedFCMToken: { token: string; expiresAt: number } | null = null
 
 interface PushPayload {
   user_id: string
-  notification_type: 'challenge_received' | 'match_ready' | 'friend_request_received'
+  notification_type: 'challenge_received' | 'match_ready' | 'friend_request_received' | 'club_invite'
   match_id?: string  // Optional - not needed for friend requests
   title: string
   body: string

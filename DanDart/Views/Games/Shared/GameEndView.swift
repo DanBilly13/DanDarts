@@ -180,6 +180,9 @@ struct GameEndView: View {
                 VStack(spacing: 16) {
                     // Play Again Button (same players)
                     AppButton(role: .primary, controlSize: .extraLarge, compact: true) {
+                        // The trial may have ended mid-game: Play Again skips setup, so check here too.
+                        guard GameAccess.isFree(gameType: game.title)
+                                || EntitlementStore.shared.requireAccess(to: .partyGames) else { return }
                         onPlayAgain()
                     } label: {
                         Label("Play Again", systemImage: "arrow.clockwise")

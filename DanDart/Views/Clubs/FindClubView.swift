@@ -156,6 +156,7 @@ struct FindClubView: View {
 
     private var createRow: some View {
         Button {
+            guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
             router.push(.createClub(name: trimmedQuery))
         } label: {
             HStack(spacing: 10) {
@@ -218,6 +219,7 @@ struct FindClubView: View {
 
     private func join(_ club: ClubSearchResult) {
         guard joiningId == nil else { return }
+        guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         joiningId = club.id
         Task {
             defer { joiningId = nil }
@@ -226,6 +228,9 @@ struct FindClubView: View {
                 switch outcome.result {
                 case .ok, .alreadyMember:
                     joinedIds.insert(club.id)
+                    // A moment on "Joined", then into the club rather than left on the search screen.
+                    try? await Task.sleep(for: .milliseconds(500))
+                    await ClubNavigation.open(clubId: club.id, welcome: .joined, clubsService: clubsService, router: router)
                 default:
                     notice = Notice(title: "Couldn't join", message: outcome.result.userMessage ?? "Please try again.")
                 }
@@ -238,6 +243,7 @@ struct FindClubView: View {
 
     private func joinByCode() {
         guard !isJoiningByCode else { return }
+        guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         guard let clean = ClubLink.normalizedCode(code) else {
             notice = Notice(title: "Check the code", message: ClubActionResult.invalidCode.userMessage ?? "")
             return
@@ -249,11 +255,9 @@ struct FindClubView: View {
             do {
                 let outcome = try await clubsService.joinClub(code: clean)
                 switch outcome.result {
-                case .ok:
+                case .ok, .alreadyMember:
                     code = ""
-                    notice = Notice(title: "You're in", message: "You've joined the club.", leavesScreen: true)
-                case .alreadyMember:
-                    notice = Notice(title: "Already in", message: outcome.result.userMessage ?? "", leavesScreen: true)
+                    await ClubNavigation.open(clubId: outcome.clubId, welcome: .joined, clubsService: clubsService, router: router)
                 default:
                     notice = Notice(title: "Couldn't join", message: outcome.result.userMessage ?? "Please try again.")
                 }

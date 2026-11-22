@@ -377,9 +377,19 @@ struct ReceivedRequestCard: View {
     let isProcessing: Bool
     let onAccept: () -> Void
     let onDeny: () -> Void
+    /// A club you're both in, so the request says where it came from.
+    @State private var clubName: String?
     
     var body: some View {
         VStack(spacing: 12) {
+            if let clubName {
+                Label("From \(clubName)", systemImage: "shield.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppColor.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 8)
+            }
+
             // Player Card with time label
             ZStack(alignment: .topTrailing) {
                 PlayerCard(player: request.user.toPlayer())
@@ -427,6 +437,9 @@ struct ReceivedRequestCard: View {
         }
         .padding(.bottom, 16)
         
+        .task(id: request.user.id) {
+            clubName = await ClubsService().sharedClubName(with: request.user.id)
+        }
     }
 }
 

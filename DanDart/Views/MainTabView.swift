@@ -16,6 +16,7 @@ struct MainTabView: View {
     @StateObject private var remoteMatchService = RemoteMatchService()
     @StateObject private var voiceChatService = VoiceChatService.shared
     @ObservedObject private var toastManager = FriendRequestToastManager.shared
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @State private var showProfile: Bool = false
     @State private var pendingRequestCount: Int = 0
     @State private var pendingChallengeCount: Int = 0
@@ -48,6 +49,9 @@ struct MainTabView: View {
     }
 
     @State private var clubCodeToJoin: ClubCodeToJoin? = nil
+    /// The club link whose unlock screen is open (clubs are locked). Closing it without
+    /// unlocking forgets the link; unlocking opens the join sheet.
+    @State private var clubPaywallCode: String? = nil
     
     private func logTabScreen(_ tab: AppTab) {
         AnalyticsService.shared.logScreenView(screenName: tab.analyticsScreenName)
@@ -114,12 +118,15 @@ struct MainTabView: View {
                 // Clubs tab
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
+                        guard entitlements.requireAccess(to: .clubs) else { return }
                         router.push(.createClub(name: ""))
                     } label: {
-                        Text("Create")
-                            .font(.system(size: 17, weight: .regular))
+                        // An icon, not the word: a word gets squeezed in the shared glass pill.
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(AppColor.justWhite)
                     }
+                    .accessibilityLabel("Create a club")
 
                     Button {
                         router.push(.findClub)
@@ -134,6 +141,7 @@ struct MainTabView: View {
                 // Remote tab
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        guard entitlements.requireAccess(to: .remoteMatches) else { return }
                         remoteShowGameSelection = true
                     } label: {
                         Text("Challenge")
@@ -170,6 +178,7 @@ struct MainTabView: View {
                         showProfile: $showProfile,
                         selectedTab: $selectedTab
                     )
+                    .safeAreaInset(edge: .top) { TrialBanner() }
                     .tabItem {
                         Image(systemName: "target")
                             .font(.system(size: 17, weight: .semibold))
@@ -305,23 +314,59 @@ struct MainTabView: View {
         }) { token in
             InviteClaimView(token: token.token)
                 .modernSheet(title: "Invite", detents: [.medium], background: AppColor.surfacePrimary)
+                .paywallSheet()
         }
         .sheet(item: $clubCodeToJoin) { item in
-            JoinClubSheet(code: item.code) {
+            JoinClubSheet(code: item.code) { clubId in
                 selectedTab = .clubs
-                router.popToRoot()
+                Task {
+                    await ClubNavigation.open(clubId: clubId, welcome: .joined, clubsService: clubsService, router: router)
+                }
             }
             // A sheet does not inherit the environment objects above it, so pass them on.
             .environmentObject(clubsService)
             .modernSheet(title: "Join a club", detents: [.medium], background: AppColor.surfacePrimary)
+            .paywallSheet()
+        }
+        // Off while a cover or sheet with its own .paywallSheet() is up, so only one presents.
+        .paywallSheet(isEnabled: !showProfile && clubCodeToJoin == nil && inviteTokenToClaim == nil)
+        .task { entitlements.start() }
+        .task(id: authService.currentUser?.id) {
+            await entitlements.refresh()
+            presentPendingClubCode()
+            showTrialEndedNoticeIfNeeded()
+        }
+        .onChange(of: entitlements.state.hasFullAccess) { _, hasAccess in
+            // A club link that waited behind the unlock screen opens once they unlock.
+            if hasAccess { presentPendingClubCode() }
+        }
+        .onChange(of: navigationPath.isEmpty) { _, isEmpty in
+            if isEmpty { showTrialEndedNoticeIfNeeded() }
+        }
+        .onChange(of: entitlements.paywall) { _, reason in
+            if reason == nil { paywallClosed() }
         }
         .onReceive(NotificationCenter.default.publisher(for: PendingClubCodeStore.linkReceived)) { _ in
             presentPendingClubCode()
         }
-        .fullScreenCover(isPresented: $showProfile) {
-            ProfileView()
+        .fullScreenCover(isPresented: $showProfile, onDismiss: showTrialEndedNoticeIfNeeded) {
+            ProfileView(
+                onOpenClub: { club in
+                    showProfile = false
+                    selectedTab = .clubs
+                    router.popToRoot()
+                    router.push(.clubDetail(club))
+                },
+                onFindClub: {
+                    showProfile = false
+                    selectedTab = .clubs
+                    router.popToRoot()
+                    router.push(.findClub)
+                }
+            )
                 .environmentObject(authService)
                 .environmentObject(friendsService)
+                .paywallSheet()
         }
         .onAppear {
             // Wire router closures to @State path (coalesced to next runloop)
@@ -431,6 +476,9 @@ struct MainTabView: View {
                 selectedTab = .remote
             case .friendsTab:
                 selectedTab = .friends
+            case .clubsTab:
+                selectedTab = .clubs
+                router.popToRoot()
             }
             
             // Clear intent after consumption
@@ -461,6 +509,15 @@ struct MainTabView: View {
             }
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Back in the app: a purchase, refund or the trial's end may have happened meanwhile.
+            // Only from the background: an alert (such as an Apple Account prompt) also makes the
+            // app inactive, and refreshing after each one could loop.
+            if newPhase == .active, oldPhase == .background, authService.currentUser != nil {
+                Task {
+                    await entitlements.refresh()
+                    showTrialEndedNoticeIfNeeded()
+                }
+            }
             // Check for pending requests when app returns to foreground
             if newPhase == .active && oldPhase == .background {
                 print("🔄 [App] App returned to foreground")
@@ -473,11 +530,53 @@ struct MainTabView: View {
         }
     }
     
+    /// The "your 4 weeks are up" screen, once per account. Not while a link sheet, Profile or a
+    /// navigation flow (a game, a match) is up: it would land on top of what they opened.
+    private func showTrialEndedNoticeIfNeeded() {
+        guard let userId = authService.currentUser?.id else { return }
+        let screenBusy = showProfile || inviteTokenToClaim != nil || clubCodeToJoin != nil || !navigationPath.isEmpty
+        entitlements.showTrialEndedNoticeIfNeeded(userId: userId, screenBusy: screenBusy)
+    }
+
     /// Shows the join sheet for a club link that arrived earlier (signed out, or before this screen existed).
+    /// Clubs need DartFreak Pro after the trial: then the unlock screen shows instead and the
+    /// code waits while it's open, so the join sheet opens if they unlock.
     private func presentPendingClubCode() {
-        guard clubCodeToJoin == nil, authService.currentUser != nil,
-              let code = PendingClubCodeStore.shared.consumeCode() else { return }
-        clubCodeToJoin = ClubCodeToJoin(code: code)
+        guard clubCodeToJoin == nil, let userId = authService.currentUser?.id,
+              let code = PendingClubCodeStore.shared.getCode() else { return }
+        let paywallOpenForCode = clubPaywallCode == code && entitlements.paywall != nil
+        let decision = ClubLinkDecision.decide(
+            entitlementLoaded: entitlements.refreshedUserId == userId,
+            canUseClubs: entitlements.canUse(.clubs),
+            paywallOpenForCode: paywallOpenForCode,
+            otherPaywallShowing: entitlements.paywall != nil && !paywallOpenForCode
+        )
+        switch decision {
+        case .wait:
+            return
+        case .presentJoin:
+            clubPaywallCode = nil
+            entitlements.paywall = nil
+            PendingClubCodeStore.shared.clearCode()
+            clubCodeToJoin = ClubCodeToJoin(code: code)
+        case .showPaywall:
+            clubPaywallCode = code
+            entitlements.showPaywall(.feature(.clubs))
+        }
+    }
+
+    /// The unlock screen closed (bought, restored, or swiped away).
+    private func paywallClosed() {
+        if let code = clubPaywallCode {
+            clubPaywallCode = nil
+            if !entitlements.canUse(.clubs), PendingClubCodeStore.shared.getCode() == code {
+                // Closed without unlocking: forget the link rather than asking on every launch.
+                PendingClubCodeStore.shared.clearCode()
+                return
+            }
+        }
+        // Unlocked, or a link was waiting behind a different unlock screen.
+        presentPendingClubCode()
     }
 
     private func loadPendingRequestCount() {
@@ -706,8 +805,24 @@ struct GamesTabView: View {
     let gameHeroNamespace: Namespace.ID
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var authService: AuthService
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @Binding var showProfile: Bool
     @Binding var selectedTab: AppTab
+
+    /// 301 and 501 are free forever; the other games need DartFreak Pro after the trial.
+    private func isLocked(_ game: Game) -> Bool {
+        !GameAccess.isFree(gameType: game.title) && !entitlements.canUse(.partyGames)
+    }
+
+    private func openSetup(for game: Game) {
+        guard GameAccess.isFree(gameType: game.title) || entitlements.requireAccess(to: .partyGames) else { return }
+        router.push(.gameSetup(game: game))
+    }
+
+    private func openRemoteSetup(for game: Game) {
+        guard entitlements.requireAccess(to: .remoteMatches) else { return }
+        router.push(.remoteGameSetup(game: game, opponent: nil))
+    }
     
     var body: some View {
         ZStack {
@@ -727,13 +842,13 @@ struct GamesTabView: View {
                             .padding(.horizontal, 16)
                         
                         VStack(spacing: 12) {
-                            GameCardRemote(game: Game.remote301) {
-                                router.push(.remoteGameSetup(game: Game.remote301, opponent: nil))
+                            GameCardRemote(game: Game.remote301, isLocked: !entitlements.canUse(.remoteMatches)) {
+                                openRemoteSetup(for: Game.remote301)
                             }
                             .modifier(GameHeroSourceModifier(game: Game.remote301, namespace: gameHeroNamespace))
                             
-                            GameCardRemote(game: Game.remote501) {
-                                router.push(.remoteGameSetup(game: Game.remote501, opponent: nil))
+                            GameCardRemote(game: Game.remote501, isLocked: !entitlements.canUse(.remoteMatches)) {
+                                openRemoteSetup(for: Game.remote501)
                             }
                             .modifier(GameHeroSourceModifier(game: Game.remote501, namespace: gameHeroNamespace))
                         }
@@ -750,8 +865,8 @@ struct GamesTabView: View {
                         
                         LazyVStack(spacing: 16) {
                             ForEach(games) { game in
-                                GameCard(game: game) {
-                                    router.push(.gameSetup(game: game))
+                                GameCard(game: game, isLocked: isLocked(game)) {
+                                    openSetup(for: game)
                                 }
                                 .modifier(GameHeroSourceModifier(game: game, namespace: gameHeroNamespace))
                             }

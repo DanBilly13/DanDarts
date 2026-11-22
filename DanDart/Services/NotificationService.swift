@@ -662,11 +662,13 @@ struct NotificationRouteIntent: Equatable {
     enum Destination: Equatable {
         case remoteTab
         case friendsTab
+        case clubsTab
     }
     
     enum HighlightStyle: Equatable {
         case incoming  // Scroll to pending challenges section
         case ready     // Scroll to ready matches section
         case friendRequest  // Friend request notification
+        case clubInvite     // A friend invited you to a club
     }
 }

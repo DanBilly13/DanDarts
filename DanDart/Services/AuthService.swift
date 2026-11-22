@@ -861,6 +861,7 @@ class AuthService: ObservableObject {
             // 4. Clear Keychain session (handled by Supabase SDK automatically)
             
             // 5. Reset currentUser to nil and set isAuthenticated to false
+            PendingClubCodeStore.shared.clearCode()
             clearAuthenticationState()
             
         } catch {
@@ -870,6 +871,7 @@ class AuthService: ObservableObject {
             
             // Log the error for debugging but don't throw it
             // User should always be able to sign out locally
+            PendingClubCodeStore.shared.clearCode()
             print("Sign out error (cleared local state anyway): \(error.localizedDescription)")
         }
     }
@@ -919,6 +921,8 @@ class AuthService: ObservableObject {
         // Best-effort local sign out (the server session is already invalid).
         try? await supabaseService.client.auth.signOut()
         
+        // A club link from this account must not auto-join whoever signs in next.
+        PendingClubCodeStore.shared.clearCode()
         clearAuthenticationState()
     }
     
@@ -1421,6 +1425,7 @@ class AuthService: ObservableObject {
         needsPermissionsOnboarding = false
         needsClubOnboarding = false
         ProfileStatsService.shared.clearPersistedStats()
+        EntitlementStore.shared.reset()
     }
     
     // MARK: - REST API Sign Up (Workaround for SDK timeout issue)

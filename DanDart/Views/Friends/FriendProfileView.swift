@@ -13,6 +13,7 @@ struct FriendProfileView: View {
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var router: Router
     @StateObject private var matchesService = MatchesService()
+    @ObservedObject private var entitlements = EntitlementStore.shared
     @StateObject private var friendsService = FriendsService()
     
     @State private var showRemoveConfirmation: Bool = false
@@ -23,13 +24,14 @@ struct FriendProfileView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24, pinnedViews: [.sectionHeaders]) {
                 // Profile Header (Reusable Component)
                 ProfileHeaderView(player: refreshedFriend ?? friend)
                     .padding(.top, 24)
                 
                 // Challenge Button
                 AppButton(role: .primary, controlSize: .large) {
+                    guard entitlements.requireAccess(to: .remoteMatches) else { return }
                     showGameSelection = true
                 } label: {
                     HStack(spacing: 8) {
@@ -43,6 +45,7 @@ struct FriendProfileView: View {
                 .padding(.horizontal, 16)
                 
                 // Head-to-Head Section
+                Section {
                 VStack(alignment: .leading, spacing: 16) {
                     // Header with title and avatars
                     HStack {
@@ -104,6 +107,13 @@ struct FriendProfileView: View {
                             currentUserId: authService.currentUser?.id ?? UUID(),
                             friendId: friend.userId ?? friend.id
                         )
+                        .proLocked(.headToHead)
+                    }
+                }
+                } header: {
+                    // Free users with matches together: the Get Pro panel pins above the blurred stats.
+                    if !headToHeadMatches.isEmpty {
+                        ProPanel(feature: .headToHead, background: AppColor.backgroundPrimary)
                     }
                 }
             }
@@ -111,6 +121,7 @@ struct FriendProfileView: View {
             .padding(.bottom, 40)
         }
         .background(AppColor.backgroundPrimary)
+        .proPanelBar(.headToHead, color: AppColor.backgroundPrimary)
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -362,6 +373,7 @@ struct HeadToHeadStatsView: View {
                         // User's score (right box)
                         ScoreBox(score: stat.currentUserWins)
                     }
+                    .proLockedData()
                 }
                 .padding(16)
                 .background(AppColor.inputBackground)

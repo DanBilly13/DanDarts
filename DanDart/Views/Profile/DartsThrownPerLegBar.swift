@@ -30,6 +30,7 @@ struct DartsThrownPerLegBar: View {
                 loadingState
             } else {
                 barView
+                    .proLockedData()
             }
         }
     }

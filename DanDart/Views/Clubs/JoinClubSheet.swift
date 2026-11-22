@@ -14,7 +14,7 @@ struct JoinClubSheet: View {
 
     let code: String
     /// Called after a successful join, so the app can show the Clubs tab.
-    let onJoined: () -> Void
+    let onJoined: (UUID?) -> Void
 
     @State private var phase: Phase = .loading
     @State private var isJoining = false
@@ -70,7 +70,7 @@ struct JoinClubSheet: View {
 
     private func found(_ club: ClubCodePreview) -> some View {
         VStack(spacing: 16) {
-            ClubTile(id: club.id, name: club.name, size: 72)
+            ClubTile(id: club.id, name: club.name, size: 72, imageURL: club.imageURL)
 
             VStack(spacing: 6) {
                 Text(club.isMember ? "You're already in" : "Join this club?")
@@ -87,7 +87,11 @@ struct JoinClubSheet: View {
                     .foregroundColor(AppColor.textSecondary)
             }
 
-            ClubVisibilityChip(visibility: club.visibility)
+            if club.visibility == .invite {
+                Label("Invite-only club", systemImage: "lock.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+            }
 
             if let errorMessage {
                 Text(errorMessage)
@@ -180,6 +184,8 @@ struct JoinClubSheet: View {
 
     private func join(visibility: ClubVisibility) {
         guard !isJoining else { return }
+        // Backstop: the link flow checks first, but clubs need DartFreak Pro after the trial.
+        guard EntitlementStore.shared.requireAccess(to: .clubs) else { return }
         isJoining = true
         errorMessage = nil
         Task {
@@ -189,7 +195,7 @@ struct JoinClubSheet: View {
                 switch outcome.result {
                 case .ok, .alreadyMember:
                     dismiss()
-                    onJoined()
+                    onJoined(outcome.clubId)
                 default:
                     errorMessage = outcome.result.userMessage ?? "Please try again."
                 }

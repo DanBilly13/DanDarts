@@ -9,6 +9,8 @@ import SwiftUI
 
 struct GameCardRemote: View {
     let game: Game
+    /// Remote matches need DartFreak Pro after the trial: shows the PRO chip.
+    var isLocked: Bool = false
     let onTapped: () -> Void
     
     private var gameNumber: String {
@@ -49,6 +51,11 @@ struct GameCardRemote: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 120)
+        .overlay(alignment: .topTrailing) {
+            if isLocked {
+                ProBadge().padding(10)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture {

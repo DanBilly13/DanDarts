@@ -14,6 +14,15 @@ struct NotificationPayloadParser {
             )
         }
         
+        // A friend invited you to a club: the invite card is on the Clubs tab.
+        if typeString == "club_invite" {
+            return NotificationRouteIntent(
+                matchId: nil,
+                destination: .clubsTab,
+                highlightStyle: .clubInvite
+            )
+        }
+
         // Remote match notifications (require matchId)
         let matchIdString = (userInfo["matchId"] as? String)
             ?? (userInfo["match_id"] as? String)

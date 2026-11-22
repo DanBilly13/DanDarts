@@ -10,6 +10,7 @@ import SwiftUI
 struct ScoringDistributionChart: View {
     let distribution: ScoringDistribution
     let isLoading: Bool
+    @Environment(\.proDataLocked) private var proDataLocked
     
     private let donutSize: CGFloat = 140
     private let donutThickness: CGFloat = 28
@@ -17,8 +18,10 @@ struct ScoringDistributionChart: View {
     private let legendGutter: CGFloat = 24 // Fixed spacing between legend columns
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Scoring Distribution (\(distribution.totalVisits) visits)")
+        // 20pt under the title: the blurred donut (free tier) spreads past its frame.
+        VStack(alignment: .leading, spacing: 20) {
+            // The visit count is data too: hidden on the free tier.
+            Text(proDataLocked ? "Scoring Distribution" : "Scoring Distribution (\(distribution.totalVisits) visits)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(AppColor.textSecondary)
 
@@ -26,6 +29,7 @@ struct ScoringDistributionChart: View {
                 loadingState
             } else {
                 chartView
+                    .proLockedData()
             }
         }
     }
@@ -36,7 +40,7 @@ struct ScoringDistributionChart: View {
                 .frame(width: donutSize, height: donutSize)
                 .mask {
                     Circle()
-                        .stroke(lineWidth: donutThickness)
+                        .strokeBorder(lineWidth: donutThickness)
                         .frame(width: donutSize, height: donutSize)
                 }
 
@@ -66,8 +70,9 @@ struct ScoringDistributionChart: View {
     }
 
     private var emptyDonut: some View {
+        // strokeBorder keeps the ring inside its frame (a plain stroke spills half its width outside).
         Circle()
-            .stroke(AppColor.interactivePrimaryBackground, lineWidth: donutThickness)
+            .strokeBorder(AppColor.interactivePrimaryBackground, lineWidth: donutThickness)
             .frame(width: donutSize, height: donutSize)
     }
     

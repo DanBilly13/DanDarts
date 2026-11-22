@@ -246,6 +246,10 @@ struct GameSetupView: View {
                             }
 
                             AppButton(role: .primary, controlSize: .extraLarge, isDisabled: !canStartGame) {
+                                // Backstop for any route into setup (Restart, deep links): party games
+                                // need DartFreak Pro after the trial.
+                                guard GameAccess.isFree(gameType: game.title)
+                                        || EntitlementStore.shared.requireAccess(to: .partyGames) else { return }
                                 let params = config.gameParameters(players: selectedPlayers, selection: setupState.selectedOption)
                                 router.push(.preGameHype(
                                     game: params.game,

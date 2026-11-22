@@ -10,6 +10,7 @@ import SwiftUI
 struct MatchHistoryView: View {
     @EnvironmentObject private var authService: AuthService
     @StateObject private var historyService = MatchHistoryService.shared
+    @ObservedObject private var entitlements = EntitlementStore.shared
     private let analytics = AnalyticsService.shared
     
     @Binding var isSearchPresented: Bool
@@ -251,12 +252,16 @@ struct MatchHistoryView: View {
                 // Match list
                 LazyVStack(spacing: 12) {
                     ForEach(filteredSummaries) { summary in
-                        NavigationLink(value: summary.id) {
-                            matchRowView(summary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                        if canOpen(summary) {
+                            NavigationLink(value: summary.id) {
+                                matchRowView(summary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            lockedRow(summary)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -272,6 +277,25 @@ struct MatchHistoryView: View {
 
     private func matchRowView(_ summary: MatchSummary) -> some View {
         MatchCard(summary: summary)
+    }
+
+    private func canOpen(_ summary: MatchSummary) -> Bool {
+        GameAccess.isFree(gameType: summary.gameType) || entitlements.canUse(.fullHistory)
+    }
+
+    private func lockedRow(_ summary: MatchSummary) -> some View {
+        Button {
+            entitlements.showPaywall(.feature(.fullHistory))
+        } label: {
+            matchRowView(summary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .overlay(alignment: .topTrailing) {
+                    ProBadge()
+                        .padding(10)
+                }
+        }
+        .buttonStyle(.plain)
     }
     // Search overlay (Liquid Glass pattern)
     private var searchOverlay: some View {
@@ -324,13 +348,17 @@ struct MatchHistoryView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredSummaries) { summary in
-                                NavigationLink(value: summary.id) {
-                                    matchRowView(summary)
+                                if canOpen(summary) {
+                                    NavigationLink(value: summary.id) {
+                                        matchRowView(summary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .simultaneousGesture(TapGesture().onEnded {
+                                        stopSearch()
+                                    })
+                                } else {
+                                    lockedRow(summary)
                                 }
-                                .buttonStyle(.plain)
-                                .simultaneousGesture(TapGesture().onEnded {
-                                    stopSearch()
-                                })
                             }
                         }
                         .padding(.horizontal, 16)

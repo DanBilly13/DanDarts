@@ -9,6 +9,10 @@ import SwiftUI
 import PhotosUI
 
 struct ProfileView: View {
+    /// Close Profile and open a club (or Find a club) on the Clubs tab.
+    var onOpenClub: (Club) -> Void = { _ in }
+    var onFindClub: () -> Void = {}
+
     private enum ProfileDestination: Hashable {
         case editProfile
         case settings
@@ -23,7 +27,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
-                VStack(spacing: 24) {
+                LazyVStack(spacing: 24, pinnedViews: [.sectionHeaders]) {
                     if let currentUser = authService.currentUser {
                         ProfileHeaderView(
                             player: currentUser.toPlayer()
@@ -51,13 +55,14 @@ struct ProfileView: View {
                             (statsService.threeDartAverageHistory + statsService.practice.threeDartAverageHistory).map(\.average)
                         )
 
+                        Section {
                         VStack(spacing: 48) {
                             ThreeDartAverageTrendChart(
                                 dataPoints: statsService.threeDartAverageHistory,
                                 isLoading: statsService.isLoading,
                                 yScale: trendScale
                             )
-                            
+
                             DartsThrownPerLegBar(
                                 avgDarts: statsService.avgDartsPerLeg,
                                 rank: statsService.avgDartsRank,
@@ -92,11 +97,22 @@ struct ProfileView: View {
                                 )
                             }
                         }
+                        .proLocked(.fullStats)
+                        } header: {
+                            // Free users: one Get Pro panel pinned under the title, stats blurred behind it.
+                            ProPanel(feature: .fullStats)
+                        }
+
+                        // After the stats (so the Pro panel has scrolled away by here), never blurred.
+                        ProfileClubsSection(onOpenClub: onOpenClub, onFindClub: onFindClub)
+                            .padding(.top, 24)
+                            .padding(.bottom, 32)
                     }
                 }
                 .padding(.horizontal, 16)
             }
             .background(AppColor.surfacePrimary)
+            .proPanelBar(.fullStats)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .task {
