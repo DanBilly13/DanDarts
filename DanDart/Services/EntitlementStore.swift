@@ -57,7 +57,9 @@ final class EntitlementStore: ObservableObject {
     var inputs: AccessInputs {
         AccessInputs(
             hasPurchasedUnlock: hasPurchasedUnlock || Self.debugForcePro,
-            isLegacyPaidCustomer: isLegacyPaidCustomer,
+            // The trial test switch also ignores "first downloaded when the app was paid",
+            // which every developer's phone is.
+            isLegacyPaidCustomer: isLegacyPaidCustomer && !Self.debugTrialSwitchOn,
             hasServerEntitlement: hasServerEntitlement,
             accountCreatedAt: accountCreatedAt,
             now: Self.debugTrialNow(accountCreatedAt: accountCreatedAt) ?? Self.now
@@ -95,6 +97,14 @@ final class EntitlementStore: ObservableObject {
     private static var debugForcePro: Bool {
         #if DEBUG
         return UserDefaults.standard.bool(forKey: "debugForcePro")
+        #else
+        return false
+        #endif
+    }
+
+    private static var debugTrialSwitchOn: Bool {
+        #if DEBUG
+        return UserDefaults.standard.integer(forKey: "debugTrialDaysLeft") > 0
         #else
         return false
         #endif
