@@ -15,6 +15,8 @@ enum ClubJoinSource: String {
     case code
     case link
     case signup
+    /// Accepted an invite from a friend.
+    case invite
 }
 
 enum ClubAnalyticsEvent: Equatable {

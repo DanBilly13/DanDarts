@@ -325,7 +325,7 @@ class FriendsService: ObservableObject {
             let toast = FriendRequestToast(
                 type: .requestReceived,
                 user: requester,
-                message: "New friend request from \(requester.displayName)",
+                message: await Self.requestMessage(from: requester),
                 friendshipId: friendshipId
             )
             
@@ -486,7 +486,7 @@ class FriendsService: ObservableObject {
             let toast = FriendRequestToast(
                 type: .requestReceived,
                 user: requester,
-                message: "New friend request from \(requester.displayName)",
+                message: await Self.requestMessage(from: requester),
                 friendshipId: mostRecent.id
             )
             
@@ -532,7 +532,17 @@ class FriendsService: ObservableObject {
     /// - Parameters:
     ///   - userId: Current user's ID (requester)
     ///   - friendId: Friend's user ID (addressee)
-    func sendFriendRequest(userId: UUID, friendId: UUID) async throws {
+    /// "Sam wants to be friends · The Crown" when you share a club, so a request from a clubmate
+    /// never looks random; otherwise the plain "New friend request from Sam".
+    static func requestMessage(from requester: User) async -> String {
+        if let club = await ClubsService().sharedClubName(with: requester.id) {
+            return "\(requester.displayName) wants to be friends · \(club)"
+        }
+        return "New friend request from \(requester.displayName)"
+    }
+
+    /// `clubName`: sent from a club's member list, so the push can say which club.
+    func sendFriendRequest(userId: UUID, friendId: UUID, clubName: String? = nil) async throws {
         print("📤 [SendRequest] Sending friend request:")
         print("   From (requester): \(userId.uuidString)")
         print("   To (addressee): \(friendId.uuidString)")
@@ -617,7 +627,8 @@ class FriendsService: ObservableObject {
                     user_id: friendId.uuidString,
                     notification_type: "friend_request_received",
                     title: "Friend request from \(currentUser.displayName)",
-                    body: "\(currentUser.displayName) wants to be friends",
+                    body: clubName.map { "\(currentUser.displayName) from \($0) wants to be friends" }
+                        ?? "\(currentUser.displayName) wants to be friends",
                     route: "friends",
                     highlight: "friend_request"
                 )

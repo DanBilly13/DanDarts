@@ -2,13 +2,15 @@
 //  ClubDetailView.swift
 //  Dart Freak
 //
-//  A club's page. Members see who is in it (with Add / Request sent / Friend on each row), can
-//  share the club link, report the club or a person, and leave. The admin also gets the code
-//  with Copy and Make a new code, the Open / Invite-only switch, and can remove members.
+//  A club's page, the same calm layout for everyone: the club, three stats, one Invite players
+//  button, then the members (with Add friend / Request sent / Friend on each row), then Leave.
+//  Invite players opens a sheet: the share button for everyone, plus for the admin the
+//  Open / Invite-only switch and, for an Invite-only club, the code with a "new code" button.
 //
 
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct ClubDetailView: View {
     @EnvironmentObject private var router: Router
@@ -27,6 +29,21 @@ struct ClubDetailView: View {
     @State private var justCopied = false
     @State private var pending: Pending?
     @State private var notice: Notice?
+    @State private var showInvite = false
+    /// Confirmations and messages raised from inside the Invite sheet (the page's own can't show over it).
+    @State private var sheetPending: Pending?
+    @State private var sheetNotice: Notice?
+    @State private var welcome: ClubWelcome
+    /// A short line at the bottom, e.g. "Friend request sent to Sam".
+    @State private var toast: String?
+    @State private var showPhotoPicker = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var isSavingPhoto = false
+    /// The Invite sheet's "Your friends" list.
+    @State private var friends: [User] = []
+    @State private var friendsLoaded = false
+    @State private var invitedIds: Set<UUID> = []
+    @State private var invitingId: UUID?
 
     /// Something that needs a "Are you sure?" before it happens.
     private enum Pending {
@@ -45,23 +62,17 @@ struct ClubDetailView: View {
         var leavesScreen = false
     }
 
-    init(club: Club) {
+    init(club: Club, welcome: ClubWelcome = .none) {
         _club = State(initialValue: club)
+        _welcome = State(initialValue: welcome)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                if club.isAdmin {
-                    adminHeader
-                    inviteCard
-                    visibilityPicker
-                } else {
-                    memberHeader
-                    statsRow
-                    shareButton
-                }
-
+                header
+                statsRow
+                inviteButton
                 membersSection
                 footerActions
             }
@@ -69,14 +80,47 @@ struct ClubDetailView: View {
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
+        .overlay(alignment: .bottom) {
+            if let toast {
+                Text(toast)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(AppColor.justBlack)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(AppColor.justWhite, in: Capsule())
+                    .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .refreshable { await refresh() }
         .background(AppColor.backgroundPrimary)
         .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
-        .sheet(isPresented: $showShareSheet) {
-            if let url = club.shareURL {
-                ShareSheet(activityItems: ["Join \(club.name) on Dart Freak:", url])
+        .task {
+            // A new club opens straight onto the Invite sheet: bringing mates in is the next step.
+            if welcome == .created {
+                try? await Task.sleep(for: .milliseconds(400))
+                showInvite = true
             }
+            // Joined: a short "You're in …" at the bottom instead of leaving people to guess.
+            if welcome == .joined {
+                try? await Task.sleep(for: .milliseconds(400))
+                showToast("You're in \(club.name)")
+            }
+            welcome = .none
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            photoItem = nil
+            savePhoto(item)
+        }
+        .sheet(isPresented: $showInvite) {
+            inviteSheet
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(AppColor.surfacePrimary)
         }
         .confirmationDialog(
             pending.map { dialog(for: $0).title } ?? "",
@@ -84,8 +128,16 @@ struct ClubDetailView: View {
             titleVisibility: .visible,
             presenting: pending
         ) { item in
-            Button(dialog(for: item).button, role: dialog(for: item).isDestructive ? .destructive : nil) {
-                perform(item)
+            if case .reportClub = item, club.imageURL != nil {
+                // A club with a photo: say whether it's the photo or the club itself.
+                Button("Report the photo", role: .destructive) {
+                    report(.club, id: club.id, title: "Photo reported", reason: "photo")
+                }
+                Button("Report the club", role: .destructive) { perform(item) }
+            } else {
+                Button(dialog(for: item).button, role: dialog(for: item).isDestructive ? .destructive : nil) {
+                    perform(item)
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: { item in
@@ -102,11 +154,47 @@ struct ClubDetailView: View {
         }
     }
 
-    // MARK: - Headers
+    // MARK: - Header
 
-    private var memberHeader: some View {
+    private var header: some View {
         VStack(spacing: 12) {
-            ClubTile(id: club.id, name: club.name, size: 96)
+            if club.isAdmin {
+                // The admin taps the tile to pick a photo (or remove it).
+                Menu {
+                    Button {
+                        showPhotoPicker = true
+                    } label: {
+                        Label(club.imageURL == nil ? "Add a photo" : "Change photo", systemImage: "photo")
+                    }
+                    if club.imageURL != nil {
+                        Button(role: .destructive) {
+                            removePhoto()
+                        } label: {
+                            Label("Remove photo", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    ClubTile(id: club.id, name: club.name, size: 96, imageURL: club.imageURL)
+                        .overlay {
+                            if isSavingPhoto {
+                                Circle().fill(.black.opacity(0.45))
+                                ProgressView().tint(AppColor.justWhite)
+                            }
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppColor.justBlack)
+                                .frame(width: 30, height: 30)
+                                .background(AppColor.justWhite, in: Circle())
+                                .overlay(Circle().stroke(AppColor.backgroundPrimary, lineWidth: 3))
+                        }
+                }
+                .disabled(isSavingPhoto)
+                .accessibilityLabel("Club photo")
+            } else {
+                ClubTile(id: club.id, name: club.name, size: 96, imageURL: club.imageURL)
+            }
 
             VStack(spacing: 4) {
                 Text(club.name)
@@ -114,143 +202,256 @@ struct ClubDetailView: View {
                     .foregroundColor(AppColor.textPrimary)
                     .multilineTextAlignment(.center)
 
-                Text(visibilityLine)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColor.interactivePrimaryBackground)
+                HStack(spacing: 6) {
+                    if club.visibility == .invite { ClubInviteOnlyMark(size: 13) }
+                    Text(visibilityLine)
+                }
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(AppColor.textSecondary)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
-        .accessibilityElement(children: .combine)
     }
 
-    private var adminHeader: some View {
-        HStack(spacing: 16) {
-            ClubTile(id: club.id, name: club.name, size: 72)
+    /// "Leeds · Open club · Started Nov ’26". The admin started the club; everyone else joined it.
+    /// (Being admin shows on your own member card, so it isn't repeated here.)
+    private var visibilityLine: String {
+        var parts: [String] = []
+        if let town = club.town, !town.isEmpty { parts.append(town) }
+        parts.append(club.visibility == .open ? "Open club" : "Invite-only club")
+        parts.append("\(club.isAdmin ? "Started" : "Joined") \(ClubText.joinedText(club.joinedAt))")
+        return parts.joined(separator: " · ")
+    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(club.name)
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+    /// The club as a big player: members, your friends in it, and its rank (the average of its
+    /// ranked members), in the same cards as a player's profile.
+    private var statsRow: some View {
+        let rank = ClubText.clubRank(of: members)
+        return HStack(spacing: 8) {
+            StatCard(title: "Members", value: "\(club.memberCount)", icon: "person.3.fill")
+            StatCard(
+                title: "Your friends",
+                value: membersLoaded ? "\(ClubText.friendCount(in: members))" : "–",
+                icon: "person.2.fill"
+            )
+            StatCard(
+                title: "Rank",
+                value: membersLoaded ? rank.displayName : "–",
+                icon: rank.iconName
+            )
+        }
+    }
+
+    // MARK: - Invite players
+
+    private var inviteButton: some View {
+        AppButton(role: .primary, controlSize: .large) {
+            showInvite = true
+        } label: {
+            Label("Invite players", systemImage: "person.badge.plus")
+        }
+        .padding(.horizontal, 16)
+    }
+
+    /// Everything about getting people in, kept off the page. Open club: one line and Share.
+    /// Invite-only: the code too (admin only), tap to copy, ↻ for a new one. The admin also gets
+    /// the Open / Invite-only switch at the top, and the sheet changes as they flip it.
+    private var inviteSheet: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("Invite players")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(AppColor.textPrimary)
 
-                HStack(spacing: 6) {
-                    Image(systemName: club.visibility == .open ? "globe" : "lock.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(ClubText.subtitle(
-                        town: club.town,
-                        memberCount: club.memberCount,
-                        extra: club.visibility == .open ? "Open" : "Invite-only"
-                    ))
-                    .font(.system(size: 15, weight: .medium))
+                if club.isAdmin {
+                    visibilityPicker
                 }
-                .foregroundColor(AppColor.textSecondary)
-            }
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
-    }
 
-    /// "Leeds · Open club", or "Invite-only club" when there is no town.
-    private var visibilityLine: String {
-        let kind = club.visibility == .open ? "Open club" : "Invite-only club"
-        guard let town = club.town, !town.isEmpty else { return kind }
-        return "\(town) · \(kind)"
-    }
+                friendsSection
 
-    private var statsRow: some View {
-        HStack(spacing: 8) {
-            stat(value: "\(club.memberCount)", label: "Players")
-            stat(value: membersLoaded ? "\(ClubText.friendCount(in: members))" : "–", label: "Your friends")
-            stat(value: ClubText.joinedText(club.joinedAt), label: "Joined")
-        }
-        .padding(.vertical, 8)
-    }
-
-    private func stat(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(AppColor.textPrimary)
-            Text(label)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(AppColor.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: - Sharing
-
-    @ViewBuilder
-    private var shareButton: some View {
-        if club.shareURL != nil {
-            AppButton(role: .primary, controlSize: .large) {
-                shareLink()
-            } label: {
-                Label("Share club link", systemImage: "square.and.arrow.up")
-            }
-            .padding(.horizontal, 16)
-        }
-    }
-
-    /// Admin only: the link, the code, Make a new code and Share.
-    private var inviteCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Invite link")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(AppColor.textPrimary)
-
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    Text(ClubLink.shortLink(forCode: club.joinCode))
-                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Or send a link")
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(AppColor.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
 
-                    Spacer(minLength: 0)
-
-                    AppButton(role: .secondaryOutline, controlSize: .small, action: copyLink) {
-                        Text(justCopied ? "Copied" : "Copy")
-                    }
-                    .fixedSize()
-                }
-
-                Divider().overlay(AppColor.borderMuted)
-
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Code")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppColor.textSecondary)
-                        Text(ClubLink.displayCode(club.joinCode))
-                            .font(.system(size: 28, weight: .bold, design: .monospaced))
-                            .tracking(3)
-                            .foregroundColor(AppColor.textPrimary)
-                            .minimumScaleFactor(0.7)
-                            .lineLimit(1)
+                    if club.isAdmin && club.visibility == .invite {
+                        codeRow
                     }
 
-                    Spacer(minLength: 0)
-
-                    AppButton(role: .secondaryOutline, controlSize: .small, isDisabled: isBusy) {
-                        pending = .newCode
+                    AppButton(role: .primary, controlSize: .large) {
+                        shareLink()
                     } label: {
-                        Text("Make a new code")
+                        Label("Share invite", systemImage: "square.and.arrow.up")
                     }
-                    .fixedSize()
-                }
-
-                AppButton(role: .primary, controlSize: .regular) {
-                    shareLink()
-                } label: {
-                    Label("Share link", systemImage: "square.and.arrow.up")
+                    .disabled(club.shareURL == nil)
                 }
             }
-            .padding(16)
-            .background(AppColor.inputBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 24)
         }
+        .task { await loadFriendsForInvite() }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = club.shareURL {
+                ShareSheet(activityItems: ["Join \(club.name) on Dart Freak:", url])
+            }
+        }
+        .confirmationDialog(
+            sheetPending.map { dialog(for: $0).title } ?? "",
+            isPresented: Binding(get: { sheetPending != nil }, set: { if !$0 { sheetPending = nil } }),
+            titleVisibility: .visible,
+            presenting: sheetPending
+        ) { item in
+            Button(dialog(for: item).button, role: dialog(for: item).isDestructive ? .destructive : nil) {
+                perform(item)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { item in
+            Text(dialog(for: item).message)
+        }
+        .alert(item: $sheetNotice) { notice in
+            Alert(title: Text(notice.title), message: Text(notice.message), dismissButton: .default(Text("OK")))
+        }
+    }
+
+    /// Your DartFreak friends, each with Invite (or "In club" / "Invited"). They get a notification and
+    /// a Join / No thanks card on their Clubs tab. Nobody is added without saying yes.
+    @ViewBuilder
+    private var friendsSection: some View {
+        let memberIds = Set(members.map(\.id))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your friends")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(AppColor.textPrimary)
+
+            if !friendsLoaded {
+                ProgressView()
+                    .tint(AppColor.interactivePrimaryBackground)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            } else if friends.isEmpty {
+                Text("When you have friends on DartFreak, you can invite them here with one tap.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 8) {
+                    // People you can still invite first, then the ones already invited or in.
+                    ForEach(friends.sorted { rank($0, memberIds) < rank($1, memberIds) }) { friend in
+                        friendRow(friend, inClub: memberIds.contains(friend.id))
+                    }
+                }
+            }
+        }
+    }
+
+    private func rank(_ friend: User, _ memberIds: Set<UUID>) -> Int {
+        if memberIds.contains(friend.id) { return 2 }
+        if invitedIds.contains(friend.id) { return 1 }
+        return 0
+    }
+
+    private func friendRow(_ friend: User, inClub: Bool) -> some View {
+        HStack(spacing: 12) {
+            AsyncAvatarImage(avatarURL: friend.avatarURL, size: 40)
+            Text(friend.displayName)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundColor(AppColor.textPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            if inClub {
+                statusLabel("In club")
+            } else if invitedIds.contains(friend.id) {
+                statusLabel("Invited")
+            } else {
+                AppButton(role: .primary, controlSize: .small, isDisabled: invitingId != nil) {
+                    inviteFriend(friend)
+                } label: {
+                    if invitingId == friend.id {
+                        ProgressView().tint(AppColor.justWhite)
+                    } else {
+                        Text("Invite")
+                    }
+                }
+                .fixedSize()
+                .accessibilityLabel("Invite \(friend.displayName) to \(club.name)")
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 14)
+        .frame(height: 60)
+        .background(AppColor.inputBackground, in: Capsule())
+    }
+
+    private func loadFriendsForInvite() async {
+        guard let userId = authService.currentUser?.id else { return }
+        async let pending = try? clubsService.pendingInvitees(clubId: club.id)
+        friends = (try? await friendsService.loadFriends(userId: userId)) ?? []
+        invitedIds = await pending ?? []
+        friendsLoaded = true
+    }
+
+    private func inviteFriend(_ friend: User) {
+        guard invitingId == nil else { return }
+        invitingId = friend.id
+        Task {
+            defer { invitingId = nil }
+            do {
+                let invited = try await clubsService.invite(clubId: club.id, clubName: club.name, userIds: [friend.id])
+                if invited.contains(friend.id) {
+                    invitedIds.insert(friend.id)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                } else {
+                    // Already in, already invited by someone else, or no longer friends: refresh.
+                    await loadFriendsForInvite()
+                    if !invitedIds.contains(friend.id) {
+                        sheetNotice = Notice(title: "Couldn't invite \(friend.displayName)", message: "Please try again.")
+                    }
+                }
+            } catch {
+                print("❌ [Clubs] Invite failed: \(error)")
+                sheetNotice = Notice(title: "Couldn't invite \(friend.displayName)", message: "Check your connection and try again.")
+            }
+        }
+    }
+
+    /// The code, big, for "what's the code?" at the board. Tap to copy; ↻ makes a new one (after a warning).
+    private var codeRow: some View {
+        HStack(spacing: 12) {
+            Button(action: copyCode) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(justCopied ? "Copied" : "Code · tap to copy")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(justCopied ? AppColor.interactiveSecondaryBackground : AppColor.textSecondary)
+                    Text(ClubLink.displayCode(club.joinCode))
+                        .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        .tracking(3)
+                        .foregroundColor(AppColor.textPrimary)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Club code \(ClubLink.displayCode(club.joinCode)). Tap to copy.")
+
+            Button {
+                sheetPending = .newCode
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(AppColor.textPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(AppColor.backgroundPrimary, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isBusy)
+            .accessibilityLabel("Make a new code")
+        }
+        .padding(16)
+        .background(AppColor.inputBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     /// Opens the share sheet. Counts as sharing when it is opened, since the sheet does not say what the person picked.
@@ -259,10 +460,8 @@ struct ClubDetailView: View {
         showShareSheet = true
     }
 
-    private func copyLink() {
-        guard let url = club.shareURL else { return }
-        AnalyticsService.shared.logClub(.shared)
-        UIPasteboard.general.string = url.absoluteString
+    private func copyCode() {
+        UIPasteboard.general.string = ClubLink.displayCode(club.joinCode)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         justCopied = true
         Task {
@@ -276,42 +475,43 @@ struct ClubDetailView: View {
     private var visibilityPicker: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Who can join?")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(AppColor.textPrimary)
 
-            HStack(spacing: 4) {
-                visibilityOption(.open, title: "Open", icon: "globe")
-                visibilityOption(.invite, title: "Invite-only", icon: "lock.fill")
-            }
-            .padding(4)
-            .frame(height: 44)
-            .background(AppColor.inputBackground)
-            .clipShape(Capsule())
-
-            Text(club.visibility == .open
-                 ? "Anyone can find this club in search and join with one tap."
-                 : "Invite-only clubs don't show up in search.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppColor.textSecondary)
-                .padding(.horizontal, 4)
+            // The same radio cards as Create a club: a choice, not a button.
+            visibilityOption(.open, title: "Open", detail: "Anyone can find it and join")
+            visibilityOption(.invite, title: "Invite-only", detail: "Hidden. People join with a link or code")
         }
     }
 
-    private func visibilityOption(_ option: ClubVisibility, title: String, icon: String) -> some View {
+    private func visibilityOption(_ option: ClubVisibility, title: String, detail: String) -> some View {
         let selected = club.visibility == option
         return Button {
             setVisibility(option)
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+            HStack(spacing: 14) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(selected ? AppColor.interactivePrimaryBackground : AppColor.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                    Text(detail)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppColor.textSecondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
             }
-            .foregroundColor(selected ? AppColor.justWhite : AppColor.textSecondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Capsule().fill(selected ? AppColor.interactivePrimaryBackground : Color.clear))
-            .contentShape(Capsule())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColor.inputBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(selected ? AppColor.interactivePrimaryBackground : Color.clear, lineWidth: 2)
+            )
         }
         .buttonStyle(.plain)
         .disabled(isBusy)
@@ -327,10 +527,14 @@ struct ClubDetailView: View {
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundColor(AppColor.textPrimary)
                 Spacer()
-                Text("\(club.memberCount)")
-                    .font(.system(size: 15, weight: .medium))
+            }
+
+            // Only worth saying when someone here isn't your friend yet.
+            if ClubText.hasNonFriends(in: members) {
+                Text("Club members aren't friends automatically.")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(AppColor.textSecondary)
-                    .padding(.trailing, 8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if !membersLoaded && !membersFailed {
@@ -368,10 +572,20 @@ struct ClubDetailView: View {
             AsyncAvatarImage(avatarURL: member.avatarURL, size: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(isSelf ? "You" : member.displayName)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundColor(AppColor.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(isSelf ? "You" : member.displayName)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppColor.textPrimary)
+                        .lineLimit(1)
+                    if member.rank != .unranked {
+                        Image(member.rank.iconName)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+                            .foregroundColor(AppColor.brandPrimary)
+                            .accessibilityLabel("Rank \(member.rank.displayName)")
+                    }
+                }
 
                 if let detail = memberDetail(member, isSelf: isSelf) {
                     Text(detail)
@@ -409,16 +623,17 @@ struct ClubDetailView: View {
     private func relationshipControl(_ member: ClubMember) -> some View {
         switch member.relationship {
         case .none:
-            AppButton(role: .primary, controlSize: .small, isDisabled: addingId != nil) {
+            // Outlined, not solid red: a column of red buttons read like part of joining.
+            AppButton(role: .primaryOutline, controlSize: .small, isDisabled: addingId != nil) {
                 addFriend(member)
             } label: {
                 if addingId == member.id {
                     ProgressView().tint(AppColor.justWhite)
                 } else {
-                    Text("Add")
+                    Text("Add friend")
                 }
             }
-            .frame(width: 72)
+            .fixedSize()
             .accessibilityLabel("Add \(member.displayName) as a friend")
         case .requestSent:
             statusLabel("Request sent")
@@ -595,6 +810,14 @@ struct ClubDetailView: View {
 
     // MARK: - Actions
 
+    private func showToast(_ text: String) {
+        withAnimation { toast = text }
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation { if toast == text { toast = nil } }
+        }
+    }
+
     private func connectionNotice(_ title: String) {
         notice = Notice(title: title, message: "Check your connection and try again.")
     }
@@ -609,10 +832,11 @@ struct ClubDetailView: View {
         Task {
             defer { addingId = nil }
             do {
-                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: member.id)
+                try await friendsService.sendFriendRequest(userId: currentUserId, friendId: member.id, clubName: club.name)
                 setRelationship(.requestSent, for: member.id)
                 NotificationCenter.default.post(name: NSNotification.Name("FriendRequestsChanged"), object: nil)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showToast("Friend request sent to \(member.displayName)")
             } catch FriendsError.alreadyFriends {
                 setRelationship(.friend, for: member.id)
             } catch FriendsError.requestPending {
@@ -637,16 +861,16 @@ struct ClubDetailView: View {
                 case .ok:
                     club = club.updating(visibility: visibility)
                 case .duplicate:
-                    notice = Notice(
+                    sheetNotice = Notice(
                         title: "Can't switch to Open",
                         message: "There's already an Open club with this name and town, so this one stays Invite-only."
                     )
                 default:
-                    notice = Notice(title: "Couldn't change it", message: result.userMessage ?? "Please try again.")
+                    sheetNotice = Notice(title: "Couldn't change it", message: result.userMessage ?? "Please try again.")
                 }
             } catch {
                 print("❌ [Clubs] Set visibility failed: \(error)")
-                connectionNotice("Couldn't change it")
+                sheetNotice = Notice(title: "Couldn't change it", message: "Check your connection and try again.")
             }
         }
     }
@@ -660,13 +884,59 @@ struct ClubDetailView: View {
                 let outcome = try await clubsService.regenerateCode(clubId: club.id)
                 if outcome.result.isOk, let newCode = outcome.joinCode {
                     club = club.updating(joinCode: newCode)
-                    notice = Notice(title: "New code ready", message: "The old link and code don't work any more.")
+                    sheetNotice = Notice(title: "New code ready", message: "The old link and code don't work any more.")
                 } else {
-                    notice = Notice(title: "Couldn't make a new code", message: outcome.result.userMessage ?? "Please try again.")
+                    sheetNotice = Notice(title: "Couldn't make a new code", message: outcome.result.userMessage ?? "Please try again.")
                 }
             } catch {
                 print("❌ [Clubs] Regenerate code failed: \(error)")
-                connectionNotice("Couldn't make a new code")
+                sheetNotice = Notice(title: "Couldn't make a new code", message: "Check your connection and try again.")
+            }
+        }
+    }
+
+    /// Square-crops and shrinks the picked photo (512px JPEG), uploads it and sets it as the club photo.
+    private func savePhoto(_ item: PhotosPickerItem) {
+        guard !isSavingPhoto else { return }
+        isSavingPhoto = true
+        Task {
+            defer { isSavingPhoto = false }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data),
+                      let jpeg = image.squareCropped().resized(toMaxDimension: 512).jpegData(compressionQuality: 0.8)
+                else {
+                    notice = Notice(title: "Couldn't use that photo", message: "Please try a different one.")
+                    return
+                }
+                let saved = try await clubsService.setPhoto(clubId: club.id, jpeg: jpeg)
+                if saved.result.isOk, let url = saved.url {
+                    club = club.updating(imageURL: .some(url))
+                } else {
+                    notice = Notice(title: "Couldn't save the photo", message: saved.result.userMessage ?? "Please try again.")
+                }
+            } catch {
+                print("❌ [Clubs] Save photo failed: \(error)")
+                connectionNotice("Couldn't save the photo")
+            }
+        }
+    }
+
+    private func removePhoto() {
+        guard !isSavingPhoto else { return }
+        isSavingPhoto = true
+        Task {
+            defer { isSavingPhoto = false }
+            do {
+                let result = try await clubsService.removePhoto(clubId: club.id)
+                if result.isOk {
+                    club = club.updating(imageURL: .some(nil))
+                } else {
+                    notice = Notice(title: "Couldn't remove the photo", message: result.userMessage ?? "Please try again.")
+                }
+            } catch {
+                print("❌ [Clubs] Remove photo failed: \(error)")
+                connectionNotice("Couldn't remove the photo")
             }
         }
     }
@@ -728,13 +998,13 @@ struct ClubDetailView: View {
         }
     }
 
-    private func report(_ target: ClubsService.ReportTarget, id: UUID, title: String) {
+    private func report(_ target: ClubsService.ReportTarget, id: UUID, title: String, reason: String? = nil) {
         guard !isReporting else { return }
         isReporting = true
         Task {
             defer { isReporting = false }
             do {
-                let result = try await clubsService.report(target, id: id)
+                let result = try await clubsService.report(target, id: id, reason: reason)
                 if result.isOk {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     notice = Notice(title: title, message: "Thanks for telling us. We'll take a look.")

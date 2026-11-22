@@ -121,10 +121,12 @@ struct MainTabView: View {
                         guard entitlements.requireAccess(to: .clubs) else { return }
                         router.push(.createClub(name: ""))
                     } label: {
-                        Text("Create")
-                            .font(.system(size: 17, weight: .regular))
+                        // An icon, not the word: a word gets squeezed in the shared glass pill.
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(AppColor.justWhite)
                     }
+                    .accessibilityLabel("Create a club")
 
                     Button {
                         router.push(.findClub)
@@ -315,9 +317,11 @@ struct MainTabView: View {
                 .paywallSheet()
         }
         .sheet(item: $clubCodeToJoin) { item in
-            JoinClubSheet(code: item.code) {
+            JoinClubSheet(code: item.code) { clubId in
                 selectedTab = .clubs
-                router.popToRoot()
+                Task {
+                    await ClubNavigation.open(clubId: clubId, welcome: .joined, clubsService: clubsService, router: router)
+                }
             }
             // A sheet does not inherit the environment objects above it, so pass them on.
             .environmentObject(clubsService)
@@ -346,7 +350,20 @@ struct MainTabView: View {
             presentPendingClubCode()
         }
         .fullScreenCover(isPresented: $showProfile, onDismiss: showTrialEndedNoticeIfNeeded) {
-            ProfileView()
+            ProfileView(
+                onOpenClub: { club in
+                    showProfile = false
+                    selectedTab = .clubs
+                    router.popToRoot()
+                    router.push(.clubDetail(club))
+                },
+                onFindClub: {
+                    showProfile = false
+                    selectedTab = .clubs
+                    router.popToRoot()
+                    router.push(.findClub)
+                }
+            )
                 .environmentObject(authService)
                 .environmentObject(friendsService)
                 .paywallSheet()
@@ -459,6 +476,9 @@ struct MainTabView: View {
                 selectedTab = .remote
             case .friendsTab:
                 selectedTab = .friends
+            case .clubsTab:
+                selectedTab = .clubs
+                router.popToRoot()
             }
             
             // Clear intent after consumption

@@ -162,7 +162,8 @@ struct CreateClubView: View {
                 let outcome = try await clubsService.createClub(name: name, town: town, visibility: visibility)
                 switch outcome.result {
                 case .ok:
-                    router.popToRoot() // back to the Clubs tab, even when we came through Find
+                    // Into the new club with the Invite sheet open: the next thing is bringing mates in.
+                    await ClubNavigation.open(clubId: outcome.clubId, welcome: .created, clubsService: clubsService, router: router)
                 case .duplicate:
                     if let existing = outcome.clubId {
                         duplicateClubId = existing
@@ -189,7 +190,7 @@ struct CreateClubView: View {
                 let outcome = try await clubsService.joinClub(clubId: id)
                 switch outcome.result {
                 case .ok, .alreadyMember:
-                    router.popToRoot()
+                    await ClubNavigation.open(clubId: id, welcome: .joined, clubsService: clubsService, router: router)
                 default:
                     errorMessage = outcome.result.userMessage ?? "Please try again."
                 }

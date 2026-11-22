@@ -15,10 +15,16 @@ struct ClubsTabView: View {
     @State private var clubs: [Club] = []
     @State private var hasLoaded = false
     @State private var loadFailed = false
+    @State private var invites: [ClubInvite] = []
+    @State private var respondingId: UUID?
+    @State private var inviteError: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if !invites.isEmpty {
+                    invitesSection
+                }
                 content
             }
             .padding(.horizontal, 16)
@@ -28,6 +34,13 @@ struct ClubsTabView: View {
         .refreshable { await loadClubs() }
         .background(AppColor.backgroundPrimary)
         .task { await loadClubs() }
+        // Back on the tab (e.g. from a push): pick up new invites.
+        .onAppear { if hasLoaded { Task { await loadClubs() } } }
+        .alert("Couldn't join", isPresented: Binding(get: { inviteError != nil }, set: { if !$0 { inviteError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(inviteError ?? "")
+        }
         .onReceive(clubsService.$myClubsVersion.dropFirst()) { _ in
             Task { await loadClubs() }
         }
@@ -47,6 +60,58 @@ struct ClubsTabView: View {
         } else {
             clubList
             actions
+        }
+    }
+
+    // MARK: - Invites from friends
+
+    private var invitesSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(invites.count == 1 ? "Invite" : "Invites")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(AppColor.textPrimary)
+
+            VStack(spacing: 12) {
+                ForEach(invites) { invite in
+                    ClubInviteCard(
+                        invite: invite,
+                        isBusy: respondingId == invite.id,
+                        onJoin: { respond(to: invite, accept: true) },
+                        onDecline: { respond(to: invite, accept: false) }
+                    )
+                }
+            }
+        }
+        .padding(.bottom, 24)
+    }
+
+    private func respond(to invite: ClubInvite, accept: Bool) {
+        guard respondingId == nil else { return }
+        // Joining is part of Clubs, so it needs Pro after the trial. Saying no never does.
+        if accept { guard entitlements.requireAccess(to: .clubs) else { return } }
+        respondingId = invite.id
+        Task {
+            defer { respondingId = nil }
+            do {
+                let outcome = try await clubsService.respond(to: invite, accept: accept)
+                switch outcome.result {
+                case .ok, .alreadyMember:
+                    withAnimation { invites.removeAll { $0.id == invite.id } }
+                    if accept {
+                        await ClubNavigation.open(clubId: outcome.clubId ?? invite.clubId, welcome: .joined,
+                                                  clubsService: clubsService, router: router)
+                    }
+                case .notFound:
+                    // Expired, or the person who invited you left the club.
+                    withAnimation { invites.removeAll { $0.id == invite.id } }
+                    inviteError = "That invite has expired."
+                default:
+                    inviteError = outcome.result.userMessage ?? "Please try again."
+                }
+            } catch {
+                print("❌ [Clubs] Respond to invite failed: \(error)")
+                inviteError = "Check your connection and try again."
+            }
         }
     }
 
@@ -142,6 +207,8 @@ struct ClubsTabView: View {
     // MARK: - Loading
 
     private func loadClubs() async {
+        // Invites load alongside; if they can't load, the tab simply shows none.
+        async let loadedInvites = try? clubsService.myInvites()
         do {
             clubs = try await clubsService.myClubs()
             loadFailed = false
@@ -152,6 +219,7 @@ struct ClubsTabView: View {
             loadFailed = true
             print("❌ [Clubs] Failed to load my clubs: \(error)")
         }
+        if let fresh = await loadedInvites { invites = fresh }
         hasLoaded = true
     }
 }

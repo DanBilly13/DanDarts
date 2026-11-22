@@ -79,25 +79,26 @@ extension View {
     }
 }
 
-/// The one Get Pro panel on a locked stats screen: a short headline, one line and the button,
-/// sitting straight on the page. Use it as a pinned section header so it sticks under the
-/// navigation bar and the blurred stats scroll behind it. Draws nothing when unlocked.
+/// The one Get Pro panel on a locked stats screen: a red card with a short headline, one line and
+/// the white Get Pro button. Use it as a pinned section header so it sticks under the navigation
+/// bar and the blurred stats scroll behind it. Draws nothing when unlocked.
 struct ProPanel: View {
     let feature: PaidFeature
-    /// The page colour, so the panel hides what scrolls behind it and fades into it at the bottom.
+    /// The page colour, so the band behind the card hides what scrolls under it.
     var background: Color = AppColor.surfacePrimary
     @ObservedObject private var store = EntitlementStore.shared
 
     var body: some View {
         if !store.canUse(feature) {
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 Text(feature.proHeadline)
-                    .font(.system(.title, design: .rounded))
+                    .font(.system(.title2, design: .rounded))
                     .fontWeight(.bold)
-                    .foregroundColor(AppColor.textPrimary)
+                    .foregroundColor(AppColor.justWhite)
                 Text(feature.proBody)
-                    .font(.system(.body))
-                    .foregroundColor(AppColor.textSecondary)
+                    .font(.system(.subheadline))
+                    .fontWeight(.medium)
+                    .foregroundColor(AppColor.justWhite.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
 
                 AppButton(role: .pro, controlSize: .regular) {
@@ -110,17 +111,23 @@ struct ProPanel: View {
             }
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 28)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+            .background(
+                AppColor.interactivePrimaryBackground,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .padding(.vertical, 12)
             .background {
-                // Solid behind the panel, then a short fade so the stats dissolve as they pass under.
+                // A solid band of page colour behind the card (edge to edge), then a short fade,
+                // so the blurred stats disappear neatly behind it instead of showing round the corners.
                 VStack(spacing: 0) {
                     background
                     LinearGradient(colors: [background, background.opacity(0)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 32)
+                        .frame(height: 16)
                 }
                 .padding(.horizontal, -16)
-                .padding(.bottom, -32)
+                .padding(.bottom, -16)
                 .allowsHitTesting(false)
             }
         }

@@ -145,8 +145,106 @@ final class ClubsService: ObservableObject {
         try await rows("club_members_list", params: ClubIdParams(clubId: clubId))
     }
 
+    /// The name of a club you're both in, so a friend request can say where it came from
+    /// ("Sam · The Crown"). At most five clubs, so this is a handful of small calls; nil if none.
+    func sharedClubName(with userId: UUID) async -> String? {
+        guard let clubs = try? await myClubs() else { return nil }
+        for club in clubs {
+            if let members = try? await members(clubId: club.id), members.contains(where: { $0.id == userId }) {
+                return club.name
+            }
+        }
+        return nil
+    }
+
     func setVisibility(clubId: UUID, visibility: ClubVisibility) async throws -> ClubActionResult {
         let result = try await code("set_club_visibility", params: SetVisibilityParams(clubId: clubId, visibility: visibility.rawValue))
+        if result.isOk { myClubsVersion += 1 }
+        return result
+    }
+
+    // MARK: - Invites between friends
+
+    /// Invites friends to a club and sends each one a push. Returns who was invited.
+    func invite(clubId: UUID, clubName: String, userIds: [UUID]) async throws -> Set<UUID> {
+        let found: [InviteRow] = try await rows("invite_to_club", params: InviteParams(clubId: clubId, userIds: userIds))
+        let invited = Set(found.filter { $0.result == "ok" }.compactMap(\.userId))
+        if !invited.isEmpty {
+            AnalyticsService.shared.logClub(.shared)
+            await sendInvitePushes(to: invited, clubName: clubName)
+        }
+        return invited
+    }
+
+    /// Who already has an open invite to this club (for the Invite sheet).
+    func pendingInvitees(clubId: UUID) async throws -> Set<UUID> {
+        let found: [InviteeRow] = try await rows("club_pending_invitees", params: ClubIdParams(clubId: clubId))
+        return Set(found.map(\.userId))
+    }
+
+    /// Invites waiting for the signed-in user.
+    func myInvites() async throws -> [ClubInvite] {
+        try await rows("my_club_invites")
+    }
+
+    /// Join (accept) or No thanks. On a join, `clubId` is the club to open.
+    func respond(to invite: ClubInvite, accept: Bool) async throws -> ClubOutcome {
+        let result = noteChange(in: try await outcome("respond_to_club_invite", params: RespondParams(inviteId: invite.id, accept: accept)))
+        if accept, result.result.isOk { AnalyticsService.shared.logClub(.joined(source: .invite, visibility: nil)) }
+        return result
+    }
+
+    /// "Dan invited you to The Crown". Best effort: the invite is already saved if a push fails.
+    private func sendInvitePushes(to userIds: Set<UUID>, clubName: String) async {
+        guard let me = AuthService.shared.currentUser,
+              let session = try? await supabaseService.client.auth.session else { return }
+        struct PushPayload: Encodable {
+            let user_id: String
+            let notification_type: String
+            let title: String
+            let body: String
+            let route: String
+            let highlight: String
+        }
+        struct EmptyResponse: Decodable {}
+        for userId in userIds {
+            let payload = PushPayload(
+                user_id: userId.uuidString,
+                notification_type: "club_invite",
+                title: "Club invite",
+                body: "\(me.displayName) invited you to \(clubName)",
+                route: "clubs",
+                highlight: "club_invite"
+            )
+            do {
+                let _: EmptyResponse = try await supabaseService.client.functions.invoke(
+                    "push-notifications",
+                    options: FunctionInvokeOptions(headers: ["Authorization": "Bearer \(session.accessToken)"], body: payload)
+                )
+            } catch {
+                print("⚠️ [Clubs] Invite push failed (non-critical): \(error)")
+            }
+        }
+    }
+
+    // MARK: - Club photo (admin)
+
+    /// Uploads a JPEG to club-images/<club id>/<random>.jpg, sets it as the club's photo and returns its URL.
+    /// Only the admin may write that folder (storage rules) or set the photo (set_club_image).
+    func setPhoto(clubId: UUID, jpeg: Data) async throws -> (result: ClubActionResult, url: String?) {
+        let path = "\(clubId.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
+        try await supabaseService.client.storage
+            .from("club-images")
+            .upload(path, data: jpeg, options: .init(contentType: "image/jpeg", upsert: false))
+        let url = try supabaseService.client.storage.from("club-images").getPublicURL(path: path).absoluteString
+        let result = try await code("set_club_image", params: SetImageParams(clubId: clubId, url: url))
+        if result.isOk { myClubsVersion += 1 }
+        return (result, result.isOk ? url : nil)
+    }
+
+    /// Back to the letter tile.
+    func removePhoto(clubId: UUID) async throws -> ClubActionResult {
+        let result = try await code("set_club_image", params: SetImageParams(clubId: clubId, url: nil))
         if result.isOk { myClubsVersion += 1 }
         return result
     }
@@ -297,6 +395,52 @@ final class ClubsService: ObservableObject {
         let query: String
 
         enum CodingKeys: String, CodingKey { case query = "p_query" }
+    }
+
+    private struct InviteRow: Decodable {
+        let userId: UUID?
+        let result: String
+        enum CodingKeys: String, CodingKey { case userId = "user_id", result }
+    }
+
+    private struct InviteeRow: Decodable {
+        let userId: UUID
+        enum CodingKeys: String, CodingKey { case userId = "user_id" }
+    }
+
+    private struct InviteParams: Encodable, Sendable {
+        let clubId: UUID
+        let userIds: [UUID]
+        enum CodingKeys: String, CodingKey {
+            case clubId = "p_club_id"
+            case userIds = "p_user_ids"
+        }
+    }
+
+    private struct RespondParams: Encodable, Sendable {
+        let inviteId: UUID
+        let accept: Bool
+        enum CodingKeys: String, CodingKey {
+            case inviteId = "p_invite_id"
+            case accept = "p_accept"
+        }
+    }
+
+    private struct SetImageParams: Encodable, Sendable {
+        let clubId: UUID
+        let url: String?
+
+        enum CodingKeys: String, CodingKey {
+            case clubId = "p_club_id"
+            case url = "p_url"
+        }
+
+        // Encode a nil URL as an explicit null, so the function gets its p_url argument.
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(clubId, forKey: .clubId)
+            try container.encode(url, forKey: .url)
+        }
     }
 
     private struct SetVisibilityParams: Encodable, Sendable {
