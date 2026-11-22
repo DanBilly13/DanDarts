@@ -60,7 +60,7 @@ final class EntitlementStore: ObservableObject {
             isLegacyPaidCustomer: isLegacyPaidCustomer,
             hasServerEntitlement: hasServerEntitlement,
             accountCreatedAt: accountCreatedAt,
-            now: Self.now
+            now: Self.debugTrialNow(accountCreatedAt: accountCreatedAt) ?? Self.now
         )
     }
 
@@ -97,6 +97,19 @@ final class EntitlementStore: ObservableObject {
         return UserDefaults.standard.bool(forKey: "debugForcePro")
         #else
         return false
+        #endif
+    }
+
+    /// Launch with `-debugTrialDaysLeft 3` (Scheme › Arguments) to see the trial as it ends:
+    /// the clock is moved so the account has that many days left.
+    private static func debugTrialNow(accountCreatedAt: Date?) -> Date? {
+        #if DEBUG
+        let daysLeft = UserDefaults.standard.integer(forKey: "debugTrialDaysLeft")
+        guard daysLeft > 0, let createdAt = accountCreatedAt else { return nil }
+        let trialEnd = createdAt.addingTimeInterval(TimeInterval(AccessPolicy.trialDays) * 86_400)
+        return trialEnd.addingTimeInterval(-TimeInterval(daysLeft) * 86_400 + 60)
+        #else
+        return nil
         #endif
     }
 
